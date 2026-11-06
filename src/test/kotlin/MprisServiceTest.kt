@@ -1,6 +1,7 @@
 package com.alananasss.kittytune
 
 import com.alananasss.kittytune.data.MprisService
+import com.alananasss.kittytune.core.LinuxDesktopIdentity
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
 import org.freedesktop.dbus.DBusPath
@@ -23,6 +24,8 @@ import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
 import org.junit.BeforeClass
 import org.junit.Test
+import java.nio.file.Files
+import org.freedesktop.dbus.interfaces.Introspectable
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -30,7 +33,7 @@ import java.util.concurrent.TimeUnit
  * Talks to [MprisService] over a real (private) session bus, with playerctl as the
  * strict third-party oracle. Run under dbus-run-session:
  *
- *   dbus-run-session -- ./gradlew test --tests "*MprisServiceTest*" --no-daemon
+ *   dbus-run-session -- ./gradlew :test --tests "*MprisServiceTest*" --no-daemon
  */
 class MprisServiceTest {
 
@@ -190,7 +193,7 @@ class MprisServiceTest {
             all.keys,
         )
         assertEquals("KittyTune", all.getValue("Identity").value)
-        assertEquals("kitty-tune", all.getValue("DesktopEntry").value)
+        assertEquals("kittytune", all.getValue("DesktopEntry").value)
         assertEquals(false, all.getValue("CanQuit").value)
         assertEquals(false, all.getValue("CanSetFullscreen").value)
         assertEquals(false, all.getValue("Fullscreen").value)
@@ -263,13 +266,16 @@ class MprisServiceTest {
     }
 
     @Test
-    fun `coverless tracks omit artUrl instead of faking a cover`() {
+    fun `coverless tracks publish the bundled icon to replace stale artwork`() {
         reset()
         val coverless = track(artwork = null).copy(user = user(avatar = null))
         service.updateMedia(coverless, playing = false, positionMs = 0L)
         @Suppress("UNCHECKED_CAST")
         val meta = (props.Get(PLAYER, "Metadata") as Map<String, Any?>)
-        assertFalse(meta.containsKey("mpris:artUrl"))
+        val artwork = java.io.File(java.net.URI(metaValue(meta, "mpris:artUrl") as String))
+        assertTrue(artwork.isFile)
+        assertTrue(javax.imageio.ImageIO.read(artwork) != null)
+        assertEquals("kittytune.png", artwork.name)
     }
 
     @Test
@@ -494,4 +500,226 @@ class MprisServiceTest {
         val meta = (props.Get(PLAYER, "Metadata") as Map<String, Any?>)
         assertEquals(120_000_000L, metaValue(meta, "mpris:length"))
     }
+    @Test
+    fun `introspection exposes typed properties to desktop clients`() {
+        val xml = client.getRemoteObject(BUS, PATH, Introspectable::class.java).Introspect()
+        val document = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+        }.newDocumentBuilder()
+            .parse(xml.byteInputStream())
+        val xpath = javax.xml.xpath.XPathFactory.newInstance().newXPath()
+        fun property(iface: String, name: String, attribute: String): String = xpath.evaluate(
+            "/node/interface[@name='$iface']/property[@name='$name']/@$attribute", document)
+        assertEquals("s", property(ROOT, "DesktopEntry", "type"))
+        assertEquals("as", property(ROOT, "SupportedUriSchemes", "type"))
+        assertEquals("a{sv}", property(PLAYER, "Metadata", "type"))
+        assertEquals("x", property(PLAYER, "Position", "type"))
+        assertEquals("read", property(PLAYER, "Position", "access"))
+        for (name in listOf("Volume", "Rate", "LoopStatus", "Shuffle")) {
+            assertEquals("readwrite", property(PLAYER, name, "access"))
+        }
+    }
+
+    @Test
+    fun `pause from app freezes position and resume keeps its baseline`() {
+        reset()
+        service.updateMedia(track(), playing = true, positionMs = 10_000L)
+        Thread.sleep(150)
+        service.updatePlaybackState(false)
+        val paused = props.Get<Long>(PLAYER, "Position")
+        Thread.sleep(150)
+        assertEquals(paused, props.Get<Long>(PLAYER, "Position"))
+        service.updatePlaybackState(true)
+        val resumed = props.Get<Long>(PLAYER, "Position")
+        assertTrue("resume must not include time spent paused", resumed - paused < 100_000L)
+    }
+
+    @Test
+    fun `stop immediately exposes zero without waiting for engine callback`() {
+        reset()
+        service.updateMedia(track(), playing = false, positionMs = 30_000L)
+        player.Stop()
+        assertEquals("stop", nextEvent())
+        assertEquals(0L, props.Get<Long>(PLAYER, "Position"))
+        assertEquals(0L, nextSeeked())
+    }
+
+    @Test
+    fun `setPosition rejects foreign and placeholder object paths`() {
+        reset()
+        service.updateMedia(track(), playing = false, positionMs = 10_000L)
+        for (path in listOf("/", "/foreign/1", "/org/mpris/MediaPlayer2/CurrentTrack")) {
+            player.SetPosition(DBusPath(path), 50_000_000L)
+        }
+        assertEquals(10_000_000L, props.Get<Long>(PLAYER, "Position"))
+        assertTrue(events.poll(300, TimeUnit.MILLISECONDS) == null)
+    }
+
+    @Test
+    fun `callbacks from consecutive commands run in order without overlap`() {
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val received = LinkedBlockingQueue<String>()
+        val bus = "${BUS}_serial"
+        val serial = MprisService(
+            onRaise = {}, onPlay = {}, onPause = {}, onPlayPause = {}, onStop = {},
+            onSeek = {}, onVolume = {}, onShuffle = {}, onLoopStatus = {},
+            onNext = {
+                entered.countDown()
+                release.await(5, TimeUnit.SECONDS)
+                received.offer("next")
+            },
+            onPrevious = { received.offer("previous") },
+            busName = bus,
+        )
+        try {
+            val calls = client.getRemoteObject(bus, PATH, PlayerCalls::class.java, false)
+            calls.Next()
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            calls.Previous()
+            assertTrue("previous ran while next was still executing", received.poll(200, TimeUnit.MILLISECONDS) == null)
+            release.countDown()
+            assertEquals("next", received.poll(2, TimeUnit.SECONDS))
+            assertEquals("previous", received.poll(2, TimeUnit.SECONDS))
+        } finally {
+            release.countDown()
+            serial.close()
+        }
+    }
+
+    @Test
+    fun `quickshell discovers metadata and operates every shell control`() = runQuickshellProbe()
+
+    @Test
+    fun `ii controller selects KittyTune as music and operates its controls`() {
+        val config = System.getenv("KITTYTUNE_II_CONFIG")
+        assumeTrue("Set KITTYTUNE_II_CONFIG to the ii Quickshell config directory", config != null)
+        runQuickshellProbe(java.io.File(config!!))
+    }
+
+    private fun runQuickshellProbe(iiConfig: java.io.File? = null) {
+        assumeTrue("Quickshell is not installed", runCatching {
+            ProcessBuilder("qs", "--version").start().waitFor() == 0
+        }.getOrDefault(false))
+        reset()
+        service.updateMedia(track(), playing = false, positionMs = 10_000L)
+        val directory = Files.createTempDirectory("kittytune-quickshell-").toFile()
+        var process: Process? = null
+        try {
+            val dataHome = java.io.File(directory, "data")
+            LinuxDesktopIdentity.install(java.io.File(dataHome, "applications"), emptyList(), "kitty-tune", "default")
+            val qml = java.io.File(directory, "shell.qml")
+            var source = checkNotNull(javaClass.getResource("/mpris/quickshell.qml")).readText()
+            if (iiConfig != null) {
+                // Run the actual controller unchanged, with isolated settings/translation singletons.
+                // This keeps the user's full shell and settings out of an integration test.
+                val services = java.io.File(directory, "services").apply { mkdirs() }
+                java.io.File(iiConfig, "services/MprisController.qml")
+                    .copyTo(java.io.File(services, "MprisController.qml"))
+                java.io.File(iiConfig, "services/CoverArt.qml").copyTo(java.io.File(services, "CoverArt.qml"))
+                java.io.File(services, "qmldir").writeText(
+                    "singleton MprisController 1.0 MprisController.qml\nsingleton CoverArt 1.0 CoverArt.qml\n")
+                val common = java.io.File(directory, "modules/common").apply { mkdirs() }
+                java.io.File(common, "qmldir").writeText(
+                    "singleton Config 1.0 Config.qml\nsingleton Translation 1.0 Translation.qml\nsingleton Directories 1.0 Directories.qml\n")
+                java.io.File(common, "Config.qml").writeText("""
+                    pragma Singleton
+                    import QtQml
+                    QtObject {
+                        property var options: ({media: {priorityPlayer: "", preferMusicPlayers: true, filterDuplicatePlayers: true}})
+                    }
+                """.trimIndent())
+                java.io.File(common, "Translation.qml").writeText("""
+                    pragma Singleton
+                    import QtQml
+                    QtObject { function tr(text) { return text } }
+                """.trimIndent())
+                java.io.File(common, "Directories.qml").writeText("""
+                    pragma Singleton
+                    import QtQml
+                    QtObject { property string coverArt: "${directory.absolutePath}/covers" }
+                """.trimIndent())
+                val functions = java.io.File(common, "functions").apply { mkdirs() }
+                java.io.File(functions, "qmldir").writeText("singleton FileUtils 1.0 FileUtils.qml\n")
+                java.io.File(functions, "FileUtils.qml").writeText("""
+                    pragma Singleton
+                    import QtQml
+                    QtObject { function trimFileProtocol(path) { return path.replace(/^file:\/\//, "") } }
+                """.trimIndent())
+                source = source.replace("import QtQuick", "import \"services\" as Services\nimport QtQuick")
+                    .replace("case 0:", """
+                        case 0:
+                            const controller = Services.MprisController
+                            controller.updatePlayersList()
+                            controller.applySelectionPolicy()
+                            root.check(controller.activePlayer === p, "ii active player selection")
+                            root.check(controller.isRealPlayer(p), "ii duplicate/empty filter")
+                            root.check(controller.isMusicPlayer(p) && controller.tierOf(p) === 1, "ii music priority: " + controller.playerNames(p) + " categories=" + JSON.stringify(DesktopEntries.heuristicLookup(p.desktopEntry)?.categories) + " tier=" + controller.tierOf(p))
+                            root.check(controller.trackLengthOf(p) === 200, "ii track duration")
+                            root.check(Math.abs(controller.trackPositionOf(p) - 10) < 0.1, "ii initial progress")
+                            root.check(controller.playerMatchesKey(p, "kittytune.desktop"), "ii player pin key")
+                            controller.priorityPlayer = "KittyTune"
+                            root.check(controller.tierOf(p) === 2, "ii pinned priority")
+                            controller.priorityPlayer = ""
+                    """.trimIndent())
+                    .replace("(root.player?.trackArtUrl ?? \"\")", "Services.CoverArt.source(root.player?.trackArtUrl ?? \"\")")
+                    .replace("console.log(\"KITTYTUNE_REQUEST_BACKFILL\")", """
+                        if (Services.MprisController.activeTrack?.title !== "Untimed Song") { root.step--; return }
+                        root.check(Services.MprisController.artUrl === p.trackArtUrl, "ii replaces obsolete cover")
+                        root.check(Services.MprisController.activeTrack.artUrl === p.trackArtUrl, "ii media card cover")
+                        console.log("KITTYTUNE_REQUEST_BACKFILL")
+                    """.trimIndent())
+                    .replace("p.position = 42", "Services.MprisController.seekFraction(p, 0.21)")
+                    .replace("p.shuffle = true", "Services.MprisController.setShuffle(true)")
+                    .replace("p.loopState = MprisLoopState.Playlist", "Services.MprisController.setLoopState(MprisLoopState.Playlist)")
+                    .replace("p.togglePlaying()", "Services.MprisController.togglePlaying()")
+                    .replace("p.next()", "Services.MprisController.next()")
+                    .replace("p.previous()", "Services.MprisController.previous()")
+            }
+            qml.writeText(source)
+            val log = java.io.File(directory, "output.log")
+            process = ProcessBuilder("qs", "-p", qml.absolutePath, "--no-color")
+                .apply {
+                    environment()["QT_QPA_PLATFORM"] = "offscreen"
+                    environment()["KITTYTUNE_TEST_BUS"] = BUS
+                    environment()["XDG_DATA_HOME"] = dataHome.absolutePath
+                }.redirectErrorStream(true).redirectOutput(log).start()
+            val artwork = java.io.File(directory, "cover large #1.png")
+            javax.imageio.ImageIO.write(java.awt.image.BufferedImage(8, 8,
+                java.awt.image.BufferedImage.TYPE_INT_RGB), "png", artwork)
+            val handled = mutableSetOf<String>()
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+            while (!process.waitFor(50, TimeUnit.MILLISECONDS) && System.nanoTime() < deadline) {
+                val progress = log.takeIf { it.exists() }?.readText().orEmpty()
+                fun requested(marker: String) = marker in progress && handled.add(marker)
+                if (requested("KITTYTUNE_REQUEST_TRACK")) {
+                    service.updateMedia(track(id = 2L, artwork = artwork.absolutePath, durationMs = 120_000L)
+                        .copy(title = "Second Song"), playing = true, positionMs = 0L)
+                    service.updatePlaybackState(false)
+                }
+                if (requested("KITTYTUNE_REQUEST_UNTIMED")) {
+                    service.updateMedia(track(id = 3L, artwork = null, durationMs = null)
+                        .copy(title = "Untimed Song"), playing = false, positionMs = 0L)
+                }
+                if (requested("KITTYTUNE_REQUEST_BACKFILL")) {
+                    service.updateMedia(track(id = 3L, artwork = null, durationMs = null)
+                        .copy(title = "Untimed Song"), playing = false, positionMs = 27_000L, durationMs = 90_000L)
+                }
+                if (requested("KITTYTUNE_REQUEST_CLEAR")) service.updateMedia(null, false, 0L)
+            }
+            assertFalse("Quickshell probe timed out: " + log.readText(), process.isAlive)
+            val output = log.readText()
+            assertEquals(output, 0, process.exitValue())
+            assertTrue(output, output.contains("KITTYTUNE_QUICKSHELL_OK"))
+            val received = generateSequence { events.poll() }.toList()
+            for (event in listOf("seek:42000", "volume:0.42", "shuffle:true", "loop:Playlist",
+                "rate:1.5", "play", "pause", "next", "prev", "raise", "stop")) {
+                assertTrue("Missing $event in $received", event in received)
+            }
+        } finally {
+            process?.destroyForcibly()
+            directory.deleteRecursively()
+        }
+    }
+
 }

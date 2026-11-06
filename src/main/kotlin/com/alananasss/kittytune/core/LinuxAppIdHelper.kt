@@ -6,14 +6,14 @@ import java.nio.file.Files
 
 /**
  * Ensures the Linux window manager / compositor associates KittyTune windows
- * with the correct application ID ("kitty-tune"), icon, and .desktop launcher.
+ * with the correct application ID ("kittytune"), icon, and .desktop launcher.
  *
  * In OpenJDK's XToolkit, the X11 `WM_CLASS` property is initialized by deriving
  * the class name from the bottom of the stack trace (e.g. `com-alananasss-kittytune-MainKt`),
  * and `sun.java2d.wm.className` is ignored by OpenJDK. Compositors like Hyprland/Wayland
  * (via XWayland) and desktop shells like Quickshell / end-4 dotfiles query `window.class` to
- * resolve app icons and window rules. Setting `XToolkit.awtAppClassName` to "kitty-tune"
- * causes all AWT/Compose windows to declare `WM_CLASS = "kitty-tune", "kitty-tune"`.
+ * resolve app icons and window rules. Setting `XToolkit.awtAppClassName` to "kittytune"
+ * causes all AWT/Compose windows to declare `WM_CLASS = "kittytune", "kittytune"`.
  *
  * Also ensures that DISPLAY and XAUTHORITY are valid before AWT/Skiko connects to X11/Xwayland.
  * Under modern Linux desktop environments (e.g. KDE Plasma / KWin, GNOME/Mutter, Hyprland),
@@ -26,7 +26,7 @@ import java.nio.file.Files
  */
 object LinuxAppIdHelper {
 
-    const val APP_ID = "kitty-tune"
+    const val APP_ID = LinuxDesktopIdentity.APP_ID
 
     @Volatile
     private var applied = false

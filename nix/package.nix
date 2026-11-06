@@ -115,25 +115,25 @@ in stdenv.mkDerivation rec {
     # Install application icons
     mkdir -p "$out/share/icons/hicolor/256x256/apps" "$out/share/pixmaps"
     if [ -f "$out/opt/kitty-tune/lib/KittyTune.png" ]; then
-      cp "$out/opt/kitty-tune/lib/KittyTune.png" "$out/share/icons/hicolor/256x256/apps/kitty-tune.png"
-      cp "$out/opt/kitty-tune/lib/KittyTune.png" "$out/share/pixmaps/kitty-tune.png"
+      cp "$out/opt/kitty-tune/lib/KittyTune.png" "$out/share/icons/hicolor/256x256/apps/kittytune.png"
+      cp "$out/opt/kitty-tune/lib/KittyTune.png" "$out/share/pixmaps/kittytune.png"
     fi
 
     # Install desktop entry
     mkdir -p "$out/share/applications"
-    cat << 'EOF' > "$out/share/applications/kitty-tune.desktop"
+    cat << 'EOF' > "$out/share/applications/kittytune.desktop"
 [Desktop Entry]
 Name=KittyTune
 GenericName=Music Player
 Comment=KittyTune Desktop Music Player - SoundCloud streaming, lossless upgrades & Apple-style synchronized lyrics
 Exec=kitty-tune %U
-Icon=kitty-tune
+Icon=kittytune
 Terminal=false
 Type=Application
 Categories=AudioVideo;Audio;Player;Music;
 MimeType=audio/mpeg;audio/flac;audio/mp4;audio/aac;audio/ogg;audio/opus;audio/wav;audio/x-ms-wma;
 Keywords=music;player;soundcloud;streaming;lyrics;lossless;karaoke;
-StartupWMClass=KittyTune
+StartupWMClass=kittytune
 EOF
 
     # Default ALSA configuration fallback for environments without physical ALSA soundcards (e.g. WSL2 / WSLg)

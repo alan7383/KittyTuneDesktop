@@ -176,9 +176,8 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
             systemDefaultSinkDesc = newDefaultDesc
 
             if (newDefaultId != null && newDefaultId != lastSystemDefaultId && lastSystemDefaultId != null) {
-                currentDevice = ""
-                prefs.setAudioDevice("")
-                playerViewModel.changeOutputDevice("")
+                // A pinned output belongs to KittyTune, even when the system default changes.
+                if (currentDevice.isEmpty()) playerViewModel.changeOutputDevice("")
             }
             lastSystemDefaultId = newDefaultId
             delay(2000)

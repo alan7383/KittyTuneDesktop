@@ -3109,4 +3109,14 @@
     <string name="pet_desk_bar_button_desc">Kedinin yüzen penceresini gösterir veya gizler</string>
     <string name="pet_desk_photo_filter">Görseller</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Uyumluluk modu</string>
+    <string name="floating_compat_desc">Opak yüzen pencereler. RivaTuner (RTSS) ve bazı arayüz katmanlarının neden olduğu donmaları giderir</string>
+    <string name="floating_compat_auto_rtss">Otomatik etkinleştirildi: RivaTuner (RTSS) çalışıyor</string>
+    <string name="floating_compat_auto_freeze">Otomatik etkinleştirildi: bir yüzen pencere uygulamayı dondurdu</string>
+    <string name="update_nixos_notice_title">NixOS / Nix sistemi algılandı</string>
+    <string name="update_nixos_notice_desc">Nix üzerinde güncellemeler bildirimsel olarak yönetilir. Kurulumunuzu güncellemek için aşağıdaki komutu çalıştırın:</string>
+    <string name="update_btn_view_release">Sürümü görüntüle</string>
+    <string name="btn_copy">Kopyala</string>
 </resources>
