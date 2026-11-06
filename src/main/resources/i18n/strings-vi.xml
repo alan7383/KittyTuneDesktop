@@ -3189,4 +3189,14 @@
     <string name="pet_desk_bar_button_desc">Hiện hoặc ẩn cửa sổ nổi của chú mèo</string>
     <string name="pet_desk_photo_filter">Hình ảnh</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Chế độ tương thích</string>
+    <string name="floating_compat_desc">Cửa sổ nổi không trong suốt. Khắc phục hiện tượng treo với RivaTuner (RTSS) và một số lớp phủ</string>
+    <string name="floating_compat_auto_rtss">Tự động bật: RivaTuner (RTSS) đang chạy</string>
+    <string name="floating_compat_auto_freeze">Tự động bật: một cửa sổ nổi đã làm ứng dụng bị treo</string>
+    <string name="update_nixos_notice_title">Đã phát hiện hệ thống NixOS / Nix</string>
+    <string name="update_nixos_notice_desc">Các bản cập nhật được quản lý theo cấu hình khai báo trên Nix. Chạy lệnh bên dưới để cập nhật bản cài đặt của bạn:</string>
+    <string name="update_btn_view_release">Xem bản phát hành</string>
+    <string name="btn_copy">Sao chép</string>
 </resources>
