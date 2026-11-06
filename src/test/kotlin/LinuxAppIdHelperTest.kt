@@ -13,7 +13,7 @@ class LinuxAppIdHelperTest {
     fun testLinuxAppIdHelperAppliesWithoutError() {
         // Calling apply() must be safe and idempotent across platforms
         LinuxAppIdHelper.apply()
-        assertEquals("kitty-tune", LinuxAppIdHelper.APP_ID)
+        assertEquals("kittytune", LinuxAppIdHelper.APP_ID)
     }
 
     @Test
@@ -38,11 +38,11 @@ class LinuxAppIdHelperTest {
         assertTrue(File(hicolor, "256x256/apps/com-alananasss-kittytune-MainKt.png").exists(), "com-alananasss-kittytune-MainKt.png should exist")
 
         val userApps = File(System.getProperty("user.home"), ".local/share/applications")
-        val kittyTuneDesktop = File(userApps, "kitty-tune.desktop")
+        val kittyTuneDesktop = File(userApps, "kittytune.desktop")
         assertTrue(kittyTuneDesktop.exists(), "kitty-tune.desktop should exist")
         val content = kittyTuneDesktop.readText()
-        assertTrue(content.contains("Icon=kitty-tune-sunset"), "Desktop file should point to variant icon")
-        assertTrue(content.contains("StartupWMClass=kitty-tune"), "Desktop file should have StartupWMClass=kitty-tune")
+        assertTrue(content.contains("Icon=kittytune-sunset"), "Desktop file should point to variant icon")
+        assertTrue(content.contains("StartupWMClass=kittytune"), "Desktop file should have StartupWMClass=kittytune")
     }
 
     @Test
@@ -54,11 +54,17 @@ class LinuxAppIdHelperTest {
         frame.isVisible = true
         Thread.sleep(1000)
 
-        val proc = Runtime.getRuntime().exec(arrayOf("hyprctl", "clients"))
-        val output = proc.inputStream.bufferedReader().readText()
-
-        frame.dispose()
-
-        assertTrue(output.contains("class: kitty-tune"), "Hyprland should register window with class kitty-tune, got output:\n$output")
+        try {
+            val proc = ProcessBuilder("hyprctl", "clients", "-j").start()
+            val output = proc.inputStream.bufferedReader().readText()
+            assertEquals(0, proc.waitFor())
+            val windows = com.google.gson.JsonParser.parseString(output).asJsonArray
+            val own = windows.firstOrNull {
+                it.asJsonObject.get("pid").asLong == ProcessHandle.current().pid() &&
+                    it.asJsonObject.get("title").asString == "KittyTune Hyprland Test"
+            }
+            assertNotNull(own, "Test window must be reported by Hyprland")
+            assertEquals("kittytune", own.asJsonObject.get("class").asString)
+        } finally { frame.dispose() }
     }
 }

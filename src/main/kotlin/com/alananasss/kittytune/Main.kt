@@ -102,9 +102,10 @@ fun main(args: Array<String>) {
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
+    com.alananasss.kittytune.audio.LinuxAudioIntegration.initialize()
     com.alananasss.kittytune.audio.ai.OnnxHelper.disableNativeTelemetry()
     com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
-    System.setProperty("sun.java2d.wm.className", "kitty-tune")
+    System.setProperty("sun.java2d.wm.className", com.alananasss.kittytune.core.LinuxAppIdHelper.APP_ID)
     runCatching {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }

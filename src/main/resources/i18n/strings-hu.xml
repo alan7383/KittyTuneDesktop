@@ -3107,4 +3107,14 @@
     <string name="pet_desk_bar_button_desc">Megjeleníti vagy elrejti a cica lebegő ablakát</string>
     <string name="pet_desk_photo_filter">Képek</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Kompatibilitási mód</string>
+    <string name="floating_compat_desc">Átlátszatlan lebegő ablakok. Megoldja a RivaTuner (RTSS) és egyes átfedések okozta lefagyásokat</string>
+    <string name="floating_compat_auto_rtss">Automatikusan bekapcsolva: a RivaTuner (RTSS) fut</string>
+    <string name="floating_compat_auto_freeze">Automatikusan bekapcsolva: egy lebegő ablak lefagyasztotta az alkalmazást</string>
+    <string name="update_nixos_notice_title">NixOS / Nix rendszer észlelve</string>
+    <string name="update_nixos_notice_desc">A Nix deklaratívan kezeli a frissítéseket. A telepítés frissítéséhez futtasd az alábbi parancsot:</string>
+    <string name="update_btn_view_release">Kiadás megtekintése</string>
+    <string name="btn_copy">Másolás</string>
 </resources>
