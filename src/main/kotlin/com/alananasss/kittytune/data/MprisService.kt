@@ -1,9 +1,16 @@
 package com.alananasss.kittytune.data
 
-import com.alananasss.kittytune.core.AppIconInstaller
+import com.alananasss.kittytune.core.AppIconVariants
+import com.alananasss.kittytune.core.AppDirs
+import com.alananasss.kittytune.core.AtomicFiles
+import com.alananasss.kittytune.core.LinuxAppIdHelper
 import com.alananasss.kittytune.domain.Track
+import org.freedesktop.dbus.TypeRef
 import org.freedesktop.dbus.DBusPath
 import org.freedesktop.dbus.annotations.DBusInterfaceName
+import org.freedesktop.dbus.annotations.DBusProperty
+import org.freedesktop.dbus.annotations.DBusProperty.Access.READ
+import org.freedesktop.dbus.annotations.PropertiesEmitsChangedSignal.EmitChangeSignal.FALSE
 import org.freedesktop.dbus.connections.impl.DBusConnection
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder
 import org.freedesktop.dbus.errors.PropertyReadOnly
@@ -15,10 +22,14 @@ import org.freedesktop.dbus.messages.DBusSignal
 import org.freedesktop.dbus.types.Variant
 import java.awt.EventQueue
 import java.io.Closeable
+import java.io.File
+import java.net.URI
+import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 /**
@@ -74,18 +85,27 @@ class MprisService(
 
     private var connection: DBusConnection? = null
 
-    /** The .desktop entry's id, which is how shells find the icon to show next to the widget. */
-    private val desktopEntry: String by lazy {
-        AppIconInstaller.findInstalledDesktopFile()?.nameWithoutExtension ?: DEFAULT_DESKTOP_ENTRY
+    // Preserve D-Bus command order and keep player mutations from running concurrently.
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val actions = Channel<() -> Unit>(Channel.UNLIMITED)
+    private val actionWorker = serviceScope.launch {
+        for (action in actions) {
+            runCatching { action() }.onFailure { e ->
+                println("MPRIS action failed: ${e.message}")
+            }
+        }
     }
+
+    /** The .desktop entry's id, which is how shells find the icon to show next to the widget. */
+    private val desktopEntry: String = DEFAULT_DESKTOP_ENTRY
 
     init {
         if (isLinux()) {
             runCatching {
-                val conn = DBusConnectionBuilder.forSessionBus().build()
+                val conn = DBusConnectionBuilder.forSessionBus().withShared(false).build()
+                connection = conn
                 conn.exportObject(OBJECT_PATH, Mpris2Object())
                 conn.requestBusName(busName)
-                connection = conn
             }.onFailure { e ->
                 println("MPRIS: could not register $busName: ${e.message}")
                 runCatching { connection?.disconnect() }
@@ -97,6 +117,7 @@ class MprisService(
     /** Called whenever the track, the playing state or the position baseline changes. */
     fun updateMedia(track: Track?, playing: Boolean, positionMs: Long, durationMs: Long? = null) {
         val currentMs = currentPositionUs() / 1000L
+        val previousTrackId = currentTrack?.id
         currentTrack = track
         isPlaying = playing
         overrideDurationMs = durationMs
@@ -110,13 +131,13 @@ class MprisService(
         lastUpdateTimeMs = now
 
         val metadata = buildMetadata(track, overrideDurationMs)
-        val trackChanged = !metadataEquals(metadata, announcedMetadata)
-        // Cleared by playback alone: a track change while paused or stopped (e.g. an
+        val metadataChanged = !metadataEquals(metadata, announcedMetadata)
+        // Cleared by playback or unloading: a track change while paused or stopped (e.g. an
         // MPRIS Next) must not clear it, or "remains stopped" would be unimplementable.
-        if (playing) stopped = false
+        if (playing || track == null) stopped = false
 
         val changes = HashMap<String, Variant<*>>()
-        if (trackChanged) {
+        if (metadataChanged) {
             announcedMetadata = metadata
             changes["Metadata"] = Variant(HashMap(metadata), "a{sv}")
         }
@@ -127,7 +148,7 @@ class MprisService(
         }
         if (changes.isNotEmpty()) sendPlayerPropertiesChanged(changes)
 
-        if (!trackChanged && track != null && (movedBackward || jumpedForward)) {
+        if (track != null && previousTrackId == track.id && (movedBackward || jumpedForward)) {
             lastSeekedSignalMs = now
             send(MprisPlayerInterface.Seeked(OBJECT_PATH, clamped * 1000L))
         }
@@ -193,10 +214,10 @@ class MprisService(
         }
     }
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
     fun updatePlaybackState(playing: Boolean) {
         if (isPlaying == playing && (if (playing) !stopped else true)) return
+        positionAtUpdateMs = currentPositionUs() / 1000L
+        lastUpdateTimeMs = System.currentTimeMillis()
         isPlaying = playing
         if (playing) stopped = false
         val status = playbackStatus()
@@ -207,6 +228,7 @@ class MprisService(
     }
 
     override fun close() {
+        actions.close()
         runCatching { serviceScope.cancel() }
         runCatching { connection?.disconnect() }
         connection = null
@@ -224,11 +246,7 @@ class MprisService(
     }
 
     private fun dispatchAction(action: () -> Unit) {
-        serviceScope.launch {
-            runCatching { action() }.onFailure { e ->
-                println("MPRIS action failed: ${e.message}")
-            }
-        }
+        actions.trySend(action)
     }
 
     private fun lengthUs(): Long? =
@@ -295,12 +313,40 @@ class MprisService(
         "CanControl" to Variant(true, "b"),
     )
 
+    interface StringList : TypeRef<List<String>>
+    interface MetadataMap : TypeRef<Map<String, Variant<*>>>
+
+    // Quickshell and other clients must see the same contract in introspection and GetAll.
+    @DBusProperty(name = "CanQuit", type = Boolean::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "CanRaise", type = Boolean::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "HasTrackList", type = Boolean::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "Identity", type = String::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "DesktopEntry", type = String::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "SupportedUriSchemes", type = StringList::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "SupportedMimeTypes", type = StringList::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "CanSetFullscreen", type = Boolean::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "Fullscreen", type = Boolean::class, access = READ, emitChangeSignal = FALSE)
     @DBusInterfaceName("org.mpris.MediaPlayer2")
     interface MprisRootInterface : DBusInterface {
         fun Raise()
         fun Quit()
     }
 
+    @DBusProperty(name = "PlaybackStatus", type = String::class, access = READ)
+    @DBusProperty(name = "LoopStatus", type = String::class)
+    @DBusProperty(name = "Rate", type = Double::class)
+    @DBusProperty(name = "Shuffle", type = Boolean::class)
+    @DBusProperty(name = "Metadata", type = MetadataMap::class, access = READ)
+    @DBusProperty(name = "Volume", type = Double::class)
+    @DBusProperty(name = "Position", type = Long::class, access = READ, emitChangeSignal = FALSE)
+    @DBusProperty(name = "MinimumRate", type = Double::class, access = READ)
+    @DBusProperty(name = "MaximumRate", type = Double::class, access = READ)
+    @DBusProperty(name = "CanGoNext", type = Boolean::class, access = READ)
+    @DBusProperty(name = "CanGoPrevious", type = Boolean::class, access = READ)
+    @DBusProperty(name = "CanPlay", type = Boolean::class, access = READ)
+    @DBusProperty(name = "CanPause", type = Boolean::class, access = READ)
+    @DBusProperty(name = "CanSeek", type = Boolean::class, access = READ)
+    @DBusProperty(name = "CanControl", type = Boolean::class, access = READ, emitChangeSignal = FALSE)
     @DBusInterfaceName(PLAYER_INTERFACE)
     interface MprisPlayerInterface : DBusInterface {
         fun Play()
@@ -375,11 +421,14 @@ class MprisService(
 
         override fun Stop() {
             if (currentTrack == null || stopped) return
+            val previousPosition = currentPositionUs()
+            positionAtUpdateMs = 0L
+            lastUpdateTimeMs = System.currentTimeMillis()
             stopped = true
             isPlaying = false
             announcedPlaybackStatus = "Stopped"
             sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant("Stopped", "s")))
-            if (currentPositionUs() != 0L) send(MprisPlayerInterface.Seeked(OBJECT_PATH, 0L))
+            if (previousPosition != 0L) send(MprisPlayerInterface.Seeked(OBJECT_PATH, 0L))
             dispatchAction(onStop)
         }
 
@@ -399,12 +448,7 @@ class MprisService(
             // The spec says to ignore a SetPosition aimed at a track that is no longer current.
             val current = currentTrack ?: return
             val currentTrackPath = trackObjectPath(current.id)
-            val path = TrackId.path
-            val matchesTrack = path == currentTrackPath ||
-                path.endsWith("/${java.lang.Long.toUnsignedString(current.id)}") ||
-                path == "/org/mpris/MediaPlayer2/CurrentTrack" ||
-                path == "/" || path.isEmpty()
-            if (!matchesTrack) return
+            if (TrackId.path != currentTrackPath) return
             if (Position < 0) return
             val lengthUs = lengthUs()
             if (lengthUs != null && Position > lengthUs) return
@@ -507,16 +551,49 @@ class MprisService(
         const val PLAYER_INTERFACE = "org.mpris.MediaPlayer2.Player"
         const val NO_TRACK_PATH = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
         const val IDENTITY = "KittyTune"
-        const val DEFAULT_DESKTOP_ENTRY = "kitty-tune"
+        const val DEFAULT_DESKTOP_ENTRY = LinuxAppIdHelper.APP_ID
 
         fun isLinux(): Boolean = System.getProperty("os.name").lowercase().let { "linux" in it || "unix" in it }
 
         /** D-Bus object paths only allow [A-Za-z0-9_], so ids hash to their unsigned digits. */
         fun trackObjectPath(id: Long): String = "$OBJECT_PATH/Track/${java.lang.Long.toUnsignedString(id)}"
 
-        /** Placeholders are for the UI, never for the bus: omit instead of faking a cover. */
+        /** Discard random UI placeholders; a missing cover uses KittyTune's own icon. */
         fun usableArtUrl(url: String): Boolean =
             url.isNotBlank() && !url.contains("picsum.photos")
+
+        // A stable, packaged local image also clears stale art in clients that retain the
+        // previous URL when artUrl disappears. No network or desktop configuration needed.
+        private val fallbackArtworkUri: String? by lazy {
+            if (!isLinux()) null else runCatching {
+                val bytes = MprisService::class.java.getResourceAsStream("/" + AppIconVariants.resourcePath(AppIconVariants.DEFAULT_KEY))
+                    ?.use { it.readBytes() } ?: return@runCatching null
+                val directory = File(AppDirs.cacheDir, "mpris").apply { mkdirs() }
+                val target = File(directory, "kittytune.png")
+                if (!target.isFile || !target.readBytes().contentEquals(bytes)) {
+                    val temporary = File.createTempFile("kittytune-", ".png", directory)
+                    try {
+                        temporary.writeBytes(bytes)
+                        AtomicFiles.replace(temporary, target)
+                    } finally {
+                        temporary.delete()
+                    }
+                }
+                target.toPath().toUri().toASCIIString()
+            }.getOrNull()
+        }
+
+        /** MPRIS exposes URLs; encode local paths so spaces/# and CoverArt's file:// check work. */
+        fun artworkUri(url: String): String? {
+            if (!usableArtUrl(url)) return null
+            return runCatching {
+                when {
+                    File(url).isAbsolute -> File(url).toPath().toUri().toASCIIString()
+                    url.startsWith("file:") -> Path.of(URI(url)).toUri().toASCIIString()
+                    else -> url
+                }
+            }.getOrNull()
+        }
 
         private fun variantValueEquals(a: Any?, b: Any?): Boolean {
             if (a is Array<*> && b is Array<*>) return a.contentDeepEquals(b)
@@ -536,6 +613,7 @@ class MprisService(
             if (track == null) {
                 // Plasma rejects metadata without a trackid, even when nothing is loaded.
                 meta["mpris:trackid"] = Variant(DBusPath(NO_TRACK_PATH), "o")
+                fallbackArtworkUri?.let { meta["mpris:artUrl"] = Variant(it, "s") }
                 return meta
             }
             meta["mpris:trackid"] = Variant(DBusPath(trackObjectPath(track.id)), "o")
@@ -547,7 +625,11 @@ class MprisService(
             val album = track.publisherMetadata?.albumTitle ?: track.publisherMetadata?.releaseTitle
             if (!album.isNullOrBlank()) meta["xesam:album"] = Variant(album, "s")
             track.permalinkUrl?.takeIf { it.isNotBlank() }?.let { meta["xesam:url"] = Variant(it, "s") }
-            if (usableArtUrl(track.fullResArtwork)) meta["mpris:artUrl"] = Variant(track.fullResArtwork, "s")
+            // Local covers must remain literal paths: the SoundCloud size substitution in
+            // fullResArtwork would also rename files/directories containing "large".
+            val artwork = track.artworkUrl?.takeIf { File(it).isAbsolute || it.startsWith("file:") }
+                ?: track.fullResArtwork
+            (artworkUri(artwork) ?: fallbackArtworkUri)?.let { meta["mpris:artUrl"] = Variant(it, "s") }
             val effectiveDurationMs = durationMsOverride ?: track.effectiveFullDurationMs ?: track.durationMs
             effectiveDurationMs?.takeIf { it > 0 }?.let { meta["mpris:length"] = Variant(it * 1000L, "x") }
             return meta
