@@ -57,8 +57,12 @@ fun mixerNamed(deviceName: String, info: DataLine.Info): Mixer? {
 
 /** A playback line on the device the listener chose for the music, opened and started. */
 fun openPlaybackLine(format: javax.sound.sampled.AudioFormat, bufferBytes: Int): SourceDataLine {
+    val device = com.alananasss.kittytune.data.local.PlayerPreferences().getAudioDevice()
+    if (System.getProperty("os.name").lowercase().contains("linux")) {
+        return LinuxAudioIntegration.openLine(format, bufferBytes, device)
+    }
     val info = DataLine.Info(SourceDataLine::class.java, format)
-    val mixer = mixerNamed(com.alananasss.kittytune.data.local.PlayerPreferences().getAudioDevice(), info)
+    val mixer = mixerNamed(device, info)
     val line = (mixer?.getLine(info) ?: AudioSystem.getLine(info)) as SourceDataLine
     line.open(format, bufferBytes)
     line.start()

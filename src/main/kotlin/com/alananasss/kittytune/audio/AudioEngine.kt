@@ -16,10 +16,7 @@ import org.bytedeco.javacv.FrameGrabber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
-import javax.sound.sampled.AudioSystem
-import javax.sound.sampled.DataLine
 import javax.sound.sampled.FloatControl
-import javax.sound.sampled.Mixer
 import javax.sound.sampled.SourceDataLine
 import kotlin.concurrent.thread
 import javax.sound.sampled.AudioFormat as JavaAudioFormat
@@ -1229,30 +1226,7 @@ class AudioEngine {
         val fmt = JavaAudioFormat(
             outputSampleRate.toFloat(), 16, outputChannels, true, false,
         )
-        val info = DataLine.Info(SourceDataLine::class.java, fmt)
-
-        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-        val deviceName = prefs.getAudioDevice()
-        var mixer: Mixer? = null
-
-        if (deviceName.isNotEmpty()) {
-            val isLinux = System.getProperty("os.name").lowercase().contains("linux")
-            if (isLinux && deviceName.startsWith("alsa_output.")) {
-                System.setProperty("javax.sound.sampled.SourceDataLine", "")
-                try {
-                    val pb = ProcessBuilder("sh", "-c", "pactl set-default-sink '$deviceName'")
-                    pb.start().waitFor()
-                } catch (_: Exception) {
-                }
-            } else {
-                mixer = mixerNamed(deviceName, info)
-            }
-        }
-
-        val l =
-            if (mixer != null) mixer.getLine(info) as SourceDataLine else AudioSystem.getLine(info) as SourceDataLine
-        l.open(fmt, outputSampleRate * outputChannels * 2 * 200 / 1000)
-        l.start()
+        val l = openPlaybackLine(fmt, outputSampleRate * outputChannels * 2 * 200 / 1000)
         applyLineVolume(l)
         return l
     }
