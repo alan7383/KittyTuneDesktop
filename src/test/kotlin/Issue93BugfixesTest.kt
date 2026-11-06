@@ -121,10 +121,10 @@ class Issue93BugfixesTest {
     @Test
     fun testWindowsUpdaterScriptConstructionMsi() {
         val targetPid = 12345L
-        val installer = File("C:\\Temp\\installer.msi")
+        val installer = File("C:\\Users\\O'Brien Smith\\Downloads\\KittyTune update.msi")
         val kittyExe = File("C:\\Users\\User\\AppData\\Local\\Programs\\KittyTune\\KittyTune.exe")
         val logFile = File("C:\\Temp\\kittytune_updater.log")
-        val msiLog = File("C:\\Temp\\kittytune_msi.log")
+        val msiLog = File("C:\\Users\\O'Brien Smith\\AppData\\Local\\Temp\\kittytune msi.log")
 
         val script = UpdateManager.buildWindowsUpdaterScript(
             targetPid = targetPid,
@@ -139,7 +139,13 @@ class Issue93BugfixesTest {
         assertTrue(script.contains("Stop-Process -Force"))
         assertTrue(script.contains("WindowsSmtcBridge"))
         val escapedInstaller = installer.absolutePath.replace("'", "''")
-        assertTrue(script.contains("-ArgumentList @('/i', '$escapedInstaller'"))
+        val escapedMsiLog = msiLog.absolutePath.replace("'", "''")
+        val msiCommands = script.lineSequence().filter { it.contains("-FilePath 'msiexec.exe'") }.toList()
+        assertEquals(5, msiCommands.size)
+        msiCommands.forEach { command ->
+            assertTrue(command.contains("-ArgumentList @('/i', '\"$escapedInstaller\"'"))
+            assertTrue(command.contains("'/l*v', '\"$escapedMsiLog\"'"))
+        }
         assertTrue(script.contains("REINSTALL=ALL"))
         assertTrue(script.contains("'/qb'"))
         assertTrue(script.contains("Start-Process -FilePath \$exePath"))
