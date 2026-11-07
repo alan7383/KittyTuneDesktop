@@ -120,6 +120,11 @@ fun main(args: Array<String>) {
     // which is what made them look cut down next to Windows' own. Compose is unaffected.
     runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
 
+    // ThemeState's snapshot states must exist before the first composition. Otherwise PlayerViewModel can
+    // create them from a background thread after the window's snapshot was taken, and that composition
+    // fails with "Reading a state that was created after the snapshot was taken".
+    com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor
+
     application {
         val playerViewModel = remember { PlayerViewModel(AppInstance.application) }
         val prefsForTray = remember { PlayerPreferences() }
