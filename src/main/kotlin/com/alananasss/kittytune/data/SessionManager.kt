@@ -27,10 +27,13 @@ import java.util.concurrent.TimeUnit
  *
  * The Android version harvested SoundCloud session/DataDome cookies from a
  * headless WebView. On desktop:
- *   - The pure-OkHttp OAuth `refresh_token` grant (the portable core) is kept
- *     verbatim - this is the primary token-refresh path.
- *   - The WebView cookie jar is replaced by [CookieStore]; the PKCE login flow
- *     (handled by the login UI) populates it through OkHttp responses.
+ *   - The token lifecycle follows the official app's TokenRefreshCoordinator and
+ *     TokenExchangeCoordinator: same client and same grants. Two things differ on
+ *     purpose: tokens renew before they expire, and ending a session takes more
+ *     proof, because a wrong logout is the worse failure here.
+ *   - Tokens live in [TokenManager] only; SoundCloud cookies are never read back
+ *     as tokens, they would overwrite rotated ones with stale values.
+ *   - The WebView cookie jar is replaced by [CookieStore].
  *   - The DataDome captcha machinery was dropped entirely, mirroring Android:
  *     PKCE-issued OAuth tokens with the official client_id no longer trip
  *     DataDome's bot detection, and the desktop port never had the captcha
@@ -48,6 +51,12 @@ object SessionManager {
         @SerializedName("expires_in") val expiresInSeconds: Long?,
         @SerializedName("scope") val scope: String?
     )
+
+    private sealed interface TokenResult {
+        data class Issued(val tokens: OAuthTokenResponse) : TokenResult
+        data class Refused(val code: Int, val body: String) : TokenResult
+        data object Unreachable : TokenResult
+    }
 
     private val tokenManager = TokenManager
 
@@ -80,25 +89,7 @@ object SessionManager {
 
     fun start() {
         startKeepAliveCycle()
-    }
-
-    /**
-     * Returns a usable access token, harvested from the cookie store first (in case
-     * the login browser just wrote one), else from the token store.
-     */
-    fun harvestStoredSession(): String? {
-        // The login browser writes oauth_token/refresh_token cookies into CookieStore.
-        val cookieToken = CookieStore.value("soundcloud.com", "oauth_token")
-        val cookieRefresh = CookieStore.value("soundcloud.com", "refresh_token")
-        if (!cookieToken.isNullOrBlank()) {
-            val prev = tokenManager.getAccessToken()
-            if (cookieToken != prev) {
-                tokenManager.saveTokens(cookieToken, cookieRefresh ?: tokenManager.getRefreshToken())
-                _sessionReadyEvent.tryEmit(Unit)
-            }
-            return cookieToken
-        }
-        return tokenManager.getAccessToken()
+        scope.launch { singleFlight { migrateLegacySession() } }
     }
 
     private fun startKeepAliveCycle() {
@@ -126,7 +117,6 @@ object SessionManager {
     }
 
     fun requestSessionRefresh(force: Boolean = false) {
-        harvestStoredSession()
         if (tokenManager.isGuestMode()) return
         val shouldRefreshToken = tokenManager.shouldRefreshAccessToken()
         if (force || shouldRefreshToken) {
@@ -138,6 +128,10 @@ object SessionManager {
         }
     }
 
+    /**
+     * [staleToken] is the token the server just refused, when there is one. The refresh runs in
+     * [scope], so a caller's timeout only stops the wait: a rotated token still gets saved.
+     */
     suspend fun awaitFreshAccessToken(
         staleToken: String? = null,
         force: Boolean = false,
@@ -145,24 +139,17 @@ object SessionManager {
     ): String? {
         if (tokenManager.isGuestMode()) return null
 
-        val cookieToken = harvestStoredSession()
-        val currentToken = cookieToken ?: tokenManager.getAccessToken()
-
+        val currentToken = tokenManager.getAccessToken()
         if (!force && !currentToken.isNullOrEmpty() && !tokenManager.shouldRefreshAccessToken()) {
             return currentToken
         }
 
-        if (force && !staleToken.isNullOrEmpty() && !cookieToken.isNullOrEmpty() && cookieToken != staleToken) {
-            return cookieToken
-        }
-
         val refreshedByApi = withTimeoutOrNull(timeoutMs) {
-            refreshAccessTokenFromApi()
+            refreshAccessTokenFromApi(staleToken)
         }
 
-        return refreshedByApi?.takeIf { it.isNotEmpty() }
-            ?: harvestStoredSession()
-            ?: currentToken
+        // Read back rather than falling back to currentToken: the session may have just ended.
+        return refreshedByApi?.takeIf { it.isNotEmpty() } ?: tokenManager.getAccessToken()
     }
 
     fun refreshSessionBlocking(
@@ -172,76 +159,163 @@ object SessionManager {
         awaitFreshAccessToken(staleToken = staleToken, force = true, timeoutMs = timeoutMs)
     }
 
-    private suspend fun refreshAccessTokenFromApi(): String? {
-        val refreshToken = tokenManager.getRefreshToken() ?: return null
-        if (refreshToken == "ghost_refresh") return null
+    private suspend fun refreshAccessTokenFromApi(staleToken: String? = null): String? =
+        singleFlight { refreshSession(staleToken) }
 
-        var shouldStartRefresh = false
-        val refreshDeferred = synchronized(apiRefreshLock) {
+    /**
+     * One token operation at a time: refresh tokens rotate, so a second request carrying the same
+     * one would be refused. Whatever the operation needs is read inside [block], never before.
+     */
+    private suspend fun singleFlight(block: () -> String?): String? {
+        var shouldStart = false
+        val deferred = synchronized(apiRefreshLock) {
             pendingApiRefresh?.takeIf { !it.isCompleted } ?: CompletableDeferred<String?>().also {
                 pendingApiRefresh = it
-                shouldStartRefresh = true
+                shouldStart = true
             }
         }
 
-        if (shouldStartRefresh) {
+        if (shouldStart) {
             scope.launch {
-                val refreshedToken = executeRefreshTokenRequest(refreshToken)
-                refreshDeferred.complete(refreshedToken)
-                synchronized(apiRefreshLock) {
-                    if (pendingApiRefresh === refreshDeferred) pendingApiRefresh = null
+                try {
+                    deferred.complete(block())
+                } finally {
+                    deferred.complete(null)
+                    synchronized(apiRefreshLock) {
+                        if (pendingApiRefresh === deferred) pendingApiRefresh = null
+                    }
                 }
             }
         }
 
-        return refreshDeferred.await()
+        return deferred.await()
     }
 
-    private fun executeRefreshTokenRequest(refreshToken: String): String? {
-        return oauthTokenUrls().firstNotNullOfOrNull { tokenUrl ->
-            val request = Request.Builder()
-                .url(tokenUrl)
-                .header("User-Agent", Config.USER_AGENT)
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Origin", "https://soundcloud.com")
-                .header("Referer", "https://soundcloud.com/")
-                .header("Authorization", Config.OFFICIAL_CLIENT_SIGNATURE)
-                .post(
-                    FormBody.Builder()
-                        .add("grant_type", "refresh_token")
-                        .add("client_id", Config.OFFICIAL_CLIENT_ID)
-                        .add("refresh_token", refreshToken)
-                        .build()
-                )
-                .build()
+    private fun refreshSession(staleToken: String?): String? {
+        val accessToken = tokenManager.getAccessToken()
+        // A burst of 401s all carry the same old token: only the first one may refresh.
+        if (staleToken != null && accessToken != null && accessToken != staleToken) return accessToken
 
-            runCatching {
-                authClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
+        val refreshToken = tokenManager.getRefreshToken()
+        if (refreshToken == "ghost_refresh") return null
+        if (refreshToken != null) return redeemRefreshToken(refreshToken)
 
-                    val body = response.body?.string().orEmpty()
-                    val tokenResponse = gson.fromJson(body, OAuthTokenResponse::class.java)
-                    val accessToken = tokenResponse.accessToken.cleanOAuthValue() ?: return@use null
-                    val nextRefreshToken = tokenResponse.refreshToken.cleanOAuthValue() ?: refreshToken
+        // Nothing to redeem. Only a token the server refused can end the session here, and one
+        // endpoint refusing it proves little (a stream can 401 for reasons of its own), so ask /me.
+        if (accessToken != null && accessToken == staleToken && isRejectedByServer(accessToken)) {
+            endSession("access token rejected, no refresh token")
+        }
+        return null
+    }
 
-                    tokenManager.saveTokens(
-                        accessToken = accessToken,
-                        refreshToken = nextRefreshToken,
-                        expiresInSeconds = tokenResponse.expiresInSeconds,
-                        scope = tokenResponse.scope
-                    )
-                    _sessionReadyEvent.tryEmit(Unit)
-                    accessToken
+    private fun redeemRefreshToken(refreshToken: String): String? {
+        val form = FormBody.Builder()
+            .add("grant_type", "refresh_token")
+            .add("client_id", Config.OFFICIAL_CLIENT_ID)
+            .add("refresh_token", refreshToken)
+            .build()
+
+        return when (val result = requestTokens(form)) {
+            is TokenResult.Issued ->
+                // A logout during the request must not bring the session back.
+                if (tokenManager.getRefreshToken() == refreshToken) saveIssuedTokens(result.tokens, refreshToken) else null
+            is TokenResult.Refused -> {
+                println("KittyTune: token refresh refused (HTTP ${result.code})")
+                if (tokenManager.getRefreshToken() == refreshToken &&
+                    OAuthTokens.isRefreshTokenDead(result.code, result.body)
+                ) {
+                    endSession("refresh token invalidated")
                 }
-            }.getOrNull()
+                null
+            }
+            TokenResult.Unreachable -> null
         }
     }
 
-    private fun oauthTokenUrls(): List<String> = listOf(
-        "${AUTH_API_BASE_URL.trimEnd('/')}/oauth/token",
-        "${Config.BASE_URL.trimEnd('/')}/oauth/token"
-    ).distinct()
+    /**
+     * Moves a non-expiring token onto the expiring client, like the official app's
+     * TokenExchangeCoordinator. Sessions logged in with the legacy client (v1.4.7 to v1.4.9) hold
+     * such a token and no refresh token. A failure keeps the token as is; the next launch retries.
+     */
+    private fun migrateLegacySession(): String? {
+        val accessToken = tokenManager.getAccessToken() ?: return null
+        if (tokenManager.isGuestMode() || tokenManager.hasExpiringSession()) return null
+
+        val form = FormBody.Builder()
+            .add("grant_type", "token_exchange")
+            .add("token", accessToken)
+            .add("client_id", Config.LEGACY_CLIENT_ID)
+            .add("client_secret", Config.LEGACY_CLIENT_SECRET)
+            .add("issue_for_client_id", Config.OFFICIAL_CLIENT_ID)
+            .build()
+
+        return when (val result = requestTokens(form)) {
+            is TokenResult.Issued ->
+                if (tokenManager.getAccessToken() == accessToken) saveIssuedTokens(result.tokens, null) else null
+            is TokenResult.Refused -> {
+                println("KittyTune: token exchange refused (HTTP ${result.code})")
+                null
+            }
+            TokenResult.Unreachable -> null
+        }
+    }
+
+    /** Like the official app: no Authorization header, api-auth only. The other headers are ours. */
+    private fun requestTokens(form: FormBody): TokenResult {
+        val request = Request.Builder()
+            .url("${AUTH_API_BASE_URL}oauth/token")
+            .header("User-Agent", Config.USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .header("Origin", "https://soundcloud.com")
+            .header("Referer", "https://soundcloud.com/")
+            .post(form)
+            .build()
+
+        return try {
+            authClient.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) return TokenResult.Refused(response.code, body)
+
+                val tokens = gson.fromJson(body, OAuthTokenResponse::class.java)
+                if (tokens?.accessToken.cleanOAuthValue() == null) TokenResult.Unreachable else TokenResult.Issued(tokens)
+            }
+        } catch (e: Exception) {
+            println("KittyTune: token request failed: ${e.message}")
+            TokenResult.Unreachable
+        }
+    }
+
+    private fun saveIssuedTokens(tokens: OAuthTokenResponse, currentRefreshToken: String?): String? {
+        val accessToken = tokens.accessToken.cleanOAuthValue() ?: return null
+        tokenManager.saveTokens(
+            accessToken = accessToken,
+            refreshToken = tokens.refreshToken.cleanOAuthValue() ?: currentRefreshToken,
+            expiresInSeconds = tokens.expiresInSeconds,
+            scope = tokens.scope
+        )
+        _sessionReadyEvent.tryEmit(Unit)
+        return accessToken
+    }
+
+    private fun isRejectedByServer(accessToken: String): Boolean {
+        val request = Request.Builder()
+            .url("${Config.BASE_URL}me?client_id=${Config.OFFICIAL_CLIENT_ID}")
+            .header("User-Agent", Config.USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Authorization", "OAuth $accessToken")
+            .build()
+
+        return runCatching {
+            authClient.newCall(request).execute().use { it.code == 401 }
+        }.getOrDefault(false)
+    }
+
+    /** Sends the user back to the login screen instead of leaving a dead session looking alive. */
+    private fun endSession(reason: String) {
+        println("KittyTune: SoundCloud session ended: $reason")
+        tokenManager.logout()
+    }
 
     // --- Client id capture ---------------------------------------------------------------
 

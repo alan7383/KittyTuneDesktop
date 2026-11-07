@@ -111,10 +111,6 @@ object CookieStore : CookieJar {
             .takeIf { it.isNotBlank() }
     }
 
-    /** Extract a single cookie value by name across all stored cookies for a host. */
-    fun value(host: String, name: String): String? =
-        store.values.firstOrNull { it.name == name && host.endsWith(it.domain) }?.value
-
     fun clear() {
         store.clear()
         persist()
