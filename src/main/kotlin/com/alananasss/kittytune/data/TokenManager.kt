@@ -33,7 +33,6 @@ object TokenManager {
 
     private const val DEFAULT_TOKEN_VALIDITY_MS = 25 * 60 * 1000L
     private const val REFRESH_SKEW_MS = 5 * 60 * 1000L
-    private const val SCOPE_NON_EXPIRING = "non-expiring"
 
     val logoutFlow = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -91,7 +90,7 @@ object TokenManager {
         val cleanRefreshToken = cleanToken(refreshToken)
         val cleanScope = cleanToken(scope)
         val now = System.currentTimeMillis()
-        val expiresAt = resolveExpiresAt(now, expiresInSeconds, cleanScope)
+        val expiresAt = resolveExpiresAt(now, expiresInSeconds, cleanAccessToken)
 
         values[KEY_ACCESS_TOKEN] = JsonPrimitive(cleanAccessToken)
         if (!cleanRefreshToken.isNullOrEmpty()) {
@@ -143,9 +142,13 @@ object TokenManager {
 
     fun hasAccessToken(): Boolean = !getAccessToken().isNullOrEmpty()
 
+    /** False for a legacy non-expiring token: it has nothing to renew and no expiry to watch. */
+    fun hasExpiringSession(): Boolean =
+        OAuthTokens.jwtExpiryMillis(getAccessToken()) != null || getRefreshToken() != null
+
     fun shouldRefreshAccessToken(bufferMs: Long = REFRESH_SKEW_MS): Boolean {
         if (!hasAccessToken()) return true
-        if (getTokenScope() == SCOPE_NON_EXPIRING) return false
+        if (!hasExpiringSession()) return false
 
         val now = System.currentTimeMillis()
         val expiresAt = getAccessTokenExpiresAt()
@@ -194,9 +197,7 @@ object TokenManager {
         }
     }
 
-    private fun resolveExpiresAt(now: Long, expiresInSeconds: Long?, scope: String?): Long {
-        if (scope == SCOPE_NON_EXPIRING) return Long.MAX_VALUE
-
+    private fun resolveExpiresAt(now: Long, expiresInSeconds: Long?, accessToken: String): Long {
         val explicitExpiry = expiresInSeconds
             ?.takeIf { it > 0L }
             ?.let { seconds ->
@@ -205,6 +206,7 @@ object TokenManager {
             }
 
         if (explicitExpiry != null) return explicitExpiry
+        OAuthTokens.jwtExpiryMillis(accessToken)?.let { return it }
 
         val existingExpiry = getLongValue(KEY_TOKEN_EXPIRES_AT, 0L)
         if (existingExpiry > now) return existingExpiry

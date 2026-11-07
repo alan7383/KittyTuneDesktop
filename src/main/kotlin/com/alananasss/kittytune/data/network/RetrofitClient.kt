@@ -35,7 +35,7 @@ object RetrofitClient {
 
         val authInterceptor = Interceptor { chain ->
             val originalRequest = chain.request()
-            var token = SessionManager.harvestStoredSession() ?: tokenManager.getAccessToken()
+            var token = tokenManager.getAccessToken()
 
             if (!token.isNullOrEmpty() && !tokenManager.isGuestMode() && tokenManager.shouldRefreshAccessToken()) {
                 token = SessionManager.refreshSessionBlocking(
@@ -57,7 +57,7 @@ object RetrofitClient {
             }
 
             val deviceId = Config.getOrCreateSoundCloudDeviceId()
-            val buildVersion = "2026.10.08-release"
+            val buildVersion = "2026.11.02-release"
             // Android Build.VERSION.RELEASE / MODEL are unavailable on desktop —
             // use stable values matching a generic device (the API only reads the UA loosely).
             val customUserAgent = "SoundCloud/$buildVersion (Android 14; Pixel 8)"
@@ -67,7 +67,7 @@ object RetrofitClient {
                 .header("User-Agent", customUserAgent)
                 .header("Accept", "application/json")
                 .header("Accept-Language", com.alananasss.kittytune.core.Strings.getAcceptLanguage())
-                .header("App-Version", "376070")
+                .header("App-Version", "379060")
                 .header("UDID", deviceId)
 
             if (!token.isNullOrEmpty()) {
