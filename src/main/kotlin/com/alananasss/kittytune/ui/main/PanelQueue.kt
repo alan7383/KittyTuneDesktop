@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.alananasss.kittytune.ui.player.queuePastIndices
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -110,12 +111,10 @@ internal fun QueueList(vm: PlayerViewModel) {
     val currentIndex = vm.uiCurrentQueueIndex
     val keys = remember(queue) { queueItemKeys(queue) }
 
-    // Compacted for having been heard, not for sitting at a lower index. Jumping ahead to the sixth
-    // track used to draw the five skipped ones as "already played", and jumping back drew the ones
-    // really heard as still to come (issue #33).
     val played = vm.playedTrackIds
-    val pastIndices = remember(queue, currentIndex, played) {
-        queue.indices.filter { it < currentIndex - 1 && queue[it].id in played }
+    val preserveUpcoming = vm.isQueuePreserveUpcomingEnabled
+    val pastIndices = remember(queue, currentIndex, played, preserveUpcoming) {
+        queuePastIndices(queue, currentIndex, played, preserveUpcoming)
     }
     val pastCount = pastIndices.size
     val firstPast = pastIndices.firstOrNull()
@@ -125,7 +124,7 @@ internal fun QueueList(vm: PlayerViewModel) {
 
     val upNextCount = (queue.size - currentIndex - 1).coerceAtLeast(0)
 
-    val listItems = remember(queue, currentIndex, played, isPastExpanded, upNextCount) {
+    val listItems = remember(queue, currentIndex, pastIndices, isPastExpanded, upNextCount) {
         buildList {
             for (index in queue.indices) {
                 if (index == firstPast) add(QueueListItem.PastHeader(count = pastCount, isExpanded = isPastExpanded))
@@ -368,7 +367,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
             .hoverable(interactionSource)
             .onClick(
                 matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                onClick = { vm.showTrackOptions(track) }
+                onClick = { vm.showTrackOptions(track, fromPlayer = true, queueIndex = index) }
             )
             .clickable(interactionSource = interactionSource, indication = null) { vm.skipToQueueItem(index) }
             .padding(horizontal = 8.dp, vertical = if (isPast) 4.dp else 6.dp)
