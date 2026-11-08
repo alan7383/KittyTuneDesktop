@@ -112,7 +112,10 @@ class RainPlayer {
                 initPlayer()
                 clip?.start()
             } else {
-                clip?.stop()
+                // Closed, not just stopped: a Clip holds the whole decoded loop in memory (18 MB for
+                // the rain), and a stopped one kept it until exit. Turning it back on reopens it from
+                // the cached WAV, which is a few milliseconds.
+                releaseClip()
             }
         }
     }
