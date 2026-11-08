@@ -19,6 +19,7 @@ kotlin-js-store/
 !src/main/resources/icons/variants/*.png
 *.wav
 *.py
+!scripts/check-linux-dbus.py
 *.ps1
 !scripts/build-smtc-bridge.ps1
 !scripts/build-native-windows.ps1
