@@ -479,6 +479,9 @@ class PlayerPreferences {
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
+        private const val KEY_PROTECTED_TRACKS = "protected_tracks_enabled"
+        private const val KEY_PROTECTED_BACKEND = "protected_backend"
+        private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
         private const val KEY_WIDEVINE_CDM_PATH = "widevine_cdm_path"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
@@ -778,6 +781,18 @@ class PlayerPreferences {
     /** A CDM the user pointed at, when automatic discovery did not find one. Empty means "search". */
     fun getWidevineCdmPath(): String = Prefs.getString(KEY_WIDEVINE_CDM_PATH, "") ?: ""
     fun setWidevineCdmPath(path: String) = Prefs.putString(KEY_WIDEVINE_CDM_PATH, path)
+
+    /** Off, SoundCloud's protected streams are never tried and a track goes to its other sources. */
+    fun getProtectedTracksEnabled(): Boolean = Prefs.getBoolean(KEY_PROTECTED_TRACKS, true)
+    fun setProtectedTracksEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PROTECTED_TRACKS, enabled)
+
+    /** Windows only: "playready" (the OS renderer) or "wsl" (the Widevine sidecar in WSL). */
+    fun getProtectedBackend(): String = Prefs.getString(KEY_PROTECTED_BACKEND, "playready") ?: "playready"
+    fun setProtectedBackend(backend: String) = Prefs.putString(KEY_PROTECTED_BACKEND, backend)
+
+    /** Whether the protected tracks introduction was shown, so it opens by itself only once. */
+    fun getDrmOnboardingDone(): Boolean = Prefs.getBoolean(KEY_DRM_ONBOARDING_DONE, false)
+    fun setDrmOnboardingDone(done: Boolean) = Prefs.putBoolean(KEY_DRM_ONBOARDING_DONE, done)
 
     fun getDownloadDrmStreamsEnabled(): Boolean = Prefs.getBoolean(KEY_DOWNLOAD_DRM_STREAMS, true)
     fun setDownloadDrmStreamsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DOWNLOAD_DRM_STREAMS, enabled)

@@ -40,6 +40,27 @@ object SoundCloudWidevineLicense {
     @Volatile
     internal var persistableUrl: String = PERSISTABLE_URL
 
+    /**
+     * True once the server has answered `403` to a licence request from this machine.
+     *
+     * A `403` is not transient: the server judges the *client identity* inside the request, and a CDM
+     * driven outside a browser is refused on Windows (measured; see `docs/SOUNDCLOUD_DRM_WINDOWS.md`).
+     * Re-asking for every protected track only costs a round trip and fails the fragment afterwards,
+     * so the refusal is remembered for the session and `StreamResolver` stops offering encrypted
+     * candidates — which lets its existing provider / preview fallback take over.
+     */
+    @Volatile
+    var licenceRefused: Boolean = false
+        private set
+
+    /**
+     * Forgets a previous refusal. Production keeps the answer for the whole run, except when a
+     * different CDM takes over (the WSL sidecar replacing the refused in-process one).
+     */
+    internal fun resetLicenceRefusal() {
+        licenceRefused = false
+    }
+
     private val OCTET_STREAM = "application/octet-stream".toMediaType()
 
     internal var client: okhttp3.OkHttpClient.Builder = ProxyManager.getOkHttpClient().newBuilder()
@@ -70,12 +91,17 @@ object SoundCloudWidevineLicense {
             call.execute().use { response ->
                 val body = response.body?.bytes()
                 if (!response.isSuccessful) {
+                    // 403 is the server judging the client identity, not a bad token: remember it so
+                    // the resolver stops routing protected tracks into a licence exchange that the
+                    // server will refuse every time on this machine.
+                    if (response.code == 403) licenceRefused = true
                     val detail = body
                         ?.let { String(it, 0, minOf(it.size, 160), Charsets.UTF_8) }
                         ?.trim()
                     throw DrmLicenseException(
                         "license server answered HTTP ${response.code}" +
-                            (if (detail.isNullOrEmpty()) "" else ": $detail")
+                            (if (detail.isNullOrEmpty()) "" else ": $detail") +
+                            refusalHint(response.code)
                     )
                 }
                 if (body == null || body.isEmpty()) {
@@ -89,6 +115,23 @@ object SoundCloudWidevineLicense {
         } catch (e: IOException) {
             throw DrmLicenseException("license request failed: ${e.message}", e)
         }
+    }
+
+    /**
+     * Why a `403` under Windows is not a bug in the bridge, spelled out once.
+     *
+     * The server judges the client identity carried in the request body. A CDM driven outside a
+     * browser presents an identity Windows is refused for, while the same CDM on Linux gets a
+     * licence — measured, and documented in `docs/SOUNDCLOUD_DRM_WINDOWS.md`. Saying so in the
+     * exception turns a bare `HTTP 403` in a log into something a user can act on.
+     */
+    private fun refusalHint(code: Int): String {
+        if (code != 403) return ""
+        val os = System.getProperty("os.name").orEmpty()
+        if (!os.startsWith("Windows", ignoreCase = true)) return ""
+        return " — SoundCloud refuses the client identity presented by a CDM driven outside a " +
+            "browser on Windows, so protected tracks cannot be decrypted here; see " +
+            "docs/SOUNDCLOUD_DRM_WINDOWS.md"
     }
 
     private const val TAG = "SoundCloudWidevineLicense"

@@ -156,7 +156,7 @@ class CencDecrypterTest {
         #EXTM3U
         #EXT-X-VERSION:7
         #EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,AAAAa3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAAEsSEBb7NIiL+lkEpnFuMsqjKa4aC2J1eWRybWtleW9zIiQwNGJjMjkxYy1jM2E0LTQzMTAtYWNjNy0wMDU3MGYyNTk5ODZI49yVmwY=",IV=0x16fb34888bfa5904a6716e32caa329ae,KEYID=0x16fb34888bfa5904a6716e32caa329ae,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1"
-        #EXT-X-KEY:METHOD=SAMPLE-AES-CTR,URI="data:text/plain;charset=UTF-16;base64,AAQAAAEAAQD2AzwA",KEYID=0x16fb34888bfa5904a6716e32caa329ae,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1"
+        #EXT-X-KEY:METHOD=SAMPLE-AES-CTR,URI="data:text/plain;charset=UTF-16;base64,AAQAAAEAAQD2AzwAVwBSAE0ASABFAEEARABFAFIAIAB4AG0AbABuAHMAPQAiAGgAdAB0AHAAOgAvAC8AcwBjAGgAZQBtAGEAcwAuAG0AaQBjAHIAbwBzAG8AZgB0AC4AYwBvAG0ALwBEAFIATQAvADIAMAAwADcALwAwADMALwBQAGwAYQB5AFIAZQBhAGQAeQBIAGUAYQBkAGUAcgAiACAAdgBlAHIAcwBpAG8AbgA9ACIANAAuADAALgAwAC4AMAAiAD4APABEAEEAVABBAD4APABQAFIATwBUAEUAQwBUAEkATgBGAE8APgA8AEsARQBZAEwARQBOAD4AMQA2ADwALwBLAEUAWQBMAEUATgA+ADwAQQBMAEcASQBEAD4AQQBFAFMAQwBUAFIAPAAvAEEATABHAEkARAA+ADwALwBQAFIATwBUAEUAQwBUAEkATgBGAE8APgA8AEsASQBEAD4AaQBEAFQANwBGAHYAcQBMAEIARgBtAG0AYwBXADQAeQB5AHEATQBwAHIAZwA9AD0APAAvAEsASQBEAD4APABMAEEAXwBVAFIATAA+AGgAdAB0AHAAcwA6AC8ALwBsAGkAYwBlAG4AcwBlAC4AbQBlAGQAaQBhAC0AcwB0AHIAZQBhAG0AaQBuAGcALgBzAG8AdQBuAGQAYwBsAG8AdQBkAC4AYwBsAG8AdQBkAC8AcABsAGEAeQBiAGEAYwBrAC8AcABsAGEAeQByAGUAYQBkAHkAPAAvAEwAQQBfAFUAUgBMAD4APABEAFMAXwBJAEQAPgBWAGwAUgA3AEkAZABzAEkASgBFAHUAUgBkADAANgBMAGEAcQBzADIAagB3AD0APQA8AC8ARABTAF8ASQBEAD4APABDAFUAUwBUAE8ATQBBAFQAVABSAEkAQgBVAFQARQBTACAAeABtAGwAbgBzAD0AIgAiAD4APABDAEkARAA+AE0ARABSAGkAWQB6AEkANQBNAFcATQB0AFkAegBOAGgATgBDADAAMABNAHoARQB3AEwAVwBGAGoAWQB6AGMAdABNAEQAQQAxAE4AegBCAG0ATQBqAFUANQBPAFQAZwAyADwALwBDAEkARAA+ADwARABSAE0AVABZAFAARQA+AHMAbQBvAG8AdABoADwALwBEAFIATQBUAFkAUABFAD4APAAvAEMAVQBTAFQATwBNAEEAVABUAFIASQBCAFUAVABFAFMAPgA8AEMASABFAEMASwBTAFUATQA+AGQANABLAGsAWgBkAGYANwBkAGcAcwA9ADwALwBDAEgARQBDAEsAUwBVAE0APgA8AC8ARABBAFQAQQA+ADwALwBXAFIATQBIAEUAQQBEAEUAUgA+AA==",KEYID=0x16fb34888bfa5904a6716e32caa329ae,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1"
         #EXT-X-MAP:URI="https://playback.media-streaming.soundcloud.cloud/cenc/x/aac_160k/h/init.mp4"
         #EXTINF:10.008,
         https://playback.media-streaming.soundcloud.cloud/cenc/x/aac_160k/h/data000.m4s
@@ -177,6 +177,27 @@ class CencDecrypterTest {
         assertEquals("pssh", String(pssh, 4, 4, Charsets.US_ASCII))
         // Widevine's system id, big-endian: edef8ba9-79d6-4ace-a3c8-27dcd51d21ed
         assertEquals("edef8ba979d64acea3c827dcd51d21ed", IsoBmff.hex(pssh, 12, 28))
+    }
+
+    @Test
+    fun playReadyKeyNamesTheWindowsLicenseEndpoint() {
+        val info = HlsEncryptionInfo.parsePlayReady(realPlaylist)
+        assertNotNull("the playlist carries a PlayReady key line", info)
+        assertEquals(
+            "https://license.media-streaming.soundcloud.cloud/playback/playready",
+            info!!.licenseUrl,
+        )
+        assertEquals("16fb34888bfa5904a6716e32caa329ae", info.keyIdHex)
+        assertEquals("217b5456-08db-4b24-9177-4e8b6aab368f", info.domainServiceId)
+        assertEquals("AESCTR", info.algorithm)
+        assertEquals(
+            "MDRiYzI5MWMtYzNhNC00MzEwLWFjYzctMDA1NzBmMjU5OTg2",
+            info.customAttributes["CID"],
+        )
+        assertEquals(
+            "https://license.media-streaming.soundcloud.cloud/playback/playready?license_token=abc",
+            info.licenseUrlWithToken("abc"),
+        )
     }
 
     @Test

@@ -180,6 +180,8 @@ class AudioEngine {
         private set
     private var currentHeaders: Map<String, String> = emptyMap()
     private var hlsAdapter: HlsStreamAdapter? = null
+    @Volatile private var protectedPlayback: WindowsProtectedPlayback? = null
+    val usesProtectedPlayback: Boolean get() = protectedPlayback != null
 
     /**
      * License token of the track being prepared, for a Widevine-protected (`ctr-encrypted-hls`) stream.
@@ -236,7 +238,47 @@ class AudioEngine {
             licenseToken = trackId?.let { id ->
                 runCatching { com.alananasss.kittytune.data.MusicManager.getDrmToken(id) }.getOrNull()
             }
-            hlsAdapter = if (url.contains(".m3u8")) {
+            // Key by the resolved URL, not just track id: a provider/plain-stream fallback for
+            // the same track must never inherit its previous protected stream's token.
+            val nativeToken = WindowsPlayReadyRuntime.tokenFor(url)
+            val nativeRoot = if (nativeToken != null) WindowsPlayReadyRuntime.bridgeDirectory else null
+            // With the CDM sidecar configured, a protected URL decodes in-process like any other
+            // stream: the fragments are decrypted into the FFmpeg path, so the whole DSP chain runs.
+            // PlayReady is the fallback, not the destination, exactly when the sidecar is absent.
+            val preferSidecar = com.alananasss.kittytune.data.drm.SoundCloudDrm.usesSidecar
+            if (nativeRoot != null && nativeToken != null && !preferSidecar) {
+                lateinit var playback: WindowsProtectedPlayback
+                playback = WindowsProtectedPlayback(nativeRoot, url, nativeToken, startPositionMs,
+                    onStatus = { status -> scope.launch(Dispatchers.Main) {
+                        if (protectedPlayback !== playback || released) return@launch
+                        positionMs = status.positionMs
+                        durationMs = status.durationMs
+                        if (status.ended) {
+                            setPlaying(false)
+                            setState(State.ENDED)
+                            onCompletion?.invoke()
+                        } else if (status.durationMs > 0) {
+                            val nextState = if (status.state == 1 || status.state == 2) State.BUFFERING else State.READY
+                            if (state != nextState) setState(nextState)
+                            if (status.state >= 3) setPlaying(status.state == 3)
+                        }
+                    } },
+                    onError = { error -> scope.launch(Dispatchers.Main) {
+                        if (protectedPlayback !== playback || released) return@launch
+                        setPlaying(false)
+                        setState(State.IDLE)
+                        onError?.invoke(error)
+                    } },
+                    prepare = { directory, stream -> WindowsProtectedMedia.prepare(directory, stream, headers) },
+                )
+                protectedPlayback = playback
+                playback.volume(nativeVolume())
+                playback.rate(effects.speed)
+                playback.effects(effects)
+            }
+            // The previous track's stream no longer needs its DRM session (and the CDM behind it).
+            hlsAdapter?.releaseDrm()
+            hlsAdapter = if (protectedPlayback == null && url.contains(".m3u8")) {
                 (HlsHeadCache.take(url, ::reResolveUrl)
                     ?: HlsStreamAdapter(url, headers, refreshPlaylistUrl = ::reResolveUrl)).also {
                     it.licenseToken = licenseToken
@@ -249,7 +291,7 @@ class AudioEngine {
         }
 
         val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-        if (com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
+        if (protectedPlayback == null && com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
             com.alananasss.kittytune.audio.ai.AiDetectionManager.analyzeTrackUpfront(
                 urlOrPath = url,
                 headers = headers,
@@ -306,6 +348,7 @@ class AudioEngine {
     @Synchronized
     fun prepare() {
         if (released) return
+        if (protectedPlayback != null) return // The native MediaPlayer prepares its protected source.
         val url = currentUrl ?: return
         stopFlag = false
         val newWorkerId = ++activeWorkerId
@@ -371,6 +414,37 @@ class AudioEngine {
 
     fun play() {
         if (released) return
+        protectedPlayback?.let {
+            if (state == State.ENDED) it.seek(0)
+            val pausedFor = if (paused && pausedTimestamp > 0) System.currentTimeMillis() - pausedTimestamp else 0L
+            paused = false
+            pausedTimestamp = 0L
+            val failedUrl = currentUrl
+            if (pausedFor > RECONNECT_AFTER_PAUSE_MS && failedUrl != null) {
+                val playback = it
+                val resumePosition = positionMs
+                scope.launch(Dispatchers.IO) {
+                    val fresh = reResolveUrl(failedUrl)
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        if (protectedPlayback !== playback || released) return@withContext
+                        val token = fresh?.let(WindowsPlayReadyRuntime::tokenFor)
+                        if (fresh != null && token != null) {
+                            currentUrl = fresh
+                            playback.replaceSource(fresh, token, resumePosition)
+                            playback.play()
+                        } else if (fresh != null) {
+                            // Re-resolution may select a provider/plain stream. Hand it back to
+                            // the ordinary decoder instead of asking PlayReady to open it.
+                            setMediaItem(fresh, currentHeaders, resumePosition)
+                            prepare()
+                            play()
+                        } else playback.play()
+                    }
+                }
+            } else it.play()
+            setPlaying(true)
+            return
+        }
         warmUpJob?.cancel()
         warmUpJob = null
         val pausedFor = if (paused && pausedTimestamp > 0L) System.currentTimeMillis() - pausedTimestamp else 0L
@@ -401,6 +475,13 @@ class AudioEngine {
     }
 
     fun pause() {
+        protectedPlayback?.let {
+            paused = true
+            pausedTimestamp = System.currentTimeMillis()
+            it.pause()
+            setPlaying(false)
+            return
+        }
         paused = true
         pausedTimestamp = System.currentTimeMillis()
         setPlaying(false)
@@ -452,6 +533,7 @@ class AudioEngine {
     fun seekTo(ms: Long) {
         if (released) return
         val coerced = ms.coerceAtLeast(0)
+        protectedPlayback?.let { it.seek(coerced); positionMs = coerced; return }
         seekRequestMs = coerced
         positionMs = coerced
         aiDetection.notifySeek(coerced)
@@ -462,6 +544,7 @@ class AudioEngine {
     fun setVolume(v: Float) {
         if (released) return
         volume = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
+        protectedPlayback?.volume(nativeVolume())
         applyLineVolume()
     }
 
@@ -469,10 +552,13 @@ class AudioEngine {
     fun setTrackGainDb(db: Float) {
         if (released) return
         trackGainDb = db.coerceIn(TRACK_GAIN_MIN_DB, TRACK_GAIN_MAX_DB)
+        protectedPlayback?.volume(nativeVolume())
         applyLineVolume()
     }
 
     fun getVolume(): Float = volume
+
+    private fun nativeVolume(): Double = (volume * Math.pow(10.0, trackGainDb / 20.0)).coerceIn(0.0, 1.0)
 
     /**
      * The media position being heard right now: [positionMs] is where decoding is, and the output
@@ -521,6 +607,8 @@ class AudioEngine {
         if (released) return
         released = true
         stop()
+        // Without this the CDM (with WSL, a whole Linux VM) would stay up until it noticed it was idle.
+        hlsAdapter?.releaseDrm()
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         // Terminal: this engine is being discarded. stopInternal() only flush()es the
@@ -670,6 +758,8 @@ class AudioEngine {
 
         val pitch = if (state.isPitchEnabled) state.speed else 1f
         stretcher.setParameters(state.speed, pitch)
+        protectedPlayback?.rate(state.speed)
+        protectedPlayback?.effects(state)
 
         limiter.setCeiling(peakLimiterCeilingFor(state))
     }
@@ -710,6 +800,7 @@ class AudioEngine {
         if (isHls) {
             var adapter = hlsAdapter
             if (adapter == null || adapter.playlistUrl != targetUrl) {
+                adapter?.releaseDrm()
                 adapter = HlsStreamAdapter(targetUrl, headers, refreshPlaylistUrl = ::reResolveUrl).also {
                     it.licenseToken = licenseToken
                 }
@@ -1303,6 +1394,9 @@ class AudioEngine {
 
     @Synchronized
     private fun stopInternal() {
+        val native = protectedPlayback
+        protectedPlayback = null
+        native?.close()
         warmUpJob?.cancel()
         warmUpJob = null
         warmUpRequested = false

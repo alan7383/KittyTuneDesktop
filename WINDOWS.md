@@ -4,11 +4,24 @@ Extract `KittyTune-<version>-Windows-Portable-x64.zip` into a writable folder an
 open `KittyTune/KittyTune.exe`. Keep `app` and `runtime` beside the executable.
 The Java runtime is included; no installer or system Java is required.
 
+SoundCloud protected playback uses an unpackaged native Windows PlayReady renderer.
+It requires no Developer Mode, MSIX registration, Store publication or certificate import.
+The x64 renderer targets Windows 10 version 2004 or newer and Windows 11.
+Encrypted fragments are cached before playback starts; startup depends on the network.
+See [the implementation and verified limits](docs/SOUNDCLOUD_PLAYREADY_WINDOWS.md).
+
 The portable package uses the normal KittyTune profile in `%APPDATA%\KittyTune`
 and cache in `%LOCALAPPDATA%\KittyTuneCache`. It does not relocate settings into
 the extracted folder. Exit an older running version from its tray menu before
 starting another version, because single-instance handling can reopen the old
 process.
+
+When building inside a Codex workspace, test the portable ZIP after extracting it
+outside the workspace (for example, in Downloads). Workspace executables can inherit
+a Windows Low integrity label and then fail to create SQLite's temporary lock file
+in the normal user profile; jpackage displays the misleading "Failed to launch JVM"
+dialog. ZIP extraction into a normal user directory creates files with that directory's
+normal security metadata. Do not change the workspace's sandbox ACLs to work around it.
 
 ## Build
 

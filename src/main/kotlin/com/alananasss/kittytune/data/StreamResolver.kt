@@ -10,6 +10,8 @@ import com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality
 import com.alananasss.kittytune.data.drm.SoundCloudDrm
+import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
+import com.alananasss.kittytune.data.drm.ProtectedBackend
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.CookieStore
 import com.alananasss.kittytune.data.network.RetrofitClient
@@ -183,6 +185,11 @@ object StreamResolver {
         streamCache.remove(trackId)
     }
 
+    /** Drops every resolved stream, so a changed source policy applies from the next play. */
+    fun forgetStreams() {
+        streamCache.clear()
+    }
+
     /** The cached URL for [trackId] while it is still playable, else null. */
     fun cachedStreamUrl(trackId: Long): String? =
         streamCache[trackId]?.takeIf { it.isUsable() }?.stream?.url
@@ -262,6 +269,7 @@ object StreamResolver {
             val cached = streamCache[track.id]
             if (cached != null) {
                 if (cached.isUsable() && (!isRestricted(track) || (cached.stream.source != "soundcloud" && cached.stream.source != null))) {
+                    WindowsPlayReadyRuntime.rememberStream(cached.stream.url, cached.stream.licenseAuthToken)
                     return cached.stream
                 }
                 streamCache.remove(track.id)
@@ -391,7 +399,7 @@ object StreamResolver {
 
                     if (ytFallback != null) {
                         ytFallback
-                    } else if (restricted) {
+                    } else if (restricted && !forDownload) {
                         Logger.w("StreamResolver", "All alternatives failed for restricted track '${trackToResolve.title}', using 30s preview snippet as last resort")
                         resolveFromSoundCloudWithDrm(trackToResolve, forDownload, allowSnippet = true)
                     } else {
@@ -625,62 +633,39 @@ object StreamResolver {
 
     private const val RACE_POLL_MS = 40L
 
-    /**
-     * How far a YouTube candidate's length may be from the track's before it is rejected.
-     *
-     * Wide enough for the usual differences — a fade, a bit of silence, an intro on the upload — and far
-     * too narrow for a snippet or a teaser to slip through.
-     */
-    private const val DURATION_TOLERANCE_SEC = 12L
+    /** Recording identity is checked before duration, including for restricted previews (issue #76). */
+    private fun youtubeFallbackRecording(track: Track): YoutubeFallbackMatcher.Recording {
+        val duration = track.effectiveFullDurationMs ?: 0L
+        val restricted = isRestricted(track) || track.isSnipped
+        val snippet = (restricted || duration in 1..45_000) && track.fullDurationMs == null
+        return YoutubeFallbackMatcher.Recording(track.title.orEmpty(),
+            track.displayArtist.ifBlank { track.user?.username.orEmpty() }, duration / 1000, restricted || snippet, snippet)
+    }
+
+    internal fun matchYoutubeFallbackVideo(track: Track, videos: List<StreamInfoItem>): StreamInfoItem? {
+        val selected = YoutubeFallbackMatcher.match(youtubeFallbackRecording(track), videos.map {
+            YoutubeFallbackMatcher.Candidate(it.url, it.name, listOf(it.uploaderName.orEmpty()), it.duration)
+        }) ?: return null
+        return videos.firstOrNull { it.url == selected.id }
+    }
 
     private fun resolveViaNewPipe(track: Track): String? {
         ensureNewPipeClientVersion()
         fun extract(): String? {
-            val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
-            val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.trim()
-            val query = if (artistName.isNotBlank() && !cleanTitle.contains(artistName, ignoreCase = true)) {
-                "$cleanTitle $artistName"
-            } else {
-                cleanTitle.ifBlank { track.title.orEmpty().trim() }
-            }
-
+            val recording = youtubeFallbackRecording(track)
+            val queries = YoutubeFallbackMatcher.queries(recording)
+            if (queries.isEmpty()) return null
             val youtubeService = ServiceList.YouTube
-            val searchInfo = SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), ""))
-            val videoResults = searchInfo.relatedItems.filterIsInstance<StreamInfoItem>()
-
-            if (videoResults.isEmpty()) return null
-
-            // The first hit was taken blindly, and that is how a twenty-second clip came to stand in for a
-            // three-minute song: YouTube's top result for a track name is frequently a snippet, a teaser or
-            // a "sped up" edit. A substitute has to be the same length as the thing it replaces, so results
-            // whose duration is nowhere near the track's are dropped, and among what is left the closest
-            // wins (issue #33).
-            val rawDurationMs = track.effectiveFullDurationMs ?: track.durationMs ?: 0L
-            val restricted = isRestricted(track)
-            val isSnippetDuration = restricted && rawDurationMs <= 45_000L
-            val wantedSec = if (isSnippetDuration) 0L else rawDurationMs / 1000L
-            val firstResultUrl = if (wantedSec <= 0) {
-                // No duration or snippet track — prefer a full-length video (>45s) over teasers
-                val nonTeaser = videoResults.firstOrNull { it.duration > 45 }
-                (nonTeaser ?: videoResults.first()).url
-            } else {
-                val matched = videoResults
-                    .filter { it.duration > 0 && kotlin.math.abs(it.duration - wantedSec) <= DURATION_TOLERANCE_SEC }
-                    .minByOrNull { kotlin.math.abs(it.duration - wantedSec) }
-                    ?: if (restricted) {
-                        videoResults.filter { it.duration > 0 && kotlin.math.abs(it.duration - wantedSec) <= 30L }
-                            .minByOrNull { kotlin.math.abs(it.duration - wantedSec) }
-                            ?: videoResults.firstOrNull { it.duration > 45 }
-                    } else null
-                if (matched == null) {
-                    println(
-                        "StreamResolver: no YouTube result within tolerance of " +
-                            "${wantedSec}s for '${track.title}' — refusing to substitute a different song"
-                    )
-                    return null
-                }
-                matched.url
-            }
+            val videoResults = queries.flatMap { query ->
+                try {
+                    SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), ""))
+                        .relatedItems.filterIsInstance<StreamInfoItem>()
+                } catch (cancelled: java.util.concurrent.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) { emptyList() }
+            }.distinctBy { it.url }
+            val selected = matchYoutubeFallbackVideo(track, videoResults) ?: return null
+            val firstResultUrl = selected.url
             val extractor = youtubeService.getStreamExtractor(firstResultUrl)
             extractor.fetchPage()
 
@@ -824,11 +809,27 @@ object StreamResolver {
         // license cannot be answered without one, and a protected fragment without a key is noise.
         // Downloads use them too — DrmStreamDownloader writes a decrypted, clear file — so a track
         // that exists nowhere else can be saved and then played back without any CDM at all.
-        val allowDrm = SoundCloudDrm.isAvailable
+        //
+        // [canLicense] drops out of the first `403` from the licence server: a CDM that is installed
+        // but refused (any CDM driven outside a browser on Windows) would otherwise send every
+        // protected track into a licence exchange that cannot succeed. Returning no candidate here is
+        // what lets the caller fall through to its providers and its 30 s preview.
+        // Windows playback uses its own PlayReady/PMP renderer. Download/analysis must still
+        // require a CDM that can supply samples to our decoder.
+        // The user's switch comes first: turned off, not even the CDM is loaded, and the caller moves
+        // straight on to its other sources.
+        val preferences = PlayerPreferences()
+        val protectedEnabled = preferences.getProtectedTracksEnabled()
+        // On Windows the in-process Widevine CDM is always refused, so Widevine only counts when the
+        // user chose WSL; PlayReady stays the playback fallback while WSL does not answer.
+        val widevineAllowed = !WindowsPlayReadyRuntime.windows || ProtectedBackend.current == ProtectedBackend.WSL
+        val allowDrm = protectedEnabled &&
+            ((!forDownload && WindowsPlayReadyRuntime.isAvailable) || (widevineAllowed && SoundCloudDrm.canLicense))
         val candidates = buildTranscodingCandidates(transcodingsWithMobile, qualityPref, forDownload, allowDrm)
 
         if (candidates.isEmpty()) {
-            notifyIfOnlyProtected(transcodingsWithMobile)
+            // A choice the user made needs no notice.
+            if (protectedEnabled) notifyIfOnlyProtected(transcodingsWithMobile)
             return null
         }
 
@@ -924,11 +925,13 @@ object StreamResolver {
 
                 val isHlsLike = protocol == "hls" || protocol.contains("encrypted-hls") || streamInfoUrl.contains(".m3u8")
                 if (isHlsLike) {
+                    WindowsPlayReadyRuntime.rememberStream(streamInfoUrl, licenseAuthToken)
                     return ResolvedStream(streamInfoUrl, licenseAuthToken, mimeType = resolvedMime, source = "soundcloud")
                 }
 
                 // Progressive stream: if already a CDN media URL (sndcdn.com or .mp3), return directly without extra network request
                 if (streamInfoUrl.contains("sndcdn.com") || streamInfoUrl.contains(".mp3") || streamInfoUrl.contains("media-streaming.soundcloud.cloud")) {
+                    WindowsPlayReadyRuntime.rememberStream(streamInfoUrl, licenseAuthToken)
                     return ResolvedStream(streamInfoUrl, licenseAuthToken, mimeType = resolvedMime, source = "soundcloud")
                 }
 
@@ -945,6 +948,7 @@ object StreamResolver {
                     finalUrl.contains(".ogg") -> "audio/ogg"
                     else -> resolvedMime
                 }
+                WindowsPlayReadyRuntime.rememberStream(finalUrl, licenseAuthToken)
                 return ResolvedStream(finalUrl, licenseAuthToken, mimeType = finalMime, source = "soundcloud")
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1047,8 +1051,15 @@ object StreamResolver {
         if (!onlyProtected) return
         val now = System.currentTimeMillis()
         if (now - lastDrmNoticeAt.getAndSet(now) < DRM_NOTICE_INTERVAL_MS) return
+        // Installing a browser is advice for the Widevine platforms: it changes nothing on Windows.
         com.alananasss.kittytune.core.Toaster.show(
-            com.alananasss.kittytune.core.str(com.alananasss.kittytune.R.string.drm_unavailable_toast)
+            com.alananasss.kittytune.core.str(
+                if (WindowsPlayReadyRuntime.windows) {
+                    com.alananasss.kittytune.R.string.drm_unavailable_toast_windows
+                } else {
+                    com.alananasss.kittytune.R.string.drm_unavailable_toast
+                }
+            )
         )
     }
 
@@ -1088,13 +1099,13 @@ object StreamResolver {
     suspend fun resolveStreamForBeatAnalysis(track: Track): ResolvedStream? {
         return withContext(Dispatchers.IO) {
             val cached = cachedStreamUrl(track.id)
-            if (!cached.isNullOrBlank()) {
+            if (!cached.isNullOrBlank() && WindowsPlayReadyRuntime.tokenFor(cached) == null) {
                 Logger.d("StreamResolver", "[BeatAnalysis] Using cached stream for '${track.title}'")
                 return@withContext ResolvedStream(cached)
             }
 
             val scStream = try {
-                resolveFromSoundCloudWithDrm(track, forDownload = false)
+                resolveFromSoundCloudWithDrm(track, forDownload = true)
             } catch (e: Exception) {
                 Logger.w("StreamResolver", "[BeatAnalysis] Failed resolving SoundCloud stream: ${e.message}")
                 null

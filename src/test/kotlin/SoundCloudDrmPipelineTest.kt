@@ -8,6 +8,9 @@ import com.alananasss.kittytune.data.drm.SoundCloudWidevineLicense
 import com.alananasss.kittytune.data.drm.WidevineCdm
 import com.alananasss.kittytune.data.drm.WidevineCdmRegistry
 import com.alananasss.kittytune.data.drm.WidevineLicenseSession
+import com.alananasss.kittytune.data.StreamResolver
+import com.alananasss.kittytune.domain.Format
+import com.alananasss.kittytune.domain.Transcoding
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import org.junit.Assert.assertEquals
@@ -49,6 +52,7 @@ class SoundCloudDrmPipelineTest {
     private lateinit var base: String
 
     private val licensePosts = AtomicInteger(0)
+    private val licenseRefusals = AtomicInteger(0)
     private val licenseRequests = mutableListOf<ByteArray>()
     private val originalPlaybackUrl = SoundCloudWidevineLicense.playbackUrl
 
@@ -86,6 +90,13 @@ class SoundCloudDrmPipelineTest {
             synchronized(licenseRequests) { licenseRequests.add(exchange.requestBody.readBytes()) }
             respond(exchange, "LICENSE".toByteArray(), "application/octet-stream")
         }
+        // What the licence server does to a CDM driven outside a browser on Windows.
+        server.createContext("/refuse/widevine") { exchange ->
+            licenseRefusals.incrementAndGet()
+            exchange.requestBody.readBytes()
+            exchange.sendResponseHeaders(403, 0)
+            exchange.responseBody.close()
+        }
         server.executor = null
         server.start()
         base = "http://127.0.0.1:${server.address.port}"
@@ -95,6 +106,7 @@ class SoundCloudDrmPipelineTest {
     @After
     fun stopServer() {
         SoundCloudWidevineLicense.playbackUrl = originalPlaybackUrl
+        SoundCloudWidevineLicense.resetLicenceRefusal()
         WidevineCdmRegistry.install(null)
         SoundCloudDrm.clearCache()
         server.stop(0)
@@ -231,6 +243,65 @@ class SoundCloudDrmPipelineTest {
             failure!!.message!!.contains("license token", ignoreCase = true)
         )
         assertEquals(0, licensePosts.get())
+    }
+
+    /**
+     * A `403` is the server judging the client identity, and it will judge it the same way for every
+     * protected track on that machine. Remembering it is what lets `StreamResolver` stop routing
+     * these tracks into a licence exchange that cannot succeed, so its provider/preview fallback
+     * runs instead — the difference between a track that dies at the first fragment and one that
+     * plays from somewhere else.
+     */
+    @Test
+    fun aRefusedLicenceIsRememberedForTheRestOfTheRun() {
+        assertFalse("nothing has been refused yet", SoundCloudWidevineLicense.licenceRefused)
+        WidevineCdmRegistry.install(FakeCdm())
+        SoundCloudWidevineLicense.playbackUrl = "$base/refuse/widevine?license_token="
+
+        val adapter = HlsStreamAdapter("$base/playlist.m3u8", emptyMap())
+        adapter.licenseToken = "test-token"
+        val failure = runCatching { adapter.getInputStream(0).use { it.readBytes() } }.exceptionOrNull()
+
+        assertTrue("the adapter must fail rather than feed ciphertext, got $failure", failure is java.io.IOException)
+        assertTrue(
+            "a refused licence must be remembered, message was: ${failure?.cause?.message ?: failure?.message}",
+            SoundCloudWidevineLicense.licenceRefused
+        )
+        assertEquals("only one exchange should be attempted", 1, licenseRefusals.get())
+    }
+
+    /**
+     * With licensing off, a playlist that only offers encrypted presets must yield *no* candidate, so
+     * the resolver falls through to its providers and its 30 s preview instead of picking a stream it
+     * cannot decrypt. With licensing on, the same list must yield the Widevine preset.
+     */
+    @Test
+    fun drmOnlyTranscodingsYieldNoCandidateWhenLicensingIsOff() {
+        val drmOnly = listOf(
+            Transcoding(
+                url = "$base/ctr-encrypted/aac_160k",
+                preset = "aac_160k",
+                duration = 135_543,
+                format = Format(protocol = "ctr-encrypted-hls", mimeType = "audio/mp4"),
+            ),
+            Transcoding(
+                url = "$base/cbc-encrypted/aac_160k",
+                preset = "aac_160k",
+                duration = 135_543,
+                format = Format(protocol = "cbc-encrypted-hls", mimeType = "audio/mp4"),
+            ),
+        )
+
+        assertTrue(
+            "no encrypted candidate (Widevine nor FairPlay) without a usable licence",
+            StreamResolver.buildTranscodingCandidates(drmOnly, "HIGH", forDownload = false, allowDrm = false)
+                .none { it.format?.protocol?.contains("encrypted", ignoreCase = true) == true }
+        )
+        assertTrue(
+            "the Widevine preset must be offered when licensing is on",
+            StreamResolver.buildTranscodingCandidates(drmOnly, "HIGH", forDownload = false, allowDrm = true)
+                .any { it.format?.protocol == "ctr-encrypted-hls" }
+        )
     }
 
     // --- helpers ----------------------------------------------------------------------------------

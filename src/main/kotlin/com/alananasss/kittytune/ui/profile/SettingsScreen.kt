@@ -211,7 +211,7 @@ internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: Strin
     MISC_GENERAL("settings_cat_general", "misc_general_sub", Icons.Rounded.Tune),
     MISC_DISCORD("pref_discord_title", "misc_discord_sub", Icons.Rounded.Forum),
     MISC_CONTENT_FILTER("pref_content_filter_title", "pref_content_filter_subtitle", Icons.Rounded.Block),
-    MISC_DRM("pref_drm_title", "misc_drm_sub", Icons.Rounded.Lock),
+    MISC_DRM(drmSettingsTitleKey, "misc_drm_sub", Icons.Rounded.Lock),
 }
 
 private val interfacePages = listOf(
@@ -356,7 +356,7 @@ private fun SettingsPageContent(
         SettingsSubPage.MISC_GENERAL -> MiscGeneralPage()
         SettingsSubPage.MISC_DISCORD -> MiscDiscordPage(navController, playerViewModel)
         SettingsSubPage.MISC_CONTENT_FILTER -> ContentFilterSettingsPage()
-        SettingsSubPage.MISC_DRM -> DrmSettingsSection(showTitle = false)
+        SettingsSubPage.MISC_DRM -> DrmSettingsSection()
     }
 }
 
@@ -1044,7 +1044,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         ),
         // MISC - Content filtering & AI detection (issue #41)
         SettingsSearchItem(str("pref_content_filter_title"), str("pref_content_filter_subtitle"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.Block, keywords = listOf("content filter", "ai detection", "block music", "auto skip", "blocked tracks", "blocked artists", "suno", "udio", "artifactnet", "filtrage contenu", "détection ia", "bloquer musique", "titres bloqués", "artistes bloqués", "фильтр контента", "ии", "заблокированные")),
-        SettingsSearchItem(str("pref_drm_title"), str("misc_drm_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DRM)), Icons.Rounded.Lock, keywords = listOf("widevine", "cdm", "drm", "protected", "license", "licence", "chiffrement", "dechiffrement", "déchiffrement", "protégé", "widevine cdm", "verfahren", "защита", "лицензия", "korumalı")),
+        SettingsSearchItem(str(drmSettingsTitleKey), str("misc_drm_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DRM)), Icons.Rounded.Lock, keywords = listOf("widevine", "playready", "cdm", "drm", "protected", "license", "licence", "chiffrement", "dechiffrement", "déchiffrement", "protégé", "widevine cdm", "verfahren", "защита", "лицензия", "korumalı")),
         SettingsSearchItem(str("block_section_ai"), str("block_model_card_title"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.SmartToy, keywords = listOf("suno", "udio", "artifactnet", "ai music", "musique ia", "ии музыка")),
         SettingsSearchItem(
             title = str("block_ai_auto_skip"),
