@@ -425,8 +425,24 @@ fun MainScreen(
     )
     }
 
+    // Everything below is covered while the full player is open: it is opaque and fills the window. Its own moving
+    // parts — the "My Wave" card, the player bar's wave and playhead, the playing bars, canvas videos — kept running
+    // underneath all the same, and with the full player's they had the window redrawn well past the screen's own
+    // needs. They are told they are unseen once the full player has finished coming in, and seen again the moment it
+    // starts going, so its fade in and out still shows them moving (issue #33).
+    val windowSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    var coveredByFullPlayer by remember { mutableStateOf(false) }
+    LaunchedEffect(playerViewModel.isLyricsFullScreen) {
+        if (!playerViewModel.isLyricsFullScreen) {
+            coveredByFullPlayer = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(FULLSCREEN_ENTER_MS.toLong() + 100L)
+        coveredByFullPlayer = true
+    }
     androidx.compose.runtime.CompositionLocalProvider(
         com.alananasss.kittytune.ui.common.LocalPlayerBarOverlay provides barOverlay.takeIf { isBarFloating },
+        com.alananasss.kittytune.core.LocalWindowSeen provides (windowSeen && !coveredByFullPlayer),
     ) {
     Column(
         modifier = Modifier
