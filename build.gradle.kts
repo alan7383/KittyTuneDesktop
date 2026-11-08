@@ -238,6 +238,18 @@ compose.desktop {
         // collections stop the world, which is the stutter G1 was chosen to end, and Parallel saves nothing.
         jvmArgs += "-XX:ParallelGCThreads=2"
         jvmArgs += "-XX:ConcGCThreads=1"
+        // The concurrent-mark stack is committed up front at MarkStackSize entries of 8 bytes, and the default of
+        // 4M entries is 32 MB — most of the "GC" line in native memory tracking, measured at 38 MB, for a heap whose
+        // live set is around a hundred megabytes. 256K entries brought that line to 8 MB with no other change
+        // (fresh profile, idle: 417 → 392 MB private). It is a starting size, not a limit: on overflow G1 doubles
+        // the stack up to MarkStackSizeMax and carries on, so a large library costs a resize, never a failure.
+        jvmArgs += "-XX:MarkStackSize=262144"
+        // How much time G1 may spend collecting before it grows the heap instead: 1/(1+N), so 20% rather than the
+        // default 12's 8%. Growth is G1's answer to the allocation rate, and an animating interface allocates in
+        // bursts that the default met by committing more young regions and keeping them. Measured while listening
+        // with the full player open: 146 MB committed instead of 179, for the same CPU time over three minutes
+        // (74 s against 76 s) — the extra young collections are a few milliseconds each on two workers.
+        jvmArgs += "-XX:GCTimeRatio=4"
         // Start small and grow on demand. The default first commit is 1/64 of physical RAM, 256 MB on a
         // 16 GB machine, for an app whose live data at idle is about 45 MB.
         jvmArgs += "-Xms16m"
