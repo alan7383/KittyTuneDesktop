@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -105,10 +106,11 @@ fun DrmSettingsSection() {
     // Bumped when the assistant closes: it may have changed the method or turned protected tracks
     // off, and the page's rows keep their own state.
     var generation by remember { mutableIntStateOf(0) }
+    var uninstalling by remember { mutableStateOf(false) }
 
     key(generation) {
         if (WindowsPlayReadyRuntime.windows) {
-            WindowsDrmSection(onOpenWizard = { wizard = it })
+            WindowsDrmSection(onOpenWizard = { wizard = it }, onOpenUninstall = { uninstalling = true })
         } else {
             WidevineDrmSection(onOpenWizard = { wizard = it })
         }
@@ -117,6 +119,12 @@ fun DrmSettingsSection() {
     wizard?.let { start ->
         DrmSetupWizard(start = start, onClose = {
             wizard = null
+            generation++
+        })
+    }
+    if (uninstalling) {
+        WslUninstallWizard(onClose = {
+            uninstalling = false
             generation++
         })
     }
@@ -129,7 +137,7 @@ fun DrmSettingsSection() {
  * quietly falls back to PlayReady meanwhile, and the page says so next to the way to fix it.
  */
 @Composable
-internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
+internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUninstall: () -> Unit = {}) {
     var backend by remember { mutableStateOf(ProtectedBackend.current) }
     // Null until checked: the first check extracts the renderer, which is file work.
     var playReady by remember { mutableStateOf<Boolean?>(null) }
@@ -268,12 +276,25 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
                 onClick = { onOpenWizard(DrmWizardStart.WSL) },
             )
         }
+        // Offered whenever something of the WSL method may still be on the PC, including after switching
+        // back to PlayReady: that is exactly when someone wants it gone.
+        val hasWslLeftovers = remember(backend) { WslSidecarSetup.hasLeftovers() }
+        val wslUninstallRow: @Composable (Shape) -> Unit = { shape ->
+            SettingsItem(
+                shape = shape,
+                title = str("pref_drm_wsl_uninstall_title"),
+                subtitle = str("pref_drm_wsl_uninstall_desc"),
+                icon = Icons.Rounded.DeleteSweep,
+                titleColor = MaterialTheme.colorScheme.error,
+                onClick = onOpenUninstall,
+            )
+        }
         SettingsGroup(
             items = when {
                 backend == ProtectedBackend.PLAYREADY -> listOf(testRow)
                 wslConnected -> listOf(testRow, wslSetupRow)
                 else -> listOf(wslSetupRow)
-            } + drmLogRow(report) { showLog = true },
+            } + (if (hasWslLeftovers) listOf(wslUninstallRow) else emptyList()) + drmLogRow(report) { showLog = true },
         )
 
         DrmHelpGroup(onOpenWizard, experimental = backend == ProtectedBackend.WSL)

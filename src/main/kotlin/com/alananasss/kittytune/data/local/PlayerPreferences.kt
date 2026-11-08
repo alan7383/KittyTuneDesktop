@@ -482,6 +482,8 @@ class PlayerPreferences {
         private const val KEY_PROTECTED_TRACKS = "protected_tracks_enabled"
         private const val KEY_PROTECTED_BACKEND = "protected_backend"
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
+        private const val KEY_WSL_INSTALLED_BY_APP = "wsl_installed_by_kittytune"
+        private const val KEY_WSL_DISTRO_INSTALLED_BY_APP = "wsl_distro_installed_by_kittytune"
         private const val KEY_WIDEVINE_CDM_PATH = "widevine_cdm_path"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
@@ -789,6 +791,15 @@ class PlayerPreferences {
     /** Windows only: "playready" (the OS renderer) or "wsl" (the Widevine sidecar in WSL). */
     fun getProtectedBackend(): String = Prefs.getString(KEY_PROTECTED_BACKEND, "playready") ?: "playready"
     fun setProtectedBackend(backend: String) = Prefs.putString(KEY_PROTECTED_BACKEND, backend)
+    /**
+     * What the WSL setup installed itself, so uninstalling can offer to remove exactly that and never a
+     * WSL or a distribution the user already had: WSL when its installer was opened with no WSL on the
+     * machine, and the distribution it was opened to add.
+     */
+    fun getWslInstalledByApp(): Boolean = Prefs.getBoolean(KEY_WSL_INSTALLED_BY_APP, false)
+    fun setWslInstalledByApp(installed: Boolean) = Prefs.putBoolean(KEY_WSL_INSTALLED_BY_APP, installed)
+    fun getWslDistroInstalledByApp(): String? = Prefs.getString(KEY_WSL_DISTRO_INSTALLED_BY_APP, null)?.takeIf { it.isNotBlank() }
+    fun setWslDistroInstalledByApp(distro: String?) = Prefs.putString(KEY_WSL_DISTRO_INSTALLED_BY_APP, distro ?: "")
 
     /** Whether the protected tracks introduction was shown, so it opens by itself only once. */
     fun getDrmOnboardingDone(): Boolean = Prefs.getBoolean(KEY_DRM_ONBOARDING_DONE, false)

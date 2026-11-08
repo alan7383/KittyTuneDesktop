@@ -59,6 +59,12 @@ internal object WslSidecarSetup {
     /** What [openInstaller] runs, for people who would rather paste it themselves. */
     const val INSTALL_COMMAND = "wsl --install -d Ubuntu"
 
+    /** The distribution [openInstaller] adds. */
+    private const val INSTALLER_DISTRO = "Ubuntu"
+
+    /** The packages [TOOLS_SCRIPT] had to install, one per line, so uninstalling removes those and no others. */
+    const val PACKAGES_FILE = "$INSTALL_DIR/.installed-packages"
+
     private const val CONFIG_NAME = "cdm-sidecar.json"
     private const val HEREDOC = "KITTYTUNE_SOURCE_EOF"
 
@@ -131,10 +137,16 @@ internal object WslSidecarSetup {
      * Its own window because the user has to see it: Windows asks for elevation, may ask for a
      * restart, and Ubuntu's first start asks for a Linux user name and password. None of that can be
      * answered from here, and pretending otherwise would hang.
+     *
+     * Notes what it is about to install, from [state] — the machine as [detect] found it — so that
+     * uninstalling can later offer to remove what KittyTune added and nothing the user already had.
      */
-    fun openInstaller(): Boolean = runCatching {
+    fun openInstaller(state: State): Boolean = runCatching {
         ProcessBuilder("cmd.exe", "/c", "start", "KittyTune - WSL", wslExe.absolutePath, "--install", "-d", "Ubuntu")
             .start()
+        val prefs = PlayerPreferences()
+        if (state == State.NO_WSL) prefs.setWslInstalledByApp(true)
+        if (state == State.NO_WSL || state == State.NO_DISTRO) prefs.setWslDistroInstalledByApp(INSTALLER_DISTRO)
         true
     }.getOrElse {
         Logger.w(TAG, "could not open the WSL installer: ${it.message}")
@@ -238,14 +250,17 @@ internal object WslSidecarSetup {
      * An older `wsl.exe` ignores `WSL_UTF8` and answers in UTF-16LE: read as UTF-8, every character
      * carries a NUL and the byte order mark becomes replacement characters. Both are dropped.
      */
-    internal fun parseDistros(output: String): List<String> = output
+    internal fun parseDistros(output: String): List<String> = parseAllDistros(output)
+        .filterNot { it.startsWith("docker-desktop", true) || it.startsWith("rancher-desktop", true) }
+
+    /** Every registered distribution, Docker's and Rancher's included: they need WSL as much as any other. */
+    internal fun parseAllDistros(output: String): List<String> = output
         .replace("\u0000", "")
         .replace("\uFEFF", "")
         .replace("\uFFFD", "")
         .lineSequence()
         .map { it.trim().trim('"') }
         .filter { it.isNotEmpty() }
-        .filterNot { it.startsWith("docker-desktop", true) || it.startsWith("rancher-desktop", true) }
         .toList()
 
     internal fun sourcesScript(): String = buildString {
@@ -308,6 +323,289 @@ internal object WslSidecarSetup {
         }
     }
 
+    // ------------------------------------------------------------------------------------------------
+    // Uninstalling: everything the setup put on the machine, and, when the user wants it and nothing else
+    // depends on it, the distribution and WSL that came with it.
+    // ------------------------------------------------------------------------------------------------
+
+    /**
+     * What removing the WSL method involves on this machine, as [planUninstall] found it.
+     *
+     * The distribution and WSL itself are only ever offered as choices: a distribution the user had before
+     * KittyTune can hold their own work, and WSL can carry Docker or another distribution. What KittyTune
+     * added on its own ([distroInstalledByApp], [wslInstalledByApp]) is what the assistant ticks by default.
+     */
+    data class UninstallPlan(
+        /** The distribution the method uses or used, null when there is none left. */
+        val distro: String?,
+        /** Whether KittyTune's files are in it: [INSTALL_DIR], or the setup script's copy in a home. */
+        val filesPresent: Boolean,
+        /** What the setup had to install with apt, as recorded in [PACKAGES_FILE]. */
+        val packages: List<String>,
+        /** True when [distro] is the one the installer KittyTune opened added. */
+        val distroInstalledByApp: Boolean,
+        /** Every other registered distribution, Docker's included: while any is left, WSL itself stays. */
+        val otherDistros: List<String>,
+        val wslPresent: Boolean,
+        /** True when WSL was installed from nothing by the installer KittyTune opened. */
+        val wslInstalledByApp: Boolean,
+        /** Whether KittyTune's link to the daemon is still written on the Windows side. */
+        val configPresent: Boolean,
+    )
+
+    enum class UninstallStep { STOP, FILES, PACKAGES, DISTRO, SETTINGS, WSL }
+
+    /** [refused]: Windows asked for permission to remove WSL and was told no. */
+    class UninstallException(val step: UninstallStep, message: String, val refused: Boolean = false) : Exception(message)
+
+    private val configFile: File?
+        get() = System.getenv("LOCALAPPDATA")?.let { File(it, "KittyTune/$CONFIG_NAME") }
+
+    /**
+     * Whether there may be anything to uninstall, without starting WSL: the method is chosen, its link is
+     * written, or the setup installed something. Cheap enough for the settings page to ask on every visit.
+     */
+    fun hasLeftovers(): Boolean {
+        if (!windows) return false
+        val prefs = PlayerPreferences()
+        return ProtectedBackend.current == ProtectedBackend.WSL ||
+            configFile?.isFile == true ||
+            prefs.getWslInstalledByApp() ||
+            prefs.getWslDistroInstalledByApp() != null
+    }
+
+    /** Looks at what is installed. May start the distribution for a moment, so callers stay off the UI thread. */
+    suspend fun planUninstall(): UninstallPlan = withContext(Dispatchers.IO) {
+        val prefs = PlayerPreferences()
+        val configPresent = configFile?.isFile == true
+        val wslInstalledByApp = prefs.getWslInstalledByApp()
+        val ownedDistro = prefs.getWslDistroInstalledByApp()
+        if (!windows || !wslExe.isFile) {
+            return@withContext UninstallPlan(
+                distro = null, filesPresent = false, packages = emptyList(), distroInstalledByApp = false,
+                otherDistros = emptyList(), wslPresent = false, wslInstalledByApp = wslInstalledByApp,
+                configPresent = configPresent,
+            )
+        }
+        val list = runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()
+        val all = if (list?.exit == 0) parseAllDistros(list.output) else emptyList()
+        val usable = parseDistros(all.joinToString("\n"))
+        val wslPresent = list?.exit == 0 ||
+            runCatching { run(listOf("--version"), timeoutMs = 15_000) }.getOrNull()?.exit == 0
+        val distro = if (usable.isEmpty()) null else pickDistro(usable)
+
+        var filesPresent = false
+        var packages = emptyList<String>()
+        if (distro != null) {
+            WslVmLifecycle.acquire(distro)
+            try {
+                val probe = runCatching {
+                    run(listOf("-d", distro, "-u", "root", "--exec", "bash", "-s"), INSPECT_SCRIPT, timeoutMs = 60_000)
+                }.getOrNull()
+                val lines = probe?.output?.lineSequence()?.map { it.trim() }?.toList().orEmpty()
+                filesPresent = "KT_FILES" in lines
+                packages = lines.filter { it.startsWith("KT_PKG:") }
+                    .map { it.removePrefix("KT_PKG:").trim() }
+                    .filter { PACKAGE_NAME.matches(it) }
+                    .distinct()
+            } finally {
+                WslVmLifecycle.release()
+            }
+        }
+        UninstallPlan(
+            distro = distro,
+            filesPresent = filesPresent,
+            packages = packages,
+            distroInstalledByApp = distro != null && ownedDistro != null && distro.equals(ownedDistro, ignoreCase = true),
+            otherDistros = all.filterNot { it == distro },
+            wslPresent = wslPresent,
+            wslInstalledByApp = wslInstalledByApp,
+            configPresent = configPresent,
+        )
+    }
+
+    /** WSL itself can only go when nothing else would be left using it. */
+    fun canRemoveWsl(plan: UninstallPlan, removeDistro: Boolean): Boolean =
+        plan.wslPresent && plan.otherDistros.isEmpty() && (plan.distro == null || removeDistro)
+
+    /** The steps [uninstall] runs for these choices, in order. */
+    fun uninstallSteps(plan: UninstallPlan, removeDistro: Boolean, removeWsl: Boolean): List<UninstallStep> = buildList {
+        add(UninstallStep.STOP)
+        if (plan.distro != null) {
+            if (removeDistro) {
+                add(UninstallStep.DISTRO)
+            } else {
+                add(UninstallStep.FILES)
+                if (plan.packages.isNotEmpty()) add(UninstallStep.PACKAGES)
+            }
+        }
+        add(UninstallStep.SETTINGS)
+        if (removeWsl && canRemoveWsl(plan, removeDistro)) add(UninstallStep.WSL)
+    }
+
+    /**
+     * Removes what [plan] found, as chosen: the module is stopped and protected tracks go back to PlayReady,
+     * KittyTune's files and the tools it installed leave the distribution (or the whole distribution goes),
+     * its link is forgotten, and WSL itself is uninstalled when [removeWsl] and nothing else uses it.
+     *
+     * @return true when Windows has to restart to finish, which is when WSL itself was removed.
+     * @throws UninstallException naming the step that failed.
+     */
+    suspend fun uninstall(
+        plan: UninstallPlan,
+        removeDistro: Boolean,
+        removeWsl: Boolean,
+        onStep: (UninstallStep) -> Unit,
+        onLine: (String) -> Unit,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val distro = plan.distro
+        var restart = false
+        for (step in uninstallSteps(plan, removeDistro, removeWsl)) {
+            onStep(step)
+            onLine("== ${step.name.lowercase()}")
+            when (step) {
+                UninstallStep.STOP -> {
+                    // Also drops the running daemon and every stream licensed through it.
+                    ProtectedBackend.select(ProtectedBackend.PLAYREADY)
+                    if (distro != null) runCatching { run(listOf("--terminate", distro), timeoutMs = 30_000, onLine = onLine) }
+                    onLine("module stopped, protected tracks play through PlayReady")
+                }
+                UninstallStep.FILES -> inDistro(distro!!, step, REMOVE_FILES_SCRIPT, 120_000, onLine)
+                UninstallStep.PACKAGES -> inDistro(distro!!, step, removePackagesScript(plan.packages), 600_000, onLine)
+                UninstallStep.DISTRO -> {
+                    val result = run(listOf("--unregister", distro!!), timeoutMs = 300_000, onLine = onLine)
+                    if (result.exit != 0) throw UninstallException(step, lastLine(result))
+                    if (plan.distroInstalledByApp) removeDistroStorePackage(distro, onLine)
+                    PlayerPreferences().setWslDistroInstalledByApp(null)
+                }
+                UninstallStep.SETTINGS -> {
+                    configFile?.let { file ->
+                        if (file.exists() && !file.delete()) throw UninstallException(step, "could not delete ${file.path}")
+                    }
+                    StreamResolver.forgetStreams()
+                    onLine("KittyTune no longer points at WSL")
+                }
+                UninstallStep.WSL -> {
+                    runCatching { run(listOf("--shutdown"), timeoutMs = 60_000) }
+                    removeWslElevated(disablePlatform = plan.wslInstalledByApp, onLine = onLine)
+                    PlayerPreferences().setWslInstalledByApp(false)
+                    restart = true
+                }
+            }
+        }
+        restart
+    }
+
+    private suspend fun inDistro(distro: String, step: UninstallStep, script: String, timeoutMs: Long, onLine: (String) -> Unit) {
+        WslVmLifecycle.acquire(distro)
+        try {
+            val result = run(listOf("-d", distro, "-u", "root", "--exec", "bash", "-s"), script, timeoutMs, onLine)
+            if (result.exit != 0) throw UninstallException(step, lastLine(result))
+        } finally {
+            WslVmLifecycle.release()
+        }
+    }
+
+    private fun lastLine(result: Result): String =
+        result.output.lineSequence().firstOrNull { it.startsWith("KT_ERROR:") }?.removePrefix("KT_ERROR:")?.trim()
+            ?: result.output.lineSequence().lastOrNull { it.isNotBlank() }
+            ?: "exit ${result.exit}"
+
+    /**
+     * An Ubuntu that `wsl --install` added from the Store also left its app behind, in the Start menu. Only
+     * called for the distribution KittyTune's installer added; never fatal, the distribution itself is gone.
+     */
+    private fun removeDistroStorePackage(distro: String, onLine: (String) -> Unit) {
+        if (!distro.startsWith("Ubuntu", ignoreCase = true)) return
+        runCatching {
+            val process = ProcessBuilder(
+                "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                "Get-AppxPackage -Name 'CanonicalGroupLimited.Ubuntu*' | Remove-AppxPackage",
+            ).redirectErrorStream(true).start()
+            process.inputStream.bufferedReader().readText().lineSequence().filter { it.isNotBlank() }.forEach(onLine)
+            if (process.waitFor(120, TimeUnit.SECONDS)) onLine("Ubuntu app removed")
+        }.onFailure { onLine("Ubuntu app left in place: ${it.message}") }
+    }
+
+    /**
+     * Uninstalls WSL and turns off the Windows features it runs on, which takes an administrator: Windows
+     * shows its own permission prompt. Virtual Machine Platform is only turned off when KittyTune's installer
+     * is what turned it on ([disablePlatform]); the WSL feature itself is WSL's alone.
+     */
+    private fun removeWslElevated(disablePlatform: Boolean, onLine: (String) -> Unit) {
+        val work = File(System.getProperty("java.io.tmpdir"), "kittytune-wsl-uninstall").apply { mkdirs() }
+        val script = File(work, "uninstall-wsl.ps1")
+        val log = File(work, "uninstall-wsl.log").apply { delete() }
+        fun quoted(file: File) = "'" + file.absolutePath.replace("'", "''") + "'"
+        script.writeText(
+            buildString {
+                appendLine("\$ErrorActionPreference = 'Continue'")
+                appendLine("& {")
+                appendLine("  & \"\$env:SystemRoot\\System32\\wsl.exe\" --uninstall")
+                appendLine("  Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart | Out-String")
+                if (disablePlatform) {
+                    appendLine("  Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart | Out-String")
+                }
+                appendLine("} *>&1 | Out-File -FilePath ${quoted(log)} -Encoding utf8")
+                appendLine("exit 0")
+            }
+        )
+        val launch = "try { \$p = Start-Process -FilePath powershell.exe -Verb RunAs -Wait -PassThru -WindowStyle Hidden " +
+            "-ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','\"${script.absolutePath.replace("'", "''")}\"'); " +
+            "exit \$p.ExitCode } catch { exit 1223 }"
+        val process = ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", launch)
+            .redirectErrorStream(true).start()
+        process.inputStream.bufferedReader().readText()
+        if (!process.waitFor(15, TimeUnit.MINUTES)) {
+            process.destroyForcibly()
+            throw UninstallException(UninstallStep.WSL, "Windows did not finish removing WSL within 15 minutes")
+        }
+        runCatching { log.readText(Charsets.UTF_8) }.getOrNull()
+            ?.replace("\uFEFF", "")?.lineSequence()?.map { it.trimEnd() }?.filter { it.isNotBlank() }?.forEach(onLine)
+        when (process.exitValue()) {
+            0 -> onLine("WSL removed; Windows finishes after a restart")
+            1223 -> throw UninstallException(UninstallStep.WSL, "permission refused", refused = true)
+            else -> throw UninstallException(UninstallStep.WSL, "exit ${process.exitValue()}")
+        }
+        runCatching { script.delete(); log.delete() }
+    }
+
+    /** apt package names only: what is read back from the distribution goes into a command. */
+    private val PACKAGE_NAME = Regex("[a-z0-9][a-z0-9.+-]*")
+
+    /** Finds KittyTune's files and the packages the setup recorded; prints KT_FILES and KT_PKG:name lines. */
+    internal val INSPECT_SCRIPT = """
+        if [ -d $INSTALL_DIR ] || ls -d /home/*/.local/share/kittytune /root/.local/share/kittytune >/dev/null 2>&1; then echo KT_FILES; fi
+        if [ -f $PACKAGES_FILE ]; then sed 's/^/KT_PKG:/' $PACKAGES_FILE; fi
+        exit 0
+    """.trimIndent() + "\n"
+
+    /** KittyTune's install, and the copy `scripts/setup-cdm-sidecar.sh` leaves in a home. */
+    internal val REMOVE_FILES_SCRIPT = """
+        rm -rf $INSTALL_DIR /root/.local/share/kittytune
+        for d in /home/*/.local/share/kittytune; do
+          if [ -e "${'$'}d" ]; then rm -rf "${'$'}d"; fi
+        done
+        echo "KittyTune's files removed"
+        exit 0
+    """.trimIndent() + "\n"
+
+    /**
+     * Gives back the tools the setup installed. Marked as automatically installed rather than purged, so
+     * apt only removes the ones nothing else came to depend on since: purging curl outright would also
+     * take away whatever the user installed afterwards that needs it.
+     */
+    internal fun removePackagesScript(packages: List<String>): String {
+        val names = packages.filter { PACKAGE_NAME.matches(it) }.joinToString(" ")
+        return """
+            export DEBIAN_FRONTEND=noninteractive
+            apt-mark auto $names </dev/null || { echo "KT_ERROR: apt-mark failed"; exit 69; }
+            apt-get autoremove -y -q --purge </dev/null || { echo "KT_ERROR: apt-get autoremove failed"; exit 69; }
+            echo "tools no other program needs were removed"
+            exit 0
+        """.trimIndent() + "\n"
+    }
+
     internal val TOOLS_SCRIPT = """
         if [ "${'$'}(uname -m)" != "x86_64" ]; then
           echo "KT_ERROR: Chrome's Widevine module only exists for x86_64, this distribution is ${'$'}(uname -m)"; exit 65
@@ -325,6 +623,8 @@ internal object WslSidecarSetup {
         echo "installing:${'$'}missing"
         apt-get update -q </dev/null || { echo "KT_ERROR: apt-get update failed, check the internet connection"; exit 69; }
         apt-get install -y -q --no-install-recommends ${'$'}missing </dev/null || { echo "KT_ERROR: installing${'$'}missing failed"; exit 69; }
+        mkdir -p $INSTALL_DIR
+        for p in ${'$'}missing; do grep -qx "${'$'}p" $PACKAGES_FILE 2>/dev/null || echo "${'$'}p" >> $PACKAGES_FILE; done
         echo "tools installed"
     """.trimIndent() + "\n"
 
