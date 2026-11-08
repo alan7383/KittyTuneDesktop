@@ -16,6 +16,7 @@ import tempfile
 import threading
 import time
 import traceback
+import wave
 
 import dbus
 import dbus.service
@@ -54,6 +55,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("app", type=Path, help="directory containing bin/KittyTune and lib/runtime")
     parser.add_argument("--private-watcher", action="store_true", help="use only inside dbus-run-session")
+    parser.add_argument("--playback", action="store_true", help="also test playback/seek on a desktop with audio output")
     parser.add_argument("--log", type=Path, default=Path("build/reports/linux-dbus.log"))
     args = parser.parse_args()
     app = args.app.resolve()
@@ -91,7 +93,15 @@ def main():
         # Do not let a developer's JDK or library overrides mask a broken package.
         for key in ("JAVA_HOME", "JDK_HOME", "CLASSPATH", "LD_LIBRARY_PATH", "_JAVA_OPTIONS", "JDK_JAVA_OPTIONS"):
             env.pop(key, None)
-        process = subprocess.Popen([str(app / "bin/KittyTune")], env=env,
+        # Reading real metadata exercises the packaged tag readers and their reflected
+        # enums too. A service that exports correctly but never loads a track is insufficient.
+        audio = Path(profile) / "dbus-verification.wav"
+        with wave.open(str(audio), "wb") as wav:
+            wav.setnchannels(2)
+            wav.setsampwidth(2)
+            wav.setframerate(44100)
+            wav.writeframes(bytes(44100 * 4 * 30))
+        process = subprocess.Popen([str(app / "bin/KittyTune"), str(audio)], env=env,
                                    stdout=log, stderr=log, start_new_session=True)
 
         def verify():
@@ -119,6 +129,16 @@ def main():
                 root = client.get_object(MPRIS, "/org/mpris/MediaPlayer2")
                 props = dbus.Interface(root, PROPS)
                 assert str(props.Get("org.mpris.MediaPlayer2", "Identity")) == "KittyTune"
+
+                def metadata_loaded():
+                    """silent WAV metadata to appear through MPRIS"""
+                    metadata = props.Get(PLAYER, "Metadata")
+                    return str(metadata.get("xesam:title", "")) == "dbus-verification"
+
+                eventually(metadata_loaded, 30)
+                metadata = props.Get(PLAYER, "Metadata")
+                assert abs(int(metadata["mpris:length"]) - 30_000_000) < 100_000
+                print("PASS: real WAV metadata and duration from packaged tag readers", flush=True)
                 player = dbus.Interface(root, PLAYER)
                 player.Pause()
                 props.Set(PLAYER, "Volume", dbus.Double(0.37))
@@ -131,6 +151,46 @@ def main():
                 result = subprocess.check_output(["playerctl", "-p", "kittytune", "volume"], text=True)
                 assert abs(float(result.strip()) - 0.37) < 0.01, result
                 print("PASS: MPRIS properties, Pause, volume round-trip and playerctl", flush=True)
+
+                if args.playback:
+                    for index in range(40):
+                        target = (index % 10) / 10.0
+                        props.Set(PLAYER, "Volume", dbus.Double(target))
+
+                        def volume_settled():
+                            """repeated volume commands to reach the player"""
+                            return abs(float(props.Get(PLAYER, "Volume")) - target) < 0.01
+
+                        eventually(volume_settled, 5)
+                    props.Set(PLAYER, "Volume", dbus.Double(0.0))
+                    player.Play()
+
+                    def playing():
+                        """real audio playback to start"""
+                        return str(props.Get(PLAYER, "PlaybackStatus")) == "Playing"
+
+                    eventually(playing, 10)
+                    before = int(props.Get(PLAYER, "Position"))
+                    time.sleep(1)
+                    assert int(props.Get(PLAYER, "Position")) > before
+                    player.Pause()
+
+                    def paused():
+                        """real audio playback to pause"""
+                        return str(props.Get(PLAYER, "PlaybackStatus")) == "Paused"
+
+                    eventually(paused, 10)
+                    before = int(props.Get(PLAYER, "Position"))
+                    time.sleep(0.5)
+                    assert abs(int(props.Get(PLAYER, "Position")) - before) < 100_000
+                    player.Seek(dbus.Int64(3_000_000))
+
+                    def sought():
+                        """real audio playback to seek"""
+                        return int(props.Get(PLAYER, "Position")) >= before + 2_500_000
+
+                    eventually(sought, 10)
+                    print("PASS: 40 volume round-trips, Play, advancing Position, Pause, Seek", flush=True)
 
                 item = client.get_object(sni, "/StatusNotifierItem")
                 assert str(dbus.Interface(item, PROPS).Get("org.kde.StatusNotifierItem", "Status")) == "Active"
