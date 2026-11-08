@@ -84,7 +84,7 @@ dependencies {
     implementation("org.java-websocket:Java-WebSocket:1.6.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.1")
 
-    val ktorVersion = "3.6.0"
+    val ktorVersion = "3.6.1"
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
