@@ -55,3 +55,4 @@ bin/
 .DS_Store
 arch_build/
 *.pkg.tar.zst
+!scripts/enable-segment-heap.ps1
