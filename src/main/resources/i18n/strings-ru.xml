@@ -3240,16 +3240,18 @@
     <string name="pref_drm_windows_test_ok">Проверка пройдена, защищённые треки воспроизводятся на этом ПК</string>
     <string name="pref_drm_windows_test_failed">Проверка не пройдена, смотрите журнал ниже</string>
     <string name="drm_unavailable_toast_windows">🔒 Защищённый трек: здесь недоступен. См. Настройки, Разное, Защищённые треки</string>
-    <string name="drm_download_failed">Защищённый трек: не удалось скачать. Проверьте CDM в Настройки, Разное</string>    <string name="floating_compat_title">Режим совместимости</string>
-    <string name="floating_compat_desc">Непрозрачные плавающие окна. Устраняет зависания с RivaTuner (RTSS) и некоторыми оверлеями</string>
-    <string name="floating_compat_auto_rtss">Включено автоматически: запущен RivaTuner (RTSS)</string>
-    <string name="floating_compat_auto_freeze">Включено автоматически: плавающее окно заморозило приложение</string>
-    <string name="update_nixos_notice_title">Обнаружена система NixOS или Nix</string>
-    <string name="update_nixos_notice_desc">В Nix обновления управляются декларативно. Выполните команду ниже, чтобы обновить установку:</string>
-    <string name="update_btn_view_release">Открыть релиз</string>
-    <string name="btn_copy">Копировать</string>
+    <string name="drm_download_failed">Защищённый трек: не удалось скачать. Проверьте CDM в Настройки, Разное</string>
     <string name="drm_native_fx_available">This protected track supports speed, 8D, Trance Gate and soundscapes. Other effects and pitch adjustment are unavailable for this track.</string>
     <string name="drm_native_eq_unavailable">Equalizer unavailable for this protected track</string>
     <string name="drm_native_offline_unavailable">Offline downloading of this protected track is not currently supported on Windows. No offline file was created.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Режим совместимости</string>
+    <string name="floating_compat_desc">Непрозрачные плавающие окна. Устраняет зависания при использовании RivaTuner (RTSS) и некоторых оверлеев</string>
+    <string name="floating_compat_auto_rtss">Включено автоматически: запущен RivaTuner (RTSS)</string>
+    <string name="floating_compat_auto_freeze">Включено автоматически: плавающее окно вызвало зависание приложения</string>
+    <string name="update_nixos_notice_title">Обнаружена система NixOS / Nix</string>
+    <string name="update_nixos_notice_desc">В Nix обновления управляются декларативно. Чтобы обновить установленную версию, выполните приведённую ниже команду:</string>
+    <string name="update_btn_view_release">Открыть выпуск</string>
+    <string name="btn_copy">Копировать</string>
 </resources>

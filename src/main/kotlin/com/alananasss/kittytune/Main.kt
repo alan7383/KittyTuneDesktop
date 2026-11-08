@@ -102,10 +102,11 @@ fun main(args: Array<String>) {
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
+    com.alananasss.kittytune.audio.LinuxAudioIntegration.initialize()
     com.alananasss.kittytune.audio.ai.OnnxHelper.disableNativeTelemetry()
     com.alananasss.kittytune.core.MacWindowIntegration.configureApplication()
     com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
-    System.setProperty("sun.java2d.wm.className", "kitty-tune")
+    System.setProperty("sun.java2d.wm.className", com.alananasss.kittytune.core.LinuxAppIdHelper.APP_ID)
     runCatching {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }
@@ -119,6 +120,11 @@ fun main(args: Array<String>) {
     // Swing's own dialogs (folder pickers, the avatar chooser) in the system's look rather than Java's Metal,
     // which is what made them look cut down next to Windows' own. Compose is unaffected.
     runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
+
+    // ThemeState's snapshot states must exist before the first composition. Otherwise PlayerViewModel can
+    // create them from a background thread after the window's snapshot was taken, and that composition
+    // fails with "Reading a state that was created after the snapshot was taken".
+    com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor
 
     application {
         val playerViewModel = remember { PlayerViewModel(AppInstance.application) }

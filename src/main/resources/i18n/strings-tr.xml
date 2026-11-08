@@ -3241,16 +3241,18 @@
     <string name="pref_drm_windows_test_ok">Test başarılı, korumalı parçalar bu bilgisayarda çalıyor</string>
     <string name="pref_drm_windows_test_failed">Test başarısız, aşağıdaki günlüğe bak</string>
     <string name="drm_unavailable_toast_windows">🔒 Korumalı parça: burada kullanılamıyor. Ayarlar, Diğer, Korumalı parçalar bölümüne bak</string>
-    <string name="drm_download_failed">Korumalı parça: indirme başarısız. CDM'i Ayarlar, Diğer bölümünden kontrol et</string>    <string name="floating_compat_title">Uyumluluk modu</string>
-    <string name="floating_compat_desc">Opak yüzen pencereler. RivaTuner (RTSS) ve bazı katmanlarla oluşan donmaları giderir</string>
-    <string name="floating_compat_auto_rtss">Otomatik açık: RivaTuner (RTSS) çalışıyor</string>
-    <string name="floating_compat_auto_freeze">Otomatik açık: bir yüzen pencere uygulamayı dondurdu</string>
-    <string name="update_nixos_notice_title">NixOS veya Nix sistemi algılandı</string>
-    <string name="update_nixos_notice_desc">Nix üzerinde güncellemeler bildirimsel olarak yönetilir. Kurulumunu güncellemek için aşağıdaki komutu çalıştır:</string>
-    <string name="update_btn_view_release">Sürümü Görüntüle</string>
-    <string name="btn_copy">Kopyala</string>
+    <string name="drm_download_failed">Korumalı parça: indirme başarısız. CDM'i Ayarlar, Diğer bölümünden kontrol et</string>
     <string name="drm_native_fx_available">This protected track supports speed, 8D, Trance Gate and soundscapes. Other effects and pitch adjustment are unavailable for this track.</string>
     <string name="drm_native_eq_unavailable">Equalizer unavailable for this protected track</string>
     <string name="drm_native_offline_unavailable">Offline downloading of this protected track is not currently supported on Windows. No offline file was created.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Uyumluluk modu</string>
+    <string name="floating_compat_desc">Opak yüzen pencereler. RivaTuner (RTSS) ve bazı arayüz katmanlarının neden olduğu donmaları giderir</string>
+    <string name="floating_compat_auto_rtss">Otomatik etkinleştirildi: RivaTuner (RTSS) çalışıyor</string>
+    <string name="floating_compat_auto_freeze">Otomatik etkinleştirildi: bir yüzen pencere uygulamayı dondurdu</string>
+    <string name="update_nixos_notice_title">NixOS / Nix sistemi algılandı</string>
+    <string name="update_nixos_notice_desc">Nix üzerinde güncellemeler bildirimsel olarak yönetilir. Kurulumunuzu güncellemek için aşağıdaki komutu çalıştırın:</string>
+    <string name="update_btn_view_release">Sürümü görüntüle</string>
+    <string name="btn_copy">Kopyala</string>
 </resources>

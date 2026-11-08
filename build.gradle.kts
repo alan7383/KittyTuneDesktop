@@ -57,7 +57,7 @@ dependencies {
         }
     }
     implementation("com.mocharealm.accompanist:lyrics-core:0.5.0")
-    implementation("org.jetbrains.compose.material3:material3:1.13.0-alpha02")
+    implementation("org.jetbrains.compose.material3:material3:1.13.0-beta02")
     implementation(compose.materialIconsExtended)
     implementation(compose.components.resources)
 
@@ -163,6 +163,22 @@ dependencies {
 // `-PuiScale=1.5` runs the tests as on a display scaled to 150%. AWT reads the property once at start-up,
 // which is why it is a JVM argument of the test task and not something a test could set for itself.
 tasks.withType<Test>().configureEach {
+    // Private session buses change between runs; do not reuse a cached, dead bus address
+    // or a previous skipped test result from another bus/configuration.
+    providers.environmentVariable("ALSA_CONFIG_PATH").orNull?.let {
+        environment("ALSA_CONFIG_PATH", it)
+        inputs.file(it).withPropertyName("linuxAudioTestBackend")
+    }
+    inputs.property("liveLinuxAudioTest", providers.environmentVariable("KITTYTUNE_LINUX_AUDIO_TEST").orElse(""))
+    providers.environmentVariable("KITTYTUNE_LINUX_AUDIO_TEST").orNull?.let { environment("KITTYTUNE_LINUX_AUDIO_TEST", it) }
+    inputs.property("mprisSessionBus", providers.environmentVariable("DBUS_SESSION_BUS_ADDRESS").orElse(""))
+    inputs.property("mprisIiConfig", providers.environmentVariable("KITTYTUNE_II_CONFIG").orElse(""))
+    providers.environmentVariable("DBUS_SESSION_BUS_ADDRESS").orNull?.let { environment("DBUS_SESSION_BUS_ADDRESS", it) }
+    providers.environmentVariable("KITTYTUNE_II_CONFIG").orNull?.let {
+        environment("KITTYTUNE_II_CONFIG", it)
+        inputs.files(file("$it/services/MprisController.qml"), file("$it/services/CoverArt.qml"))
+            .withPropertyName("mprisIiSources")
+    }
     providers.gradleProperty("uiScale").orNull?.let { systemProperty("sun.java2d.uiScale", it) }
     jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
     systemProperty("ORT_DISABLE_TELEMETRY", "1")
@@ -419,7 +435,7 @@ compose.desktop {
                 }
                 shortcut = true
                 menuGroup = "AudioVideo"
-                appCategory = "AudioVideo"
+                appCategory = "AudioVideo;Audio;Music;Player;"
                 packageName = "kitty-tune"
                 iconFile.set(project.file("src/main/resources/icons/kittytune_linux.png"))
             }
@@ -446,7 +462,7 @@ compose.desktop {
 }
 
 tasks.withType<JavaExec>().configureEach {
-    systemProperty("sun.java2d.wm.className", "kitty-tune")
+    systemProperty("sun.java2d.wm.className", "kittytune")
     jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
 }
 kotlin {
@@ -957,7 +973,8 @@ tasks.register<Test>("headlessTest") {
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest",
-            "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest"
+            "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*"
         ).forEach(::includeTestsMatching)
     }
 }

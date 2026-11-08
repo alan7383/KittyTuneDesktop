@@ -3239,16 +3239,18 @@
     <string name="pref_drm_windows_test_ok">A teszt sikeres, a védett számok lejátszhatók ezen a gépen</string>
     <string name="pref_drm_windows_test_failed">A teszt sikertelen, lásd a lenti naplót</string>
     <string name="drm_unavailable_toast_windows">🔒 Védett szám: itt nem érhető el. Lásd: Beállítások, Egyéb, Védett számok</string>
-    <string name="drm_download_failed">Védett szám: a letöltés nem sikerült. Ellenőrizd a CDM-et a Beállítások, Egyéb alatt</string>    <string name="floating_compat_title">Kompatibilitási mód</string>
-    <string name="floating_compat_desc">Átlátszatlan lebegő ablakok. Kijavítja a RivaTuner (RTSS) és egyes átfedések okozta fagyásokat</string>
-    <string name="floating_compat_auto_rtss">Automatikusan be: a RivaTuner (RTSS) fut</string>
-    <string name="floating_compat_auto_freeze">Automatikusan be: egy lebegő ablak lefagyasztotta az alkalmazást</string>
-    <string name="update_nixos_notice_title">NixOS vagy Nix rendszer észlelve</string>
-    <string name="update_nixos_notice_desc">A Nix alatt a frissítéseket deklaratívan kezelik. Futtasd az alábbi parancsot a telepítés frissítéséhez:</string>
-    <string name="update_btn_view_release">Kiadás megtekintése</string>
-    <string name="btn_copy">Másolás</string>
+    <string name="drm_download_failed">Védett szám: a letöltés nem sikerült. Ellenőrizd a CDM-et a Beállítások, Egyéb alatt</string>
     <string name="drm_native_fx_available">This protected track supports speed, 8D, Trance Gate and soundscapes. Other effects and pitch adjustment are unavailable for this track.</string>
     <string name="drm_native_eq_unavailable">Equalizer unavailable for this protected track</string>
     <string name="drm_native_offline_unavailable">Offline downloading of this protected track is not currently supported on Windows. No offline file was created.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Kompatibilitási mód</string>
+    <string name="floating_compat_desc">Átlátszatlan lebegő ablakok. Megoldja a RivaTuner (RTSS) és egyes átfedések okozta lefagyásokat</string>
+    <string name="floating_compat_auto_rtss">Automatikusan bekapcsolva: a RivaTuner (RTSS) fut</string>
+    <string name="floating_compat_auto_freeze">Automatikusan bekapcsolva: egy lebegő ablak lefagyasztotta az alkalmazást</string>
+    <string name="update_nixos_notice_title">NixOS / Nix rendszer észlelve</string>
+    <string name="update_nixos_notice_desc">A Nix deklaratívan kezeli a frissítéseket. A telepítés frissítéséhez futtasd az alábbi parancsot:</string>
+    <string name="update_btn_view_release">Kiadás megtekintése</string>
+    <string name="btn_copy">Másolás</string>
 </resources>
