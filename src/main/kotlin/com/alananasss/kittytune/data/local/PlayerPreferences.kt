@@ -486,8 +486,8 @@ class PlayerPreferences {
         private const val KEY_PROTECTED_HINT_SHOWN = "protected_tracks_hint_shown"
         private const val KEY_PROTECTED_BACKEND = "protected_backend"
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
-        private const val KEY_WSL_INSTALLED_BY_APP = "wsl_installed_by_kittytune"
-        private const val KEY_WSL_DISTRO_INSTALLED_BY_APP = "wsl_distro_installed_by_kittytune"
+        private const val KEY_WSL_SETUP_PENDING = "wsl_setup_pending_reboot"
+        private const val KEY_WSL_SETUP_VERSION = "wsl_setup_version"
         private const val KEY_WIDEVINE_CDM_PATH = "widevine_cdm_path"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
@@ -814,14 +814,13 @@ class PlayerPreferences {
     fun getProtectedBackend(): String = Prefs.getString(KEY_PROTECTED_BACKEND, "playready") ?: "playready"
     fun setProtectedBackend(backend: String) = Prefs.putString(KEY_PROTECTED_BACKEND, backend)
     /**
-     * What the WSL setup installed itself, so uninstalling can offer to remove exactly that and never a
-     * WSL or a distribution the user already had: WSL when its installer was opened with no WSL on the
-     * machine, and the distribution it was opened to add.
+     * Whether the WSL setup is waiting for the restart that enabling the Windows feature needs, so the
+     * assistant resumes by itself when the user comes back. [getWslSetupVersion] is 1 (WSL1) or 2 (WSL2).
      */
-    fun getWslInstalledByApp(): Boolean = Prefs.getBoolean(KEY_WSL_INSTALLED_BY_APP, false)
-    fun setWslInstalledByApp(installed: Boolean) = Prefs.putBoolean(KEY_WSL_INSTALLED_BY_APP, installed)
-    fun getWslDistroInstalledByApp(): String? = Prefs.getString(KEY_WSL_DISTRO_INSTALLED_BY_APP, null)?.takeIf { it.isNotBlank() }
-    fun setWslDistroInstalledByApp(distro: String?) = Prefs.putString(KEY_WSL_DISTRO_INSTALLED_BY_APP, distro ?: "")
+    fun getWslSetupPending(): Boolean = Prefs.getBoolean(KEY_WSL_SETUP_PENDING, false)
+    fun setWslSetupPending(pending: Boolean) = Prefs.putBoolean(KEY_WSL_SETUP_PENDING, pending)
+    fun getWslSetupVersion(): Int = Prefs.getInt(KEY_WSL_SETUP_VERSION, 1)
+    fun setWslSetupVersion(version: Int) = Prefs.putInt(KEY_WSL_SETUP_VERSION, version)
 
     /** Whether the protected tracks introduction was shown, so it opens by itself only once. */
     fun getDrmOnboardingDone(): Boolean = Prefs.getBoolean(KEY_DRM_ONBOARDING_DONE, false)

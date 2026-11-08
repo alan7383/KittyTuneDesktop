@@ -1,5 +1,14 @@
 # Option : décoder les pistes protégées dans l'app, via le CDM en sidecar
 
+> **Mise à jour (8 novembre 2026) — sous Windows, le sidecar tourne désormais dans une mini-distro
+> WSL dédiée (`kittytune-cdm`), pas dans une Ubuntu complète.** L'app télécharge un rootfs d'environ
+> 14 Mo (`scripts/build-wsl1-rootfs.sh`, construit en CI), l'importe en **WSL1 par défaut** (pas de VM,
+> `vmmemWSL` à 0 ; WSL2 en secours), puis récupère le CDM depuis le `.deb` de Chrome avec
+> `busybox ar` + `xz` + `busybox tar` (GNU `tar` et `dpkg-deb` échouent sous WSL1). L'activation du
+> composant WSL1 passe par l'UAC et un redémarrage, après quoi l'assistant reprend tout seul. Les
+> sections ci-dessous décrivant la compilation dans une Ubuntu (apt, `g++`, `wsl --install -d Ubuntu`)
+> sont historiques. Voir `data/drm/WslSidecarSetup.kt`.
+
 ## Le point de départ
 
 Le chemin livré sous Windows est PlayReady (`SOUNDCLOUD_PLAYREADY_WINDOWS.md`) : il joue les pistes
