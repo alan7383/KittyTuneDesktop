@@ -20,6 +20,15 @@ val desktopDistributionDirectory = layout.buildDirectory.dir(
     if (desktopIsWindows) "compose/binaries/${project.version}" else "compose/binaries"
 )
 
+/** Major version of the JDK the packaged runtime is built from (see `javaHome` in compose.desktop). */
+val PACKAGING_JDK = 25
+val packagingJdkHome: String by lazy {
+    javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(PACKAGING_JDK))
+        vendor.set(JvmVendorSpec.AZUL)
+    }.get().metadata.installationPath.asFile.absolutePath
+}
+
 repositories {
     google()
     mavenCentral()
@@ -177,6 +186,13 @@ compose.desktop {
         val localJdk21 = File(System.getProperty("user.home"), ".gradle/jdks/eclipse_adoptium-21-amd64-linux.2")
         if (localJdk21.exists()) {
             javaHome = localJdk21.absolutePath
+        } else {
+            // The runtime shipped in the packages is a JDK 25, whatever JDK runs Gradle: compact object headers
+            // and SoftMaxHeapSize below only exist from there, and the code still compiles to 21 bytecode.
+            // Provisioned by Gradle (foojay) so a local build and CI ship the same runtime with nothing to
+            // install. Zulu rather than Temurin because Temurin 25 no longer ships `jmods` (JEP 493), and the
+            // ProGuard step reads the JDK's classes from there: without them it sees no java.* class at all.
+            javaHome = packagingJdkHome
         }
 
         // Grants what the app already does, so the JDK stops warning about it on every launch:
@@ -185,7 +201,7 @@ compose.desktop {
         // errors in a later JDK, so declaring them now is also what keeps the app running then.
         // Gated on the build JDK because the packaged runtime is built from it, and an older
         // one would refuse to start on an option it does not know.
-        val buildJdk = if (localJdk21.exists()) 21 else (JavaVersion.current().majorVersion.toIntOrNull() ?: 0)
+        val buildJdk = if (localJdk21.exists()) 21 else PACKAGING_JDK
         if (buildJdk >= 24) jvmArgs += "--enable-native-access=ALL-UNNAMED"
         // JEP 500's option only exists from JDK 26; a JDK 25 launcher refuses to start on it.
         if (buildJdk >= 26) jvmArgs += "--enable-final-field-mutation=ALL-UNNAMED"
@@ -891,9 +907,8 @@ tasks.matching { it.name == "zipWindowsPortable" || (it.name.startsWith("package
 
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask>().configureEach {
     val localJdk21 = File(System.getProperty("user.home"), ".gradle/jdks/eclipse_adoptium-21-amd64-linux.2")
-    if (localJdk21.exists()) {
-        javaHome.set(localJdk21.absolutePath)
-    }
+    // ProGuard reads the packaged JDK's jmods as its library classes, so it has to be that same JDK.
+    javaHome.set(if (localJdk21.exists()) localJdk21.absolutePath else packagingJdkHome)
     maxHeapSize.set("2048m")
 }
 
