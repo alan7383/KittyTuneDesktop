@@ -8,10 +8,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.Closeable
 import java.io.File
-import java.io.PrintWriter
-import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
-import kotlin.concurrent.thread
 
 /**
  * KittyTune in the Windows media flyout, on the lock screen and behind the keyboard's media keys.
@@ -29,22 +26,13 @@ class WindowsSmtcService(
     private val onSeek: (Long) -> Unit,
 ) : Closeable {
 
-    private var process: Process? = null
-    private var writer: PrintWriter? = null
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var lastSentUpdate: String? = null
+    private val bridge = if (System.getProperty("os.name").lowercase().contains("win")) {
+        SmtcBridgeWorker(::start, ::handleBridgeLine)
+    } else null
 
-    init {
-        if (System.getProperty("os.name").lowercase().contains("win")) {
-            runCatching { start() }.onFailure { e ->
-                println("Windows SMTC unavailable: ${e.message}")
-                close()
-            }
-        }
-    }
-
-    private fun start() {
-        val exe = extractBridge() ?: return
+    private fun start(): Process? {
+        val exe = extractBridge() ?: return null
         // Our own launcher path, so the bridge can give Windows's flyout a shortcut to resolve the
         // session's app identity from (see WindowsSmtcBridge.cs). Dev runs from gradle have no
         // launcher exe; the bridge then only patches whatever shortcut already exists.
@@ -52,16 +40,9 @@ class WindowsSmtcService(
             it.substringAfterLast('/').substringAfterLast('\\').equals("KittyTune.exe", ignoreCase = true)
         } ?: ProcessHandle.current().info().command().orElse(null)
             ?.takeIf { it.substringAfterLast('/').substringAfterLast('\\').equals("KittyTune.exe", ignoreCase = true) }
-        val p = ProcessBuilder(
+        return ProcessBuilder(
             mutableListOf(exe.absolutePath).also { if (launcher != null) it.add(launcher) },
         ).redirectErrorStream(true).start()
-        process = p
-        writer = PrintWriter(p.outputStream.bufferedWriter(StandardCharsets.UTF_8), true)
-        thread(isDaemon = true, name = "WindowsSmtc-Reader") {
-            runCatching {
-                p.inputStream.bufferedReader(StandardCharsets.UTF_8).forEachLine { handleBridgeLine(it.trim()) }
-            }
-        }
     }
 
     private fun handleBridgeLine(line: String) {
@@ -100,7 +81,7 @@ class WindowsSmtcService(
 
     /** Pushes what is playing. Cheap to call often: identical updates are not re-sent. */
     fun updateMedia(track: Track?, isPlaying: Boolean, positionMs: Long, durationMs: Long) {
-        val out = writer ?: return
+        if (bridge == null) return
         val fields = listOf(
             "UPDATE",
             track?.title.orEmpty(),
@@ -112,33 +93,16 @@ class WindowsSmtcService(
             durationMs.coerceAtLeast(0L).toString(),
         )
         val message = fields.joinToString("\t") { it.replace(CONTROL_CHARS, " ") }
-        if (message == lastSentUpdate) return
-        lastSentUpdate = message
-        out.println(message)
+        bridge.update(message)
     }
 
+    /** Queued with media writes; the new helper receives the latest known update automatically. */
     fun restart() {
-        runCatching { writer?.println("QUIT") }
-        runCatching { writer?.flush() }
-        runCatching { writer?.close() }
-        runCatching {
-            if (process?.waitFor(1500, java.util.concurrent.TimeUnit.MILLISECONDS) != true) {
-                process?.destroyForcibly()
-                process?.waitFor(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
-            }
-        }
-        process = null
-        writer = null
-        lastSentUpdate = null
-        start()
+        bridge?.restart()
     }
 
     override fun close() {
-        runCatching { writer?.println("QUIT") }
-        runCatching { writer?.close() }
-        process?.destroy()
-        process = null
-        writer = null
+        bridge?.close()
         mainScope.cancel()
     }
 
