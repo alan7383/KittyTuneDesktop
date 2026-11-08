@@ -37,11 +37,11 @@ import java.util.concurrent.TimeUnit
  * Three sources, first match wins:
  *
  *  1. `KITTYTUNE_CDM_SIDECAR` — a quoted command line, e.g.
- *     `wsl.exe -d Ubuntu -- /home/me/.local/share/kittytune/ktcdm /home/me/.../libwidevinecdm.so`
+ *     `wsl.exe -d kittytune-cdm -u root --exec /opt/kittytune/ktcdm /opt/kittytune/libwidevinecdm.so`
  *  2. `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` — `{"command": ["wsl.exe", "-d", ...]}`,
- *     written by `scripts/setup-cdm-sidecar.ps1`.
+ *     written by the in-app setup ([WslSidecarSetup]).
  *  3. WSL auto-detection — the first installed distribution, with the daemon at the path the setup
- *     script uses. This is what makes the feature one toggle for a user who ran the script.
+ *     uses.
  *
  * ## Protocol
  *
@@ -91,7 +91,7 @@ internal object CdmSidecar {
     /** Why the configured backend is not in use, or null when nothing is configured. */
     val lastFailure: String? get() = failureReason
 
-    /** What is registered, for diagnostics: `Widevine (sidecar over WSL (Ubuntu))`. */
+    /** What is registered, for diagnostics: `sidecar over WSL (kittytune-cdm)`. */
     val describe: String get() = installed?.name ?: (failureReason ?: "not configured")
 
     /**
@@ -332,7 +332,8 @@ internal object CdmSidecar {
 /**
  * A [WidevineCdm] whose daemon runs only while it is needed.
  *
- * Over WSL, a running daemon keeps the whole Linux VM up, which costs well over a gigabyte. So:
+ * A running daemon is only cheap under WSL1; under WSL2 it keeps the Linux VM up, which costs hundreds
+ * of megabytes. Either way it should not outlive the tracks that need it. So:
  *  - the process starts when a protected track opens a session, never before;
  *  - it stops [GRACE_MS] after the last session is closed. A track closes its session as soon as all
  *    its fragments are decrypted, or when the player drops it;

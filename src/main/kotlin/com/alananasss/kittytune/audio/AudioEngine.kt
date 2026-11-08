@@ -605,7 +605,7 @@ class AudioEngine {
         if (released) return
         released = true
         stop()
-        // Without this the CDM (with WSL, a whole Linux VM) would stay up until it noticed it was idle.
+        // Without this the CDM daemon (in WSL) would stay up until it noticed it was idle.
         hlsAdapter?.releaseDrm()
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
