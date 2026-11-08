@@ -15,7 +15,11 @@ permissions:
 
 jobs:
   packaged-dbus:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -37,7 +41,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: linux-dbus-report
+          name: linux-dbus-report-${{ matrix.runner }}
           path: |
             build/reports/linux-dbus.log
             build/reports/tests/test

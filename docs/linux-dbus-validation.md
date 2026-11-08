@@ -34,14 +34,14 @@ Application output is saved to `build/reports/linux-dbus.log`.
 The release workflow runs this check on the final x86_64 and aarch64 Arch
 archives before publishing them. The AppImage payload comes from the same
 extracted Debian package. The pull request workflow checks the release Debian
-package and the MPRIS/tray integration tests.
+package and the MPRIS/tray integration tests on both x86_64 and ARM64 runners.
 
 ## Run in the real desktop session
 
 Close any running KittyTune, then run:
 
 ```sh
-python3 scripts/check-linux-dbus.py build/compose/binaries/main-release/app/KittyTune
+python3 scripts/check-linux-dbus.py build/compose/binaries/main-release/app/KittyTune --playback
 ```
 
 This uses the desktop's real StatusNotifierWatcher and bus, with a temporary
@@ -52,6 +52,14 @@ local verification was x86_64. Launching the original archive with the module
 preflight deliberately bypassed reproduced failures for both MPRIS and SNI:
 `com/sun/security/auth/module/UnixSystem`. The rebuilt archive passed the same
 D-Bus interactions.
+
+The check also opens a generated silent WAV and verifies its title and duration
+through MPRIS. This caught an independent ProGuard rule error: the jaudiotagger
+artifact's Maven group is `net.jthink`, but its Java package is `org.jaudiotagger`.
+Keeping the wrong package removed enum constants used by `EnumMap` during tag
+reads. The correct rule preserves the readers and their runtime metadata.
+`--playback` additionally exercises 40 volume updates, Play, advancing Position,
+Pause with a frozen Position, and Seek; this option requires working audio output.
 
 Publishing a new release is required to deliver the corrected runtime to users
 of the old packages; editing the branch cannot change existing release assets.

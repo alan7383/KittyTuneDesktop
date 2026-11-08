@@ -49,7 +49,10 @@
 -keep class io.coil-kt.** { *; }
 -keep class coil3.** { *; }
 -keep class io.github.alexzhirkevich.compottie.** { *; }
--keep class net.jthink.jaudiotagger.** { *; }
+# The Maven group is net.jthink, but the Java packages are org.jaudiotagger.
+# EnumMap and the tag readers resolve these classes at runtime; shrinking their
+# enum constants makes local-file metadata reads fail in the release package.
+-keep class org.jaudiotagger.** { *; }
 -keep class com.mpatric.mp3agic.** { *; }
 -keep class org.schabi.newpipe.extractor.** { *; }
 
