@@ -63,6 +63,14 @@ fun TrimMemoryWhileHidden(window: Window) {
             return@LaunchedEffect
         }
         delay(TRIM_AFTER_HIDDEN_MS)
+        // Read the window itself, not the state: this composes inside the window before it is first shown, so
+        // the state starts out "put away", and showing a window raises no componentShown for listeners added
+        // before it. Measured, that trimmed a visible window at every launch — covers dropped, and with the
+        // working-set trim the whole interface paged out under the user's cursor.
+        if (!isPutAway(window)) {
+            isPutAway = false
+            return@LaunchedEffect
+        }
         releaseMemoryNow()
     }
 }
@@ -89,10 +97,59 @@ fun releaseMemoryNow() {
     HeapSizing.tighten()
     System.gc()
     com.alananasss.kittytune.utils.NativeMemoryManager.trim()
+    WorkingSet.trimSoon()
+}
+
+/**
+ * Hands the physical pages of a put-away window back to Windows.
+ *
+ * What the Task Manager shows as an app's memory is its private working set: the pages of it actually in RAM.
+ * Hidden, almost none of those are touched — the interface is not drawing, the heap is idle — yet they stayed
+ * resident. Emptying the working set moves them to the standby list, from which Windows hands them to whoever
+ * needs RAM, or back to us in a soft fault if we touch them first. Music playing in the tray faults back the
+ * few pages the decoder uses within a second; the rest only returns when the window is shown again.
+ *
+ * Delayed because the collection [releaseMemoryNow] asks for runs concurrently: trimming before it finishes
+ * would only have the collector fault the heap straight back in.
+ */
+private object WorkingSet {
+    private const val TRIM_DELAY_MS = 8_000L
+    private val isWindows = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
+
+    /** jna-platform's Kernel32 does not map this one. */
+    private interface WorkingSetApi : com.sun.jna.win32.StdCallLibrary {
+        fun SetProcessWorkingSetSize(process: com.sun.jna.Pointer, minimum: Long, maximum: Long): Boolean
+    }
+
+    @Volatile
+    private var pending: Thread? = null
+
+    fun trimSoon() {
+        if (!isWindows || pending?.isAlive == true) return
+        pending = Thread({
+            try {
+                Thread.sleep(TRIM_DELAY_MS)
+            } catch (_: InterruptedException) {
+                return@Thread // shown again before the trim: leave its pages where they are
+            }
+            runCatching {
+                val api = com.sun.jna.Native.load("kernel32", WorkingSetApi::class.java)
+                // GetCurrentProcess() is the pseudo-handle -1, and (SIZE_T)-1 for both bounds is the documented
+                // way to empty the working set. SIZE_T is 64-bit on the only Windows we ship for.
+                api.SetProcessWorkingSetSize(com.sun.jna.Pointer(-1L), -1L, -1L)
+            }.onFailure { com.alananasss.kittytune.utils.Logger.w("MemoryTrim", "Working set trim failed: ${it.message}") }
+        }, "working-set-trim").apply { isDaemon = true; start() }
+    }
+
+    fun cancel() {
+        pending?.interrupt()
+        pending = null
+    }
 }
 
 /** Gives G1 its usual headroom back, for an interface that is about to allocate again. */
 fun restoreMemorySizing() {
+    WorkingSet.cancel()
     HeapSizing.restore()
 }
 
