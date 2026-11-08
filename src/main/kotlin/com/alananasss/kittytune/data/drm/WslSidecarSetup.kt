@@ -71,14 +71,15 @@ internal object WslSidecarSetup {
     const val FEATURE_WSL2 = "VirtualMachinePlatform"
 
     /**
-     * The minimal rootfs, built by `scripts/build-wsl1-rootfs.sh` in CI and published with the release.
-     * [ROOTFS_SHA256] pins it; an empty string skips verification (only for a local, unreleased build).
+     * The minimal rootfs, built by `scripts/build-wsl1-rootfs.sh` and published by the "Build CDM rootfs"
+     * workflow under an **immutable, versioned** release (`cdm-rootfs-v<N>`): a published version is never
+     * overwritten, so [ROOTFS_SHA256] stays valid. Changing the rootfs means publishing `v<N+1>` and bumping
+     * both constants here together.
      */
+    const val ROOTFS_VERSION = 1
     const val ROOTFS_URL =
-        "https://github.com/alan7383/KittyTuneDesktop/releases/download/cdm-rootfs/ktroot.tgz"
-    // The sha256 of the published `ktroot.tgz`. When the rootfs is rebuilt (the CI job prints the new
-    // sum), update this; an empty string would skip verification.
-    const val ROOTFS_SHA256 = "99c222909543b0286e6f46288c6dff8e74e15bae2d9d1337f8528357846120dc"
+        "https://github.com/alan7383/KittyTuneDesktop/releases/download/cdm-rootfs-v$ROOTFS_VERSION/ktroot.tgz"
+    const val ROOTFS_SHA256 = "fc7d52fd63502291cf759c51c34cfe3b538400d13f3c377f4985b918493dbdd9"
 
     private const val CHROME_DEB =
         "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
@@ -125,7 +126,13 @@ internal object WslSidecarSetup {
         val wsl2Available: Boolean,
         /** The version our distribution is imported as, when [State.SET_UP] (1 or 2), else null. */
         val installedVersion: Int? = null,
-    )
+    ) {
+        /**
+         * Whether the Windows component [version] needs is on. Readiness is always judged for the version
+         * the user picked: WSL2's component being on does not make a WSL1 import possible, and vice versa.
+         */
+        fun featureOn(version: Int): Boolean = if (version == 1) wsl1Available else wsl2Available
+    }
 
     enum class Step { DOWNLOAD, IMPORT, CDM, PROBE, CONNECT }
 
@@ -165,13 +172,38 @@ internal object WslSidecarSetup {
     }
 
     /** The WSL version our distribution is registered as, read from `wsl -l -v`. */
-    private suspend fun importedVersion(): Int? {
+    private suspend fun importedVersion(): Int? = registeredVersions()[DISTRO.lowercase()]
+
+    /** Every registered distribution (lower-cased name) with its WSL version, from `wsl -l -v`. */
+    private suspend fun registeredVersions(): Map<String, Int> {
         val out = runCatching { run(listOf("--list", "--verbose"), timeoutMs = 20_000) }.getOrNull()?.output
-            ?: return null
-        val line = out.lineSequence()
-            .map { it.replace("\u0000", "").replace("*", "").trim() }
-            .firstOrNull { it.startsWith(DISTRO, ignoreCase = true) } ?: return null
-        return Regex("\\b([12])\\b").find(line)?.groupValues?.get(1)?.toIntOrNull()
+            ?: return emptyMap()
+        return parseVerbose(out)
+    }
+
+    /**
+     * `wsl -l -v` rows → name to version. The header and the default-distribution `*` are skipped; the
+     * version is the last column, whatever language the STATE column is printed in.
+     */
+    internal fun parseVerbose(output: String): Map<String, Int> = output
+        .replace("\u0000", "").replace("﻿", "").replace("�", "")
+        .lineSequence()
+        .map { it.trim().removePrefix("*").trim() }
+        .mapNotNull { line ->
+            val parts = line.split(Regex("\\s+"))
+            val version = parts.lastOrNull()?.toIntOrNull()?.takeIf { it == 1 || it == 2 } ?: return@mapNotNull null
+            if (parts.size < 3) return@mapNotNull null
+            parts.first().lowercase() to version
+        }
+        .toMap()
+
+    /**
+     * Whether uninstalling may offer to turn the WSL1 component back off: it is on, and no distribution
+     * other than ours runs on it (turning it off would break that one).
+     */
+    suspend fun wsl1FeatureRemovable(): Boolean = withContext(Dispatchers.IO) {
+        if (!windows || !wslExe.isFile || !featureEnabled(FEATURE_WSL1)) return@withContext false
+        registeredVersions().none { (name, version) -> version == 1 && name != DISTRO.lowercase() }
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -265,27 +297,48 @@ internal object WslSidecarSetup {
 
     private fun downloadRootfs(onLine: (String) -> Unit): File {
         val target = File.createTempFile("kittytune-rootfs-", ".tgz")
-        onLine("downloading the Linux image")
-        val request = Request.Builder().url(ROOTFS_URL).header("User-Agent", "KittyTune").build()
-        ProxyManager.getOkHttpClient().newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                target.delete()
-                throw SetupException(Step.DOWNLOAD, "the Linux image could not be downloaded (HTTP ${response.code})")
+        onLine("downloading the Linux image (v$ROOTFS_VERSION)")
+        try {
+            val request = Request.Builder().url(ROOTFS_URL).header("User-Agent", "KittyTune").build()
+            ProxyManager.getOkHttpClient().newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw SetupException(Step.DOWNLOAD, "the Linux image could not be downloaded (HTTP ${response.code})")
+                }
+                val body = response.body ?: throw SetupException(Step.DOWNLOAD, "the Linux image came back empty")
+                val total = body.contentLength()
+                target.outputStream().use { out ->
+                    val input = body.byteStream()
+                    val buffer = ByteArray(1 shl 16)
+                    var done = 0L
+                    var lastStep = -1L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        out.write(buffer, 0, read)
+                        done += read
+                        if (total > 0) {
+                            val step = done * 4 / total // a line every 25 %
+                            if (step != lastStep) { lastStep = step; onLine("  ${done * 100 / total} %") }
+                        }
+                    }
+                }
             }
-            val body = response.body ?: run {
-                target.delete(); throw SetupException(Step.DOWNLOAD, "the Linux image came back empty")
-            }
-            target.outputStream().use { out -> body.byteStream().copyTo(out) }
-        }
-        if (ROOTFS_SHA256.isNotBlank()) {
             val actual = sha256(target)
             if (!actual.equals(ROOTFS_SHA256, ignoreCase = true)) {
-                target.delete()
-                throw SetupException(Step.DOWNLOAD, "the Linux image did not match its checksum")
+                onLine("expected sha256 $ROOTFS_SHA256")
+                onLine("received sha256 $actual")
+                throw SetupException(
+                    Step.DOWNLOAD,
+                    "the downloaded Linux image is not the one this version of KittyTune expects",
+                )
             }
+            onLine("downloaded and verified (${target.length() / 1024} KB)")
+            return target
+        } catch (e: Throwable) {
+            target.delete()
+            if (e is SetupException) throw e
+            throw SetupException(Step.DOWNLOAD, "the Linux image could not be downloaded: ${e.message ?: e.javaClass.simpleName}")
         }
-        onLine("downloaded ${target.length() / 1024} KB")
-        return target
     }
 
     private suspend fun importDistro(tgz: File, version: Int, onLine: (String) -> Unit) {
@@ -577,7 +630,10 @@ internal object WslSidecarSetup {
         found=${'$'}(find root -path '*WidevineCdm*linux_x64/libwidevinecdm.so' -type f | head -n 1)
         [ -n "${'$'}found" ] || { echo "KT_ERROR: the Chrome package carried no Widevine module"; exit 69; }
         mkdir -p $INSTALL_DIR
-        install -m 0755 "${'$'}found" $CDM
+        # cp + chmod + mv rather than `install`: Ubuntu's busybox-static has no `install` applet.
+        cp "${'$'}found" $CDM.tmp
+        chmod 0755 $CDM.tmp
+        mv -f $CDM.tmp $CDM
         cd /; rm -rf "${'$'}work"
         echo "Widevine module ready"
     """.trimIndent() + "\n"

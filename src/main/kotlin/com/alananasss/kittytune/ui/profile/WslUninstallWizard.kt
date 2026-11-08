@@ -76,8 +76,13 @@ private enum class UninstallPage { WHAT, REMOVE, DONE }
 
 /** State kept above the sliding pages, so going back does not lose a check that took seconds. */
 internal class UninstallState {
-    /** Also turn the WSL1 Windows feature back off (admin + restart); off by default — it is harmless to leave. */
+    /** Also turn the WSL1 Windows component back off (admin + restart); off by default — it is harmless to leave. */
     var removeFeature by mutableStateOf(false)
+    /**
+     * Whether that choice is offered at all: the component is on and no other distribution runs on it.
+     * Null while it is being checked.
+     */
+    var featureRemovable by mutableStateOf<Boolean?>(null)
 
     var steps by mutableStateOf<List<UninstallStep>>(emptyList())
     val states = mutableStateListOf<StepState>()
@@ -92,11 +97,10 @@ internal class UninstallState {
 /**
  * Removes the WSL method from the PC, for whoever chose it and wants their machine back as it was.
  *
- * It says first, in plain words, what goes: KittyTune's files and the tools the setup installed in Linux,
- * the link to WSL, and — as choices, ticked when KittyTune installed them itself — the whole distribution
- * and WSL. A distribution the user already had is never ticked for them, and WSL is only offered when no
- * other distribution (Docker's included) still needs it. Then it does all of it, and protected tracks go
- * back to PlayReady.
+ * It says first, in plain words, what goes: KittyTune's own Linux image (the `kittytune-cdm`
+ * distribution) and its link in KittyTune. Turning the WSL1 Windows component back off is offered as a
+ * choice, unticked, and only when no other distribution runs on it. Then it does all of it, and protected
+ * tracks go back to PlayReady.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -106,6 +110,11 @@ fun WslUninstallWizard(onClose: () -> Unit) {
     val pages = UninstallPage.entries
     val index = pages.indexOf(page)
     val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        val removable = WslSidecarSetup.wsl1FeatureRemovable()
+        un.featureRemovable = removable
+        if (!removable) un.removeFeature = false
+    }
 
     val start: () -> Unit = start@{
         un.steps = WslSidecarSetup.uninstallSteps(un.removeFeature)
@@ -254,14 +263,17 @@ internal fun WhatPage(un: UninstallState) {
     ExplainRow(Icons.Rounded.Folder, str("drm_unwiz_files_title", WslSidecarSetup.DISTRO), str("drm_unwiz_files_body"))
     ExplainRow(Icons.Rounded.Settings, str("drm_unwiz_settings_title"), str("drm_unwiz_settings_body"))
 
-    // The Windows feature is left on by default: it is harmless, and turning it off needs admin + a restart.
-    ChoiceCard(
-        checked = un.removeFeature,
-        title = str("drm_unwiz_feature_title"),
-        body = str("drm_unwiz_feature_body"),
-        warning = true,
-        onToggle = { un.removeFeature = it },
-    )
+    // The Windows component is left on by default: it is harmless, and turning it off needs admin + a
+    // restart. Only offered when nothing else runs on it.
+    if (un.featureRemovable == true) {
+        ChoiceCard(
+            checked = un.removeFeature,
+            title = str("drm_unwiz_feature_title"),
+            body = str("drm_unwiz_feature_body"),
+            warning = true,
+            onToggle = { un.removeFeature = it },
+        )
+    }
 }
 
 /** A titled choice with a checkbox; [warning] colours the text when ticking it deletes something of the user's. */

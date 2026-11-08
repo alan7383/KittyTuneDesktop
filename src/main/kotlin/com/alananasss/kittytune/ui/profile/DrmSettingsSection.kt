@@ -346,13 +346,14 @@ internal fun WslStatus(detection: WslSidecarSetup.Detection?, connected: Boolean
         )
         detection == null -> DrmStatusLine(str("drm_wiz_wsl_checking"), Icons.Rounded.Search, MaterialTheme.colorScheme.onSurfaceVariant)
         else -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val key = when (detection.state) {
-                WslSidecarSetup.State.NO_WSL -> "drm_wiz_wsl_missing"
-                WslSidecarSetup.State.FEATURE_OFF -> "drm_wiz_wsl_needs_enable"
-                WslSidecarSetup.State.NOT_SET_UP -> "pref_drm_wsl_not_set_up"
-                WslSidecarSetup.State.SET_UP -> "pref_drm_wsl_not_answering"
+            val text = when (detection.state) {
+                WslSidecarSetup.State.NO_WSL -> str("drm_wiz_wsl_missing")
+                // The component of the version installed before, else WSL1, the default.
+                WslSidecarSetup.State.FEATURE_OFF -> str("drm_wiz_wsl_needs_enable", detection.installedVersion ?: 1)
+                WslSidecarSetup.State.NOT_SET_UP -> str("pref_drm_wsl_not_set_up")
+                WslSidecarSetup.State.SET_UP -> str("pref_drm_wsl_not_answering")
             }
-            DrmStatusLine(str(key), Icons.Rounded.ErrorOutline, error)
+            DrmStatusLine(text, Icons.Rounded.ErrorOutline, error)
             Text(
                 str("pref_drm_wsl_fallback"),
                 style = MaterialTheme.typography.bodySmall,
