@@ -100,6 +100,7 @@ fun EqualizerScreen(
     modifier: Modifier = Modifier,
 ) {
     val eqState = viewModel.equalizerState
+    val protectedPlayback = protectedPlaybackInUse()
     val headphones by HeadphoneDetector.device.collectAsState(initial = viewModel.connectedHeadphone)
     var mode by rememberSaveable {
         mutableStateOf(if (eqState.autoProfileName != null) EqualizerMode.AUTO else EqualizerMode.MANUAL)
@@ -112,6 +113,7 @@ fun EqualizerScreen(
     SettingsScaffold(
         title = str("equalizer_title"),
         subtitle = when {
+            protectedPlayback -> str("drm_native_eq_unavailable")
             !eqState.isEnabled -> str("equalizer_off")
             eqState.autoProfileName != null -> eqState.autoProfileName
             else -> eqState.selectedPreset
@@ -129,7 +131,8 @@ fun EqualizerScreen(
                 )
             }
             SettingsSwitch(
-                checked = eqState.isEnabled,
+                checked = eqState.isEnabled && !protectedPlayback,
+                enabled = !protectedPlayback,
                 onCheckedChange = { enabled ->
                     if (enabled != eqState.isEnabled) viewModel.toggleEqualizer()
                 }

@@ -42,12 +42,41 @@ object SoundCloudDrm {
      *
      * Loading the CDM is attempted here, once and lazily: a build (or a machine) without one keeps
      * the previous behaviour instead of failing at the first protected track.
+     *
+     * The optional CDM sidecar is tried first, because it is the only path that gives the app PCM
+     * samples — and therefore the only one where the equalizer, the filters and the pitch shifter
+     * work on a protected track. It is off unless the user configured it; when it is absent this
+     * falls straight through to the in-process CDM and then to PlayReady.
      */
     val isAvailable: Boolean
-        get() = NativeWidevineCdm.installIfAvailable() && WidevineCdmRegistry.isAvailable
+        get() = CdmSidecar.installIfConfigured() ||
+            (NativeWidevineCdm.installIfAvailable() && WidevineCdmRegistry.isAvailable)
 
-    /** The CDM binary in use, for diagnostics. */
-    val cdmPath: String? get() = NativeWidevineCdm.currentCdmPath
+    /**
+     * True when protected playback is decoded by the sidecar rather than by the PlayReady renderer.
+     *
+     * [com.alananasss.kittytune.audio.AudioEngine] reads this to decide whether a protected URL goes
+     * to the OS renderer or through the ordinary FFmpeg + DSP chain. Cheap on purpose: it must not
+     * trigger a probe while a track is being prepared.
+     */
+    val usesSidecar: Boolean get() = CdmSidecar.isInstalled
+
+    /**
+     * True while asking this CDM for a licence is still worth the round trip.
+     *
+     * [isAvailable] answers "is a CDM installed"; this answers "will the server license it". They
+     * differ on Windows, where the licence server refuses the client identity of a CDM driven outside
+     * a browser (measured; see `docs/SOUNDCLOUD_DRM_WINDOWS.md`). The first protected track discovers
+     * it; from then on `StreamResolver` stops offering encrypted candidates, so its existing provider
+     * and preview fallbacks take over instead of handing the engine a stream that dies at the first
+     * fragment. Nothing is remembered across runs: a new CDM, a different platform or a changed server
+     * policy is tried again from scratch.
+     */
+    val canLicense: Boolean
+        get() = isAvailable && !SoundCloudWidevineLicense.licenceRefused
+
+    /** The CDM in use, for diagnostics: a sidecar description, or the in-process binary's path. */
+    val cdmPath: String? get() = if (CdmSidecar.isInstalled) CdmSidecar.describe else NativeWidevineCdm.currentCdmPath
 
     /**
      * Returns a licensed session for [encryption], opening one when needed.
@@ -64,7 +93,7 @@ object SoundCloudDrm {
         // token means a seek or a re-resolve inside the token's lifetime reuses the session instead of
         // paying for a second license exchange.
         val key = (encryption.keyIdHex ?: IsoBmff.hex(pssh)) + ":" + licenseToken.hashCode()
-        currentSession?.let { if (currentKey == key) return it }
+        currentSession?.let { if (currentKey == key && !it.isExpired) return it }
 
         runCatching { currentSession?.close() }
         currentSession = null
@@ -89,14 +118,16 @@ object SoundCloudDrm {
     fun sessionForDownload(encryption: HlsEncryptionInfo, licenseToken: String): WidevineLicenseSession {
         val pssh = requireWidevinePssh(encryption, licenseToken)
         val key = (encryption.keyIdHex ?: IsoBmff.hex(pssh)) + ":" + licenseToken.hashCode()
-        downloadSession?.let { if (downloadKey == key) return it }
+        downloadSession?.let { if (downloadKey == key && !it.isExpired) return it }
 
         runCatching { downloadSession?.close() }
         downloadSession = null
         downloadKey = null
 
+        // With the WSL sidecar, the second instance is a second daemon: the in-process CDM is the one
+        // SoundCloud refuses on Windows.
         val cdm = downloadCdm
-            ?: NativeWidevineCdm.secondaryCdm()?.also {
+            ?: (if (CdmSidecar.isInstalled) CdmSidecar.secondaryCdm() else NativeWidevineCdm.secondaryCdm())?.also {
                 downloadCdm = it
                 Logger.d(TAG, "download CDM ready: ${it.name}")
             }
@@ -108,6 +139,35 @@ object SoundCloudDrm {
         downloadSession = session
         downloadKey = key
         return session
+    }
+
+    /**
+     * Closes [session] when it is playback's current one: its stream no longer needs decrypting.
+     *
+     * Closing is what lets the WSL sidecar stop its daemon a few seconds later instead of keeping the
+     * Linux VM up. Any other session (a download's, an older one) is left to its owner.
+     */
+    @Synchronized
+    fun releaseSession(session: WidevineLicenseSession) {
+        if (currentSession !== session) return
+        runCatching { session.close() }
+        currentSession = null
+        currentKey = null
+    }
+
+    /**
+     * Forgets every session and the download instance, because the CDM behind them changed (the
+     * method was switched, or the sidecar was set up again). The next track licenses afresh.
+     */
+    @Synchronized
+    fun forgetSessions() {
+        runCatching { currentSession?.close() }
+        currentSession = null
+        currentKey = null
+        runCatching { downloadSession?.close() }
+        downloadSession = null
+        downloadKey = null
+        downloadCdm = null
     }
 
     /** Drops the download session; the instance is kept for the next download. */
@@ -167,7 +227,7 @@ object SoundCloudDrm {
     ): ByteArray {
         if (track == null) return segment
         // The CDM picks the key by KID; tell it which one this fragment declares.
-        (session as? NativeWidevineSession)?.useKeyId(track.keyId)
+        (session as? KeyIdScopedSession)?.useKeyId(track.keyId)
         return CencDecrypter.decryptSegment(segment, track) { buffer, offset, size, iv, subsamples ->
             val sample = buffer.copyOfRange(offset, offset + size)
             val plain = session.decryptSample(sample, iv, subsamples ?: emptyList())

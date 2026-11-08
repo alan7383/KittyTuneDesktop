@@ -331,6 +331,12 @@ compose.desktop {
             vendor = "KittyTune"
 
             modules(
+                // Required by runtime dependencies (Compose suggestRuntimeModules). A Gradle run
+                // has the full JDK, so missing modules otherwise surface only in the packaged app.
+                "java.compiler",
+                "java.instrument",
+                "java.scripting",
+                "jdk.dynalink",
                 "java.management",
                 "java.net.http",
                 "java.sql",
@@ -574,6 +580,18 @@ val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") 
         "-OutDir", outDir.get().asFile.absolutePath)
 }
 
+val compileWindowsPlayReady = tasks.register<Exec>("compileWindowsPlayReady") {
+    description = "Builds the unpackaged Windows PlayReady renderer from source."
+    enabled = desktopIsWindows
+    val outDir = layout.buildDirectory.dir("generated/native-resources/native/playready")
+    inputs.files("scripts/build-windows-playready.ps1", "src/main/cpp/playready/DesktopProtectedPlayer.cpp",
+        "src/main/cpp/playready/PlayReadyCdm.h", "src/main/cpp/playready/MediaFoundationCompat.h")
+    outputs.file(outDir.map { it.file("KittyTuneProtectedPlayer.exe") })
+    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-File", project.file("scripts/build-windows-playready.ps1").absolutePath,
+        "-OutputDirectory", outDir.get().asFile.absolutePath)
+}
+
 val compileMacNowPlayingHelper = tasks.register<Exec>("compileMacNowPlayingHelper") {
     description = "Builds the native Swift macOS Now Playing helper app."
     val osName = System.getProperty("os.name").lowercase()
@@ -626,13 +644,26 @@ tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
     dependsOn(compileNativeWidevine)
     if (desktopIsWindows) dependsOn(compileWindowsSmtcBridge)
+    if (desktopIsWindows) dependsOn(compileWindowsPlayReady)
     from(layout.buildDirectory.dir("generated/native-resources")) {
         if (desktopIsWindows) {
-            include("native/*.dll", "native/WindowsSmtcBridge.exe")
+            include("native/*.dll", "native/WindowsSmtcBridge.exe", "native/playready/KittyTuneProtectedPlayer.exe")
         } else if (System.getProperty("os.name").lowercase().contains("mac")) {
             include("native/*.dylib")
         } else {
             include("native/*.so", "native/linux-x86_64/*.so")
+        }
+    }
+    // The WSL setup compiles the CDM sidecar inside the distribution, from these sources.
+    if (desktopIsWindows) {
+        from(project.file("src/main/cpp")) {
+            include(
+                "widevine/WidevineBridge.cpp",
+                "widevine/content_decryption_module.h",
+                "widevine/content_decryption_module_export.h",
+                "cdmsidecar/CdmSidecar.cpp",
+            )
+            into("sidecar-src")
         }
     }
 }
@@ -852,7 +883,8 @@ tasks.register<Test>("headlessTest") {
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest",
-            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest"
+            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest",
+            "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest"
         ).forEach(::includeTestsMatching)
     }
 }

@@ -561,7 +561,7 @@ internal class NativeWidevineSession(
     private val handle: Pointer,
     private val pssh: ByteArray,
     private val lock: Any,
-) : WidevineLicenseSession {
+) : WidevineLicenseSession, KeyIdScopedSession {
 
     @Volatile
     private var keyId: ByteArray = ByteArray(0)
@@ -612,7 +612,7 @@ internal class NativeWidevineSession(
     }
 
     /** Called by [SoundCloudDrm] once the init segment revealed the KID. */
-    fun useKeyId(kid: ByteArray) {
+    override fun useKeyId(kid: ByteArray) {
         keyId = kid
     }
 

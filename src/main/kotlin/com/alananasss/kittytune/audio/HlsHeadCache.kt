@@ -25,6 +25,7 @@ object HlsHeadCache {
 
     /** Opens [playlistUrl] in the background, unless it is already open or opening. */
     fun warm(playlistUrl: String, headers: Map<String, String>) {
+        if (WindowsPlayReadyRuntime.tokenFor(playlistUrl) != null) return
         if (!playlistUrl.contains(".m3u8") || SignedUrl.isExpired(playlistUrl)) return
         synchronized(this) {
             if (playlistUrl in ready || !warming.add(playlistUrl)) return

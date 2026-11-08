@@ -941,7 +941,13 @@ object DownloadManager {
                     _downloadProgress.update { it + (track.id to 0) }
 
                 val resolvedStream = StreamResolver.resolveStreamWithDrm(track, forDownload = true)
-                val streamUrl = resolvedStream?.url ?: throw Exception("Cannot resolve stream URL for download")
+                if (resolvedStream == null) {
+                    withContext(Dispatchers.Main) {
+                        com.alananasss.kittytune.core.Toaster.show(str("download_offline_source_unavailable"))
+                    }
+                    throw java.io.IOException("No source available for offline download")
+                }
+                val streamUrl = resolvedStream.url
                 val licenseToken = resolvedStream.licenseAuthToken
 
                 val isHlsStream = streamUrl.contains(".m3u8") || streamUrl.contains("hls")
@@ -980,7 +986,19 @@ object DownloadManager {
                         // that would otherwise look like a click that did nothing at all.
                         Logger.e("DownloadManager", "Protected download failed for ${track.id}: ${e.message}")
                         withContext(Dispatchers.Main) {
-                            com.alananasss.kittytune.core.Toaster.show(str("drm_download_failed"))
+                            com.alananasss.kittytune.core.Toaster.show(
+                                str(
+                                    // PlayReady never downloads; with WSL a download can, so its failure
+                                    // is an ordinary one.
+                                    if (com.alananasss.kittytune.audio.WindowsPlayReadyRuntime.windows &&
+                                        !com.alananasss.kittytune.data.drm.SoundCloudDrm.usesSidecar
+                                    ) {
+                                        "drm_unavailable_toast_windows"
+                                    } else {
+                                        "drm_download_failed"
+                                    }
+                                )
+                            )
                         }
                         throw e
                     } finally {

@@ -1,4 +1,4 @@
-﻿// Bridges a Widevine CDM (the .so a browser already downloaded) to KittyTune's JVM side.
+// Bridges a Widevine CDM (the .so a browser already downloaded) to KittyTune's JVM side.
 //
 // Playback of SoundCloud's `ctr-encrypted-hls` needs a CDM: the component that signs the license
 // request, holds the content keys and decrypts the samples. The JVM has none, so this bridge drives
@@ -498,7 +498,16 @@ KtwvCdm ktwv_create(const char* cdm_path, char* err, int err_len) {
 
   // A distinctive identifier is what a per-device certificate is: without allowing it the CDM can
   // only present the default identity its binary ships with.
-  bridge->cdm->Initialize(false, false, false);
+  // Identity flags, as the host is allowed to state them. A distinctive identifier is what a
+  // per-device certificate is: without it the CDM can only present the identity baked into its
+  // binary. Persistent state lets it keep a provisioned certificate between runs. Both stay off by
+  // default so the shipped behaviour only changes when a measurement says it should.
+  auto env_flag = [](const char* name) {
+    const char* value = getenv(name);
+    return value && *value && strcmp(value, "0") != 0;
+  };
+  bridge->cdm->Initialize(env_flag("KITTYTUNE_CDM_DISTINCTIVE"), env_flag("KITTYTUNE_CDM_PERSISTENT"),
+                          false);
   {
     std::unique_lock<std::mutex> lock(bridge->mutex);
     if (!bridge->cv.wait_for(lock, std::chrono::seconds(20),
@@ -653,6 +662,56 @@ int ktwv_provide_license(KtwvCdm handle, const uint8_t* license, int license_len
   if (!bridge->keys_usable) {
     set_error(err, err_len, "the license granted keys that are not usable");
     return 0;
+  }
+  return 1;
+}
+
+/**
+ * Feeds a message into the open session and hands back the next message the CDM produced, if any.
+ * This is the certificate step of the browser flow: the licence server answers the 08 04 request with
+ * a 710-byte service certificate, and the browser passes that answer straight back through
+ * session.update(). Unlike ktwv_provide_license it does not wait for usable keys, because at this
+ * point the CDM is still asking for the licence.
+ * Returns 1 when the CDM answered, 0 on rejection or timeout (|err| filled).
+ */
+int ktwv_update(KtwvCdm handle, const uint8_t* message, int message_len, uint8_t** out,
+                int* out_len, char* err, int err_len) {
+  Bridge* bridge = static_cast<Bridge*>(handle);
+  if (!bridge || !message || message_len <= 0 || !out || !out_len) {
+    set_error(err, err_len, "bad arguments");
+    return 0;
+  }
+  *out = nullptr;
+  *out_len = 0;
+  {
+    std::lock_guard<std::mutex> lock(bridge->mutex);
+    bridge->license_requested = false;
+    bridge->keys_changed = false;
+    bridge->rejected = false;
+    bridge->license_request.clear();
+  }
+  bridge->cdm->UpdateSession(2, bridge->session_id.c_str(),
+                             static_cast<uint32_t>(bridge->session_id.size()), message,
+                             static_cast<uint32_t>(message_len));
+  std::unique_lock<std::mutex> lock(bridge->mutex);
+  if (!bridge->cv.wait_for(lock, std::chrono::seconds(15), [bridge] {
+        return bridge->license_requested || bridge->keys_changed || bridge->rejected;
+      })) {
+    set_error(err, err_len, "the CDM did not answer");
+    return 0;
+  }
+  if (bridge->rejected) {
+    set_error(err, err_len, bridge->last_error.c_str());
+    return 0;
+  }
+  if (bridge->license_requested && !bridge->license_request.empty()) {
+    *out = static_cast<uint8_t*>(malloc(bridge->license_request.size()));
+    if (!*out) {
+      set_error(err, err_len, "out of memory");
+      return 0;
+    }
+    memcpy(*out, bridge->license_request.data(), bridge->license_request.size());
+    *out_len = static_cast<int>(bridge->license_request.size());
   }
   return 1;
 }

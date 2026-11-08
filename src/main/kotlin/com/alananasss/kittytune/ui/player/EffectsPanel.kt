@@ -89,6 +89,7 @@ private fun AudioFxDefinition.tooltip(): String {
 @Composable
 fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val isPrecise = viewModel.isPreciseSpeedEnabled
+    val protectedPlayback = protectedPlaybackInUse()
 
     var showBassBoostDialog by remember { mutableStateOf(false) }
     var showEarrapeDialog by remember { mutableStateOf(false) }
@@ -445,14 +446,15 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
         )
     }
 
-    val pinnedTiles = remember(viewModel.pinnedAudioFx, allEffects) {
-        viewModel.pinnedAudioFx.mapNotNull { id -> allEffects.find { it.id == id } }
+    val availableEffects = if (protectedPlayback) allEffects.filter { it.id in setOf("eight_d", "trance_gate", "rain") } else allEffects
+    val pinnedTiles = remember(viewModel.pinnedAudioFx, availableEffects) {
+        viewModel.pinnedAudioFx.mapNotNull { id -> availableEffects.find { it.id == id } }
     }
 
     if (showStudioEditSheet) {
         AudioFxStudioSheet(
             viewModel = viewModel,
-            allEffects = allEffects,
+            allEffects = availableEffects,
             onDismiss = { showStudioEditSheet = false }
         )
     } else {
@@ -464,11 +466,15 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 .padding(bottom = 24.dp)
         ) {
             // The tab already says what this is, so the speed card leads (issue #66).
-            SpeedCard(viewModel)
+            SpeedCard(viewModel, allowPitch = !protectedPlayback)
+            if (protectedPlayback) {
+                Text(str("drm_native_fx_available"), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+            }
             Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
-            val activeCount = allEffects.count { it.isActive(viewModel.effectsState) }
+            val activeCount = availableEffects.count { it.isActive(viewModel.effectsState) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -880,9 +886,9 @@ fun FxTile(
 
 /** Playback speed: the value, whether the pitch moves with it, and the slider. */
 @Composable
-private fun SpeedCard(viewModel: PlayerViewModel) {
+private fun SpeedCard(viewModel: PlayerViewModel, allowPitch: Boolean = true) {
     val speed = viewModel.effectsState.speed
-    val isPitchActive = viewModel.effectsState.isPitchEnabled
+    val isPitchActive = allowPitch && viewModel.effectsState.isPitchEnabled
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -922,6 +928,7 @@ private fun SpeedCard(viewModel: PlayerViewModel) {
             )
             Surface(
                 onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
+                enabled = allowPitch,
                 shape = CircleShape,
                 color = pitchContainerColor,
                 contentColor = pitchContentColor

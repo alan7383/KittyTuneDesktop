@@ -1,5 +1,9 @@
 # SoundCloud DRM sur desktop — comment ça marche, et où
 
+> Windows utilise désormais un [lecteur PlayReady Win32 sans paquet](SOUNDCLOUD_PLAYREADY_WINDOWS.md)
+> pour la lecture protégée, vérifié le 7 novembre 2026. Les paragraphes historiques
+> sur le refus du pont Widevine ne décrivent pas ce nouveau chemin de lecture.
+
 Les pistes `MONETIZE` de SoundCloud (par exemple `soundcloud.com/bladee1000/it-girl`) n'existent
 qu'en HLS chiffré CENC. Ce document décrit le protocole tel qu'il a été **vérifié** sur l'application
 de référence (SoundCloud-Desktop 8.7.0), et comment KittyTuneDesktop les lit maintenant.
@@ -60,7 +64,8 @@ Où il se trouve selon la plateforme :
 | Android (KittyTune) | `MediaDrm`, fourni par l'OS |
 | Windows (app UWP SoundCloud) | PlayReady, fourni par l'OS |
 | Le `.exe` SoundCloud-Desktop | un CDM sur **leurs serveurs** (`scnative.dev` renvoie la clé) |
-| **JVM desktop (Linux, macOS, Windows)** | personne — d'où le pont vers le CDM du navigateur |
+| **JVM desktop (Linux, macOS)** | personne — d'où le pont vers le CDM du navigateur |
+| **Windows** | PlayReady, fourni par l'OS (le pont Widevine n'est pas accepté par le serveur) |
 
 Vérifié sur l'AppImage : **aucun CDM dedans**. Pas de `.wvd`, aucun symbole `decrypt::Engine`, et
 aucun des 205 `.so` embarqués n'expose l'API CDM. Le commentaire du code amont est explicite : « le
@@ -147,9 +152,24 @@ décode en `aac (LC) 44100 Hz stéréo, 160 kb/s`.
   `widevinecdm.dll` qu'Edge (dossier `EdgeCore\<version>\WidevineCdm` ou WebView2) ou Chrome
   laissent sur la machine. Le `.dll` est lié statiquement (`-static`) pour ne pas dépendre de
   `libwinpthread-1.dll`, que l'app portable n'embarque pas.
-  État mesuré sous Windows : le pont charge le CDM d'Edge comme celui de Firefox et produit une
-  requête de licence valide ; l'échange de licence SoundCloud, lui, a répondu `HTTP 403` depuis ce
-  réseau (reproduit hors application, avec les deux CDM), donc la fin de chaîne reste à confirmer.
+  **Windows n'est pas supporté pour le déchiffrement, et ce n'est pas contournable dans ce projet.**
+  Mesuré : le pont charge le CDM d'Edge comme celui de Firefox, mais l'échange **Widevine** répond
+  `HTTP 403` parce que le serveur refuse l'identité client présentée par un CDM Windows hors
+  navigateur (la requête d'un vrai navigateur, 4 297 o, est acceptée ; la nôtre, 4 409 o, refusée ;
+  sur Linux la même identité en clair reçoit `200`). `VerifyCdmHost_0` a depuis été réussie **avant**
+  la création de l'instance : le CDM chiffre alors réellement son identité (4 377 o avec les binaires
+  signés de Chrome) et le `403` persiste — Chrome passe, **Edge est refusé**, et il reste 80 octets
+  d'identité que seul l'adaptateur CDM du navigateur produit. Le corps signé de la requête n'est pas
+  retouchable (un octet inversé → `403`), et injecter le pont dans un `chrome.exe` réel ne change rien.
+  Détail et relevés : [`SOUNDCLOUD_DRM_WINDOWS.md`](SOUNDCLOUD_DRM_WINDOWS.md). La playlist déclare
+  aussi **PlayReady** : le CDM
+  PlayReady fourni par Windows obtient `200` avec le même `licenseAuthToken` et la clé devient
+  `USABLE`, mais son décrypteur n'est pas utilisable par une application : l'ITA est un proxy distant
+  (violation d'accès dans `combase.dll`), une session PMP « non protégée » ne déchiffre pas par
+  conception, et `PlayReadyLicenseSession` (WinRT) refuse de se construire hors paquet MSIX.
+  Conséquence pratique : après le premier `403`, l'app cesse de proposer les flux chiffrés et retombe
+  sur ses fournisseurs puis sur l'extrait de 30 s (voir §6), au lieu d'échouer au premier fragment.
+  Mesures, causes et voies restantes : [`SOUNDCLOUD_DRM_WINDOWS.md`](SOUNDCLOUD_DRM_WINDOWS.md).
 
 ---
 

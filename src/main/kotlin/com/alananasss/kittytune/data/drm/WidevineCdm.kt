@@ -55,6 +55,17 @@ interface WidevineLicenseSession : AutoCloseable {
     override fun close()
 }
 
+/**
+ * A session whose CDM resolves the content key by KID instead of holding one key per exchange.
+ *
+ * Every CDM behaves this way — it keeps the keys it was granted and picks the one a sample belongs
+ * to — so [SoundCloudDrm][com.alananasss.kittytune.data.drm.SoundCloudDrm] tells the session which
+ * KID the current fragment declares, once per init segment.
+ */
+interface KeyIdScopedSession {
+    fun useKeyId(kid: ByteArray)
+}
+
 /** Widevine `License.KeyContainer.KeyType`, as far as a decryptor cares. */
 enum class ContentKeyType {
     SIGNING,
@@ -97,6 +108,17 @@ class DrmLicenseException(message: String, cause: Throwable? = null) : Exception
  * Deliberately tiny and synchronous: installing happens once, before any DRM track is resolved, and
  * reads happen on the segment-decoding thread.
  */
+/**
+ * A session that can stop being usable on its own, like one whose CDM process was stopped when idle.
+ * Whoever caches a session checks [expired] before reusing it.
+ */
+interface ExpiringSession {
+    val expired: Boolean
+}
+
+/** True when [this] is an [ExpiringSession] that expired; other sessions live as long as their CDM. */
+val WidevineLicenseSession.isExpired: Boolean get() = (this as? ExpiringSession)?.expired == true
+
 object WidevineCdmRegistry {
 
     @Volatile

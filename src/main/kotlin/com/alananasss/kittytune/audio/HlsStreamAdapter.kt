@@ -4,6 +4,7 @@ import com.alananasss.kittytune.data.drm.CencDecrypter
 import com.alananasss.kittytune.data.drm.HlsEncryptionInfo
 import com.alananasss.kittytune.data.drm.SoundCloudDrm
 import com.alananasss.kittytune.data.drm.WidevineLicenseSession
+import com.alananasss.kittytune.data.drm.isExpired
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
 import okhttp3.Request
@@ -91,6 +92,30 @@ class HlsStreamAdapter(
     @Volatile
     private var drmSession: WidevineLicenseSession? = null
 
+    /**
+     * How a session this stream no longer needs is handed back.
+     *
+     * Playback's session is closed, which lets a CDM that costs something to keep alive (the WSL
+     * sidecar) stop. A session that is not playback's current one is left alone: a download releases
+     * its own when it is done.
+     */
+    internal var sessionRelease: (WidevineLicenseSession) -> Unit = SoundCloudDrm::releaseSession
+
+    /**
+     * Fragments of a protected stream, already decrypted, by index.
+     *
+     * Every reader of the stream (the decoder, the upfront audio analysis, a seek) would otherwise
+     * decrypt each fragment again, and keep the CDM busy for it. Once all of them are here the track
+     * never needs the CDM again, so the session is released at once ([releaseDrm]). Bounded by
+     * [CLEAR_CACHE_LIMIT]: past it (an hour-long mix) nothing is kept and the CDM simply stops
+     * when it goes idle.
+     */
+    private val clearFragments = java.util.concurrent.ConcurrentHashMap<Int, ByteArray>()
+    private val clearBytes = java.util.concurrent.atomic.AtomicLong()
+
+    @Volatile
+    private var clearCacheFull = false
+
     /** How the fragment samples are encrypted, read from the init segment's `tenc` box. */
     @Volatile
     private var trackEncryption: CencDecrypter.TrackEncryption? = null
@@ -130,6 +155,37 @@ class HlsStreamAdapter(
 
         /** How long to leave a refresh that did not help alone, so a dead track cannot spin. */
         private const val REFRESH_RETRY_BACKOFF_MS = 5_000L
+
+        /** About fifty minutes of AAC 160: enough for nearly every track, bounded for mixes. */
+        private const val CLEAR_CACHE_LIMIT = 64L * 1024 * 1024
+    }
+
+    /** Keeps a decrypted fragment; once every fragment is kept, the CDM is no longer needed. */
+    private fun rememberClear(index: Int, bytes: ByteArray) {
+        if (!isEncrypted || clearCacheFull) return
+        if (clearFragments.putIfAbsent(index, bytes) == null &&
+            clearBytes.addAndGet(bytes.size.toLong()) > CLEAR_CACHE_LIMIT
+        ) {
+            clearCacheFull = true
+            clearFragments.clear()
+            Logger.d("HlsStreamAdapter", "Track too long to keep decrypted; the CDM stops when idle instead")
+            return
+        }
+        val total = segmentCount()
+        if (total > 0 && clearFragments.size >= total) {
+            Logger.d("HlsStreamAdapter", "All $total fragments decrypted; releasing the DRM session")
+            releaseDrm()
+        }
+    }
+
+    /**
+     * Hands the licensed session back, because nothing of this stream needs decrypting any more: it is
+     * fully decrypted, or the engine dropped it. Safe to call more than once; a later read that still
+     * needs the CDM simply opens a new session.
+     */
+    fun releaseDrm() {
+        val session = synchronized(this) { drmSession.also { drmSession = null } } ?: return
+        runCatching { sessionRelease(session) }
     }
 
     private fun loadPlaylist(url: String): Playlist {
@@ -182,9 +238,10 @@ class HlsStreamAdapter(
      * handles them, rather than a DRM error escaping a background thread.
      */
     private fun acquireSession(): WidevineLicenseSession {
-        drmSession?.let { return it }
+        // An expired session lost its keys with its CDM process (the WSL sidecar stops when idle).
+        drmSession?.takeIf { !it.isExpired }?.let { return it }
         synchronized(this) {
-            drmSession?.let { return it }
+            drmSession?.takeIf { !it.isExpired }?.let { return it }
             val info = encryption
                 ?: throw IOException("Stream is not DRM-protected but a license was requested")
             if (!info.isSampleAes) {
@@ -217,7 +274,13 @@ class HlsStreamAdapter(
             ?: throw IOException("Protected stream whose init segment carried no tenc box")
         val session = acquireSession()
         return try {
-            SoundCloudDrm.decryptSegment(bytes, track, session)
+            try {
+                SoundCloudDrm.decryptSegment(bytes, track, session)
+            } catch (e: Exception) {
+                // The daemon stopped between the check and the call: once more, on a fresh session.
+                if (!session.isExpired) throw e
+                SoundCloudDrm.decryptSegment(bytes, track, acquireSession())
+            }
         } catch (e: Exception) {
             Logger.e("HlsStreamAdapter", "Fragment decryption failed: ${e.message}")
             throw IOException(e.message ?: "DRM fragment could not be decrypted", e)
@@ -259,7 +322,7 @@ class HlsStreamAdapter(
             val request = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) response.body?.bytes()?.let { decryptSegment(it) } else null
-            }
+            }?.also { rememberClear(0, it) }
         } catch (e: Exception) {
             Logger.e("HlsStreamAdapter", "Could not prefetch the first fragment: ${e.message}")
             null
@@ -387,15 +450,17 @@ class HlsStreamAdapter(
                         currentStream = if (cached != null) {
                             java.io.ByteArrayInputStream(cached)
                         } else {
-                            openSigned { initUrl() }
+                            openSigned(null) { initUrl() }
                         }
                         emittedInit = true
                     } else if (currentSegmentIndex < segmentCount()) {
-                        val prefetched = openingSegmentData.takeIf { currentSegmentIndex == 0 }
-                        currentStream = if (prefetched != null) {
-                            java.io.ByteArrayInputStream(prefetched)
-                        } else {
-                            openSigned { segmentUrlAt(currentSegmentIndex) }
+                        val index = currentSegmentIndex
+                        val prefetched = openingSegmentData.takeIf { index == 0 }
+                        val clear = clearFragments[index]
+                        currentStream = when {
+                            clear != null -> java.io.ByteArrayInputStream(clear)
+                            prefetched != null -> java.io.ByteArrayInputStream(prefetched)
+                            else -> openSigned(index) { segmentUrlAt(index) }
                         }
                         currentSegmentIndex++
                         onFragmentProgress?.invoke(currentSegmentIndex, segmentCount())
@@ -428,21 +493,22 @@ class HlsStreamAdapter(
          * out of time and once more if the CDN turns it down anyway. [url] is re-read after a
          * refresh so it picks up the new signature.
          */
-        private fun openSigned(url: () -> String?): InputStream {
+        private fun openSigned(index: Int?, url: () -> String?): InputStream {
             val current = url() ?: throw IOException("No fragment to read")
             if (SignedUrl.isExpired(current)) {
                 Logger.e("HlsStreamAdapter", "Fragment signature lapsed; re-signing the playlist")
                 refreshSegments()
             }
             return try {
-                openHttpStream(url() ?: current)
+                openHttpStream(url() ?: current, index)
             } catch (e: IOException) {
                 if (!refreshSegments()) throw e
-                openHttpStream(url() ?: throw e)
+                openHttpStream(url() ?: throw e, index)
             }
         }
 
-        private fun openHttpStream(url: String): InputStream {
+        /** [index] is the fragment's place in the playlist, or null for the init segment. */
+        private fun openHttpStream(url: String, index: Int?): InputStream {
             val req = Request.Builder().url(url).apply {
                 headers.forEach { (k, v) -> header(k, v) }
             }.build()
@@ -460,7 +526,9 @@ class HlsStreamAdapter(
             // A protected fragment has to be held whole: its samples are decrypted per `senc` entry
             // and the encryption boxes are stripped, so the demuxer never sees the original bytes.
             val decrypted = response.use { it.body?.bytes()?.let { bytes -> decryptSegment(bytes) } }
-            return ByteArrayInputStream(decrypted ?: throw IOException("Empty segment body"))
+                ?: throw IOException("Empty segment body")
+            if (index != null) rememberClear(index, decrypted)
+            return ByteArrayInputStream(decrypted)
         }
 
         override fun close() {
