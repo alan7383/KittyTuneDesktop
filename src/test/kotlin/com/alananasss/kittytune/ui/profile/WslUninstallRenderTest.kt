@@ -31,7 +31,7 @@ class WslUninstallRenderTest {
 
     @Test
     fun whatPageOffersTurningTheFeatureOff() = render("wsl-uninstall-what") {
-        WhatPage(UninstallState().apply { removeFeature = true })
+        WhatPage(UninstallState().apply { featureRemovable = true; removeFeature = true })
     }
 
     @Test

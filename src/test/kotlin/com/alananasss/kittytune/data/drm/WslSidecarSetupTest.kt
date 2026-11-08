@@ -47,6 +47,51 @@ class WslSidecarSetupTest {
     }
 
     @Test
+    fun `the CDM fetch only runs tools the rootfs guarantees`() {
+        // The rootfs build fails when busybox lacks one of REQUIRED; everything else the script runs must be
+        // a shell builtin or one of the real binaries the rootfs ships. (Ubuntu's busybox has no `install`.)
+        val build = File("scripts/build-wsl1-rootfs.sh").readText()
+        val required = Regex("""REQUIRED="([^"]+)"""").find(build)!!.groupValues[1].split(" ").toSet()
+        val shipped = setOf("curl", "xz")
+        val builtins = setOf("set", "export", "if", "then", "elif", "else", "fi", "echo", "exit", "cd", "[", "{", "}")
+        val commands = WslSidecarSetup.CDM_SCRIPT.lines()
+            .map { it.substringBefore(" #").trim() }
+            .filterNot { it.startsWith("#") || it.isEmpty() }
+            .flatMap { it.split("|", ";", "&&", "||", "\$(") }
+            .map { it.trim().trimStart('(').substringAfter("=").trim() }
+            .mapNotNull { it.split(Regex("\\s+")).firstOrNull()?.takeIf { w -> w.isNotEmpty() && !w.startsWith("\"") && !w.startsWith("$") } }
+            .filter { Regex("[a-z\\[{}][a-z0-9_-]*|\\[").matches(it) }
+            .toSet()
+        val unknown = commands - required - shipped - builtins
+        assertTrue("CDM_SCRIPT runs tools the rootfs does not guarantee: $unknown", unknown.isEmpty())
+    }
+
+    @Test
+    fun `wsl -l -v is parsed whatever the language, the default marker and the encoding`() {
+        // A French Windows, with the default-distribution star and wsl.exe's UTF-16LE read as UTF-8.
+        val output = "  NAME             STATE           VERSION\r\n* Ubuntu           Arrêté          2\r\n  kittytune-cdm    En cours d'exécution 1\r\n"
+            .toByteArray(Charsets.UTF_16LE).toString(Charsets.UTF_8)
+        assertEquals(mapOf("ubuntu" to 2, "kittytune-cdm" to 1), WslSidecarSetup.parseVerbose(output))
+        assertEquals(emptyMap<String, Int>(), WslSidecarSetup.parseVerbose("  NAME   STATE   VERSION\n"))
+    }
+
+    @Test
+    fun `readiness is judged for the chosen version only`() {
+        val onlyWsl2 = WslSidecarSetup.Detection(WslSidecarSetup.State.NOT_SET_UP, wsl1Available = false, wsl2Available = true)
+        assertEquals(false, onlyWsl2.featureOn(1))
+        assertEquals(true, onlyWsl2.featureOn(2))
+        val onlyWsl1 = WslSidecarSetup.Detection(WslSidecarSetup.State.NOT_SET_UP, wsl1Available = true, wsl2Available = false)
+        assertEquals(true, onlyWsl1.featureOn(1))
+        assertEquals(false, onlyWsl1.featureOn(2))
+    }
+
+    @Test
+    fun `the pinned rootfs is a versioned, immutable release`() {
+        assertTrue(WslSidecarSetup.ROOTFS_URL.contains("/cdm-rootfs-v${WslSidecarSetup.ROOTFS_VERSION}/"))
+        assertTrue("sha256 must be pinned", Regex("[0-9a-f]{64}").matches(WslSidecarSetup.ROOTFS_SHA256))
+    }
+
+    @Test
     fun `uninstall steps follow whether the Windows feature is removed too`() {
         assertEquals(listOf(U.STOP, U.DISTRO, U.SETTINGS), WslSidecarSetup.uninstallSteps(removeFeature = false))
         assertEquals(listOf(U.STOP, U.DISTRO, U.SETTINGS, U.FEATURE), WslSidecarSetup.uninstallSteps(removeFeature = true))

@@ -79,8 +79,18 @@ BB="$(command -v busybox || true)"
 [ -n "$BB" ] || { log "busybox required (apt-get install -y busybox-static)"; exit 69; }
 cp -L "$BB" "$R/usr/bin/busybox"
 chmod 0755 "$R/usr/bin/busybox"
-for applet in ar tar mkdir mktemp cp install find rm cat wc awk ls chmod chown ln mv head sed grep; do
+# Only link applets this busybox really has: a link to a missing applet fails only at the user's setup.
+# REQUIRED is what WslSidecarSetup.CDM_SCRIPT runs (besides the real curl and xz); a busybox without one
+# of them must fail the build, not the user's setup.
+REQUIRED="ar tar mkdir mktemp cp chmod mv find head rm"
+OPTIONAL="cat wc awk ls chown ln sed grep"
+APPLETS="$("$BB" --list)"
+for applet in $REQUIRED; do
+  echo "$APPLETS" | grep -qx "$applet" || { log "this busybox has no '$applet' applet, which the CDM fetch needs"; exit 69; }
   ln -sf busybox "$R/usr/bin/$applet"
+done
+for applet in $OPTIONAL; do
+  if echo "$APPLETS" | grep -qx "$applet"; then ln -sf busybox "$R/usr/bin/$applet"; fi
 done
 
 # ---------------------------------------------------------------------------------------------

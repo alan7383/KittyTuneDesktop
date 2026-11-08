@@ -130,8 +130,10 @@ internal enum class StepState { PENDING, RUNNING, DONE, FAILED }
  *
  * It opens by itself the first time the page is visited, and from the page afterwards. It explains
  * what SoundCloud protects and how KittyTune plays it, lets a Windows user choose between PlayReady
- * and WSL, and, for WSL, does the whole setup: it checks for WSL, opens Microsoft's installer when it
- * is missing, and installs everything inside Ubuntu without a single command typed.
+ * and WSL (WSL1 by default, WSL2 under "advanced options"), and, for WSL, does the whole setup: it
+ * turns the Windows component on through its own UAC prompt, resumes by itself after the restart, then
+ * downloads and imports KittyTune's tiny Linux image and fetches the Widevine module, without a single
+ * command typed.
  *
  * Steps slide like the onboarding of essentials; the hero of each step is a Material shape.
  *
@@ -163,7 +165,14 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
     val index = steps.indexOf(step).coerceAtLeast(0)
 
     // The WSL part keeps its state here, so going back and forth does not restart the setup.
-    val wsl = remember { WslWizardState().apply { if (resuming) version = WslSidecarSetup.pendingVersion() ?: 1 } }
+    val wsl = remember {
+        WslWizardState().apply {
+            if (resuming) {
+                version = WslSidecarSetup.pendingVersion() ?: 1
+                versionChosen = true
+            }
+        }
+    }
 
     val close = {
         prefs.setDrmOnboardingDone(true)
@@ -172,9 +181,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
         onClose()
     }
     val canGoOn = when (step) {
-        WizardStep.WSL_CHECK -> wsl.detection?.state.let {
-            it == WslSidecarSetup.State.NOT_SET_UP || it == WslSidecarSetup.State.SET_UP
-        }
+        WizardStep.WSL_CHECK -> !wsl.checking && wsl.detection?.featureOn(wsl.version) == true
         WizardStep.WSL_SETUP -> wsl.succeeded
         else -> true
     }
@@ -221,14 +228,14 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
                                 choice = choice,
                                 onChoose = { choice = it },
                                 version = wsl.version,
-                                onVersion = { wsl.version = it },
+                                onVersion = { wsl.version = it; wsl.versionChosen = true },
                                 onSkip = {
                                     prefs.setProtectedTracksEnabled(false)
                                     StreamResolver.forgetStreams()
                                     close()
                                 },
                             )
-                            WizardStep.WSL_CHECK -> WslCheckStep(wsl)
+                            WizardStep.WSL_CHECK -> WslCheckStep(wsl, showVersionChoice = WizardStep.CHOOSE !in steps)
                             WizardStep.WSL_SETUP -> WslSetupStep(wsl)
                             WizardStep.DONE -> DoneStep(windows, choice)
                         }
@@ -509,8 +516,8 @@ private fun VersionRow(selected: Boolean, title: String, body: String, onClick: 
 internal const val KITTYTUNE_REPO_URL = "https://github.com/alan7383/KittyTuneDesktop"
 
 /**
- * Says plainly that this is experimental: on Windows, that WSL is heavy but the only stable way for
- * now and that a real Linux stays lighter; everywhere, that the code is open to a better idea.
+ * Says plainly that this is still a beta: on Windows, that the WSL method is a tiny, light Linux made
+ * only for the module; everywhere, that the code is open to a better idea.
  */
 @Composable
 internal fun DrmExperimentalCard(windows: Boolean, modifier: Modifier = Modifier) {
@@ -693,7 +700,7 @@ internal fun MethodPoints(method: ProtectedBackend) {
     val points = if (method == ProtectedBackend.PLAYREADY) {
         listOf("drm_method_pro_ready" to true) + abilities.map { it to false }
     } else {
-        abilities.map { it to true } + listOf("drm_method_con_setup" to false, "drm_method_con_space" to false)
+        abilities.map { it to true } + listOf("drm_method_pro_light" to true, "drm_method_con_setup" to false)
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         points.forEach { (key, good) ->
@@ -719,10 +726,14 @@ internal class WslWizardState {
     var detection by mutableStateOf<WslSidecarSetup.Detection?>(null)
     var checking by mutableStateOf(false)
 
-    /** Which WSL version to set up: 1 (WSL1, light, no VM) or 2 (the fallback when WSL1 is blocked). */
+    /** Which WSL version to set up: 1 (WSL1, light, no VM, the default) or 2 (a lightweight VM). */
     var version by mutableStateOf(1)
+    /** True once the user picked a version themselves, so detection does not override it. */
+    var versionChosen by mutableStateOf(false)
     var enabling by mutableStateOf(false)
     var enableRefused by mutableStateOf(false)
+    /** Why turning the component on failed (not a refusal), or null. */
+    var enableError by mutableStateOf<String?>(null)
     /** True once the Windows feature was turned on and the machine must restart for the setup to go on. */
     var awaitingReboot by mutableStateOf(false)
 
@@ -734,30 +745,41 @@ internal class WslWizardState {
     var showLog by mutableStateOf(false)
 }
 
+/**
+ * Checks that the Windows component the chosen WSL version runs on is on, and turns it on when it is not.
+ *
+ * Readiness is judged for [WslWizardState.version] only: WSL2's component being on does not make a WSL1
+ * import possible, and vice versa. Turning a component on goes through Windows' own UAC prompt, then a
+ * restart; the assistant resumes by itself afterwards.
+ *
+ * @param showVersionChoice offer the WSL1/WSL2 choice here, for when the assistant opened straight at
+ *   this step (from the settings) and the method step, which normally holds it, is not part of the flow.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun WslCheckStep(wsl: WslWizardState) {
+internal fun WslCheckStep(wsl: WslWizardState, showVersionChoice: Boolean) {
     val scope = rememberCoroutineScope()
     val recheck: () -> Unit = {
         scope.launch {
             wsl.checking = true
             try {
-                wsl.detection = WslSidecarSetup.detect()
+                val found = WslSidecarSetup.detect()
+                // Redoing an existing setup keeps its version, unless the user picked one.
+                if (!wsl.versionChosen) found.installedVersion?.let { wsl.version = it }
+                wsl.detection = found
             } finally {
                 wsl.checking = false
             }
         }
     }
     LaunchedEffect(Unit) { if (wsl.detection == null) recheck() }
-    // After the user enables the feature and restarts, the feature reads as on: stop waiting, move on.
+    // After the restart (or straight away when Windows needed none), the component reads as on: move on.
     LaunchedEffect(wsl.awaitingReboot) {
         while (wsl.awaitingReboot) {
             delay(5_000)
             val found = WslSidecarSetup.detect()
             wsl.detection = found
-            if (found.state == WslSidecarSetup.State.NOT_SET_UP || found.state == WslSidecarSetup.State.SET_UP) {
-                wsl.awaitingReboot = false
-            }
+            if (found.featureOn(wsl.version)) wsl.awaitingReboot = false
         }
     }
 
@@ -765,12 +787,16 @@ internal fun WslCheckStep(wsl: WslWizardState) {
         scope.launch {
             wsl.enabling = true
             wsl.enableRefused = false
+            wsl.enableError = null
             try {
                 val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     WslSidecarSetup.enable(version)
                 }
                 wsl.version = version
                 wsl.enableRefused = result.refused
+                if (!result.ok && !result.refused) {
+                    wsl.enableError = result.log.lineSequence().lastOrNull { it.isNotBlank() } ?: ""
+                }
                 wsl.awaitingReboot = result.ok
             } finally {
                 wsl.enabling = false
@@ -781,11 +807,11 @@ internal fun WslCheckStep(wsl: WslWizardState) {
     Hero(MaterialShapes.Pill, Icons.Rounded.Terminal)
     StepTitle(str("drm_wiz_wsl_title"), str("drm_wiz_wsl_what"))
 
-    val state = wsl.detection?.state
+    val detection = wsl.detection
+    val version = wsl.version
     when {
-        state == null || wsl.checking -> WaitingCard(str("drm_wiz_wsl_checking"))
-        state == WslSidecarSetup.State.NOT_SET_UP || state == WslSidecarSetup.State.SET_UP ->
-            ResultCard(ok = true, text = str("drm_wiz_wsl_ready"))
+        detection == null || wsl.checking -> WaitingCard(str("drm_wiz_wsl_checking"))
+        detection.featureOn(version) -> ResultCard(ok = true, text = str("drm_wiz_wsl_ready", version))
         wsl.awaitingReboot -> {
             ResultCard(ok = true, text = str("drm_wiz_wsl_enabled"))
             Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
@@ -802,43 +828,57 @@ internal fun WslCheckStep(wsl: WslWizardState) {
             }
         }
         else -> {
-            // FEATURE_OFF or NO_WSL: one click enables the Windows component through its own UAC prompt.
-            ResultCard(ok = false, text = str("drm_wiz_wsl_needs_enable"))
-            ExplainRow(Icons.Rounded.Memory, str("drm_wiz_how_nobrowser_title"), str("drm_wiz_enable_light"))
-            if (wsl.enableRefused) {
-                Text(
-                    str("drm_wiz_enable_refused"),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+            // The component this version runs on is off: one click turns it on through Windows' UAC prompt.
+            // A normal step to take, not a failure: a neutral card, never the red error one.
+            InfoCard(str("drm_wiz_wsl_needs_enable", version))
+            ExplainRow(
+                Icons.Rounded.Memory,
+                str(if (version == 1) "drm_wiz_version_wsl1" else "drm_wiz_version_wsl2"),
+                str(if (version == 1) "drm_wiz_version_wsl1_desc" else "drm_wiz_version_wsl2_desc"),
+            )
+            Text(
+                str("drm_wiz_enable_how"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val problem = when {
+                wsl.enableRefused -> str("drm_wiz_enable_refused")
+                wsl.enableError != null -> str("drm_wiz_enable_failed") +
+                    wsl.enableError.orEmpty().let { if (it.isBlank()) "" else "\n$it" }
+                else -> null
+            }
+            if (problem != null) {
+                Text(problem, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             }
             if (wsl.enabling) {
                 WaitingCard(str("drm_wiz_enabling"))
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(shapes = ButtonDefaults.shapes(), onClick = { enable(wsl.version) }) {
+                    Button(shapes = ButtonDefaults.shapes(), onClick = { enable(version) }) {
                         Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(str("drm_wiz_enable"))
+                        Text(str("drm_wiz_enable", version))
                     }
-                    // The other WSL version, offered when the chosen one was declined or is unavailable.
-                    val other = if (wsl.version == 1) 2 else 1
-                    if (wsl.enableRefused) {
+                    // The other version, once the chosen one was declined or could not be turned on.
+                    if (problem != null) {
+                        val other = if (version == 1) 2 else 1
                         OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { enable(other) }) {
-                            Text(str(if (other == 2) "drm_wiz_enable_wsl2" else "drm_wiz_enable_wsl1"))
+                            Text(str("drm_wiz_enable_other", other))
                         }
                     }
                 }
             }
         }
     }
+    if (showVersionChoice && !wsl.enabling && !wsl.awaitingReboot) {
+        WslVersionChoice(version = wsl.version, onVersion = { wsl.version = it; wsl.versionChosen = true })
+    }
 }
 
-/** Asks Windows to restart so a just-enabled feature takes effect; KittyTune resumes on next launch. */
+/** Asks Windows to restart so a just-enabled component takes effect; KittyTune resumes on next launch. */
 private fun restartWindows() {
-    runCatching {
-        ProcessBuilder("shutdown.exe", "/r", "/t", "0").start()
-    }
+    // A few seconds' grace, as the uninstall assistant gives: the click was deliberate, but not a crash.
+    runCatching { ProcessBuilder("shutdown.exe", "/r", "/t", "10").start() }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -1101,6 +1141,26 @@ internal fun StatusText(ok: Boolean, text: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = if (ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
         )
+    }
+}
+
+/** Something the user has to do next, said neutrally: neither a success nor an error. */
+@Composable
+internal fun InfoCard(text: String) {
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
     }
 }
 
