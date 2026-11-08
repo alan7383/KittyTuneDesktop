@@ -103,6 +103,7 @@ fun main(args: Array<String>) {
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
     com.alananasss.kittytune.audio.ai.OnnxHelper.disableNativeTelemetry()
+    com.alananasss.kittytune.core.MacWindowIntegration.configureApplication()
     com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
     runCatching {
@@ -161,6 +162,7 @@ fun main(args: Array<String>) {
         val osName = remember { System.getProperty("os.name").lowercase() }
         val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
         val isWindowsHost = remember { osName.contains("win") }
+        val isMacHost = remember { osName.contains("mac") }
 
         fun showMainWindow() {
             isWindowVisible = true
@@ -216,7 +218,9 @@ fun main(args: Array<String>) {
         var useSniTray by remember { mutableStateOf(isLinux) }
 
         androidx.compose.runtime.DisposableEffect(appIconVariant) {
-            runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
+            // The packaged Mac bundle already has its icon. Only an explicit variant selection
+            // needs a persistent Finder update; startup updates the live Dock through Taskbar.
+            if (!isMacHost) runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
             onDispose { }
         }
 
@@ -269,7 +273,25 @@ fun main(args: Array<String>) {
         val trayMenuScope = androidx.compose.runtime.rememberCoroutineScope()
 
         if (trayIcon != null && !useSniTray) {
-            if (isWindowsHost) {
+            if (isMacHost) {
+                // Media transport belongs to macOS Now Playing; the status menu contains app actions.
+                Tray(icon = trayIcon, tooltip = "KittyTune", onAction = { showMainWindow() }) {
+                    Item(str("menu_show_window"), onClick = { showMainWindow() })
+                    Item(
+                        if (playerViewModel.isMiniPlayerVisible) str("menu_mini_player_hide") else str("menu_mini_player_show"),
+                        onClick = { playerViewModel.toggleMiniPlayer() },
+                    )
+                    Item(
+                        if (com.alananasss.kittytune.ui.pet.PetWindowState.visible) str("pet_desk_hide") else str("pet_desk_tray_show"),
+                        onClick = { com.alananasss.kittytune.ui.pet.PetWindowState.toggle() },
+                    )
+                    Separator()
+                    Item(str("menu_exit"), onClick = {
+                        com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                        exitApplication()
+                    })
+                }
+            } else if (isWindowsHost) {
                 // Windows gets a real Win32 menu (see Win32TrayMenu): dark when the app is, rounded on
                 // Windows 11, and the only kind the hidden-icons flyout stays open around.
                 Tray(
@@ -340,7 +362,9 @@ fun main(args: Array<String>) {
             !isAppFullScreen &&
             !com.alananasss.kittytune.data.theme.WindowsFullScreen.isFullScreen
         ) {
-            savedPlacement = windowState.placement
+            if (windowState.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                savedPlacement = windowState.placement
+            }
             if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
                 val curW = windowState.size.width.value.toInt()
                 val curH = windowState.size.height.value.toInt()
@@ -360,7 +384,9 @@ fun main(args: Array<String>) {
             val wanted = com.alananasss.kittytune.core.AppWindowState.fullScreen
             if (wanted && !isAppFullScreen) {
                 isAppFullScreen = true
-                savedPlacement = windowState.placement
+                if (windowState.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                    savedPlacement = windowState.placement
+                }
                 if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
                     val curW = windowState.size.width.value.toInt()
                     val curH = windowState.size.height.value.toInt()
@@ -540,6 +566,22 @@ fun main(args: Array<String>) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
 
             androidx.compose.runtime.DisposableEffect(window) {
+                val removeMacListeners = com.alananasss.kittytune.core.MacWindowIntegration.install(window) {
+                    // A minimized/hidden window must release its native full-screen Space as well
+                    // as the lyrics request. Otherwise notch apps keep treating it as full screen.
+                    if (com.alananasss.kittytune.core.AppWindowState.fullScreen ||
+                        windowState.placement == androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                        com.alananasss.kittytune.core.AppWindowState.fullScreen = false
+                        windowState.placement = savedPlacement.takeUnless {
+                            it == androidx.compose.ui.window.WindowPlacement.Fullscreen
+                        } ?: androidx.compose.ui.window.WindowPlacement.Floating
+                        com.alananasss.kittytune.core.MacWindowIntegration.releaseFullScreen(window)
+                    }
+                }
+                onDispose { removeMacListeners() }
+            }
+
+            androidx.compose.runtime.DisposableEffect(window) {
                 val listener = object : java.awt.event.WindowAdapter() {
                     override fun windowGainedFocus(event: java.awt.event.WindowEvent?) {
                         playerViewModel.refreshSyncedPlaybackOnForeground()
@@ -594,7 +636,7 @@ fun main(args: Array<String>) {
                 if (isFS) {
                     wasFullScreenInWindow = true
                     wasAlwaysOnTop = window.isAlwaysOnTop
-                    runCatching { window.isAlwaysOnTop = true }
+                    if (!isMacHost) runCatching { window.isAlwaysOnTop = true }
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
                             com.alananasss.kittytune.data.theme.WindowsFullScreen.enter(window)
@@ -718,8 +760,8 @@ fun main(args: Array<String>) {
         }
 
         // Custom tray context menu — transparent, rounded, themed; lives outside the main window
-        // so it can open next to the tray icon on any OS.
-        com.alananasss.kittytune.ui.tray.ModernTrayMenuHost(
+        // so it can open next to the tray icon on Windows/Linux. macOS uses its native menu.
+        if (!isMacHost) com.alananasss.kittytune.ui.tray.ModernTrayMenuHost(
             nowPlaying = playerViewModel.currentTrack?.let { track ->
                 com.alananasss.kittytune.ui.tray.TrayNowPlaying(
                     title = track.title,
@@ -747,8 +789,7 @@ fun main(args: Array<String>) {
 
 
 /**
- * Keeps the Windows title bar in step with the app's palette, or hands it back to the system when
- * the user turns the setting off. A no-op on every other platform — see [WindowsTitleBar].
+ * Keeps native Windows/macOS title bars in step with the palette while retaining system controls.
  */
 @Composable
 private fun ThemedTitleBarEffect(window: java.awt.Window) {
@@ -763,6 +804,7 @@ private fun ThemedTitleBarEffect(window: java.awt.Window) {
     androidx.compose.runtime.LaunchedEffect(enabled, caption, captionText, dark) {
         // The window is realised by the time an effect runs, but a first launch can still race the
         // native peer; one retry is enough and costs nothing when the first attempt worked.
+        com.alananasss.kittytune.core.MacWindowIntegration.themeTitleBar(window, enabled)
         repeat(2) { attempt ->
             if (attempt > 0) kotlinx.coroutines.delay(400)
             if (enabled) {

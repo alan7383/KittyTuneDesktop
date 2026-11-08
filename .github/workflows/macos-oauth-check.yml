@@ -1,4 +1,4 @@
-name: macOS SoundCloud OAuth check
+name: macOS desktop integration check
 
 on:
   pull_request:
@@ -6,6 +6,14 @@ on:
       - 'src/main/kotlin/com/alananasss/kittytune/data/*OAuth*'
       - 'src/main/kotlin/com/alananasss/kittytune/ui/login/LoginScreen.kt'
       - 'src/main/kotlin/com/alananasss/kittytune/Main.kt'
+      - 'src/main/kotlin/com/alananasss/kittytune/core/MacWindowIntegration.kt'
+      - 'src/main/kotlin/com/alananasss/kittytune/core/AppIcon*.kt'
+      - 'src/main/kotlin/com/alananasss/kittytune/ui/player/lyrics/accompanist/**'
+      - 'src/main/resources/icons/**'
+      - 'src/test/kotlin/MacWindowIntegrationTest.kt'
+      - 'src/test/kotlin/MacDockIconTest.kt'
+      - 'src/test/kotlin/LyricsSpringPlacementTest.kt'
+      - 'src/test/kotlin/AppIconRuntimeTest.kt'
       - 'src/test/kotlin/com/alananasss/kittytune/data/*OAuth*'
       - 'build.gradle.kts'
       - '.github/workflows/macos-oauth-check.yml'
@@ -25,8 +33,12 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Test callbacks and package app
-        run: bash gradlew :test --tests '*SoundCloudOAuthTest' packageDmg --console=plain
+      - name: Test desktop integration and package app
+        run: >-
+          bash gradlew :test --tests '*SoundCloudOAuthTest'
+          --tests '*MacWindowIntegrationTest' --tests MacDockIconTest
+          --tests LyricsSpringPlacementTest --tests AppIconRuntimeTest
+          packageDmg --console=plain
       - name: Check packaged URL scheme
         run: |
           APP=build/compose/binaries/main/app/KittyTune.app

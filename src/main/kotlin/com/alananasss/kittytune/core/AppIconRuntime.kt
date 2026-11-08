@@ -29,14 +29,13 @@ object AppIconRuntime {
      *   first pass — which is exactly the launch where the icon matters most.
      */
     fun apply(variantKey: String, window: Window? = null) {
-        if (System.getProperty("os.name").lowercase().contains("mac")) return
         val source = load(variantKey) ?: return
         setDockIcon(source)
         setWindowIcons(source, window)
     }
 
     private fun load(variantKey: String): BufferedImage? = runCatching {
-        Thread.currentThread().contextClassLoader
+        (Thread.currentThread().contextClassLoader ?: AppIconRuntime::class.java.classLoader)
             ?.getResourceAsStream(AppIconVariants.resourcePath(variantKey))
             ?.use { IconEncoders.decode(it.readBytes()) }
     }.getOrNull()
@@ -81,7 +80,8 @@ object AppIconRuntime {
      */
     fun loadTrayPainter(variantKey: String): androidx.compose.ui.graphics.painter.Painter? = runCatching {
         val source = load(variantKey) ?: return@runCatching null
-        val filled = fillTransparentCorners(source)
+        val os = System.getProperty("os.name").lowercase()
+        val filled = if (os.contains("linux") || os.contains("nix")) fillTransparentCorners(source) else source
         val scaled = IconEncoders.scaled(filled, 48)
         androidx.compose.ui.graphics.painter.BitmapPainter(
             scaled.toComposeImageBitmap()
