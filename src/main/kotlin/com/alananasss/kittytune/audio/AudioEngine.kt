@@ -196,7 +196,8 @@ class AudioEngine {
         chain.forEach { it.configure(fmt) }
         aiDetection.setPreferences(PlayerPreferences())
         if (!com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelLoaded() &&
-            com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady()
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() &&
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.isDetectionWanted()
         ) {
             com.alananasss.kittytune.audio.ai.AiDetectionManager.initAsync()
         }

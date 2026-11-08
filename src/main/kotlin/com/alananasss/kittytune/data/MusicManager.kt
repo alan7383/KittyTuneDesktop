@@ -134,7 +134,9 @@ object MusicManager {
         // Model load is off the main thread: mmap + XNNPACK delegate init is seconds.
         BlockManager.init()
         scope.launch(Dispatchers.IO) {
-            com.alananasss.kittytune.audio.ai.AiDetectionManager.init()
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.init(
+                loadModel = com.alananasss.kittytune.audio.ai.AiDetectionManager.isDetectionWanted()
+            )
         }
 
         // The saved level has to be applied here rather than from the ViewModel: AppBootstrap

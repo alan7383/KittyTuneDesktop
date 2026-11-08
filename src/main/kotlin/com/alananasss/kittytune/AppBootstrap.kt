@@ -65,7 +65,7 @@ object AppBootstrap {
         // Prevent JavaCPP from falsely throwing OutOfMemoryError when host physical memory > 8GB
         System.setProperty("org.bytedeco.javacpp.maxphysicalbytes", "0")
 
-        com.alananasss.kittytune.audio.ai.OnnxHelper.ensureNativeLibrariesLoaded()
+        // ONNX Runtime is loaded by the first model that runs (AI detection, karaoke), not here.
         com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
 
         runCatching {
