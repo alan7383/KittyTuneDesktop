@@ -1,0 +1,57 @@
+name: Build CDM rootfs
+
+# Builds the tiny WSL rootfs the app imports for protected tracks (ktcdm + the glibc/busybox/curl/xz
+# closure, no Widevine module — that is fetched at setup). Publishes it to a stable `cdm-rootfs`
+# release so the app can download it (WslSidecarSetup.ROOTFS_URL). Pin the printed sha256 into
+# WslSidecarSetup.ROOTFS_SHA256 after a build.
+
+on:
+  push:
+    paths:
+      - 'scripts/build-wsl1-rootfs.sh'
+      - 'src/main/cpp/widevine/**'
+      - 'src/main/cpp/cdmsidecar/**'
+      - '.github/workflows/build-cdm-rootfs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-rootfs:
+    name: Build the WSL rootfs on Linux
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q build-essential busybox-static xz-utils curl binutils
+
+      - name: Build the rootfs
+        id: build
+        run: |
+          bash scripts/build-wsl1-rootfs.sh --cpp src/main/cpp --out build/wsl1
+          sha="$(sha256sum build/wsl1/ktroot.tgz | cut -d' ' -f1)"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "::notice title=rootfs sha256::Pin this into WslSidecarSetup.ROOTFS_SHA256 -> $sha"
+
+      - name: Upload as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ktroot
+          path: build/wsl1/ktroot.tgz
+
+      - name: Publish to the cdm-rootfs release
+        if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: cdm-rootfs
+          name: CDM rootfs
+          body: |
+            The minimal WSL rootfs KittyTune imports for protected tracks.
+            sha256: ${{ steps.build.outputs.sha256 }}
+          files: build/wsl1/ktroot.tgz
