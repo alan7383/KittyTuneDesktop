@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
+import com.alananasss.kittytune.data.drm.WslSidecarSetup.UninstallStep as U
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -28,6 +29,9 @@ class WslSidecarSetupTest {
             "cdm" to WslSidecarSetup.CDM_SCRIPT,
             "build" to WslSidecarSetup.BUILD_SCRIPT,
             "sources" to WslSidecarSetup.sourcesScript(),
+            "inspect" to WslSidecarSetup.INSPECT_SCRIPT,
+            "remove files" to WslSidecarSetup.REMOVE_FILES_SCRIPT,
+            "remove packages" to WslSidecarSetup.removePackagesScript(listOf("curl", "build-essential")),
         )
         for ((name, script) in scripts) {
             assertTrue("$name has a carriage return", '\r' !in script)
@@ -53,5 +57,62 @@ class WslSidecarSetupTest {
         val opened = Regex("<<'KITTYTUNE_SOURCE_EOF'").findAll(script).count()
         val closed = script.lines().count { it == "KITTYTUNE_SOURCE_EOF" }
         assertEquals(opened, closed)
+    }
+
+    private fun plan(
+        distro: String? = "Ubuntu",
+        others: List<String> = emptyList(),
+        packages: List<String> = emptyList(),
+        distroOwned: Boolean = true,
+        wslOwned: Boolean = true,
+    ) = WslSidecarSetup.UninstallPlan(
+        distro = distro, filesPresent = distro != null, packages = packages, distroInstalledByApp = distroOwned,
+        otherDistros = others, wslPresent = true, wslInstalledByApp = wslOwned, configPresent = true,
+    )
+
+    @Test
+    fun `docker distributions count when deciding whether WSL may go`() {
+        assertEquals(
+            listOf("Ubuntu", "docker-desktop"),
+            WslSidecarSetup.parseAllDistros(listOf("Ubuntu", "docker-desktop", "").joinToString("\n")),
+        )
+        val withDocker = plan(others = listOf("docker-desktop"))
+        assertEquals(false, WslSidecarSetup.canRemoveWsl(withDocker, removeDistro = true))
+    }
+
+    @Test
+    fun `WSL only goes together with the distribution and when nothing else uses it`() {
+        assertEquals(true, WslSidecarSetup.canRemoveWsl(plan(), removeDistro = true))
+        assertEquals(false, WslSidecarSetup.canRemoveWsl(plan(), removeDistro = false))
+        assertEquals(true, WslSidecarSetup.canRemoveWsl(plan(distro = null), removeDistro = false))
+        assertEquals(false, WslSidecarSetup.canRemoveWsl(plan(others = listOf("Debian")), removeDistro = true))
+    }
+
+    @Test
+    fun `steps follow the choices`() {
+        assertEquals(
+            listOf(U.STOP, U.DISTRO, U.SETTINGS, U.WSL),
+            WslSidecarSetup.uninstallSteps(plan(), removeDistro = true, removeWsl = true),
+        )
+        assertEquals(
+            listOf(U.STOP, U.FILES, U.PACKAGES, U.SETTINGS),
+            WslSidecarSetup.uninstallSteps(plan(packages = listOf("curl")), removeDistro = false, removeWsl = true),
+        )
+        assertEquals(
+            listOf(U.STOP, U.FILES, U.SETTINGS),
+            WslSidecarSetup.uninstallSteps(plan(), removeDistro = false, removeWsl = false),
+        )
+        assertEquals(
+            listOf(U.STOP, U.SETTINGS),
+            WslSidecarSetup.uninstallSteps(plan(distro = null, others = listOf("Debian")), removeDistro = false, removeWsl = true),
+        )
+    }
+
+    @Test
+    fun `package removal only marks recorded names and never purges them outright`() {
+        val script = WslSidecarSetup.removePackagesScript(listOf("curl", "build-essential", "evil; rm -rf /", "\$(reboot)"))
+        assertTrue(script.contains("apt-mark auto curl build-essential "))
+        assertTrue(!script.contains("rm -rf /") && !script.contains("reboot"))
+        assertTrue(!script.contains("apt-get purge"))
     }
 }

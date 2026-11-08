@@ -280,7 +280,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
 
 /** Progress at the top: the current step is a long pill, the others dots. */
 @Composable
-private fun StepDots(count: Int, current: Int, modifier: Modifier = Modifier) {
+internal fun StepDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(count) { i ->
             val width by animateFloatAsState(if (i == current) 28f else 8f, label = "dot")
@@ -295,7 +295,7 @@ private fun StepDots(count: Int, current: Int, modifier: Modifier = Modifier) {
 
 /** The big shape at the top of a step, slowly turning behind a still icon. */
 @Composable
-private fun Hero(shape: androidx.graphics.shapes.RoundedPolygon, icon: ImageVector) {
+internal fun Hero(shape: androidx.graphics.shapes.RoundedPolygon, icon: ImageVector) {
     val turn = rememberInfiniteTransition(label = "hero")
     val rotation by turn.animateFloat(
         initialValue = 0f,
@@ -321,7 +321,7 @@ private fun Hero(shape: androidx.graphics.shapes.RoundedPolygon, icon: ImageVect
 }
 
 @Composable
-private fun StepTitle(title: String, body: String? = null) {
+internal fun StepTitle(title: String, body: String? = null) {
     Text(
         text = title,
         style = MaterialTheme.typography.headlineSmall,
@@ -342,7 +342,7 @@ private fun StepTitle(title: String, body: String? = null) {
 
 /** A titled point with a small shaped icon, for explanations. */
 @Composable
-private fun ExplainRow(icon: ImageVector, title: String, body: String) {
+internal fun ExplainRow(icon: ImageVector, title: String, body: String) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -714,7 +714,7 @@ internal fun WslCheckStep(wsl: WslWizardState) {
                 Button(
                     shapes = ButtonDefaults.shapes(),
                     onClick = {
-                        val opened = WslSidecarSetup.openInstaller()
+                        val opened = WslSidecarSetup.openInstaller(state)
                         wsl.installerFailed = !opened
                         wsl.installerOpened = opened
                     },
@@ -911,7 +911,7 @@ private fun stepLabel(step: WslSidecarSetup.Step): String = str(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SetupStepRow(label: String, state: StepState) {
+internal fun SetupStepRow(label: String, state: StepState) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
             when (state) {
@@ -963,7 +963,7 @@ private fun NumberedLine(number: Int, text: String) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun WaitingRow(text: String) {
+internal fun WaitingRow(text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         LoadingIndicator(Modifier.size(32.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium)
@@ -971,14 +971,14 @@ private fun WaitingRow(text: String) {
 }
 
 @Composable
-private fun WaitingCard(text: String) {
+internal fun WaitingCard(text: String) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Box(Modifier.fillMaxWidth().padding(16.dp)) { WaitingRow(text) }
     }
 }
 
 @Composable
-private fun StatusText(ok: Boolean, text: String) {
+internal fun StatusText(ok: Boolean, text: String) {
     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(
             if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
@@ -995,7 +995,7 @@ private fun StatusText(ok: Boolean, text: String) {
 }
 
 @Composable
-private fun ResultCard(ok: Boolean, text: String) {
+internal fun ResultCard(ok: Boolean, text: String) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = if (ok) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
@@ -1005,7 +1005,7 @@ private fun ResultCard(ok: Boolean, text: String) {
 }
 
 @Composable
-private fun LogBox(log: String, onCopy: () -> Unit) {
+internal fun LogBox(log: String, onCopy: () -> Unit) {
     val scroll = rememberScrollState()
     LaunchedEffect(log) { scroll.animateScrollTo(scroll.maxValue) }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {

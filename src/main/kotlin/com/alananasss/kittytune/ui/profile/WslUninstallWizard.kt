@@ -1,0 +1,441 @@
+package com.alananasss.kittytune.ui.profile
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.drm.WslSidecarSetup
+import com.alananasss.kittytune.data.drm.WslSidecarSetup.UninstallStep
+import kotlinx.coroutines.launch
+
+private enum class UninstallPage { WHAT, REMOVE, DONE }
+
+/** State kept above the sliding pages, so going back does not lose a check that took seconds. */
+internal class UninstallState {
+    var plan by mutableStateOf<WslSidecarSetup.UninstallPlan?>(null)
+    var removeDistro by mutableStateOf(false)
+    var removeWsl by mutableStateOf(false)
+
+    var steps by mutableStateOf<List<UninstallStep>>(emptyList())
+    val states = mutableStateListOf<StepState>()
+    var running by mutableStateOf(false)
+    var succeeded by mutableStateOf(false)
+    var restartNeeded by mutableStateOf(false)
+    var failure by mutableStateOf<String?>(null)
+    var log by mutableStateOf("")
+    var showLog by mutableStateOf(false)
+}
+
+/**
+ * Removes the WSL method from the PC, for whoever chose it and wants their machine back as it was.
+ *
+ * It says first, in plain words, what goes: KittyTune's files and the tools the setup installed in Linux,
+ * the link to WSL, and — as choices, ticked when KittyTune installed them itself — the whole distribution
+ * and WSL. A distribution the user already had is never ticked for them, and WSL is only offered when no
+ * other distribution (Docker's included) still needs it. Then it does all of it, and protected tracks go
+ * back to PlayReady.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun WslUninstallWizard(onClose: () -> Unit) {
+    val un = remember { UninstallState() }
+    var page by remember { mutableStateOf(UninstallPage.WHAT) }
+    val pages = UninstallPage.entries
+    val index = pages.indexOf(page)
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        val plan = WslSidecarSetup.planUninstall()
+        un.plan = plan
+        un.removeDistro = plan.distroInstalledByApp
+        un.removeWsl = plan.wslInstalledByApp && WslSidecarSetup.canRemoveWsl(plan, un.removeDistro)
+    }
+
+    val start: () -> Unit = start@{
+        val plan = un.plan ?: return@start
+        val removeWsl = un.removeWsl && WslSidecarSetup.canRemoveWsl(plan, un.removeDistro)
+        un.steps = WslSidecarSetup.uninstallSteps(plan, un.removeDistro, removeWsl)
+        un.states.clear()
+        un.states.addAll(List(un.steps.size) { StepState.PENDING })
+        un.failure = null
+        un.log = ""
+        un.running = true
+        scope.launch {
+            val log = StringBuilder()
+            var current: UninstallStep? = null
+            try {
+                un.restartNeeded = WslSidecarSetup.uninstall(
+                    plan = plan,
+                    removeDistro = un.removeDistro,
+                    removeWsl = removeWsl,
+                    onStep = { next ->
+                        current?.let { un.states[un.steps.indexOf(it)] = StepState.DONE }
+                        current = next
+                        un.states[un.steps.indexOf(next)] = StepState.RUNNING
+                    },
+                    onLine = { line ->
+                        synchronized(log) { log.append(line).append('\n') }
+                        un.log = synchronized(log) { log.toString() }
+                    },
+                )
+                current?.let { un.states[un.steps.indexOf(it)] = StepState.DONE }
+                un.succeeded = true
+            } catch (e: WslSidecarSetup.UninstallException) {
+                un.states[un.steps.indexOf(e.step)] = StepState.FAILED
+                un.failure = if (e.refused) str("drm_unwiz_refused")
+                else str("drm_unwiz_failed", uninstallStepLabel(e.step)) + "\n" + e.message
+                un.showLog = !e.refused
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                current?.let { un.states[un.steps.indexOf(it)] = StepState.FAILED }
+                un.failure = e.message ?: e.javaClass.simpleName
+                un.showLog = true
+            } finally {
+                un.running = false
+            }
+        }
+    }
+
+    // Nothing may interrupt a removal halfway: no closing, no going back while it runs.
+    val close = { if (!un.running) onClose() }
+    BackHandler(onBack = close)
+    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.width(640.dp).fillMaxHeight(0.9f).heightIn(max = 780.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StepDots(count = pages.size, current = index, modifier = Modifier.weight(1f))
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = close, enabled = !un.running) {
+                        Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
+                    }
+                }
+
+                AnimatedContent(
+                    targetState = page,
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        (slideInHorizontally(tween(380)) { if (forward) it / 3 else -it / 3 } + fadeIn(tween(380)))
+                            .togetherWith(slideOutHorizontally(tween(380)) { if (forward) -it / 3 else it / 3 } + fadeOut(tween(250)))
+                    },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    label = "wsl-uninstall",
+                ) { shown ->
+                    Column(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                            .padding(horizontal = 32.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        when (shown) {
+                            UninstallPage.WHAT -> WhatPage(un)
+                            UninstallPage.REMOVE -> RemovePage(un, onRetry = start)
+                            UninstallPage.DONE -> DonePage(un)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Back only from a removal that stopped: once something is removed there is no going back
+                    // to choose, and while it runs nothing may interrupt it.
+                    if (page == UninstallPage.REMOVE && !un.running && !un.succeeded) {
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = { page = UninstallPage.WHAT }) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(str("btn_back"))
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    when (page) {
+                        UninstallPage.WHAT -> Button(
+                            shapes = ButtonDefaults.shapes(),
+                            enabled = un.plan != null,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                            ),
+                            modifier = Modifier.height(48.dp),
+                            onClick = {
+                                page = UninstallPage.REMOVE
+                                start()
+                            },
+                        ) {
+                            Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(str("drm_unwiz_start"), fontWeight = FontWeight.Bold)
+                        }
+                        UninstallPage.REMOVE -> Button(
+                            shapes = ButtonDefaults.shapes(),
+                            enabled = un.succeeded,
+                            modifier = Modifier.height(48.dp),
+                            onClick = { page = UninstallPage.DONE },
+                        ) {
+                            Text(str("drm_wiz_next"), fontWeight = FontWeight.Bold)
+                        }
+                        UninstallPage.DONE -> Button(
+                            shapes = ButtonDefaults.shapes(),
+                            modifier = Modifier.height(48.dp),
+                            onClick = onClose,
+                        ) {
+                            Text(str("drm_wiz_finish"), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun WhatPage(un: UninstallState) {
+    Hero(MaterialShapes.Cookie9Sided, Icons.Rounded.DeleteSweep)
+    StepTitle(str("drm_unwiz_title"), str("drm_unwiz_body"))
+    val plan = un.plan
+    if (plan == null) {
+        WaitingCard(str("drm_unwiz_checking"))
+        return
+    }
+    val distro = plan.distro
+    if (distro != null) {
+        ExplainRow(Icons.Rounded.Folder, str("drm_unwiz_files_title", distro), str("drm_unwiz_files_body"))
+        if (plan.packages.isNotEmpty()) {
+            ExplainRow(
+                Icons.Rounded.Build,
+                str("drm_unwiz_packages_title"),
+                str("drm_unwiz_packages_body", plan.packages.joinToString(", ")),
+            )
+        }
+    }
+    ExplainRow(Icons.Rounded.Settings, str("drm_unwiz_settings_title"), str("drm_unwiz_settings_body"))
+
+    if (distro != null) {
+        ChoiceCard(
+            checked = un.removeDistro,
+            title = str("drm_unwiz_distro_title", distro),
+            body = str(if (plan.distroInstalledByApp) "drm_unwiz_distro_owned" else "drm_unwiz_distro_shared", distro),
+            warning = !plan.distroInstalledByApp,
+            onToggle = {
+                un.removeDistro = it
+                // WSL can only go along with the distribution: keep the two choices consistent.
+                if (!WslSidecarSetup.canRemoveWsl(plan, it)) un.removeWsl = false
+            },
+        )
+    }
+    if (plan.wslPresent) {
+        when {
+            plan.otherDistros.isNotEmpty() -> ExplainRow(
+                Icons.Rounded.Verified,
+                str("drm_unwiz_wsl_title"),
+                str("drm_unwiz_wsl_kept", plan.otherDistros.joinToString(", ")),
+            )
+            else -> ChoiceCard(
+                checked = un.removeWsl && WslSidecarSetup.canRemoveWsl(plan, un.removeDistro),
+                enabled = WslSidecarSetup.canRemoveWsl(plan, un.removeDistro),
+                title = str("drm_unwiz_wsl_title"),
+                body = str(if (plan.wslInstalledByApp) "drm_unwiz_wsl_owned" else "drm_unwiz_wsl_shared") +
+                    if (WslSidecarSetup.canRemoveWsl(plan, un.removeDistro)) "" else "\n" + str("drm_unwiz_wsl_needs_distro", distro ?: ""),
+                warning = !plan.wslInstalledByApp,
+                onToggle = { un.removeWsl = it },
+            )
+        }
+    }
+}
+
+/** A titled choice with a checkbox; [warning] colours the text when ticking it deletes something of the user's. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ChoiceCard(
+    checked: Boolean,
+    title: String,
+    body: String,
+    warning: Boolean,
+    onToggle: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = if (checked && warning) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable(enabled = enabled) { onToggle(!checked) }
+                .padding(start = 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Checkbox(checked = checked, onCheckedChange = onToggle, enabled = enabled)
+            Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (checked && warning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun RemovePage(un: UninstallState, onRetry: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    Hero(MaterialShapes.Cookie12Sided, Icons.Rounded.DeleteSweep)
+    StepTitle(str("drm_unwiz_running_title"), str("drm_unwiz_running_body"))
+
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            un.steps.forEachIndexed { i, s ->
+                SetupStepRow(uninstallStepLabel(s), un.states.getOrElse(i) { StepState.PENDING })
+            }
+            if (un.running || un.succeeded) {
+                val done = un.states.count { it == StepState.DONE }
+                val progress by animateFloatAsState(
+                    if (un.states.isEmpty()) 0f else done.toFloat() / un.states.size,
+                    label = "uninstall-progress",
+                )
+                LinearWavyProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+            }
+        }
+    }
+
+    when {
+        un.succeeded -> ResultCard(ok = true, text = str("drm_unwiz_removed"))
+        un.failure != null -> ResultCard(ok = false, text = un.failure.orEmpty())
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!un.running && !un.succeeded && un.failure != null) {
+            Button(shapes = ButtonDefaults.shapes(), onClick = onRetry) {
+                Text(str("btn_retry"))
+            }
+        }
+        if (un.log.isNotEmpty()) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = { un.showLog = !un.showLog }) {
+                Text(str(if (un.showLog) "drm_wiz_details_hide" else "drm_wiz_details_show"))
+            }
+        }
+    }
+    AnimatedVisibility(un.showLog && un.log.isNotEmpty(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        LogBox(un.log, onCopy = { clipboard.setText(AnnotatedString(un.log)) })
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun DonePage(un: UninstallState) {
+    var restarting by remember { mutableStateOf(false) }
+    Hero(MaterialShapes.SoftBurst, Icons.Rounded.Verified)
+    StepTitle(str("drm_unwiz_done_title"), str("drm_unwiz_done_body"))
+    if (un.restartNeeded) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(str("drm_unwiz_restart"), style = MaterialTheme.typography.bodyLarge)
+                FilledTonalButton(
+                    shapes = ButtonDefaults.shapes(),
+                    enabled = !restarting,
+                    onClick = {
+                        // The user's own click, after the dialog said why; Windows still gives a few seconds.
+                        restarting = true
+                        runCatching { ProcessBuilder("shutdown.exe", "/r", "/t", "10").start() }
+                            .onFailure { restarting = false }
+                    },
+                ) {
+                    Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("drm_unwiz_restart_now"))
+                }
+            }
+        }
+    }
+}
+
+private fun uninstallStepLabel(step: UninstallStep): String = str(
+    when (step) {
+        UninstallStep.STOP -> "drm_unwiz_step_stop"
+        UninstallStep.FILES -> "drm_unwiz_step_files"
+        UninstallStep.PACKAGES -> "drm_unwiz_step_packages"
+        UninstallStep.DISTRO -> "drm_unwiz_step_distro"
+        UninstallStep.SETTINGS -> "drm_unwiz_step_settings"
+        UninstallStep.WSL -> "drm_unwiz_step_wsl"
+    }
+)
