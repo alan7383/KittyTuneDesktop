@@ -29,31 +29,15 @@ import org.junit.Test
  */
 class WslUninstallRenderTest {
 
-    private val plan = WslSidecarSetup.UninstallPlan(
-        distro = "Ubuntu",
-        filesPresent = true,
-        packages = listOf("build-essential", "curl"),
-        distroInstalledByApp = false,
-        otherDistros = emptyList(),
-        wslPresent = true,
-        wslInstalledByApp = false,
-        configPresent = true,
-    )
-
     @Test
-    fun whatPageWarnsBeforeDeletingADistributionTheUserHad() = render("wsl-uninstall-what") {
-        WhatPage(UninstallState().apply {
-            plan = this@WslUninstallRenderTest.plan
-            removeDistro = true
-            removeWsl = true
-        })
+    fun whatPageOffersTurningTheFeatureOff() = render("wsl-uninstall-what") {
+        WhatPage(UninstallState().apply { removeFeature = true })
     }
 
     @Test
     fun removePageListsTheChosenSteps() = render("wsl-uninstall-running") {
         RemovePage(UninstallState().apply {
-            plan = this@WslUninstallRenderTest.plan
-            steps = WslSidecarSetup.uninstallSteps(this@WslUninstallRenderTest.plan, removeDistro = true, removeWsl = true)
+            steps = WslSidecarSetup.uninstallSteps(removeFeature = true)
             states.addAll(listOf(StepState.DONE, StepState.DONE, StepState.RUNNING, StepState.PENDING))
             running = true
         }, onRetry = {})
