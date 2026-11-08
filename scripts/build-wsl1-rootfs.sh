@@ -116,7 +116,8 @@ done
 # Without an ld.so.cache the loader does not search the multiarch dirs (/usr/lib/x86_64-linux-gnu),
 # so ktcdm fails with "libdl.so.2: cannot open shared object file". Build the cache for this rootfs.
 printf '/lib/x86_64-linux-gnu\n/usr/lib/x86_64-linux-gnu\n/lib64\n/usr/lib\n/lib\n' > "$R/etc/ld.so.conf"
-ldconfig -r "$R" 2>/dev/null || log "note: ldconfig -r failed; relying on default paths"
+ldconfig -r "$R" || { log "ldconfig -r failed: without ld.so.cache ktcdm cannot load its libraries"; exit 70; }
+[ -s "$R/etc/ld.so.cache" ] || { log "ldconfig wrote no ld.so.cache"; exit 70; }
 
 # ---------------------------------------------------------------------------------------------
 # TLS trust store, so curl can reach dl.google.com.
