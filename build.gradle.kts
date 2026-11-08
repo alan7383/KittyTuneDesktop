@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.4.9"
+version = "2.0.0"
 
 val desktopIsWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 // Keep Windows app images separate by version, including when an older build is running.
