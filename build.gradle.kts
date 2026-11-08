@@ -843,6 +843,52 @@ tasks.matching { it.name in listOf("createDistributable", "createReleaseDistribu
     }
 }
 
+/**
+ * Opts the Windows launcher into the segment heap (scripts/enable-segment-heap.ps1 has the why).
+ *
+ * jpackage's KittyTune.exe hosts the JVM in-process, so its manifest decides the allocator behind every native
+ * allocation the app makes. Patched in the app image, which is what both the MSI (jpackage --app-image) and the
+ * portable zip are built from.
+ */
+abstract class EnableSegmentHeapTask : DefaultTask() {
+    @get:InputFile
+    abstract val script: RegularFileProperty
+
+    @get:Internal
+    abstract val distributionDir: DirectoryProperty
+
+    @TaskAction
+    fun execute() {
+        val base = distributionDir.get().asFile
+        val exes = listOf("main/app/KittyTune/KittyTune.exe", "main-release/app/KittyTune/KittyTune.exe")
+            .map { File(base, it) }.filter { it.isFile }
+        if (exes.isEmpty()) return
+        val command = listOf("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+            "-File", script.get().asFile.absolutePath, "-Executable") + exes.map { it.absolutePath }
+        val process = ProcessBuilder(command).redirectErrorStream(true).start()
+        val output = process.inputStream.bufferedReader().readText()
+        if (process.waitFor() != 0) throw GradleException("Enabling the segment heap failed:\n$output")
+        logger.lifecycle(output.trim())
+    }
+}
+
+val enableSegmentHeap = tasks.register<EnableSegmentHeapTask>("enableSegmentHeap") {
+    description = "Opts the packaged Windows launcher into the segment heap."
+    enabled = desktopIsWindows
+    script.set(layout.projectDirectory.file("scripts/enable-segment-heap.ps1"))
+    distributionDir.set(desktopDistributionDirectory)
+    // Never patch an image that is still being written or stripped.
+    mustRunAfter(stripForeignNativesDistributable, stripForeignNativesDistributableMain)
+}
+
+tasks.matching { it.name in listOf("createDistributable", "createReleaseDistributable") }.configureEach {
+    if (desktopIsWindows) finalizedBy(enableSegmentHeap)
+}
+
+tasks.matching { it.name == "zipWindowsPortable" || (it.name.startsWith("package") && it.name.endsWith("Msi")) }.configureEach {
+    if (desktopIsWindows) dependsOn(enableSegmentHeap)
+}
+
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask>().configureEach {
     val localJdk21 = File(System.getProperty("user.home"), ".gradle/jdks/eclipse_adoptium-21-amd64-linux.2")
     if (localJdk21.exists()) {
