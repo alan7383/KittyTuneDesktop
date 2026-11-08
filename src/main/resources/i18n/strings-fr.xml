@@ -3291,4 +3291,16 @@
     <string name="drm_unwiz_done_body">Il ne reste plus rien de la configuration WSL. Les titres protégés se lisent avec PlayReady.</string>
     <string name="drm_unwiz_restart">Redémarre Windows pour finir de retirer WSL.</string>
     <string name="drm_unwiz_restart_now">Redémarrer maintenant</string>
+    <!-- DRM: protected tracks announcement and notices -->
+    <string name="protected_ann_title">Titres protégés</string>
+    <string name="protected_beta">Bêta</string>
+    <string name="protected_ann_body_windows">KittyTune peut maintenant lire les titres protégés de SoundCloud. C’est encore en bêta, donc désactivé par défaut : active-le pour essayer. Les effets, l’égaliseur et les téléchargements restent coupés sur ces titres.</string>
+    <string name="protected_ann_body_desktop">KittyTune lit maintenant les titres protégés de SoundCloud, avec le module Widevine de ton navigateur. C’est déjà activé, et encore en bêta.</string>
+    <string name="protected_ann_enable">Activer</string>
+    <string name="protected_ann_learn">En savoir plus</string>
+    <string name="protected_ann_later">Plus tard</string>
+    <string name="protected_ann_got_it">Compris</string>
+    <string name="protected_ann_enabled">C’est activé. Tu peux le changer à tout moment dans Réglages, Divers, Titres protégés.</string>
+    <string name="protected_hint_title">Titre protégé</string>
+    <string name="protected_hint_offer">Ce titre est protégé par SoundCloud, il a donc été lu depuis une autre source. Active les titres protégés (bêta) pour écouter l’original.</string>
 </resources>

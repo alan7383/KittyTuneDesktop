@@ -3291,4 +3291,16 @@
     <string name="drm_unwiz_done_body">WSL kurulumundan hiçbir şey kalmadı. Korumalı parçalar PlayReady ile çalıyor.</string>
     <string name="drm_unwiz_restart">WSL’i tamamen kaldırmak için Windows’u yeniden başlat.</string>
     <string name="drm_unwiz_restart_now">Şimdi yeniden başlat</string>
+    <!-- DRM: protected tracks announcement and notices -->
+    <string name="protected_ann_title">Korumalı parçalar</string>
+    <string name="protected_beta">Beta</string>
+    <string name="protected_ann_body_windows">KittyTune artık SoundCloud’un korumalı parçalarını çalabiliyor. Henüz beta olduğu için varsayılan olarak kapalı: denemek için aç. Bu parçalarda efektler, ekolayzer ve indirme kapalı kalır.</string>
+    <string name="protected_ann_body_desktop">KittyTune artık SoundCloud’un korumalı parçalarını tarayıcının Widevine modülüyle çalıyor. Zaten açık ve henüz beta.</string>
+    <string name="protected_ann_enable">Aç</string>
+    <string name="protected_ann_learn">Daha fazla bilgi</string>
+    <string name="protected_ann_later">Sonra</string>
+    <string name="protected_ann_got_it">Anladım</string>
+    <string name="protected_ann_enabled">Açıldı. Bunu istediğin zaman Ayarlar, Diğer, Korumalı parçalar bölümünden değiştirebilirsin.</string>
+    <string name="protected_hint_title">Korumalı parça</string>
+    <string name="protected_hint_offer">Bu parça SoundCloud tarafından korunuyor, bu yüzden başka bir kaynaktan çalındı. Orijinalini dinlemek için korumalı parçaları (beta) aç.</string>
 </resources>

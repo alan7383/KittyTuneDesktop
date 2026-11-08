@@ -1394,6 +1394,14 @@ fun MainScreen(
     CoverViewerOverlay()
     com.alananasss.kittytune.ui.profile.passport.PassportViewerOverlay()
 
+    // Notices about protected tracks, floating above the player bar.
+    Box(
+        modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 112.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        com.alananasss.kittytune.ui.profile.ProtectedTracksNoticeHost()
+    }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomEnd

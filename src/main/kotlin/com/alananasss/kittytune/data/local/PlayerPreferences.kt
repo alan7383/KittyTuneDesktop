@@ -213,6 +213,8 @@ val DEFAULT_PINNED_AUDIO_FX = listOf(
     "rain"
 )
 
+private val isWindowsHost: Boolean = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
+
 class PlayerPreferences {
     private val gson = Gson()
     private val queueFile = File(AppDirs.dataDir, "queue_cache.json")
@@ -480,6 +482,8 @@ class PlayerPreferences {
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_PROTECTED_TRACKS = "protected_tracks_enabled"
+        private const val KEY_PROTECTED_ANNOUNCED = "protected_tracks_announced"
+        private const val KEY_PROTECTED_HINT_SHOWN = "protected_tracks_hint_shown"
         private const val KEY_PROTECTED_BACKEND = "protected_backend"
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
         private const val KEY_WSL_INSTALLED_BY_APP = "wsl_installed_by_kittytune"
@@ -784,9 +788,27 @@ class PlayerPreferences {
     fun getWidevineCdmPath(): String = Prefs.getString(KEY_WIDEVINE_CDM_PATH, "") ?: ""
     fun setWidevineCdmPath(path: String) = Prefs.putString(KEY_WIDEVINE_CDM_PATH, path)
 
-    /** Off, SoundCloud's protected streams are never tried and a track goes to its other sources. */
-    fun getProtectedTracksEnabled(): Boolean = Prefs.getBoolean(KEY_PROTECTED_TRACKS, true)
+    /**
+     * Off, SoundCloud's protected streams are never tried and a track goes to its other sources.
+     *
+     * Off by default on Windows, on by default elsewhere. It is a beta on every platform, but on Windows the
+     * PlayReady renderer also turns off effects, the equaliser, the visualizer and downloads on those tracks,
+     * which reads as a bug to anyone who did not ask for it; so there it is offered ([getProtectedTracksAnnounced])
+     * rather than switched on. Linux and macOS load the browser's own module and lose nothing.
+     */
+    fun getProtectedTracksEnabled(): Boolean = Prefs.getBoolean(KEY_PROTECTED_TRACKS, !isWindowsHost)
     fun setProtectedTracksEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PROTECTED_TRACKS, enabled)
+
+    /** Whether the user ever set protected tracks themselves, in the settings or the assistant: then nothing nags. */
+    fun hasProtectedTracksChoice(): Boolean = Prefs.contains(KEY_PROTECTED_TRACKS)
+
+    /** Whether the "protected tracks are here" card was shown and dealt with (or never applied: a new install). */
+    fun getProtectedTracksAnnounced(): Boolean = Prefs.getBoolean(KEY_PROTECTED_ANNOUNCED, false)
+    fun setProtectedTracksAnnounced(done: Boolean) = Prefs.putBoolean(KEY_PROTECTED_ANNOUNCED, done)
+
+    /** Whether the one-time "this track is protected" hint was shown. */
+    fun getProtectedTracksHintShown(): Boolean = Prefs.getBoolean(KEY_PROTECTED_HINT_SHOWN, false)
+    fun setProtectedTracksHintShown(shown: Boolean) = Prefs.putBoolean(KEY_PROTECTED_HINT_SHOWN, shown)
 
     /** Windows only: "playready" (the OS renderer) or "wsl" (the Widevine sidecar in WSL). */
     fun getProtectedBackend(): String = Prefs.getString(KEY_PROTECTED_BACKEND, "playready") ?: "playready"

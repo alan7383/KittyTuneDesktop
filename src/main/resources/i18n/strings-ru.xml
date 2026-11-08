@@ -3290,4 +3290,16 @@
     <string name="drm_unwiz_done_body">От настройки WSL ничего не осталось. Защищённые треки играют через PlayReady.</string>
     <string name="drm_unwiz_restart">Перезагрузите Windows, чтобы завершить удаление WSL.</string>
     <string name="drm_unwiz_restart_now">Перезагрузить сейчас</string>
+    <!-- DRM: protected tracks announcement and notices -->
+    <string name="protected_ann_title">Защищённые треки</string>
+    <string name="protected_beta">Бета</string>
+    <string name="protected_ann_body_windows">KittyTune теперь умеет воспроизводить защищённые треки SoundCloud. Это пока бета, поэтому по умолчанию выключено: включите, чтобы попробовать. Эффекты, эквалайзер и загрузки для таких треков недоступны.</string>
+    <string name="protected_ann_body_desktop">KittyTune теперь воспроизводит защищённые треки SoundCloud с помощью модуля Widevine вашего браузера. Это уже включено и пока в бета-версии.</string>
+    <string name="protected_ann_enable">Включить</string>
+    <string name="protected_ann_learn">Подробнее</string>
+    <string name="protected_ann_later">Позже</string>
+    <string name="protected_ann_got_it">Понятно</string>
+    <string name="protected_ann_enabled">Включено. Это можно изменить в любой момент: Настройки, Разное, Защищённые треки.</string>
+    <string name="protected_hint_title">Защищённый трек</string>
+    <string name="protected_hint_offer">Этот трек защищён SoundCloud, поэтому он воспроизведён из другого источника. Включите защищённые треки (бета), чтобы слушать оригинал.</string>
 </resources>
