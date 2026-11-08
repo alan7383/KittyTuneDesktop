@@ -130,7 +130,7 @@ jobs:
       - name: Install packaging tools (rpm, fakeroot, zstd, file)
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot zstd binutils file
+          sudo apt-get install -y rpm fakeroot zstd binutils file python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -231,6 +231,11 @@ jobs:
           tar -cf - .PKGINFO * | zstd -19 -T0 -q - -o ../../kitty-tune-${VERSION}-1-x86_64.pkg.tar.zst
           cd ../..
 
+      # Test the final Arch archive, which also supplies the AppImage payload.
+      # The DEB and RPM use the same Gradle runtime image.
+      - name: Verify packaged Linux x64 D-Bus integration
+        run: bash scripts/check-linux-package.sh "kitty-tune-${{ steps.get_version.outputs.VERSION }}-1-x86_64.pkg.tar.zst"
+
       - name: Create Linux x64 AppImage Package (.AppImage)
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
@@ -285,7 +290,7 @@ jobs:
       - name: Install packaging tools (rpm, fakeroot, zstd, file)
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot zstd binutils file
+          sudo apt-get install -y rpm fakeroot zstd binutils file python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -385,6 +390,11 @@ jobs:
           cd arch_build_arm/pkg
           tar -cf - .PKGINFO * | zstd -19 -T0 -q - -o ../../kitty-tune-${VERSION}-1-aarch64.pkg.tar.zst
           cd ../..
+
+      # Test the final Arch archive, which also supplies the AppImage payload.
+      # The DEB and RPM use the same Gradle runtime image.
+      - name: Verify packaged Linux ARM64 D-Bus integration
+        run: bash scripts/check-linux-package.sh "kitty-tune-${{ steps.get_version.outputs.VERSION }}-1-aarch64.pkg.tar.zst"
 
       - name: Create Linux ARM64 AppImage Package (.AppImage)
         run: |

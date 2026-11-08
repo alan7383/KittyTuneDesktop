@@ -398,8 +398,10 @@ compose.desktop {
                 // knows the root locale, so the listening stats read "Mon Tue" and "October" in Russian
                 // while a run from the full JDK looked fine (issue #66).
                 "jdk.localedata",
-                // Required by dbus-java on Linux for Unix socket UID authentication (com.sun.security.auth.module.UnixSystem)
-                "jdk.security.auth"
+                // dbus-java loads UnixSystem reflectively for EXTERNAL authentication. jdeps
+                // cannot infer it: keep these explicit in every trimmed runtime (issue #107).
+                "jdk.security.auth",
+                "java.security.jgss"
             )
 
             // "Open with KittyTune" and the music entry in the OS's default-apps settings. Neither

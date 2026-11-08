@@ -1,0 +1,43 @@
+name: Packaged Linux D-Bus check
+
+on:
+  pull_request:
+    paths:
+      - 'build.gradle.kts'
+      - 'proguard-rules.pro'
+      - 'src/**'
+      - 'scripts/check-linux-*'
+      - '.github/workflows/linux-dbus-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packaged-dbus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install desktop test dependencies
+        run: sudo apt-get update && sudo apt-get install -y fakeroot python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1
+      - name: Test D-Bus services and build release package
+        run: |
+          dbus-run-session -- bash gradlew :test --tests '*MprisServiceTest*' --tests '*LinuxStatusNotifierServiceTest*' -PdesktopOnly=true --console=plain
+          bash gradlew packageReleaseDeb -PdesktopOnly=true --console=plain
+      - name: Exercise final Debian package with its embedded runtime
+        run: |
+          package=$(find build/compose/binaries/main-release/deb -name '*.deb' -print -quit)
+          bash scripts/check-linux-package.sh "$package"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: linux-dbus-report
+          path: |
+            build/reports/linux-dbus.log
+            build/reports/tests/test
