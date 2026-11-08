@@ -1,0 +1,2 @@
+# Shell scripts must stay LF: they run under WSL/Linux, where CR breaks shebangs and heredocs.
+*.sh text eol=lf
