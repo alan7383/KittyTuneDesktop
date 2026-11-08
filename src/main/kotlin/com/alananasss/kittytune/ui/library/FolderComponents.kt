@@ -440,7 +440,8 @@ fun FolderPlaySplitButton(
     folder: LibraryFolder,
     libraryViewModel: LibraryViewModel,
     playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showMenu: Boolean = true,
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
 
@@ -460,6 +461,8 @@ fun FolderPlaySplitButton(
                             recursive = false
                         )
                     },
+                    modifier = Modifier.width(40.dp),
+                    contentPadding = PaddingValues(0.dp),
                     colors = splitColors
                 ) {
                     Icon(
@@ -474,11 +477,13 @@ fun FolderPlaySplitButton(
                 SplitButtonDefaults.TrailingButton(
                     checked = isMenuExpanded,
                     onCheckedChange = { isMenuExpanded = it },
+                    modifier = Modifier.width(32.dp),
+                    contentPadding = PaddingValues(0.dp),
                     colors = splitColors
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.ArrowDropDown,
-                        contentDescription = "Options",
+                        contentDescription = str("btn_options"),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(20.dp)
                     )
@@ -487,7 +492,7 @@ fun FolderPlaySplitButton(
         )
 
         DropdownMenu(
-            expanded = isMenuExpanded,
+            expanded = isMenuExpanded && showMenu,
             onDismissRequest = { isMenuExpanded = false }
         ) {
             DropdownMenuItem(
