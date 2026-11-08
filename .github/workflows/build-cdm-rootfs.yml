@@ -1,18 +1,33 @@
 name: Build CDM rootfs
 
 # Builds the tiny WSL rootfs the app imports for protected tracks (ktcdm + the glibc/busybox/curl/xz
-# closure, no Widevine module — that is fetched at setup). Publishes it to a stable `cdm-rootfs`
-# release so the app can download it (WslSidecarSetup.ROOTFS_URL). Pin the printed sha256 into
-# WslSidecarSetup.ROOTFS_SHA256 after a build.
+# closure, no Widevine module — that is fetched at setup).
+#
+# Published rootfs are IMMUTABLE: the app pins both the URL (`cdm-rootfs-v<N>`) and the sha256 of a given
+# version (WslSidecarSetup.ROOTFS_VERSION / ROOTFS_SHA256). So:
+#   - pushes and pull requests only build and check it (artifact), they never publish;
+#   - publishing is a manual run ("Run workflow") with a NEW version number. It refuses to overwrite an
+#     existing version. Then bump ROOTFS_VERSION and ROOTFS_SHA256 in the app together.
 
 on:
   push:
+    branches: [master]
+    paths:
+      - 'scripts/build-wsl1-rootfs.sh'
+      - 'src/main/cpp/widevine/**'
+      - 'src/main/cpp/cdmsidecar/**'
+      - '.github/workflows/build-cdm-rootfs.yml'
+  pull_request:
     paths:
       - 'scripts/build-wsl1-rootfs.sh'
       - 'src/main/cpp/widevine/**'
       - 'src/main/cpp/cdmsidecar/**'
       - '.github/workflows/build-cdm-rootfs.yml'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Rootfs version to publish (cdm-rootfs-v<version>); must not exist yet'
+        required: true
 
 permissions:
   contents: write
@@ -26,6 +41,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Refuse to overwrite a published version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$VERSION" in (*[!0-9]*|'') echo "::error::version must be a number"; exit 1;; esac
+          if gh release view "cdm-rootfs-v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::cdm-rootfs-v$VERSION already exists; published rootfs are immutable, pick a new version"
+            exit 1
+          fi
+
       - name: Install build tools
         run: |
           sudo apt-get update -q
@@ -37,7 +64,16 @@ jobs:
           bash scripts/build-wsl1-rootfs.sh --cpp src/main/cpp --out build/wsl1
           sha="$(sha256sum build/wsl1/ktroot.tgz | cut -d' ' -f1)"
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
-          echo "::notice title=rootfs sha256::Pin this into WslSidecarSetup.ROOTFS_SHA256 -> $sha"
+          echo "::notice title=rootfs sha256::$sha"
+
+      - name: Check the rootfs carries what the setup needs
+        run: |
+          list="$(tar tzf build/wsl1/ktroot.tgz)"
+          for f in ./opt/kittytune/ktcdm ./usr/bin/busybox ./usr/bin/curl ./usr/bin/xz ./bin/sh \
+                   ./etc/passwd ./etc/wsl.conf ./etc/ld.so.cache ./etc/ssl/certs/ca-certificates.crt; do
+            echo "$list" | grep -qx "$f" || { echo "::error::missing $f"; exit 1; }
+          done
+          if echo "$list" | grep -q 'libwidevinecdm'; then echo "::error::the Widevine module must not be bundled"; exit 1; fi
 
       - name: Upload as a build artifact
         uses: actions/upload-artifact@v4
@@ -45,13 +81,18 @@ jobs:
           name: ktroot
           path: build/wsl1/ktroot.tgz
 
-      - name: Publish to the cdm-rootfs release
-        if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+      - name: Publish cdm-rootfs-v${{ inputs.version }}
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: cdm-rootfs
-          name: CDM rootfs
+          tag_name: cdm-rootfs-v${{ inputs.version }}
+          name: CDM rootfs v${{ inputs.version }}
+          prerelease: true
           body: |
-            The minimal WSL rootfs KittyTune imports for protected tracks.
-            sha256: ${{ steps.build.outputs.sha256 }}
+            The minimal WSL rootfs KittyTune imports for protected tracks (ktcdm + busybox/curl/xz + glibc
+            closure; no Widevine module). Immutable: never overwritten.
+
+            Pin in WslSidecarSetup:
+            ROOTFS_VERSION = ${{ inputs.version }}
+            ROOTFS_SHA256 = "${{ steps.build.outputs.sha256 }}"
           files: build/wsl1/ktroot.tgz
