@@ -56,7 +56,8 @@ fun rememberSmoothPlayhead(
     val direct by rememberUpdatedState(followsInput)
     val key by rememberUpdatedState(trackKey)
 
-    LaunchedEffect(clock) {
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(clock, ambientClock) {
         while (isActive) {
             val animate = running || clock.isGliding
             if (!animate) {
@@ -65,9 +66,12 @@ fun rememberSmoothPlayhead(
                 if (!clock.isGliding) delay(IDLE_CHECK_MS)
                 continue
             }
-            withFrameNanos { now ->
-                shown.longValue = clock.step(reported, key, direct, running, now)
-            }
+            // Steady playback moves the playhead a few pixels a second, which the shared ambient pulse draws as
+            // smoothly as every frame would; a glide after a seek or a drag answers the user, so it keeps the
+            // window's full rate (see AmbientClock).
+            val step = { now: Long -> shown.longValue = clock.step(reported, key, direct, running, now) }
+            if (clock.isGliding || direct) withFrameNanos(step)
+            else com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock, step)
         }
     }
     return shown

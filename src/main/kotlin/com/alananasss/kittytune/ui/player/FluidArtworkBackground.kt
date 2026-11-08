@@ -316,8 +316,6 @@ private const val CROSSFADE_MS = 1400
 /** The first sleeve arrives after the screen does, and fading it in is what hides the swap from the orbs. */
 private const val APPEAR_MS = 800
 
-/** 30 FPS, which is what the web player's ticker is capped at, and invisible at this much blur. */
-private const val FRAME_SECONDS = 1f / 30f
 
 /** A decoded sleeve, with the shader that reads it built once rather than per frame. */
 internal class FluidTexture(
@@ -489,17 +487,19 @@ fun FluidArtworkBackground(
     // Stopped while the window cannot be seen (minimised with the full player open, say); the field
     // resumes from where it was, since `seconds` is kept.
     val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    LaunchedEffect(isSeen) {
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(isSeen, ambientClock) {
         if (!isSeen) return@LaunchedEffect
-        // Paced by `delay`, not by awaiting frames: awaiting a frame asks for one, so the old loop had
-        // the whole window rendered at the display rate even though the field only moves thirty times a
-        // second. Now thirty frames a second are all that is asked for.
-        var last = System.nanoTime()
+        // On the shared ambient pulse rather than every frame: awaiting the window's frames would have it rendered
+        // at the display's rate. It was paced by its own 30 fps `delay` before, which kept the rate down but landed
+        // between the frames the lyrics and the progress bar ask for, adding up to thirty more redraws a second;
+        // stepping on the same pulse as them, it costs no frame of its own (see AmbientClock).
+        var last = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
         while (true) {
-            kotlinx.coroutines.delay((FRAME_SECONDS * 1000).toLong())
-            val now = System.nanoTime()
-            seconds += ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
-            last = now
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { now ->
+                seconds += ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                last = now
+            }
         }
     }
 

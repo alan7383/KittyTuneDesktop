@@ -165,12 +165,16 @@ fun WavySliderExpressive(
     val waveSpeedPx = with(density) { waveSpeed.toPx() }
 
     // Wave travels only while music is playing, window is visible, and user is not dragging
+    // On the shared ambient pulse: its own 30 fps `delay` kept the rate down but put its frames between everybody
+    // else's (see AmbientClock).
     val isWaveMoving = isSeen && isPlaying && enabled && !isInteracting
-    LaunchedEffect(isWaveMoving, wavelengthPx, waveSpeedPx) {
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(isWaveMoving, wavelengthPx, waveSpeedPx, ambientClock) {
         if (!isWaveMoving) return@LaunchedEffect
         while (isActive) {
-            wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx)
-            delay(WAVE_TICK_MS)
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) {
+                wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx)
+            }
         }
     }
 
@@ -341,8 +345,6 @@ fun WavySliderExpressive(
     }
 }
 
-/** 30 fps: at this much motion the wave reads as smooth, for half the frames of the display rate. */
-private const val WAVE_TICK_MS = 33L
 
 /** Horizontal resolution of the drawn wave. */
 private const val WAVE_STEP_PX = 2f

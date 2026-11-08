@@ -894,22 +894,24 @@ private fun rememberMeshDrift(): androidx.compose.runtime.State<Float> {
     // Returned as state and read while drawing, and paced by `delay`: it used to be read at the top of
     // the screen and advanced by awaiting every frame, so the whole full player recomposed at the display
     // rate for lights that take twenty-six seconds to go round once.
-    LaunchedEffect(isSeen) {
+    //
+    // Stepped on the shared ambient pulse rather than its own 30 fps `delay`: every independently paced loop on this
+    // screen landed between the others' frames, and together with the lyrics, the bar and the backdrop they had the
+    // full player redrawn about 190 times a second on a 240 Hz monitor. On the one pulse they share each frame.
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(isSeen, ambientClock) {
         if (!isSeen) return@LaunchedEffect
-        var last = System.nanoTime()
+        var last = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
         while (true) {
-            kotlinx.coroutines.delay(MESH_TICK_MS)
-            val now = System.nanoTime()
-            val seconds = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
-            last = now
-            drift.floatValue += seconds / (MESH_CYCLE_MS / 1000f)
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { now ->
+                val seconds = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                last = now
+                drift.floatValue += seconds / (MESH_CYCLE_MS / 1000f)
+            }
         }
     }
     return drift
 }
-
-/** At this pace nothing visibly moves between two ticks. */
-private const val MESH_TICK_MS = 33L
 
 private const val MESH_CYCLE_MS = 26_000f
 

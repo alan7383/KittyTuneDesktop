@@ -75,7 +75,8 @@ fun KittyTuneTheme(content: @Composable () -> Unit) {
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.foundation.LocalScrollbarStyle provides scrollbarStyle
         ) {
-            content()
+            // Every window is themed once, at its root, which is exactly the scope an ambient clock needs.
+            com.alananasss.kittytune.ui.common.ProvideAmbientClock(content)
         }
     }
 }

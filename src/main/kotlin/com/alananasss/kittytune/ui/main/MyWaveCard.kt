@@ -3,17 +3,11 @@ package com.alananasss.kittytune.ui.main
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +42,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -238,71 +236,91 @@ private fun waveModeVisual(mode: WaveMode): Pair<ImageVector, String> = when (mo
 /**
  * Three soft waves in the theme's colours, drifting across the card. [energy] raises them and speeds nothing up:
  * the motion is the same, the waves are taller while music plays.
+ *
+ * The drift follows the shared ambient pulse rather than every frame, and the paths and gradients are kept between
+ * frames rather than rebuilt in each one. Measured on the home screen at 240 Hz, the previous version — an infinite
+ * transition drawing three new paths and three new gradient shaders per frame — held 715 MB against 483 MB with the
+ * waves still (issue #33). The drift is slow enough that sixty steps a second draw it exactly as smoothly.
  */
 @Composable
 private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifier = Modifier) {
     val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    val transition = rememberInfiniteTransition(label = "waveDrift")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(WAVE_PERIOD_MS, easing = LinearEasing), RepeatMode.Restart),
-        label = "wavePhase",
-    )
-    // When the window is hidden, render a static phase (0f) instead of driving the Canvas at 60 fps
-    // for nobody. The wave is decorative — a static wave looks the same as a frozen one (audit
-    // Phase 3 CPU gain).
-    val effectivePhase = if (isSeen) phase else 0f
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        colors.forEachIndexed { i, color ->
-            val baseline = h * (0.62f + i * 0.1f)
-            val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)
-            val frequency = 1.2f + i * 0.45f
-            val shift = waveShift(effectivePhase, i)
-            fun crestY(x: Float) = baseline + amplitude * sin((x / w) * frequency * 2 * PI.toFloat() + shift)
-            // The crest alone gets the bright line; outlining the filled shape also drew its sides, two white
-            // bars down the card's edges.
-            val crest = Path().apply {
-                moveTo(0f, crestY(0f))
-                var x = 6f
-                while (x < w) {
-                    lineTo(x, crestY(x))
-                    x += 6f
-                }
-                lineTo(w, crestY(w))
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    val phase = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(isSeen, ambientClock) {
+        // When the window is hidden, hold a static phase instead of drawing for nobody. The wave is decorative — a
+        // static wave looks the same as a frozen one (audit Phase 3 CPU gain).
+        if (!isSeen) {
+            phase.floatValue = 0f
+            return@LaunchedEffect
+        }
+        val start = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
+        while (true) {
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { now ->
+                val turns = ((now - start) / 1_000_000.0 / WAVE_PERIOD_MS) % 1.0
+                phase.floatValue = (turns * 2 * PI).toFloat()
             }
-            val body = Path().apply {
-                addPath(crest)
-                lineTo(w, h)
-                lineTo(0f, h)
-                close()
-            }
-            drawPath(
-                path = body,
-                brush = Brush.verticalGradient(
+        }
+    }
+    Spacer(
+        modifier.drawWithCache {
+            val w = size.width
+            val h = size.height
+            val crests = List(colors.size) { Path() }
+            val bodies = List(colors.size) { Path() }
+            val bodyBrushes = colors.mapIndexed { i, color ->
+                val baseline = h * (0.62f + i * 0.1f)
+                val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)
+                Brush.verticalGradient(
                     0f to color.copy(alpha = 0.22f + 0.1f * energy),
                     1f to color.copy(alpha = 0.04f),
                     startY = baseline - amplitude,
                     endY = h,
-                ),
-            )
-            drawPath(path = crest, color = color.copy(alpha = 0.25f + 0.25f * energy), style = Stroke(width = 2f))
-        }
-        // A glow behind the play button. It is placed from the card's edge, where the button is, not from a share of the
-        // width: at a wide window the share put it well to the left of the button.
-        val glow = Offset(w - 24.dp.toPx() - PLAY_SIZE.toPx() / 2, 20.dp.toPx() + PLAY_SIZE.toPx() / 2)
-        drawCircle(
-            brush = Brush.radialGradient(
+                )
+            }
+            val crestStroke = Stroke(width = 2f)
+            // A glow behind the play button. It is placed from the card's edge, where the button is, not from a share of
+            // the width: at a wide window the share put it well to the left of the button.
+            val glow = Offset(w - 24.dp.toPx() - PLAY_SIZE.toPx() / 2, 20.dp.toPx() + PLAY_SIZE.toPx() / 2)
+            val glowBrush = Brush.radialGradient(
                 listOf(colors.first().copy(alpha = 0.18f * (0.5f + energy)), Color.Transparent),
                 center = glow,
                 radius = h * 0.8f,
-            ),
-            radius = h * 0.8f,
-            center = glow,
-        )
-    }
+            )
+            onDrawBehind {
+                val effectivePhase = phase.floatValue
+                colors.forEachIndexed { i, color ->
+                    val baseline = h * (0.62f + i * 0.1f)
+                    val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)
+                    val frequency = 1.2f + i * 0.45f
+                    val shift = waveShift(effectivePhase, i)
+                    fun crestY(x: Float) = baseline + amplitude * sin((x / w) * frequency * 2 * PI.toFloat() + shift)
+                    // The crest alone gets the bright line; outlining the filled shape also drew its sides, two white
+                    // bars down the card's edges.
+                    val crest = crests[i].apply {
+                        rewind()
+                        moveTo(0f, crestY(0f))
+                        var x = 6f
+                        while (x < w) {
+                            lineTo(x, crestY(x))
+                            x += 6f
+                        }
+                        lineTo(w, crestY(w))
+                    }
+                    val body = bodies[i].apply {
+                        rewind()
+                        addPath(crest)
+                        lineTo(w, h)
+                        lineTo(0f, h)
+                        close()
+                    }
+                    drawPath(path = body, brush = bodyBrushes[i])
+                    drawPath(path = crest, color = color.copy(alpha = 0.25f + 0.25f * energy), style = crestStroke)
+                }
+                drawCircle(brush = glowBrush, radius = h * 0.8f, center = glow)
+            }
+        }
+    )
 }
 
 /**

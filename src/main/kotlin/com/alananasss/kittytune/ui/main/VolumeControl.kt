@@ -315,10 +315,14 @@ private fun VolumeTrack(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val waveLengthPx = with(density) { spec.wavelength.toPx() }
     val waveSpeedPx = with(density) { (spec.wavelength / 2f).toPx() }
-    androidx.compose.runtime.LaunchedEffect(isMoving, waveLengthPx) {
+    // On the shared ambient pulse rather than its own 30 fps `delay`: paced apart, it put thirty extra redraws a second
+    // between everybody else's for as long as music played (see AmbientClock).
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    androidx.compose.runtime.LaunchedEffect(isMoving, waveLengthPx, ambientClock) {
         while (isMoving) {
-            phase.floatValue = com.alananasss.kittytune.ui.player.slider.wavePhasePx(waveSpeedPx, waveLengthPx)
-            kotlinx.coroutines.delay(33)
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) {
+                phase.floatValue = com.alananasss.kittytune.ui.player.slider.wavePhasePx(waveSpeedPx, waveLengthPx)
+            }
         }
     }
 

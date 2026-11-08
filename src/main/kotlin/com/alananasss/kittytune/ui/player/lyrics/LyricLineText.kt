@@ -32,7 +32,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.withFrameMillis
 import com.alananasss.kittytune.data.local.LyricsDisplayStyle
 import kotlinx.coroutines.isActive
 
@@ -367,7 +366,11 @@ internal fun rememberSmoothPosition(
 ): State<Float> {
     val initial = positionMs()
     val smooth = remember { mutableFloatStateOf(initial.toFloat()) }
-    LaunchedEffect(isPlaying, speed) {
+    // The playback position for the words moves on the shared ambient pulse, not every frame: it is what kept the full
+    // player redrawing at the display's rate — 240 times a second on a 240 Hz monitor — for as long as a song played
+    // (see AmbientClock). Line changes and scrolls the reader starts are animations of their own and keep the full rate.
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(isPlaying, speed, ambientClock) {
         if (!isPlaying) {
             smooth.floatValue = positionMs().toFloat()
             return@LaunchedEffect
@@ -375,7 +378,7 @@ internal fun rememberSmoothPosition(
         var lastReported = positionMs().toFloat()
         var lastReportedAtMs = System.currentTimeMillis()
         while (isActive) {
-            withFrameMillis {
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) {
                 val now = System.currentTimeMillis()
                 val reported = positionMs().toFloat()
                 if (reported != lastReported) {
