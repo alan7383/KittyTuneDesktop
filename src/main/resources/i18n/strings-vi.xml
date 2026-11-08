@@ -3374,7 +3374,7 @@
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Nhạc được bảo vệ</string>
     <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune giờ có thể phát các nhạc được bảo vệ của SoundCloud. Tính năng vẫn đang beta nên mặc định tắt: hãy bật để dùng thử. Hiệu ứng, bộ cân bằng và tải xuống không dùng được với các bài này.</string>
+    <string name="protected_ann_body_windows">KittyTune giờ có thể phát các nhạc được bảo vệ của SoundCloud. Tính năng vẫn đang beta nên mặc định tắt: hãy bật để dùng thử. Phương thức Windows (PlayReady) không hỗ trợ hiệu ứng, bộ cân bằng hoặc tải xuống. Để dùng chúng, nhấn “Tìm hiểu thêm” và chọn phương thức WSL: mô-đun Widevine sẽ chuyển âm thanh đã giải mã đến trình phát của KittyTune.</string>
     <string name="protected_ann_body_desktop">KittyTune giờ phát được các nhạc được bảo vệ của SoundCloud, nhờ mô-đun Widevine của trình duyệt. Tính năng đã bật và vẫn đang beta.</string>
     <string name="protected_ann_enable">Bật</string>
     <string name="protected_ann_learn">Tìm hiểu thêm</string>

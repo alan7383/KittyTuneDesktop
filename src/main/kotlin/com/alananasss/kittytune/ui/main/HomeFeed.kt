@@ -110,10 +110,14 @@ internal fun HomeFeed(
                 modifier = Modifier.padding(horizontal = HOME_PADDING),
             )
             Spacer(Modifier.height(12.dp))
-            com.alananasss.kittytune.ui.profile.ProtectedTracksAnnouncementCard(
-                modifier = Modifier.padding(horizontal = HOME_PADDING),
-                bottomSpacing = 16.dp,
-            )
+            androidx.compose.runtime.key(
+                if (com.alananasss.kittytune.ProtectedTracksDemo.enabled) com.alananasss.kittytune.ProtectedTracksDemo.cardRevision else 0
+            ) {
+                com.alananasss.kittytune.ui.profile.ProtectedTracksAnnouncementCard(
+                    modifier = Modifier.padding(horizontal = HOME_PADDING),
+                    bottomSpacing = 16.dp,
+                )
+            }
             MyWaveCard(playerViewModel, Modifier.padding(horizontal = HOME_PADDING))
         }
 
