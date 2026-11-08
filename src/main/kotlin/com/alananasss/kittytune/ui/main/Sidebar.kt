@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
@@ -1006,7 +1005,7 @@ private fun LibraryHeader(
         .collectAsState(initial = headerPrefs.getHiddenLibraryButtons())
 
     val headerVerticalPadding = androidx.compose.ui.unit.lerp(10.dp, 8.dp, collapse)
-    Row(
+    AdaptiveLibraryHeader(
         modifier = Modifier
             .fillMaxWidth()
             // Inset so this header's icon sits on the same vertical line as the rail's toggle, the
@@ -1018,229 +1017,225 @@ private fun LibraryHeader(
                 top = headerVerticalPadding,
                 bottom = 4.dp,
             )
-            // One height whether the buttons are there or not. They are taller than the title alone, so the
-            // header grew by a dozen dp in the frame they arrived and every entry below jumped down with it.
-            .height(LIBRARY_HEADER_HEIGHT),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val currentFolder = libraryViewModel.currentFolder
-        if (currentFolder != null) {
-            IconButton(
-                onClick = { libraryViewModel.navigateUp() },
-                shapes = IconButtonDefaults.shapes(),
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = str("btn_back"),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
+            // Keep a stable minimum height; exceptionally narrow headers can use two rows.
+            .heightIn(min = LIBRARY_HEADER_HEIGHT),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val currentFolder = libraryViewModel.currentFolder
+                if (currentFolder != null) {
+                    IconButton(
+                        onClick = { libraryViewModel.navigateUp() },
+                        shapes = IconButtonDefaults.shapes(),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = str("btn_back"),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = currentFolder.name,
+                        style = if (fullScreen) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+
+                } else if (fullScreen) {
+                    Icon(
+                        Icons.Filled.LibraryMusic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = str("nav_library"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                } else {
+                    // One control for both directions now that there is one layout: the same icon in the same
+                    // place, saying which way it will go.
+                    val isVisuallyCollapsed = collapse > 0.5f
+                    val toggleTip =
+                        if (isVisuallyCollapsed) str("lib_open_tooltip")
+                        else str("lib_collapse_tooltip")
+                    Tip(toggleTip) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    if (onToggleCollapse != null) {
+                                        onToggleCollapse()
+                                    } else {
+                                        if (isVisuallyCollapsed) {
+                                            libraryViewModel.expandSidebar()
+                                        } else {
+                                            libraryViewModel.collapseSidebar()
+                                        }
+                                    }
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.LibraryMusic,
+                                contentDescription = toggleTip,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(SidebarMorph.ICON_SIZE),
+                            )
+                            // Leaves the way the navigation labels above it do, so the whole panel closes with
+                            // one gesture instead of the top half receding and the library card cutting.
+                            Box(Modifier.pushedBack(collapse).padding(start = 10.dp)) {
+                                Text(
+                                    text = str("nav_library"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    softWrap = false,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = currentFolder.name,
-                style = if (fullScreen) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(Modifier.width(8.dp))
-            FolderPlaySplitButton(
-                folder = currentFolder,
-                libraryViewModel = libraryViewModel,
-                playerViewModel = playerViewModel
-            )
-            Spacer(Modifier.width(6.dp))
-        } else if (fullScreen) {
-            Icon(
-                Icons.Filled.LibraryMusic,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = str("nav_library"),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.weight(1f))
-        } else {
-            // One control for both directions now that there is one layout: the same icon in the same
-            // place, saying which way it will go.
-            val isVisuallyCollapsed = collapse > 0.5f
-            val toggleTip =
-                if (isVisuallyCollapsed) str("lib_open_tooltip")
-                else str("lib_collapse_tooltip")
-            Tip(toggleTip) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            if (onToggleCollapse != null) {
-                                onToggleCollapse()
+        },
+        actions = { extendedCreate, measuring ->
+            // Only while they can be seen: past FADE_DONE_AT they have faded out, so leaving or arriving there is
+            // invisible. They keep their full size throughout and give up room instead of being squeezed into it,
+            // which is what made them shrink and pop while the panel was still narrow.
+            if (collapse < SidebarMorph.FADE_DONE_AT) {
+                Row(Modifier.receded(collapse), verticalAlignment = Alignment.CenterVertically) {
+                    libraryViewModel.currentFolder?.let { folder ->
+                        FolderPlaySplitButton(folder, libraryViewModel, playerViewModel, showMenu = !measuring)
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    // Extended "+ Créer" with dropdown menu. Outlined rather than filled tonal: next to a row
+                    // of plain icon buttons the tonal fill made it the loudest thing in the header, which is
+                    // not what a secondary action should be (issue #33).
+                    val showCreate = PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons
+                    Box {
+                        if (showCreate) Tip(str("lib_create_playlist_tooltip")) {
+                            if (extendedCreate) {
+                                OutlinedButton(
+                                    onClick = { showCreateMenu = true },
+                                    shapes = ButtonDefaults.shapes(),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                ) {
+                                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(str("lib_create"), maxLines = 1, softWrap = false)
+                                }
                             } else {
-                                if (isVisuallyCollapsed) {
-                                    libraryViewModel.expandSidebar()
-                                } else {
-                                    libraryViewModel.collapseSidebar()
+                                IconButton(
+                                    onClick = { showCreateMenu = true },
+                                    shapes = IconButtonDefaults.shapes(),
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Add,
+                                        contentDescription = str("lib_create_playlist_tooltip"),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp),
+                                    )
                                 }
                             }
                         }
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.LibraryMusic,
-                        contentDescription = toggleTip,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(SidebarMorph.ICON_SIZE),
-                    )
-                    // Leaves the way the navigation labels above it do, so the whole panel closes with
-                    // one gesture instead of the top half receding and the library card cutting.
-                    Box(Modifier.pushedBack(collapse).padding(start = 10.dp)) {
-                        Text(
-                            text = str("nav_library"),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            softWrap = false,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+
+                        DropdownMenu(
+                            expanded = showCreateMenu && !measuring,
+                            onDismissRequest = { showCreateMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(str("lib_create_playlist_title")) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null) },
+                                onClick = {
+                                    showCreateMenu = false
+                                    onCreatePlaylist()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(str("lib_create_folder_title")) },
+                                leadingIcon = { Icon(Icons.Rounded.CreateNewFolder, contentDescription = null) },
+                                onClick = {
+                                    showCreateMenu = false
+                                    onCreateFolder()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(str("upload_screen_title")) },
+                                leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null) },
+                                onClick = {
+                                    showCreateMenu = false
+                                    onUpload()
+                                }
+                            )
+                        }
+                    }
+                    if (PlayerPreferences.LIBRARY_BUTTON_HISTORY !in hiddenButtons) {
+                        Spacer(Modifier.width(4.dp))
+                        Tip(str("history_title")) {
+                            IconButton(
+                                shapes = IconButtonDefaults.shapes(),
+                                onClick = onHistory,
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                // A plain clock rather than the clock-with-arrow: the arrow read as an undo or a
+                                // refresh next to the other header icons (issue #33).
+                                Icon(
+                                    Icons.Rounded.Schedule,
+                                    contentDescription = str("history_title"),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Tip(str("lib_import_playlist")) {
+                        IconButton(
+                            shapes = IconButtonDefaults.shapes(),
+                            onClick = onImport,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                Icons.Rounded.ImportExport,
+                                contentDescription = str("lib_import_playlist"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    val enlargeTip = if (fullScreen) str("lib_restore_tooltip") else str("lib_enlarge_tooltip")
+                    Tip(enlargeTip) {
+                        IconButton(
+                            shapes = IconButtonDefaults.shapes(),
+                            onClick = { libraryViewModel.isLibraryFullScreen = !libraryViewModel.isLibraryFullScreen },
+
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                if (fullScreen) Icons.Rounded.CloseFullscreen else Icons.Rounded.OpenInFull,
+                                contentDescription = enlargeTip,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     }
                 }
             }
-            if (collapse < SidebarMorph.FADE_DONE_AT) {
-                Spacer(Modifier.weight(1f))
-            }
-        }
-
-        // Only while they can be seen: past FADE_DONE_AT they have faded out, so leaving or arriving there is
-        // invisible. They keep their full size throughout and give up room instead of being squeezed into it,
-        // which is what made them shrink and pop while the panel was still narrow.
-        if (collapse < SidebarMorph.FADE_DONE_AT) {
-            Row(Modifier.overflowingStart().receded(collapse), verticalAlignment = Alignment.CenterVertically) {
-        // Extended "+ Créer" with dropdown menu. Outlined rather than filled tonal: next to a row
-        // of plain icon buttons the tonal fill made it the loudest thing in the header, which is
-        // not what a secondary action should be (issue #33).
-        val extendedCreate = fullScreen || libraryViewModel.sidebarWidth >= 340f
-        val showCreate = PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons
-        Box {
-            if (showCreate) Tip(str("lib_create_playlist_tooltip")) {
-                if (extendedCreate) {
-                    OutlinedButton(
-                        onClick = { showCreateMenu = true },
-                        shapes = ButtonDefaults.shapes(),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(str("lib_create"))
-                    }
-                } else {
-                    IconButton(
-                        onClick = { showCreateMenu = true },
-                        shapes = IconButtonDefaults.shapes(),
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.Add,
-                            contentDescription = str("lib_create_playlist_tooltip"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            }
-
-            DropdownMenu(
-                expanded = showCreateMenu,
-                onDismissRequest = { showCreateMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text(str("lib_create_playlist_title")) },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null) },
-                    onClick = {
-                        showCreateMenu = false
-                        onCreatePlaylist()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(str("lib_create_folder_title")) },
-                    leadingIcon = { Icon(Icons.Rounded.CreateNewFolder, contentDescription = null) },
-                    onClick = {
-                        showCreateMenu = false
-                        onCreateFolder()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(str("upload_screen_title")) },
-                    leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null) },
-                    onClick = {
-                        showCreateMenu = false
-                        onUpload()
-                    }
-                )
-            }
-        }
-        if (PlayerPreferences.LIBRARY_BUTTON_HISTORY !in hiddenButtons) {
-            Spacer(Modifier.width(4.dp))
-            Tip(str("history_title")) {
-                IconButton(
-                    shapes = IconButtonDefaults.shapes(),
-                    onClick = onHistory,
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    // A plain clock rather than the clock-with-arrow: the arrow read as an undo or a
-                    // refresh next to the other header icons (issue #33).
-                    Icon(
-                        Icons.Rounded.Schedule,
-                        contentDescription = str("history_title"),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.width(4.dp))
-        Tip(str("lib_import_playlist")) {
-            IconButton(
-                shapes = IconButtonDefaults.shapes(),
-                onClick = onImport,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    Icons.Rounded.ImportExport,
-                    contentDescription = str("lib_import_playlist"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-        Spacer(Modifier.width(4.dp))
-        val enlargeTip = if (fullScreen) str("lib_restore_tooltip") else str("lib_enlarge_tooltip")
-        Tip(enlargeTip) {
-            IconButton(
-                shapes = IconButtonDefaults.shapes(),
-                onClick = { libraryViewModel.isLibraryFullScreen = !libraryViewModel.isLibraryFullScreen },
-
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    if (fullScreen) Icons.Rounded.CloseFullscreen else Icons.Rounded.OpenInFull,
-                    contentDescription = enlargeTip,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-        }
-    }
-}
+        },
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -1870,19 +1865,8 @@ private fun EntryArtwork(
  * do not exist at all before then — an invisible button that can still be clicked is worse than no
  * animation.
  */
-/** The library header's height in every state: the height of its tallest button, the outlined "Create". */
+/** Minimum header height, including when only compact icon actions are visible. */
 private val LIBRARY_HEADER_HEIGHT = 40.dp
-
-/**
- * Measures the content at its own width and, when there is less room than that, takes only the room there is,
- * letting the content run out past its start instead of being squeezed. Used for the header buttons while the
- * panel is narrower than they are, which only happens as they fade out.
- */
-private fun Modifier.overflowingStart(): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
-    val width = placeable.width.coerceAtMost(constraints.maxWidth)
-    layout(width, placeable.height) { placeable.placeRelative(width - placeable.width, 0) }
-}
 
 @Composable
 private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> Unit) {
