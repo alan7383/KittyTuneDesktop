@@ -19,9 +19,11 @@ object OnnxHelper {
     @Volatile
     private var sharedEnv: OrtEnvironment? = null
 
-    init {
-        ensureNativeLibrariesLoaded()
-    }
+    // No `init { ensureNativeLibrariesLoaded() }` here, and no eager call from the bootstrap: main()
+    // touches this object at launch for disableNativeTelemetry(), and an init block turned that into
+    // extracting onnxruntime.dll and creating an OrtEnvironment in every session, for a model most
+    // installs have never downloaded. Every path that runs a model goes through
+    // getOrInitEnvironment() or ensureNativeLibrariesLoaded(), which load the runtime on first use.
 
     private interface LibC : com.sun.jna.Library {
         fun setenv(name: String, value: String, overwrite: Int): Int

@@ -172,6 +172,14 @@ object AiDetectionManager {
     fun isModelLoaded(): Boolean = tfliteInterpreter != null || onnxSession != null
 
     /**
+     * Whether anything would use a verdict: the badge or auto-skip. A downloaded model with both off
+     * used to be loaded at every launch all the same, a native runtime and its session held for nothing.
+     * Turning either on loads it with the next track ([analyzeTrackUpfront] initialises on demand).
+     */
+    fun isDetectionWanted(prefs: PlayerPreferences = PlayerPreferences()): Boolean =
+        prefs.aiShowBadge || prefs.aiAutoSkip
+
+    /**
      * Initializes the detector asynchronously in the background so callers
      * never block or stall the real-time audio playback thread.
      */
@@ -188,9 +196,11 @@ object AiDetectionManager {
     }
 
     /**
-     * Initializes the detector according to preferences and warms up GPU discovery.
+     * Initializes the detector according to preferences: refreshes the download states and, when [loadModel]
+     * is set, loads the selected model if it is on disk. Startup passes [isDetectionWanted], so a model nobody
+     * uses stays on disk instead of in memory.
      */
-    fun init() {
+    fun init(loadModel: Boolean = true) {
         synchronized(initLock) {
             val prefs = PlayerPreferences()
             val preferredModel = prefs.aiSelectedModel
@@ -214,6 +224,8 @@ object AiDetectionManager {
                 _activeAccelerationProvider.value = "${preferredModel.runtimeTag} (Not Downloaded)"
                 return
             }
+
+            if (!loadModel) return
 
             initArtifactNet(prefs)
         }

@@ -46,6 +46,8 @@ class AiDetectionAudioProcessor(
     @Volatile private var allCheckpointsDone = false
     @Volatile private var cachedTargetSeconds = 4
     @Volatile private var warmupTriggered = false
+    /** Read per track rather than per buffer: with the badge and auto-skip both off, playback never loads the model. */
+    @Volatile private var detectionWanted = false
 
     /** Live prefs, so a window change in settings applies to the next track with no wiring. */
     private val defaultPrefs by lazy { PlayerPreferences() }
@@ -53,6 +55,7 @@ class AiDetectionAudioProcessor(
     fun setPreferences(prefs: PlayerPreferences) {
         this.preferences = prefs
         this.cachedTargetSeconds = prefs.aiDetectionWindow.seconds
+        this.detectionWanted = AiDetectionManager.isDetectionWanted(prefs)
     }
 
     /** Called when a new track starts. */
@@ -66,6 +69,7 @@ class AiDetectionAudioProcessor(
             allCheckpointsDone = false
             warmupTriggered = false
             cachedTargetSeconds = (preferences ?: defaultPrefs).aiDetectionWindow.seconds
+            detectionWanted = AiDetectionManager.isDetectionWanted(preferences ?: defaultPrefs)
         }
     }
 
@@ -133,7 +137,7 @@ class AiDetectionAudioProcessor(
         if (!AiDetectionManager.isModelLoaded()) {
             if (!warmupTriggered) {
                 warmupTriggered = true
-                if (AiDetectionManager.isModelReady()) {
+                if (detectionWanted && AiDetectionManager.isModelReady()) {
                     AiDetectionManager.initAsync()
                 }
             }
