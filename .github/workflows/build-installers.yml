@@ -130,7 +130,7 @@ jobs:
       - name: Install packaging tools (rpm, fakeroot, zstd, file)
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot zstd binutils file python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1
+          sudo apt-get install -y rpm fakeroot zstd binutils file python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1 libegl1
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -290,7 +290,7 @@ jobs:
       - name: Install packaging tools (rpm, fakeroot, zstd, file)
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot zstd binutils file python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1
+          sudo apt-get install -y rpm fakeroot zstd binutils file python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1 libegl1
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
