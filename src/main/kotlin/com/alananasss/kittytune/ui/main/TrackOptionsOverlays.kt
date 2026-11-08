@@ -482,7 +482,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
         val activeColor = MaterialTheme.colorScheme.primary
 
         val gridItems = mutableListOf<MenuOptionItem>().apply {
-            if (!isLocalFile && !viewModel.isMenuContextFromPlayer) {
+            if (!isLocalFile) {
                 add(
                     MenuOptionItem(
                         id = "like",
@@ -517,8 +517,9 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     ) { viewModel.toggleRepeatMode() }
                 )
             }
-            if (!viewModel.isMenuContextFromPlayer) {
-                add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.insertNext(listOf(track)); viewModel.showMenuSheet = false })
+            if ((!viewModel.isMenuContextFromPlayer || viewModel.menuContextQueueIndex != null) &&
+                viewModel.menuContextQueueIndex != viewModel.currentQueueIndex) {
+                add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.playMenuTrackNext() })
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
             }
             // In a shared playlist a song can go next for everyone, or be offered to the playlist itself.

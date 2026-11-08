@@ -10,6 +10,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.onClick
+import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -65,17 +68,13 @@ fun ExpandedQueueScreen(
     onClose: () -> Unit
 ) {
     val queueState = viewModel.uiQueueState
-        val listState = rememberLazyListState()
-
-    LaunchedEffect(viewModel.uiCurrentTrack) {
-        val track = viewModel.uiCurrentTrack
-        if (track != null && queueState.isNotEmpty()) {
-            val index = queueState.indexOfFirst { it.id == track.id }
-            if (index >= 0) {
-                listState.scrollToItem(kotlin.math.max(0, index - 2))
-            }
-        }
-    }
+    val listState = rememberLazyListState()
+    AnchorCurrentQueueItem(
+        listState = listState,
+        currentIndex = viewModel.uiCurrentQueueIndex,
+        currentTrackId = viewModel.uiCurrentTrack?.id,
+        targetIndex = (viewModel.uiCurrentQueueIndex - 2).coerceAtLeast(0)
+    )
 
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState,
@@ -164,7 +163,7 @@ fun ExpandedQueueScreen(
                     state = reorderableState,
                     key = itemKey
                 ) { isDragging ->
-                    val isCurrent = track.id == viewModel.uiCurrentTrack?.id
+                    val isCurrent = index == viewModel.currentQueueIndex
                     val shouldDarken = viewModel.uiRepeatMode == RepeatMode.ONE && !isCurrent
                     val itemAlpha by animateFloatAsState(
                         targetValue = if (shouldDarken) 0.3f else 1.0f,
@@ -196,6 +195,10 @@ fun ExpandedQueueScreen(
                                         baseColor
                                 )
                                 .hoverable(interaction)
+                                .onClick(
+                                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                                    onClick = { viewModel.showTrackOptions(track, fromPlayer = true, queueIndex = index) }
+                                )
                                 .clickable { viewModel.skipToQueueItem(index) }
                                 .padding(horizontal = 24.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically

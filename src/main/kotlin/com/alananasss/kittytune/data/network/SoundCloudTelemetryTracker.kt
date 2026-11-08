@@ -1,6 +1,5 @@
 package com.alananasss.kittytune.data.network
 
-import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.PlaybackContext
@@ -261,9 +260,7 @@ object SoundCloudTelemetryTracker {
             try {
                 if (!isSyncEnabled()) return@launch
                 val isGuest = TokenManager.isGuestMode()
-                val token = if (!isGuest) {
-                    SessionManager.harvestStoredSession() ?: TokenManager.getAccessToken()
-                } else null
+                val token = if (!isGuest) TokenManager.getAccessToken() else null
 
                 val deviceId = Config.getOrCreateSoundCloudDeviceId()
                 val now = System.currentTimeMillis()

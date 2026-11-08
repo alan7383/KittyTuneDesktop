@@ -295,7 +295,9 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
             authCodeFromIntent = null
 
             if (success) {
-                SessionManager.harvestStoredSession()
+                // logout() stops the keep-alive loop and nothing else would restart it.
+                SessionManager.start()
+                // Library and home reload on the session-ready event this ends up sending.
                 SessionManager.requestSessionRefresh(force = true)
 
                 if (wasGuestMode) {

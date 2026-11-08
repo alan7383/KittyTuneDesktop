@@ -18,13 +18,15 @@ import java.io.File
 object Config {
     private const val KEY_CLIENT_ID = "dynamic_client_id"
 
-    // Official client ID and secret extracted from SoundCloud Android (2026.10.08)
-    const val OFFICIAL_CLIENT_ID = "SSdQ80vM8nLPhbDBylHl2JFK6ElhBr9B"
-    const val OFFICIAL_CLIENT_SECRET = "hfRHykhbMuLT7PnpTv0hPXsKS0NM5pX1"
+    // client_id_expiring in SoundCloud Android (2026.11.02): the client it logs in, refreshes and
+    // calls the API with. Refresh tokens are bound to it, so changing it breaks live sessions.
+    const val OFFICIAL_CLIENT_ID = "QOFuKCOeAXIph267vzqj3B1wb65cZVAQ"
+    const val OFFICIAL_CLIENT_SECRET = "EhBDsGIj9EbuBbRf0QkhH9Fq9BX3yN4B"
 
-    // Previous client ID kept as fallback
-    const val EXPIRING_CLIENT_ID = "QOFuKCOeAXIph267vzqj3B1wb65cZVAQ"
-    const val EXPIRING_CLIENT_SECRET = "EhBDsGIj9EbuBbRf0QkhH9Fq9BX3yN4B"
+    // client_id in the same app: issues non-expiring tokens and no refresh token. Only used to
+    // exchange such a token for an expiring one, see SessionManager.
+    const val LEGACY_CLIENT_ID = "SSdQ80vM8nLPhbDBylHl2JFK6ElhBr9B"
+    const val LEGACY_CLIENT_SECRET = "hfRHykhbMuLT7PnpTv0hPXsKS0NM5pX1"
     const val FALLBACK_ID = OFFICIAL_CLIENT_ID
 
     val OFFICIAL_CLIENT_SIGNATURE: String by lazy {
@@ -37,7 +39,7 @@ object Config {
             val digest = java.security.MessageDigest.getInstance("SHA-256").digest(concat)
             Base64.getUrlEncoder().withoutPadding().encodeToString(digest).trim()
         } catch (e: Exception) {
-            "cg5kjFy0kprA70IQrfihSM2yTEZiI774yeG1CW4uyTA"
+            "ztQ_RKaMCPavrjcXvMT6t0STPQ0vU2cY4YKGVeLU6Iw"
         }
     }
 

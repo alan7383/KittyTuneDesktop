@@ -463,6 +463,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var navigateToPlaylistId by mutableStateOf<String?>(null)
     var trackForMenu by mutableStateOf<Track?>(null)
     var menuContextPlaylistId by mutableStateOf<Long?>(null)
+    var menuContextQueueIndex by mutableStateOf<Int?>(null)
     var isMenuContextFromPlayer by mutableStateOf(false)
 
     // ─── Content filtering + AI detection (issue #41, ported from Android) ────
@@ -4298,9 +4299,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun skipToQueueItem(index: Int) {
         if (routeRemote("queue", index.toLong())) return
-        // In a shuffled queue the order is random anyway, so a picked track jumps in right after the current
-        // one instead of the queue running on from wherever it happened to sit.
-        val keepsUpcoming = isQueuePreserveUpcomingEnabled || shuffleEnabled
+        val keepsUpcoming = isQueuePreserveUpcomingEnabled
         if (keepsUpcoming && index > currentQueueIndex && currentQueueIndex >= 0 && index < _queue.size) {
             val targetIndex = currentQueueIndex + 1
             moveQueueItem(index, targetIndex)
@@ -4879,9 +4878,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun revertShuffle() {
-        val currentTrackId =
-            currentTrack?.id ?: return; _queue.clear(); _queue.addAll(_originalQueue); currentQueueIndex =
-            _queue.indexOfFirst { it.id == currentTrackId }.coerceAtLeast(0)
+        if (currentTrack == null) return
+        val originalIndex = matchingQueueIndex(_queue, currentQueueIndex, _originalQueue)
+        _queue.clear()
+        _queue.addAll(_originalQueue)
+        currentQueueIndex = originalIndex.coerceAtLeast(0)
     }
 
     private fun applyRepeatMode() {
@@ -4918,7 +4919,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun moveQueueItem(from: Int, to: Int) {
         if (routeRemote("move", from.toLong(), to.toLong())) return
-        if (from == to) return
+        if (from == to || from !in _queue.indices || to !in _queue.indices) return
 
         if (from < queueState.size && to < queueState.size) {
             val mut = queueState.toMutableList()
@@ -5009,6 +5010,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         saveStateAsync(saveQueue = true)
     }
 
+    fun playQueueItemNext(index: Int) {
+        when (val action = queueNextAction(_queue.size, currentQueueIndex, index)) {
+            is QueueNextAction.Move -> moveQueueItem(action.from, action.to)
+            is QueueNextAction.Replay -> insertNext(listOf(_queue[action.index]))
+            QueueNextAction.None -> Unit
+        }
+    }
+
+    /** Resolve the selected occurrence again if the queue changed while its menu was open. */
+    fun playMenuTrackNext() {
+        val track = trackForMenu ?: return
+        val index = menuContextQueueIndex
+        if (index == null) {
+            insertNext(listOf(track))
+        } else {
+            val selected = if (_queue.getOrNull(index) === track) index
+                else _queue.indexOfFirst { it === track }
+            playQueueItemNext(selected)
+        }
+        showMenuSheet = false
+    }
+
     fun insertNext(tracks: List<Track>) {
         if (tracks.isEmpty()) return
         val cleanTracks = com.alananasss.kittytune.data.BlockManager.filterBlocked(tracks)
@@ -5017,8 +5040,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         val uniqueTracks = cleanTracks.map { it.copy() }
 
+        val playingInOriginal = matchingQueueIndex(_queue, currentQueueIndex, _originalQueue)
+        val originalInsertIndex = if (playingInOriginal >= 0) playingInOriginal + 1 else _originalQueue.size
         _queue.addAll(insertIndex, uniqueTracks)
-        _originalQueue.addAll(insertIndex, uniqueTracks)
+        _originalQueue.addAll(originalInsertIndex, uniqueTracks)
         updateQueueState()
 
         if (MusicManager.player.mediaItemCount > 1) {
@@ -6059,7 +6084,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         viewModelScope.launch { _uiEvent.emit(str("equalizer_auto_restored", saved.profileName)) }
     }
 
-    fun showTrackOptions(track: Track, playlistContextId: Long? = null, fromPlayer: Boolean = false) {
+    fun showTrackOptions(track: Track, playlistContextId: Long? = null, fromPlayer: Boolean = false, queueIndex: Int? = null) {
+        menuContextQueueIndex = queueIndex
         trackForMenu = track; menuContextPlaylistId = playlistContextId; isMenuContextFromPlayer =
             fromPlayer; showMenuSheet = true
     }
@@ -6322,7 +6348,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         ConnectManager.publish(connectSnapshot())
         if (syncPlaybackReady) {
             val q = queueState
-            val index = q.indexOfFirst { it.id == currentTrack?.id }
+            val index = resolveQueueIndex(q, currentTrack?.id, currentQueueIndex)
             if (index >= 0) {
                 val position = currentPosition
                 val playing = isPlaying

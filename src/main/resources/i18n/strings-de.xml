@@ -3460,16 +3460,18 @@
     <string name="pref_drm_windows_test_ok">Test bestanden, geschützte Titel werden auf diesem PC abgespielt</string>
     <string name="pref_drm_windows_test_failed">Test fehlgeschlagen, siehe Protokoll unten</string>
     <string name="drm_unavailable_toast_windows">🔒 Geschützter Titel: hier nicht verfügbar. Siehe Einstellungen, Sonstiges, Geschützte Titel</string>
-    <string name="drm_download_failed">Geschützter Titel: der Download ist fehlgeschlagen. Prüfe das CDM unter Einstellungen, Sonstiges</string>    <string name="floating_compat_title">Kompatibilitätsmodus</string>
-    <string name="floating_compat_desc">Undurchsichtige schwebende Fenster. Behebt Einfrieren mit RivaTuner (RTSS) und einigen Overlays</string>
-    <string name="floating_compat_auto_rtss">Automatisch aktiv: RivaTuner (RTSS) läuft</string>
-    <string name="floating_compat_auto_freeze">Automatisch aktiv: ein schwebendes Fenster hat die App eingefroren</string>
-    <string name="update_nixos_notice_title">NixOS- oder Nix-System erkannt</string>
-    <string name="update_nixos_notice_desc">Unter Nix werden Updates deklarativ verwaltet. Führe den folgenden Befehl aus, um deine Installation zu aktualisieren:</string>
-    <string name="update_btn_view_release">Release ansehen</string>
-    <string name="btn_copy">Kopieren</string>
+    <string name="drm_download_failed">Geschützter Titel: der Download ist fehlgeschlagen. Prüfe das CDM unter Einstellungen, Sonstiges</string>
     <string name="drm_native_fx_available">This protected track supports speed, 8D, Trance Gate and soundscapes. Other effects and pitch adjustment are unavailable for this track.</string>
     <string name="drm_native_eq_unavailable">Equalizer unavailable for this protected track</string>
     <string name="drm_native_offline_unavailable">Offline downloading of this protected track is not currently supported on Windows. No offline file was created.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Kompatibilitätsmodus</string>
+    <string name="floating_compat_desc">Undurchsichtige schwebende Fenster. Behebt Einfrieren bei RivaTuner (RTSS) und einigen Overlays</string>
+    <string name="floating_compat_auto_rtss">Automatisch aktiviert: RivaTuner (RTSS) wird ausgeführt</string>
+    <string name="floating_compat_auto_freeze">Automatisch aktiviert: Ein schwebendes Fenster hat die App blockiert</string>
+    <string name="update_nixos_notice_title">NixOS-/Nix-System erkannt</string>
+    <string name="update_nixos_notice_desc">Unter Nix werden Updates deklarativ verwaltet. Führe den folgenden Befehl aus, um deine Installation zu aktualisieren:</string>
+    <string name="update_btn_view_release">Release anzeigen</string>
+    <string name="btn_copy">Kopieren</string>
 </resources>

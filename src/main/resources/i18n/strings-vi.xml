@@ -3321,16 +3321,18 @@
     <string name="pref_drm_windows_test_ok">Kiểm tra thành công, nhạc được bảo vệ phát được trên máy này</string>
     <string name="pref_drm_windows_test_failed">Kiểm tra thất bại, xem nhật ký bên dưới</string>
     <string name="drm_unavailable_toast_windows">🔒 Nhạc được bảo vệ: không khả dụng ở đây. Xem Cài đặt, Khác, Nhạc được bảo vệ</string>
-    <string name="drm_download_failed">Nhạc được bảo vệ: tải xuống thất bại. Kiểm tra CDM trong Cài đặt, Khác</string>    <string name="floating_compat_title">Chế độ tương thích</string>
-    <string name="floating_compat_desc">Cửa sổ nổi không trong suốt. Khắc phục tình trạng treo với RivaTuner (RTSS) và một số lớp phủ</string>
-    <string name="floating_compat_auto_rtss">Tự động bật: RivaTuner (RTSS) đang chạy</string>
-    <string name="floating_compat_auto_freeze">Tự động bật: một cửa sổ nổi đã làm ứng dụng bị treo</string>
-    <string name="update_nixos_notice_title">Đã phát hiện hệ thống NixOS hoặc Nix</string>
-    <string name="update_nixos_notice_desc">Trên Nix, bản cập nhật được quản lý theo khai báo. Chạy lệnh bên dưới để cập nhật bản cài đặt của bạn:</string>
-    <string name="update_btn_view_release">Xem bản phát hành</string>
-    <string name="btn_copy">Sao chép</string>
+    <string name="drm_download_failed">Nhạc được bảo vệ: tải xuống thất bại. Kiểm tra CDM trong Cài đặt, Khác</string>
     <string name="drm_native_fx_available">This protected track supports speed, 8D, Trance Gate and soundscapes. Other effects and pitch adjustment are unavailable for this track.</string>
     <string name="drm_native_eq_unavailable">Equalizer unavailable for this protected track</string>
     <string name="drm_native_offline_unavailable">Offline downloading of this protected track is not currently supported on Windows. No offline file was created.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Chế độ tương thích</string>
+    <string name="floating_compat_desc">Cửa sổ nổi không trong suốt. Khắc phục hiện tượng treo với RivaTuner (RTSS) và một số lớp phủ</string>
+    <string name="floating_compat_auto_rtss">Tự động bật: RivaTuner (RTSS) đang chạy</string>
+    <string name="floating_compat_auto_freeze">Tự động bật: một cửa sổ nổi đã làm ứng dụng bị treo</string>
+    <string name="update_nixos_notice_title">Đã phát hiện hệ thống NixOS / Nix</string>
+    <string name="update_nixos_notice_desc">Các bản cập nhật được quản lý theo cấu hình khai báo trên Nix. Chạy lệnh bên dưới để cập nhật bản cài đặt của bạn:</string>
+    <string name="update_btn_view_release">Xem bản phát hành</string>
+    <string name="btn_copy">Sao chép</string>
 </resources>

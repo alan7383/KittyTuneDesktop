@@ -70,7 +70,7 @@ object AppIconInstaller {
     private val LINUX_SIZES = intArrayOf(16, 22, 24, 32, 48, 64, 128, 256, 512)
 
     /** Must match the WM_CLASS Main.kt sets via `sun.java2d.wm.className`. */
-    private const val LINUX_WM_CLASS = "kitty-tune"
+    private const val LINUX_WM_CLASS = LinuxDesktopIdentity.APP_ID
 
     private fun applyLinux(variantKey: String) {
         try {
@@ -78,10 +78,10 @@ object AppIconInstaller {
             val source = IconEncoders.decode(pngBytes) ?: return
 
             val userHome = System.getProperty("user.home") ?: return
-            val iconsRoot = File(userHome, ".local/share/icons")
+            val iconsRoot = File(linuxDataHome(), "icons")
             val hicolor = File(iconsRoot, "hicolor")
-            val pixmaps = File(userHome, ".local/share/pixmaps").apply { mkdirs() }
-            val userApps = File(userHome, ".local/share/applications").apply { mkdirs() }
+            val pixmaps = File(linuxDataHome(), "pixmaps").apply { mkdirs() }
+            val userApps = File(linuxDataHome(), "applications").apply { mkdirs() }
 
             for (size in LINUX_SIZES) {
                 val dir = File(hicolor, "${size}x${size}/apps")
@@ -164,97 +164,27 @@ object AppIconInstaller {
         return "kitty-tune"
     }
 
-    /**
-     * Ensures user-level .desktop file in ~/.local/share/applications points to the
-     * active variant icon and states StartupWMClass=kitty-tune.
-     * Uses a single canonical desktop file name (kitty-tune.desktop) and removes any legacy
-     * duplicate desktop entries (kittytune.desktop, com-alananasss-kittytune-MainKt.desktop)
-     * so application launchers don't display duplicate KittyTune entries.
-     */
+    /** Publish the canonical ID and migrate old launchers without deleting their launch URLs. */
     private fun overrideDesktopFile(variantKey: String) {
-        val userApps = File(System.getProperty("user.home"), ".local/share/applications").apply { mkdirs() }
-        val systemDesktop = findInstalledDesktopFile()
-        val execPath = findExecutablePath()
-
-        val primaryName = systemDesktop?.name ?: "kitty-tune.desktop"
-        val iconName = "kitty-tune-$variantKey"
-
-        // Clean up legacy duplicate desktop files that cause multiple launcher entries
-        val obsoleteFiles = listOf("kittytune.desktop", "com-alananasss-kittytune-MainKt.desktop")
-        for (obs in obsoleteFiles) {
-            if (obs != primaryName) {
-                runCatching {
-                    val obsFile = File(userApps, obs)
-                    if (obsFile.exists()) obsFile.delete()
-                }
-            }
-        }
-
-        val baseLines = systemDesktop?.readLines() ?: listOf(
-            "[Desktop Entry]",
-            "Name=KittyTune",
-            "Comment=KittyTune Music Player",
-            "Exec=$execPath",
-            "Icon=$iconName",
-            "Terminal=false",
-            "Type=Application",
-            "Categories=AudioVideo;Audio;Player;",
-            "StartupWMClass=$LINUX_WM_CLASS"
-        )
-
-        runCatching {
-            val targetFile = File(userApps, primaryName)
-            val lines = (if (targetFile.exists()) targetFile.readLines() else baseLines).toMutableList()
-
-            var hasIcon = false
-            var hasWmClass = false
-            var hasExec = false
-
-            for (i in lines.indices) {
-                val line = lines[i]
-                if (line.startsWith("Icon=")) {
-                    lines[i] = "Icon=$iconName"
-                    hasIcon = true
-                } else if (line.startsWith("StartupWMClass=")) {
-                    lines[i] = "StartupWMClass=$LINUX_WM_CLASS"
-                    hasWmClass = true
-                } else if (line.startsWith("Exec=")) {
-                    hasExec = true
-                    if (lines[i].isBlank()) lines[i] = "Exec=$execPath"
-                }
-            }
-
-            if (!hasIcon) lines += "Icon=$iconName"
-            if (!hasWmClass) lines += "StartupWMClass=$LINUX_WM_CLASS"
-            if (!hasExec) lines += "Exec=$execPath"
-
-            targetFile.writeText(lines.joinToString("\n") + "\n")
-        }
+        LinuxDesktopIdentity.install(
+            File(linuxDataHome(), "applications"), installedDesktopFiles(), findExecutablePath(), variantKey)
     }
 
-    /**
-     * The KittyTune launcher entry the package installed, wherever the package manager put it —
-     * deb, rpm and AUR builds name it differently. Our own auth-handler stubs are skipped.
-     */
-    internal fun findInstalledDesktopFile(): File? {
-        val dataDirs = listOf(
-            File("/usr/share/applications"),
-            File("/usr/local/share/applications"),
-            File(System.getProperty("user.home"), ".local/share/applications")
-        ) + (System.getenv("XDG_DATA_DIRS") ?: "")
-            .split(":").filter { it.isNotBlank() }
-            .map { File(it, "applications") }
+    private fun linuxDataHome(): File = System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() }
+        ?.let(::File) ?: File(System.getProperty("user.home"), ".local/share")
 
-        return dataDirs
-            .filter { it.isDirectory }
-            .flatMap { dir -> dir.listFiles { f -> f.isFile && f.extension == "desktop" }?.toList() ?: emptyList() }
-            .filter { it.name.contains("kitty", ignoreCase = true) && it.name.contains("tune", ignoreCase = true) }
-            .firstOrNull { df ->
-                val txt = runCatching { df.readText() }.getOrDefault("")
-                // Skip our own auth-handler stubs (NoDisplay=true).
-                !txt.contains("NoDisplay=true") &&
-                    (txt.contains("Name=KittyTune") || txt.contains("itty-tune", ignoreCase = true))
-            }
+    private fun installedDesktopFiles(): List<File> {
+        val dataDirs = listOf(linuxDataHome()) +
+            (System.getenv("XDG_DATA_DIRS") ?: "/usr/local/share:/usr/share")
+                .split(':').filter { it.isNotBlank() }.map(::File)
+        return dataDirs.flatMap { File(it, "applications").listFiles()?.toList().orEmpty() }
+            .filter(LinuxDesktopIdentity::isLauncher)
+    }
+
+    internal fun findInstalledDesktopFile(): File? {
+        val entries = installedDesktopFiles()
+        return entries.firstOrNull { it.name == LinuxDesktopIdentity.DESKTOP_FILE }
+            ?: entries.firstOrNull { !it.readText().contains("NoDisplay=true") }
     }
 
     /** XDG desktop directory (handles localized names like ~/Bureau), fallback ~/Desktop. */
@@ -299,13 +229,13 @@ object AppIconInstaller {
 
                 val updated = lines.map { line ->
                     when {
-                        line.startsWith("Icon=") -> "Icon=kitty-tune-$variantKey"
+                        line.startsWith("Icon=") -> "Icon=kittytune-$variantKey"
                         line.startsWith("StartupWMClass=") -> "StartupWMClass=$LINUX_WM_CLASS"
                         else -> line
                     }
                 }.toMutableList()
 
-                if (updated.none { it.startsWith("Icon=") }) updated += "Icon=kitty-tune-$variantKey"
+                if (updated.none { it.startsWith("Icon=") }) updated += "Icon=kittytune-$variantKey"
                 if (updated.none { it.startsWith("StartupWMClass=") }) updated += "StartupWMClass=$LINUX_WM_CLASS"
 
                 val content = updated.joinToString("\n") + "\n"
