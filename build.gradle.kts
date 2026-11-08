@@ -700,18 +700,6 @@ tasks.named<ProcessResources>("processResources") {
             include("native/*.so", "native/linux-x86_64/*.so")
         }
     }
-    // The WSL setup compiles the CDM sidecar inside the distribution, from these sources.
-    if (desktopIsWindows) {
-        from(project.file("src/main/cpp")) {
-            include(
-                "widevine/WidevineBridge.cpp",
-                "widevine/content_decryption_module.h",
-                "widevine/content_decryption_module_export.h",
-                "cdmsidecar/CdmSidecar.cpp",
-            )
-            into("sidecar-src")
-        }
-    }
 }
 
 abstract class StripForeignNativesTask : DefaultTask() {
