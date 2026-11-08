@@ -58,13 +58,15 @@ fun GlowView(
     }
 
     var seconds by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        var last = System.nanoTime()
+    // On the shared ambient pulse, so it lands on the frames everything else draws (see AmbientClock).
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(ambientClock) {
+        var last = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
         while (true) {
-            kotlinx.coroutines.delay(33)
-            val now = System.nanoTime()
-            seconds += ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
-            last = now
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { now ->
+                seconds += ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                last = now
+            }
         }
     }
 

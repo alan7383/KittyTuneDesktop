@@ -155,8 +155,12 @@ fun LyricsEnhanced(
         playbackPositionMs.longValue = MusicManager.player.currentPosition.coerceAtLeast(0L)
     }
 
-    // High-precision frame loop tracking smooth playback position with PLL drift correction
-    LaunchedEffect(viewModel.uiCurrentTrack?.id, lyricsSessionKey, viewModel.effectsState.speed) {
+    // High-precision frame loop tracking smooth playback position with PLL drift correction.
+    // The playback position for the words moves on the shared ambient pulse, not every frame: it is what kept the full
+    // player redrawing at the display's rate — 240 times a second on a 240 Hz monitor — for as long as a song played
+    // (see AmbientClock). Line changes and scrolls the reader starts are animations of their own and keep the full rate.
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(viewModel.uiCurrentTrack?.id, lyricsSessionKey, viewModel.effectsState.speed, ambientClock) {
         var anchorPlayerPositionMs = MusicManager.player.currentPosition.coerceAtLeast(0L)
         var anchorFrameNanos = 0L
         while (isActive) {
@@ -183,7 +187,7 @@ fun LyricsEnhanced(
                 }
                 delay(if (isSliderActive) 16L else 50L)
             } else {
-                val frameNanos = withFrameNanos { frameTimeNanos -> frameTimeNanos }
+                val frameNanos = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { frameTimeNanos -> frameTimeNanos }
                 if (anchorFrameNanos == 0L) {
                     anchorFrameNanos = frameNanos
                     anchorPlayerPositionMs = rawPosition

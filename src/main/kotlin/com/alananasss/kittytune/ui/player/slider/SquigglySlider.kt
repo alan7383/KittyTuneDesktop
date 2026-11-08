@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -95,20 +94,27 @@ fun SquigglySlider(
     }
 
     // Continuous wave animation loop, paused while nobody can see the window.
+    // On the shared ambient clock rather than every frame: this bar is on screen for as long as music plays, and at
+    // the display's rate it had the whole window redrawn 240 times a second on a 240 Hz monitor (see AmbientClock).
     val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    LaunchedEffect(isPlaying, isSeen) {
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(isPlaying, isSeen, ambientClock) {
         if (!isPlaying || !isSeen) return@LaunchedEffect
 
-        var lastFrameTime = withFrameMillis { it }
+        var lastFrameTime = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
         while (isActive) {
-            withFrameMillis { frameTimeMillis ->
-                val deltaTime = (frameTimeMillis - lastFrameTime) / 1000f
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { frameTimeNanos ->
+                val deltaTime = (frameTimeNanos - lastFrameTime) / 1_000_000_000f
                 phaseOffset += deltaTime * phaseSpeed
                 phaseOffset %= waveLength
-                lastFrameTime = frameTimeMillis
+                lastFrameTime = frameTimeNanos
             }
         }
     }
+
+    // One path for the life of the slider, refilled each draw: a new one per frame was a native Skia object per frame
+    // left for the garbage collector to find.
+    val path = remember { Path() }
 
     Box(
         modifier = modifier
@@ -182,7 +188,7 @@ fun SquigglySlider(
                 }
             }
 
-            val path = Path()
+            path.rewind()
             val waveStart = -phaseOffset - waveLength / 2f
             val waveEnd = if (transitionEnabled) totalWidth else waveProgressPx
 

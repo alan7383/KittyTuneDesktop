@@ -452,7 +452,11 @@ internal fun FollowPlainLyrics(
         }
     }
 
-    LaunchedEffect(enabled, speed, lineCount) {
+    // The playback position for the words moves on the shared ambient pulse, not every frame: it is what kept the full
+    // player redrawing at the display's rate — 240 times a second on a 240 Hz monitor — for as long as a song played
+    // (see AmbientClock). Line changes and scrolls the reader starts are animations of their own and keep the full rate.
+    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
+    LaunchedEffect(enabled, speed, lineCount, ambientClock) {
         if (!enabled || lineCount <= 0) return@LaunchedEffect
 
         // The player reports about four times a second. Interpolating between those reports here
@@ -467,7 +471,7 @@ internal fun FollowPlainLyrics(
         var returningFromManual = false
 
         while (true) {
-            withFrameNanos { }
+            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { }
 
             val fresh = position()
             if (fresh != reported) {
