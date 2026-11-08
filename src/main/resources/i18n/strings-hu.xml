@@ -3292,7 +3292,7 @@
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Védett számok</string>
     <string name="protected_beta">Béta</string>
-    <string name="protected_ann_body_windows">A KittyTune mostantól lejátssza a SoundCloud védett számait. Még béta, ezért alapból ki van kapcsolva: kapcsold be, ha kipróbálnád. Ezeknél a számoknál az effektek, a hangszínszabályzó és a letöltés nem érhető el.</string>
+    <string name="protected_ann_body_windows">A KittyTune mostantól lejátssza a SoundCloud védett számait. Még béta, ezért alapból ki van kapcsolva: kapcsold be, ha kipróbálnád. A Windows-módszer (PlayReady) nem támogatja az effekteket, a hangszínszabályzót és a letöltést. Ezekhez kattints a „Részletek” gombra, és válaszd a WSL-módszert: a Widevine-modulja a visszafejtett hangot a KittyTune lejátszójának adja át.</string>
     <string name="protected_ann_body_desktop">A KittyTune mostantól lejátssza a SoundCloud védett számait, a böngésződ Widevine-moduljával. Már be van kapcsolva, és még béta.</string>
     <string name="protected_ann_enable">Bekapcsolás</string>
     <string name="protected_ann_learn">Részletek</string>

@@ -3294,7 +3294,7 @@
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Korumalı parçalar</string>
     <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune artık SoundCloud’un korumalı parçalarını çalabiliyor. Henüz beta olduğu için varsayılan olarak kapalı: denemek için aç. Bu parçalarda efektler, ekolayzer ve indirme kapalı kalır.</string>
+    <string name="protected_ann_body_windows">KittyTune artık SoundCloud’un korumalı parçalarını çalabiliyor. Henüz beta olduğu için varsayılan olarak kapalı: denemek için aç. Windows yöntemi (PlayReady) efektleri, ekolayzeri ve indirmeleri desteklemez. Bunları kullanmak için “Daha fazla bilgi”ye tıkla ve WSL yöntemini seç: Widevine modülü, şifresi çözülmüş sesi KittyTune’un oynatıcısına iletir.</string>
     <string name="protected_ann_body_desktop">KittyTune artık SoundCloud’un korumalı parçalarını tarayıcının Widevine modülüyle çalıyor. Zaten açık ve henüz beta.</string>
     <string name="protected_ann_enable">Aç</string>
     <string name="protected_ann_learn">Daha fazla bilgi</string>

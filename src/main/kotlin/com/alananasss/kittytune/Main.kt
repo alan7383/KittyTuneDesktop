@@ -112,6 +112,7 @@ fun main(args: Array<String>) {
     }
     com.alananasss.kittytune.data.MacSoundCloudOAuth.installUriHandler()
     AppBootstrap.init()
+    ProtectedTracksDemo.prepare()
     // Transparent windows (pet, mini player, menus) in software on Windows: Direct3D hung on their first frame
     // on some GPU drivers and froze the whole app.
     com.alananasss.kittytune.core.TransparentWindowRendering.install()

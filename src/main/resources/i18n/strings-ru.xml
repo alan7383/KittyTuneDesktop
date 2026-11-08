@@ -3293,7 +3293,7 @@
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Защищённые треки</string>
     <string name="protected_beta">Бета</string>
-    <string name="protected_ann_body_windows">KittyTune теперь умеет воспроизводить защищённые треки SoundCloud. Это пока бета, поэтому по умолчанию выключено: включите, чтобы попробовать. Эффекты, эквалайзер и загрузки для таких треков недоступны.</string>
+    <string name="protected_ann_body_windows">KittyTune теперь умеет воспроизводить защищённые треки SoundCloud. Это пока бета, поэтому по умолчанию выключено: включите, чтобы попробовать. Метод Windows (PlayReady) не поддерживает эффекты, эквалайзер и загрузки. Чтобы использовать их, нажмите «Подробнее» и выберите метод WSL: его модуль Widevine передаёт расшифрованный звук плееру KittyTune.</string>
     <string name="protected_ann_body_desktop">KittyTune теперь воспроизводит защищённые треки SoundCloud с помощью модуля Widevine вашего браузера. Это уже включено и пока в бета-версии.</string>
     <string name="protected_ann_enable">Включить</string>
     <string name="protected_ann_learn">Подробнее</string>

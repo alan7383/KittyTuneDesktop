@@ -3513,7 +3513,7 @@
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Geschützte Titel</string>
     <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune kann jetzt die geschützten Titel von SoundCloud abspielen. Es ist noch eine Beta und daher zunächst ausgeschaltet: Schalte es ein, um es auszuprobieren. Effekte, Equalizer und Downloads bleiben bei diesen Titeln aus.</string>
+    <string name="protected_ann_body_windows">KittyTune kann jetzt die geschützten Titel von SoundCloud abspielen. Es ist noch eine Beta und daher zunächst ausgeschaltet: Schalte es ein, um es auszuprobieren. Die Windows-Methode (PlayReady) unterstützt keine Effekte, Equalizer oder Downloads. Klicke dafür auf „Mehr erfahren“ und wähle die WSL-Methode: Ihr Widevine-Modul übergibt den entschlüsselten Ton an den Player von KittyTune.</string>
     <string name="protected_ann_body_desktop">KittyTune spielt jetzt die geschützten Titel von SoundCloud ab, mit dem Widevine-Modul deines Browsers. Es ist bereits eingeschaltet und noch eine Beta.</string>
     <string name="protected_ann_enable">Einschalten</string>
     <string name="protected_ann_learn">Mehr erfahren</string>

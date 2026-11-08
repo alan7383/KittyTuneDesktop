@@ -949,6 +949,20 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask
     }
 }
 
+tasks.register<JavaExec>("runProtectedTracksDemo") {
+    description = "Opens the real app with the protected tracks card and notice controls in an isolated guest profile."
+    group = "application"
+    dependsOn("classes")
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.alananasss.kittytune.MainKt")
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) })
+    systemProperty("kittytune.protectedTracksDemo", "true")
+    val profile = layout.buildDirectory.dir("protected-tracks-demo").get().asFile
+    environment("APPDATA", File(profile, "roaming").absolutePath)
+    environment("LOCALAPPDATA", File(profile, "local").absolutePath)
+    doFirst { listOf("roaming", "local").forEach { File(profile, it).mkdirs() } }
+}
+
 tasks.register<Test>("headlessTest") {
     description = "Runs deterministic desktop regressions without windows or audio output."
     group = "verification"

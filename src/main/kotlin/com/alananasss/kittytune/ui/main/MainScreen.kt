@@ -1399,7 +1399,13 @@ fun MainScreen(
         modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 112.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        com.alananasss.kittytune.ui.profile.ProtectedTracksNoticeHost()
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.alananasss.kittytune.ui.common.ToastNoticeHost()
+            com.alananasss.kittytune.ui.profile.ProtectedTracksNoticeHost()
+            if (com.alananasss.kittytune.ProtectedTracksDemo.enabled) {
+                com.alananasss.kittytune.ProtectedTracksDemo.Controls()
+            }
+        }
     }
 
     Box(
