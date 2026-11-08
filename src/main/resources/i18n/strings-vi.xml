@@ -3339,16 +3339,16 @@
     <string name="pref_drm_wsl_uninstall_title">Gỡ cài đặt WSL</string>
     <string name="pref_drm_wsl_uninstall_desc">Xóa mọi thứ đã cài cho WSL và đưa hệ thống về trạng thái sạch</string>
     <string name="drm_unwiz_title">Gỡ WSL khỏi máy này</string>
-    <string name="drm_unwiz_body">Mọi thứ KittyTune đã cài cho WSL sẽ bị xóa, máy của bạn trở lại như trước. Bài hát được bảo vệ vẫn phát qua PlayReady.</string>
+    <string name="drm_unwiz_body">Mọi thứ KittyTune đã cài cho WSL sẽ bị xóa, máy của bạn trở lại như trước. Nhạc được bảo vệ vẫn phát qua PlayReady.</string>
     <string name="drm_unwiz_checking">Đang kiểm tra những gì đã cài…</string>
     <string name="drm_unwiz_files_title">Tệp của KittyTune trong %1$s</string>
     <string name="drm_unwiz_files_body">Mô-đun Widevine, chương trình ktcdm và mã nguồn của chúng (/opt/kittytune).</string>
     <string name="drm_unwiz_packages_title">Công cụ đã cài cho việc thiết lập</string>
     <string name="drm_unwiz_packages_body">%1$s. Mỗi công cụ sẽ bị gỡ trừ khi có chương trình khác đang cần.</string>
     <string name="drm_unwiz_settings_title">Cài đặt WSL của KittyTune</string>
-    <string name="drm_unwiz_settings_body">Liên kết tới WSL bị xóa và bài hát được bảo vệ quay lại dùng PlayReady.</string>
+    <string name="drm_unwiz_settings_body">Liên kết tới WSL bị xóa và nhạc được bảo vệ quay lại dùng PlayReady.</string>
     <string name="drm_unwiz_distro_title">Toàn bộ bản phân phối %1$s</string>
-    <string name="drm_unwiz_distro_owned">KittyTune đã cài nó cho bài hát được bảo vệ. Nó bị xóa cùng mọi thứ bên trong.</string>
+    <string name="drm_unwiz_distro_owned">KittyTune đã cài nó cho nhạc được bảo vệ. Nó bị xóa cùng mọi thứ bên trong.</string>
     <string name="drm_unwiz_distro_shared">%1$s đã có trên máy này từ trước KittyTune. Xóa nó sẽ xóa mọi thứ bên trong, kể cả tệp của bạn: chỉ đánh dấu nếu bạn không dùng nó.</string>
     <string name="drm_unwiz_wsl_title">Bản thân WSL</string>
     <string name="drm_unwiz_wsl_owned">KittyTune đã cài nó. WSL và các tính năng Windows mà nó bật sẽ bị gỡ. Windows sẽ xin quyền, và khởi động lại sẽ hoàn tất.</string>
@@ -3368,7 +3368,19 @@
     <string name="drm_unwiz_refused">Windows chưa được cấp quyền gỡ WSL. Mọi thứ khác đã bị xóa; bạn có thể thử lại.</string>
     <string name="drm_unwiz_removed">Đã xóa tất cả.</string>
     <string name="drm_unwiz_done_title">Máy của bạn đã sạch</string>
-    <string name="drm_unwiz_done_body">Không còn gì của thiết lập WSL. Bài hát được bảo vệ phát qua PlayReady.</string>
+    <string name="drm_unwiz_done_body">Không còn gì của thiết lập WSL. Nhạc được bảo vệ phát qua PlayReady.</string>
     <string name="drm_unwiz_restart">Khởi động lại Windows để hoàn tất việc gỡ WSL.</string>
     <string name="drm_unwiz_restart_now">Khởi động lại ngay</string>
+    <!-- DRM: protected tracks announcement and notices -->
+    <string name="protected_ann_title">Nhạc được bảo vệ</string>
+    <string name="protected_beta">Beta</string>
+    <string name="protected_ann_body_windows">KittyTune giờ có thể phát các nhạc được bảo vệ của SoundCloud. Tính năng vẫn đang beta nên mặc định tắt: hãy bật để dùng thử. Hiệu ứng, bộ cân bằng và tải xuống không dùng được với các bài này.</string>
+    <string name="protected_ann_body_desktop">KittyTune giờ phát được các nhạc được bảo vệ của SoundCloud, nhờ mô-đun Widevine của trình duyệt. Tính năng đã bật và vẫn đang beta.</string>
+    <string name="protected_ann_enable">Bật</string>
+    <string name="protected_ann_learn">Tìm hiểu thêm</string>
+    <string name="protected_ann_later">Để sau</string>
+    <string name="protected_ann_got_it">Đã hiểu</string>
+    <string name="protected_ann_enabled">Đã bật. Bạn có thể đổi bất cứ lúc nào trong Cài đặt, Khác, Nhạc được bảo vệ.</string>
+    <string name="protected_hint_title">Nhạc được bảo vệ</string>
+    <string name="protected_hint_offer">Bài này được SoundCloud bảo vệ nên đã phát từ nguồn khác. Hãy bật nhạc được bảo vệ (beta) để nghe bản gốc.</string>
 </resources>

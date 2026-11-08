@@ -3290,4 +3290,16 @@
     <string name="drm_unwiz_done_body">Nothing of the WSL setup is left. Protected tracks play through PlayReady.</string>
     <string name="drm_unwiz_restart">Restart Windows to finish removing WSL.</string>
     <string name="drm_unwiz_restart_now">Restart now</string>
+    <!-- DRM: protected tracks announcement and notices -->
+    <string name="protected_ann_title">Protected tracks</string>
+    <string name="protected_beta">Beta</string>
+    <string name="protected_ann_body_windows">KittyTune can now play SoundCloud’s protected tracks. It is still a beta, so it starts turned off: turn it on to try it. Effects, the equaliser and downloads stay off on those tracks.</string>
+    <string name="protected_ann_body_desktop">KittyTune now plays SoundCloud’s protected tracks, with your browser’s Widevine module. It is already on, and still a beta.</string>
+    <string name="protected_ann_enable">Turn on</string>
+    <string name="protected_ann_learn">Learn more</string>
+    <string name="protected_ann_later">Later</string>
+    <string name="protected_ann_got_it">Got it</string>
+    <string name="protected_ann_enabled">Turned on. You can change it any time in Settings, Misc, Protected tracks.</string>
+    <string name="protected_hint_title">Protected track</string>
+    <string name="protected_hint_offer">This track is protected by SoundCloud, so it was played from another source. Turn on protected tracks (beta) to hear the original.</string>
 </resources>

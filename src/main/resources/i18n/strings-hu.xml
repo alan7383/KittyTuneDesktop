@@ -3289,4 +3289,16 @@
     <string name="drm_unwiz_done_body">A WSL-beállításból semmi sem maradt. A védett számok a PlayReadyn keresztül szólnak.</string>
     <string name="drm_unwiz_restart">Indítsd újra a Windowst a WSL eltávolításának befejezéséhez.</string>
     <string name="drm_unwiz_restart_now">Újraindítás most</string>
+    <!-- DRM: protected tracks announcement and notices -->
+    <string name="protected_ann_title">Védett számok</string>
+    <string name="protected_beta">Béta</string>
+    <string name="protected_ann_body_windows">A KittyTune mostantól lejátssza a SoundCloud védett számait. Még béta, ezért alapból ki van kapcsolva: kapcsold be, ha kipróbálnád. Ezeknél a számoknál az effektek, a hangszínszabályzó és a letöltés nem érhető el.</string>
+    <string name="protected_ann_body_desktop">A KittyTune mostantól lejátssza a SoundCloud védett számait, a böngésződ Widevine-moduljával. Már be van kapcsolva, és még béta.</string>
+    <string name="protected_ann_enable">Bekapcsolás</string>
+    <string name="protected_ann_learn">Részletek</string>
+    <string name="protected_ann_later">Később</string>
+    <string name="protected_ann_got_it">Értem</string>
+    <string name="protected_ann_enabled">Bekapcsolva. Bármikor módosíthatod: Beállítások, Egyéb, Védett számok.</string>
+    <string name="protected_hint_title">Védett szám</string>
+    <string name="protected_hint_offer">Ezt a számot a SoundCloud védi, ezért egy másik forrásból szólt. Kapcsold be a védett számokat (béta), hogy az eredetit hallgasd.</string>
 </resources>

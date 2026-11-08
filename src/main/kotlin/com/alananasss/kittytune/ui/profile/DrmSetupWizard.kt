@@ -163,6 +163,8 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
 
     val close = {
         prefs.setDrmOnboardingDone(true)
+        // Whoever went through the assistant needs no announcement of what it explains.
+        prefs.setProtectedTracksAnnounced(true)
         onClose()
     }
     val canGoOn = when (step) {
@@ -250,9 +252,15 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
                         contentPadding = ButtonDefaults.ContentPadding,
                         modifier = Modifier.height(48.dp),
                         onClick = {
-                            if (step == WizardStep.CHOOSE && choice == ProtectedBackend.PLAYREADY) {
-                                // WSL is only selected once its setup succeeds, never half-done.
-                                ProtectedBackend.select(ProtectedBackend.PLAYREADY)
+                            if (step == WizardStep.CHOOSE) {
+                                // Choosing a method is choosing to play protected tracks: off by default on
+                                // Windows, the switch is turned on here rather than left for the user to find.
+                                prefs.setProtectedTracksEnabled(true)
+                                StreamResolver.forgetStreams()
+                                if (choice == ProtectedBackend.PLAYREADY) {
+                                    // WSL is only selected once its setup succeeds, never half-done.
+                                    ProtectedBackend.select(ProtectedBackend.PLAYREADY)
+                                }
                             }
                             if (last) close() else step = steps[index + 1]
                         },
@@ -771,6 +779,8 @@ internal fun WslSetupStep(wsl: WslWizardState) {
                 )
                 current?.let { wsl.states[it.ordinal] = StepState.DONE }
                 wsl.succeeded = true
+                // Setting WSL up is asking for protected tracks, including from the settings' own button.
+                PlayerPreferences().setProtectedTracksEnabled(true)
             } catch (e: WslSidecarSetup.SetupException) {
                 wsl.states[e.step.ordinal] = StepState.FAILED
                 wsl.failure = str("drm_wiz_setup_failed", stepLabel(e.step)) + "\n" + e.message

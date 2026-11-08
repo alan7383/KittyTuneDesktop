@@ -828,8 +828,13 @@ object StreamResolver {
         val candidates = buildTranscodingCandidates(transcodingsWithMobile, qualityPref, forDownload, allowDrm)
 
         if (candidates.isEmpty()) {
-            // A choice the user made needs no notice.
-            if (protectedEnabled) notifyIfOnlyProtected(transcodingsWithMobile)
+            if (protectedEnabled) {
+                notifyIfOnlyProtected(transcodingsWithMobile)
+            } else if (!forDownload && com.alananasss.kittytune.data.drm.ProtectedTracksNotice.onlyProtected(transcodingsWithMobile)) {
+                // Off by default on Windows: offered once, when a track that needed it went elsewhere. A switch
+                // the user turned off themselves needs no notice (ProtectedTracksNotice checks).
+                com.alananasss.kittytune.data.drm.ProtectedTracksNotice.onProtectedTrackSkipped()
+            }
             return null
         }
 
@@ -1045,22 +1050,12 @@ object StreamResolver {
      */
     private fun notifyIfOnlyProtected(transcodings: List<com.alananasss.kittytune.domain.Transcoding>) {
         if (SoundCloudDrm.isAvailable) return
-        val onlyProtected = transcodings.isNotEmpty() && transcodings.all {
-            it.format?.protocol?.contains("encrypted", ignoreCase = true) == true
-        }
-        if (!onlyProtected) return
+        if (!com.alananasss.kittytune.data.drm.ProtectedTracksNotice.onlyProtected(transcodings)) return
         val now = System.currentTimeMillis()
         if (now - lastDrmNoticeAt.getAndSet(now) < DRM_NOTICE_INTERVAL_MS) return
-        // Installing a browser is advice for the Widevine platforms: it changes nothing on Windows.
-        com.alananasss.kittytune.core.Toaster.show(
-            com.alananasss.kittytune.core.str(
-                if (WindowsPlayReadyRuntime.windows) {
-                    com.alananasss.kittytune.R.string.drm_unavailable_toast_windows
-                } else {
-                    com.alananasss.kittytune.R.string.drm_unavailable_toast
-                }
-            )
-        )
+        // Shown by the main screen's notice host (the platform-specific advice is chosen there). It went through
+        // Toaster before, whose messages nothing on the desktop ever displayed.
+        com.alananasss.kittytune.data.drm.ProtectedTracksNotice.onProtectedTrackUnavailable()
     }
 
     private fun buildStreamInfoRequest(url: String, token: String?): okhttp3.Request {
