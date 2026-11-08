@@ -85,13 +85,13 @@ fun LyricsLineItem(
                     compositingStrategy = CompositingStrategy.Offscreen
 
                     val radius = blurRadius()
-                    if (radius > 0f) {
-                        renderEffect = BlurEffect(
+                    renderEffect = if (radius > 0f) {
+                        BlurEffect(
                             radiusX = radius,
                             radiusY = radius,
                             edgeTreatment = TileMode.Clamp
                         )
-                    }
+                    } else null
                 }
         ) {
             content()

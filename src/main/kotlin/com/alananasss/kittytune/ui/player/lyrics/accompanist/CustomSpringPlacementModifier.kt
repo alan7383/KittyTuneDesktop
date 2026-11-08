@@ -15,9 +15,7 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.round
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -29,7 +27,7 @@ class CustomSpringPlacementModifierNode(
     var isManualScrolling: Boolean,
     var stiffness: Float
 ) : ApproachLayoutModifierNode, Modifier.Node() {
-    private var offsetAnimatable: Animatable<IntOffset, AnimationVector2D>? = null
+    private var offsetAnimatable: Animatable<Offset, AnimationVector2D>? = null
     private var isInitialized = false
 
     override fun isMeasurementApproachInProgress(lookaheadSize: IntSize): Boolean = false
@@ -40,7 +38,7 @@ class CustomSpringPlacementModifierNode(
         val anim = offsetAnimatable ?: return false
         if (!isInitialized || isManualScrolling) return false
         val target = with(lookaheadScope) {
-            lookaheadScopeCoordinates.localLookaheadPositionOf(lookaheadCoordinates).round()
+            lookaheadScopeCoordinates.localLookaheadPositionOf(lookaheadCoordinates)
         }
         return anim.isRunning || anim.value != target
     }
@@ -54,15 +52,15 @@ class CustomSpringPlacementModifierNode(
             val coordinates = coordinates
             if (coordinates != null) {
                 val target = with(lookaheadScope) {
-                    lookaheadScopeCoordinates.localLookaheadPositionOf(coordinates).round()
+                    lookaheadScopeCoordinates.localLookaheadPositionOf(coordinates)
                 }
                 val placementOffset = with(lookaheadScope) {
-                    lookaheadScopeCoordinates.localPositionOf(coordinates, Offset.Zero).round()
+                    lookaheadScopeCoordinates.localPositionOf(coordinates, Offset.Zero)
                 }
 
                 var anim = offsetAnimatable
                 if (anim == null || !isInitialized || isManualScrolling) {
-                    offsetAnimatable = Animatable(target, IntOffset.VectorConverter)
+                    offsetAnimatable = Animatable(target, Offset.VectorConverter)
                     isInitialized = true
                     placeable.place(0, 0)
                     return@layout
@@ -71,7 +69,7 @@ class CustomSpringPlacementModifierNode(
                 val distanceY = abs(target.y - anim.value.y)
                 val distanceX = abs(target.x - anim.value.x)
                 if (distanceY > MAX_SPRING_DISPLACEMENT_PX || distanceX > MAX_SPRING_DISPLACEMENT_PX) {
-                    offsetAnimatable = Animatable(target, IntOffset.VectorConverter)
+                    offsetAnimatable = Animatable(target, Offset.VectorConverter)
                     placeable.place(0, 0)
                     return@layout
                 }
@@ -92,7 +90,12 @@ class CustomSpringPlacementModifierNode(
                 if (abs(delta.y) > MAX_SPRING_DISPLACEMENT_PX || abs(delta.x) > MAX_SPRING_DISPLACEMENT_PX) {
                     placeable.place(0, 0)
                 } else {
-                    placeable.place(delta.x, delta.y)
+                    // Retain fractional motion on Retina/high-refresh displays. Integer layout
+                    // placement rounds every spring frame and makes the settling text jitter.
+                    placeable.placeWithLayer(0, 0) {
+                        translationX = delta.x
+                        translationY = delta.y
+                    }
                 }
             } else {
                 placeable.place(0, 0)
