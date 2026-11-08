@@ -460,7 +460,9 @@ object AppIconInstaller {
                 println("[AppIconInstaller] $icnsName is not writable; skipping bundle icon")
                 return
             }
-            target.writeBytes(IconEncoders.icns(source))
+            val iconBytes = IconEncoders.icns(source)
+            if (target.isFile && target.readBytes().contentEquals(iconBytes)) return
+            target.writeBytes(iconBytes)
 
             if (plist.isFile && !plist.readText().contains("CFBundleIconFile")) {
                 addPlistIconKey(plist, icnsName)
@@ -473,10 +475,9 @@ object AppIconInstaller {
                 runCatching { it.setLastModified(now) }
             }
             listOf(
-                listOf(LSREGISTER, "-f", bundle.absolutePath),
-                // The Dock caches the tile image in memory; it comes back within a second and
-                // nothing is lost, which is the same trade as kbuildsycoca on KDE.
-                listOf("killall", "-HUP", "Dock")
+                // AppIconRuntime updates the live Dock through Taskbar. Restarting the Dock
+                // here disrupts Spaces and third-party notch widgets, even on a normal launch.
+                listOf(LSREGISTER, "-f", bundle.absolutePath)
             ).forEach { cmd ->
                 runCatching {
                     ProcessBuilder(cmd).redirectErrorStream(true).start().waitFor()

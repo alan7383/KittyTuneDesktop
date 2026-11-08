@@ -12,7 +12,8 @@ including Boring Notch, Control Center, media commands, album artwork and relaun
   and remote command APIs, with commands written to stdout and updates read from stdin.
 - `MacNowPlayingService.kt`: launches helper and bridges player updates / commands.
 - `PlayerViewModel.kt`: connects the macOS service to existing player actions.
-- `AppIconRuntime.kt`: avoids overriding the app's Dock icon with a square icon on macOS.
+- `AppIconRuntime.kt`: the current integration updates the running Dock icon through Taskbar.
+  See [macOS desktop integration validation](macos-desktop-integration.md) for subsequent fixes.
 - `scripts/build-macos-nowplaying.sh`: builds Swift helper and installs it under
   the packaged Compose `.app`'s `Contents/Helpers` directory.
 
