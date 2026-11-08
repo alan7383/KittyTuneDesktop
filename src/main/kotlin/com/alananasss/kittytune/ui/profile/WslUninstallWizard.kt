@@ -76,9 +76,8 @@ private enum class UninstallPage { WHAT, REMOVE, DONE }
 
 /** State kept above the sliding pages, so going back does not lose a check that took seconds. */
 internal class UninstallState {
-    var plan by mutableStateOf<WslSidecarSetup.UninstallPlan?>(null)
-    var removeDistro by mutableStateOf(false)
-    var removeWsl by mutableStateOf(false)
+    /** Also turn the WSL1 Windows feature back off (admin + restart); off by default — it is harmless to leave. */
+    var removeFeature by mutableStateOf(false)
 
     var steps by mutableStateOf<List<UninstallStep>>(emptyList())
     val states = mutableStateListOf<StepState>()
@@ -108,17 +107,8 @@ fun WslUninstallWizard(onClose: () -> Unit) {
     val index = pages.indexOf(page)
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        val plan = WslSidecarSetup.planUninstall()
-        un.plan = plan
-        un.removeDistro = plan.distroInstalledByApp
-        un.removeWsl = plan.wslInstalledByApp && WslSidecarSetup.canRemoveWsl(plan, un.removeDistro)
-    }
-
     val start: () -> Unit = start@{
-        val plan = un.plan ?: return@start
-        val removeWsl = un.removeWsl && WslSidecarSetup.canRemoveWsl(plan, un.removeDistro)
-        un.steps = WslSidecarSetup.uninstallSteps(plan, un.removeDistro, removeWsl)
+        un.steps = WslSidecarSetup.uninstallSteps(un.removeFeature)
         un.states.clear()
         un.states.addAll(List(un.steps.size) { StepState.PENDING })
         un.failure = null
@@ -129,9 +119,7 @@ fun WslUninstallWizard(onClose: () -> Unit) {
             var current: UninstallStep? = null
             try {
                 un.restartNeeded = WslSidecarSetup.uninstall(
-                    plan = plan,
-                    removeDistro = un.removeDistro,
-                    removeWsl = removeWsl,
+                    removeFeature = un.removeFeature,
                     onStep = { next ->
                         current?.let { un.states[un.steps.indexOf(it)] = StepState.DONE }
                         current = next
@@ -221,7 +209,6 @@ fun WslUninstallWizard(onClose: () -> Unit) {
                     when (page) {
                         UninstallPage.WHAT -> Button(
                             shapes = ButtonDefaults.shapes(),
-                            enabled = un.plan != null,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error,
                                 contentColor = MaterialTheme.colorScheme.onError,
@@ -263,55 +250,18 @@ fun WslUninstallWizard(onClose: () -> Unit) {
 internal fun WhatPage(un: UninstallState) {
     Hero(MaterialShapes.Cookie9Sided, Icons.Rounded.DeleteSweep)
     StepTitle(str("drm_unwiz_title"), str("drm_unwiz_body"))
-    val plan = un.plan
-    if (plan == null) {
-        WaitingCard(str("drm_unwiz_checking"))
-        return
-    }
-    val distro = plan.distro
-    if (distro != null) {
-        ExplainRow(Icons.Rounded.Folder, str("drm_unwiz_files_title", distro), str("drm_unwiz_files_body"))
-        if (plan.packages.isNotEmpty()) {
-            ExplainRow(
-                Icons.Rounded.Build,
-                str("drm_unwiz_packages_title"),
-                str("drm_unwiz_packages_body", plan.packages.joinToString(", ")),
-            )
-        }
-    }
+
+    ExplainRow(Icons.Rounded.Folder, str("drm_unwiz_files_title", WslSidecarSetup.DISTRO), str("drm_unwiz_files_body"))
     ExplainRow(Icons.Rounded.Settings, str("drm_unwiz_settings_title"), str("drm_unwiz_settings_body"))
 
-    if (distro != null) {
-        ChoiceCard(
-            checked = un.removeDistro,
-            title = str("drm_unwiz_distro_title", distro),
-            body = str(if (plan.distroInstalledByApp) "drm_unwiz_distro_owned" else "drm_unwiz_distro_shared", distro),
-            warning = !plan.distroInstalledByApp,
-            onToggle = {
-                un.removeDistro = it
-                // WSL can only go along with the distribution: keep the two choices consistent.
-                if (!WslSidecarSetup.canRemoveWsl(plan, it)) un.removeWsl = false
-            },
-        )
-    }
-    if (plan.wslPresent) {
-        when {
-            plan.otherDistros.isNotEmpty() -> ExplainRow(
-                Icons.Rounded.Verified,
-                str("drm_unwiz_wsl_title"),
-                str("drm_unwiz_wsl_kept", plan.otherDistros.joinToString(", ")),
-            )
-            else -> ChoiceCard(
-                checked = un.removeWsl && WslSidecarSetup.canRemoveWsl(plan, un.removeDistro),
-                enabled = WslSidecarSetup.canRemoveWsl(plan, un.removeDistro),
-                title = str("drm_unwiz_wsl_title"),
-                body = str(if (plan.wslInstalledByApp) "drm_unwiz_wsl_owned" else "drm_unwiz_wsl_shared") +
-                    if (WslSidecarSetup.canRemoveWsl(plan, un.removeDistro)) "" else "\n" + str("drm_unwiz_wsl_needs_distro", distro ?: ""),
-                warning = !plan.wslInstalledByApp,
-                onToggle = { un.removeWsl = it },
-            )
-        }
-    }
+    // The Windows feature is left on by default: it is harmless, and turning it off needs admin + a restart.
+    ChoiceCard(
+        checked = un.removeFeature,
+        title = str("drm_unwiz_feature_title"),
+        body = str("drm_unwiz_feature_body"),
+        warning = true,
+        onToggle = { un.removeFeature = it },
+    )
 }
 
 /** A titled choice with a checkbox; [warning] colours the text when ticking it deletes something of the user's. */
@@ -432,10 +382,8 @@ internal fun DonePage(un: UninstallState) {
 private fun uninstallStepLabel(step: UninstallStep): String = str(
     when (step) {
         UninstallStep.STOP -> "drm_unwiz_step_stop"
-        UninstallStep.FILES -> "drm_unwiz_step_files"
-        UninstallStep.PACKAGES -> "drm_unwiz_step_packages"
         UninstallStep.DISTRO -> "drm_unwiz_step_distro"
         UninstallStep.SETTINGS -> "drm_unwiz_step_settings"
-        UninstallStep.WSL -> "drm_unwiz_step_wsl"
+        UninstallStep.FEATURE -> "drm_unwiz_step_feature"
     }
 )

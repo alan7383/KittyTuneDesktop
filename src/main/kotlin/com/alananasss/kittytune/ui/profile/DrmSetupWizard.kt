@@ -155,11 +155,15 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
         )
         else -> listOf(WizardStep.INTRO, WizardStep.HOW, WizardStep.CHOOSE, WizardStep.DONE)
     }
-    var step by remember { mutableStateOf(steps.first()) }
+    // Resuming after the reboot the feature needed: jump straight to the setup step, which auto-starts.
+    val resuming = remember { start == DrmWizardStart.WSL && WslSidecarSetup.pendingVersion() != null }
+    var step by remember {
+        mutableStateOf(if (resuming && WizardStep.WSL_SETUP in steps) WizardStep.WSL_SETUP else steps.first())
+    }
     val index = steps.indexOf(step).coerceAtLeast(0)
 
     // The WSL part keeps its state here, so going back and forth does not restart the setup.
-    val wsl = remember { WslWizardState() }
+    val wsl = remember { WslWizardState().apply { if (resuming) version = WslSidecarSetup.pendingVersion() ?: 1 } }
 
     val close = {
         prefs.setDrmOnboardingDone(true)
@@ -216,6 +220,8 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
                             WizardStep.CHOOSE -> ChooseStep(
                                 choice = choice,
                                 onChoose = { choice = it },
+                                version = wsl.version,
+                                onVersion = { wsl.version = it },
                                 onSkip = {
                                     prefs.setProtectedTracksEnabled(false)
                                     StreamResolver.forgetStreams()
@@ -401,7 +407,13 @@ internal fun HowStep(windows: Boolean) {
 }
 
 @Composable
-internal fun ColumnScope.ChooseStep(choice: ProtectedBackend, onChoose: (ProtectedBackend) -> Unit, onSkip: () -> Unit) {
+internal fun ColumnScope.ChooseStep(
+    choice: ProtectedBackend,
+    onChoose: (ProtectedBackend) -> Unit,
+    version: Int,
+    onVersion: (Int) -> Unit,
+    onSkip: () -> Unit,
+) {
     Hero(MaterialShapes.Sunny, Icons.Rounded.Tune)
     StepTitle(str("drm_wiz_choose_title"), str("drm_wiz_choose_body"))
     Row(
@@ -423,7 +435,10 @@ internal fun ColumnScope.ChooseStep(choice: ProtectedBackend, onChoose: (Protect
         enter = expandVertically() + fadeIn(),
         exit = shrinkVertically() + fadeOut(),
     ) {
-        DrmExperimentalCard(windows = true)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            DrmExperimentalCard(windows = true)
+            WslVersionChoice(version = version, onVersion = onVersion)
+        }
     }
     TextButton(
         shapes = ButtonDefaults.shapes(),
@@ -431,6 +446,62 @@ internal fun ColumnScope.ChooseStep(choice: ProtectedBackend, onChoose: (Protect
         modifier = Modifier.align(Alignment.CenterHorizontally),
     ) {
         Text(str("drm_wiz_skip"))
+    }
+}
+
+/**
+ * The WSL1-vs-WSL2 sub-choice, hidden behind an "advanced" button so most people never see it.
+ *
+ * WSL1 is the default: no virtual machine, almost no memory. WSL2 is heavier but works on the rare
+ * machine where the WSL1 Windows feature cannot be turned on. Both play protected tracks the same way.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun WslVersionChoice(version: Int, onVersion: (Int) -> Unit) {
+    var open by remember { mutableStateOf(version != 1) }
+    TextButton(shapes = ButtonDefaults.shapes(), onClick = { open = !open }) {
+        Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(str("drm_wiz_advanced"))
+    }
+    AnimatedVisibility(visible = open, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                VersionRow(
+                    selected = version == 1,
+                    title = str("drm_wiz_version_wsl1"),
+                    body = str("drm_wiz_version_wsl1_desc"),
+                    onClick = { onVersion(1) },
+                )
+                VersionRow(
+                    selected = version == 2,
+                    title = str("drm_wiz_version_wsl2"),
+                    body = str("drm_wiz_version_wsl2_desc"),
+                    onClick = { onVersion(2) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VersionRow(selected: Boolean, title: String, body: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = selected, onClick = onClick)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 
@@ -647,8 +718,13 @@ internal fun MethodPoints(method: ProtectedBackend) {
 internal class WslWizardState {
     var detection by mutableStateOf<WslSidecarSetup.Detection?>(null)
     var checking by mutableStateOf(false)
-    var installerOpened by mutableStateOf(false)
-    var installerFailed by mutableStateOf(false)
+
+    /** Which WSL version to set up: 1 (WSL1, light, no VM) or 2 (the fallback when WSL1 is blocked). */
+    var version by mutableStateOf(1)
+    var enabling by mutableStateOf(false)
+    var enableRefused by mutableStateOf(false)
+    /** True once the Windows feature was turned on and the machine must restart for the setup to go on. */
+    var awaitingReboot by mutableStateOf(false)
 
     var running by mutableStateOf(false)
     var succeeded by mutableStateOf(false)
@@ -661,7 +737,6 @@ internal class WslWizardState {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun WslCheckStep(wsl: WslWizardState) {
-    val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val recheck: () -> Unit = {
         scope.launch {
@@ -674,14 +749,31 @@ internal fun WslCheckStep(wsl: WslWizardState) {
         }
     }
     LaunchedEffect(Unit) { if (wsl.detection == null) recheck() }
-    // While Microsoft's installer runs, look again now and then: no button to remember to press.
-    LaunchedEffect(wsl.installerOpened) {
-        while (wsl.installerOpened) {
+    // After the user enables the feature and restarts, the feature reads as on: stop waiting, move on.
+    LaunchedEffect(wsl.awaitingReboot) {
+        while (wsl.awaitingReboot) {
             delay(5_000)
             val found = WslSidecarSetup.detect()
             wsl.detection = found
-            if (found.state != WslSidecarSetup.State.NO_WSL && found.state != WslSidecarSetup.State.NO_DISTRO) {
-                wsl.installerOpened = false
+            if (found.state == WslSidecarSetup.State.NOT_SET_UP || found.state == WslSidecarSetup.State.SET_UP) {
+                wsl.awaitingReboot = false
+            }
+        }
+    }
+
+    val enable: (Int) -> Unit = { version ->
+        scope.launch {
+            wsl.enabling = true
+            wsl.enableRefused = false
+            try {
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    WslSidecarSetup.enable(version)
+                }
+                wsl.version = version
+                wsl.enableRefused = result.refused
+                wsl.awaitingReboot = result.ok
+            } finally {
+                wsl.enabling = false
             }
         }
     }
@@ -691,61 +783,61 @@ internal fun WslCheckStep(wsl: WslWizardState) {
 
     val state = wsl.detection?.state
     when {
-        state == null || (wsl.checking && !wsl.installerOpened) -> WaitingCard(str("drm_wiz_wsl_checking"))
-        state == WslSidecarSetup.State.NOT_SET_UP || state == WslSidecarSetup.State.SET_UP -> ResultCard(
-            ok = true,
-            text = str("drm_wiz_wsl_found", wsl.detection?.distro ?: "Linux"),
-        )
-        else -> {
-            ResultCard(
-                ok = false,
-                text = str(if (state == WslSidecarSetup.State.NO_WSL) "drm_wiz_wsl_missing" else "drm_wiz_wsl_no_distro"),
-            )
+        state == null || wsl.checking -> WaitingCard(str("drm_wiz_wsl_checking"))
+        state == WslSidecarSetup.State.NOT_SET_UP || state == WslSidecarSetup.State.SET_UP ->
+            ResultCard(ok = true, text = str("drm_wiz_wsl_ready"))
+        wsl.awaitingReboot -> {
+            ResultCard(ok = true, text = str("drm_wiz_wsl_enabled"))
             Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    listOf("drm_wiz_wsl_step1", "drm_wiz_wsl_step2", "drm_wiz_wsl_step3").forEachIndexed { i, key ->
+                    listOf("drm_wiz_reboot_step1", "drm_wiz_reboot_step2", "drm_wiz_reboot_step3").forEachIndexed { i, key ->
                         NumberedLine(i + 1, str(key))
                     }
                 }
             }
-            if (wsl.installerOpened) {
-                WaitingCard(str("drm_wiz_wsl_waiting"))
+            Button(shapes = ButtonDefaults.shapes(), onClick = { restartWindows() }) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(str("drm_wiz_reboot_now"))
             }
-            if (wsl.installerFailed) {
+        }
+        else -> {
+            // FEATURE_OFF or NO_WSL: one click enables the Windows component through its own UAC prompt.
+            ResultCard(ok = false, text = str("drm_wiz_wsl_needs_enable"))
+            ExplainRow(Icons.Rounded.Memory, str("drm_wiz_how_nobrowser_title"), str("drm_wiz_enable_light"))
+            if (wsl.enableRefused) {
                 Text(
-                    str("drm_wiz_wsl_install_failed", WslSidecarSetup.INSTALL_COMMAND),
+                    str("drm_wiz_enable_refused"),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    shapes = ButtonDefaults.shapes(),
-                    onClick = {
-                        val opened = WslSidecarSetup.openInstaller(state)
-                        wsl.installerFailed = !opened
-                        wsl.installerOpened = opened
-                    },
-                ) {
-                    Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(str(if (state == WslSidecarSetup.State.NO_WSL) "drm_wiz_wsl_install" else "drm_wiz_wsl_install_ubuntu"))
-                }
-                OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = recheck, enabled = !wsl.checking) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(str("drm_wiz_wsl_recheck"))
-                }
-                TextButton(
-                    shapes = ButtonDefaults.shapes(),
-                    onClick = { clipboard.setText(AnnotatedString(WslSidecarSetup.INSTALL_COMMAND)) },
-                ) {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(str("drm_wiz_wsl_copy"))
+            if (wsl.enabling) {
+                WaitingCard(str("drm_wiz_enabling"))
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(shapes = ButtonDefaults.shapes(), onClick = { enable(wsl.version) }) {
+                        Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("drm_wiz_enable"))
+                    }
+                    // The other WSL version, offered when the chosen one was declined or is unavailable.
+                    val other = if (wsl.version == 1) 2 else 1
+                    if (wsl.enableRefused) {
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { enable(other) }) {
+                            Text(str(if (other == 2) "drm_wiz_enable_wsl2" else "drm_wiz_enable_wsl1"))
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+/** Asks Windows to restart so a just-enabled feature takes effect; KittyTune resumes on next launch. */
+private fun restartWindows() {
+    runCatching {
+        ProcessBuilder("shutdown.exe", "/r", "/t", "0").start()
     }
 }
 
@@ -755,7 +847,7 @@ internal fun WslSetupStep(wsl: WslWizardState) {
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val start: () -> Unit = start@{
-        val distro = wsl.detection?.distro ?: return@start
+        if (wsl.running) return@start
         scope.launch {
             wsl.running = true
             wsl.succeeded = false
@@ -766,7 +858,7 @@ internal fun WslSetupStep(wsl: WslWizardState) {
             var current: WslSidecarSetup.Step? = null
             try {
                 WslSidecarSetup.provision(
-                    distro = distro,
+                    version = wsl.version,
                     onStep = { next ->
                         current?.let { wsl.states[it.ordinal] = StepState.DONE }
                         current = next
@@ -794,6 +886,15 @@ internal fun WslSetupStep(wsl: WslWizardState) {
             } finally {
                 wsl.running = false
             }
+        }
+    }
+
+    // Resuming after the reboot the feature needed: the setup picks up by itself, no button to find.
+    LaunchedEffect(Unit) {
+        val pending = WslSidecarSetup.pendingVersion()
+        if (pending != null && !wsl.running && !wsl.succeeded && wsl.failure == null) {
+            wsl.version = pending
+            start()
         }
     }
 
@@ -910,10 +1011,9 @@ internal fun DoneStep(windows: Boolean, choice: ProtectedBackend) {
 
 private fun stepLabel(step: WslSidecarSetup.Step): String = str(
     when (step) {
-        WslSidecarSetup.Step.TOOLS -> "drm_wiz_step_tools"
-        WslSidecarSetup.Step.SOURCES -> "drm_wiz_step_sources"
+        WslSidecarSetup.Step.DOWNLOAD -> "drm_wiz_step_download"
+        WslSidecarSetup.Step.IMPORT -> "drm_wiz_step_import"
         WslSidecarSetup.Step.CDM -> "drm_wiz_step_cdm"
-        WslSidecarSetup.Step.BUILD -> "drm_wiz_step_build"
         WslSidecarSetup.Step.PROBE -> "drm_wiz_step_probe"
         WslSidecarSetup.Step.CONNECT -> "drm_wiz_step_connect"
     }

@@ -103,6 +103,13 @@ fun DrmSettingsSection() {
     var wizard by remember {
         mutableStateOf(if (prefs.getDrmOnboardingDone()) null else DrmWizardStart.INTRO)
     }
+    // Coming back after the reboot the WSL feature needed: reopen the assistant straight at the setup
+    // step, which resumes by itself. Only when the feature is actually on now (the restart happened).
+    LaunchedEffect(Unit) {
+        if (WslSidecarSetup.pendingVersion() != null && WslSidecarSetup.pendingReady()) {
+            wizard = DrmWizardStart.WSL
+        }
+    }
     // Bumped when the assistant closes: it may have changed the method or turned protected tracks
     // off, and the page's rows keep their own state.
     var generation by remember { mutableIntStateOf(0) }
@@ -333,7 +340,7 @@ internal fun WslStatus(detection: WslSidecarSetup.Detection?, connected: Boolean
     val error = MaterialTheme.colorScheme.error
     when {
         connected -> DrmStatusLine(
-            str("pref_drm_wsl_connected", detection?.distro ?: "WSL"),
+            str("pref_drm_wsl_connected", WslSidecarSetup.DISTRO),
             Icons.Rounded.CheckCircle,
             MaterialTheme.colorScheme.primary,
         )
@@ -341,7 +348,7 @@ internal fun WslStatus(detection: WslSidecarSetup.Detection?, connected: Boolean
         else -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val key = when (detection.state) {
                 WslSidecarSetup.State.NO_WSL -> "drm_wiz_wsl_missing"
-                WslSidecarSetup.State.NO_DISTRO -> "drm_wiz_wsl_no_distro"
+                WslSidecarSetup.State.FEATURE_OFF -> "drm_wiz_wsl_needs_enable"
                 WslSidecarSetup.State.NOT_SET_UP -> "pref_drm_wsl_not_set_up"
                 WslSidecarSetup.State.SET_UP -> "pref_drm_wsl_not_answering"
             }
