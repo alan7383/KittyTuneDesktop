@@ -1,0 +1,534 @@
+// Minimal ELF64 loader for libwidevinecdm.so on Windows (x86_64).
+//
+// Phase A: map the image, apply R_X86_64_RELATIVE, point every external symbol at a
+// "DIE" stub that logs its name and exits. No real shim yet — the goal is to see how
+// far the CDM gets before it reaches outside glibc.
+//
+// Build:
+//   g++ -O2 -std=c++17 -mfsgsbase elf_loader.c -o elf_loader.exe
+//
+// Usage:
+//   elf_loader.exe <path to libwidevinecdm.so>
+
+#include <windows.h>
+#include <immintrin.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h>
+
+// ---- ELF64 structures (just the fields we touch) -------------------------------------------
+
+typedef struct { uint8_t e_ident[16]; uint16_t e_type, e_machine; uint32_t e_version;
+    uint64_t e_entry, e_phoff, e_shoff; uint32_t e_flags;
+    uint16_t e_ehsize, e_phentsize, e_phnum, e_shentsize, e_shnum, e_shstrndx; } Elf64_Ehdr;
+typedef struct { uint32_t p_type, p_flags; uint64_t p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_align; } Elf64_Phdr;
+typedef struct { int64_t d_tag; uint64_t d_val; } Elf64_Dyn;
+typedef struct { uint64_t r_offset, r_info; int64_t r_addend; } Elf64_Rela;
+typedef struct { uint32_t st_name; uint8_t st_info, st_other; uint16_t st_shndx; uint64_t st_value, st_size; } Elf64_Sym;
+
+#define PT_LOAD    1
+#define PT_DYNAMIC 2
+#define PT_TLS     7
+#define DT_NULL         0
+#define DT_NEEDED       1
+#define DT_PLTRELSZ     2
+#define DT_HASH         4
+#define DT_STRTAB       5
+#define DT_SYMTAB       6
+#define DT_RELA         7
+#define DT_RELASZ       8
+#define DT_RELAENT      9
+#define DT_STRSZ        10
+#define DT_INIT         12
+#define DT_JMPREL       23
+#define DT_INIT_ARRAY   25
+#define DT_INIT_ARRAYSZ 27
+
+#define R_X86_64_NONE      0
+#define R_X86_64_64        1
+#define R_X86_64_GLOB_DAT  6
+#define R_X86_64_JUMP_SLOT 7
+#define R_X86_64_RELATIVE  8
+#define R_X86_64_DTPMOD64  16
+#define R_X86_64_DTPOFF64  17
+#define R_X86_64_TPOFF64   18
+
+#define ELF64_R_SYM(info)  ((info) >> 32)
+#define ELF64_R_TYPE(info) ((info) & 0xffffffff)
+
+// ---- Die stub: trampoline that logs the symbol name then exits ----------------------------
+
+static const char* g_die_names[2048];
+static int g_die_count = 0;
+
+// Trampoline. Receives its slot index in a GP register to avoid runtime linking.
+// We generate one tiny stub per symbol: `mov ecx, <idx>; jmp die_handler`.
+__declspec(noinline) static void die_handler(uint32_t idx) {
+    const char* name = (idx < (uint32_t)g_die_count) ? g_die_names[idx] : "(?)";
+    fprintf(stderr, "[loader] CDM reached undefined symbol: %s (slot %u)\n", name, idx);
+    fflush(stderr);
+    ExitProcess(idx + 100);
+}
+
+// Build a block of stubs: each is 11 bytes:
+//   B9 XX XX XX XX       mov ecx, idx
+//   48 B8 XX XX XX XX XX XX XX XX   mov rax, die_handler
+//   FF E0                jmp rax
+// = 5 + 10 + 2 = 17 bytes. Rounded up to 24 for alignment.
+#define STUB_SIZE 24
+
+static uint8_t* alloc_stub_pool(int capacity) {
+    SIZE_T size = (SIZE_T)capacity * STUB_SIZE;
+    uint8_t* mem = (uint8_t*)VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (!mem) { fprintf(stderr, "stub pool alloc failed: %lu\n", GetLastError()); exit(1); }
+    return mem;
+}
+
+// A "silent zero" stub: `xor eax, eax; ret` — returns 0 for int/pointer ABI. Safer than
+// a DIE stub: the CDM can read the slot and treat it as a function that is simply a no-op.
+static uint64_t make_stub(uint8_t* pool, int idx, const char* name) {
+    uint8_t* s = pool + idx * STUB_SIZE;
+    // Log the resolution for inspection, but keep code as "return 0".
+    s[0] = 0x31; s[1] = 0xC0;             // xor eax, eax
+    s[2] = 0xC3;                          // ret
+    for (int i = 3; i < STUB_SIZE; i++) s[i] = 0xCC; // int3 pad
+    if (idx < (int)(sizeof(g_die_names)/sizeof(g_die_names[0])))
+        g_die_names[idx] = name ? strdup(name) : "(anon)";
+    if (idx >= g_die_count) g_die_count = idx + 1;
+    return (uint64_t)s;
+}
+
+static void dump_zero_resolved(void) {
+    if (g_die_count == 0) return;
+    fprintf(stderr, "[loader] %d symbols resolved to \"xor eax, eax; ret\":\n", g_die_count);
+    for (int i = 0; i < g_die_count; i++) fprintf(stderr, "    %s\n", g_die_names[i] ? g_die_names[i] : "?");
+}
+
+// ---- Shim bridge ---------------------------------------------------------------------------
+
+extern "C" void* shim_lookup(const char* name);
+extern "C" int   shim_count(void);
+extern "C" void  register_thread_bootstrap(void (*f)(void));
+
+// ---- Loader --------------------------------------------------------------------------------
+
+static uint8_t* read_file(const char* path, size_t* out_size) {
+    FILE* f = fopen(path, "rb");
+    if (!f) { fprintf(stderr, "open %s: %s\n", path, strerror(errno)); return NULL; }
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) { fclose(f); return NULL; }
+    if ((long)fread(buf, 1, sz, f) != sz) { fclose(f); free(buf); return NULL; }
+    fclose(f);
+    *out_size = (size_t)sz;
+    return buf;
+}
+
+static DWORD prot_from_flags(uint32_t pf) {
+    int r = pf & 4, w = pf & 2, x = pf & 1;
+    if (x && w) return PAGE_EXECUTE_READWRITE;
+    if (x)      return PAGE_EXECUTE_READ;
+    if (w)      return PAGE_READWRITE;
+    return PAGE_READONLY;
+}
+
+typedef struct {
+    uint8_t*  base;       // chosen load address
+    size_t    image_size; // rounded-up memsz span
+    // Resolved by parse_dynamic
+    const char* strtab;
+    uint64_t    strsz;
+    Elf64_Sym*  symtab;
+    uint64_t    symcount;
+    Elf64_Rela* rela;    uint64_t relasz;
+    Elf64_Rela* jmprel;  uint64_t pltrelsz;
+    uint64_t    init;
+    uint64_t    init_array;
+    uint64_t    init_arraysz;
+    uint8_t*    stub_pool;
+    uint64_t    tls_vaddr;
+    uint64_t    tls_filesz;
+    uint64_t    tls_memsz;
+    uint64_t    tls_align;
+} Image;
+
+static uint64_t vaddr_in_file(const uint8_t* file, const Elf64_Phdr* phdrs, int phnum, uint64_t va) {
+    for (int i = 0; i < phnum; i++) {
+        if (phdrs[i].p_type != PT_LOAD) continue;
+        if (va >= phdrs[i].p_vaddr && va < phdrs[i].p_vaddr + phdrs[i].p_memsz)
+            return phdrs[i].p_offset + (va - phdrs[i].p_vaddr);
+    }
+    return UINT64_MAX;
+}
+
+static int load_image(const char* path, Image* img) {
+    size_t file_size = 0;
+    uint8_t* file = read_file(path, &file_size);
+    if (!file) return 1;
+    Elf64_Ehdr* eh = (Elf64_Ehdr*)file;
+    if (memcmp(eh->e_ident, "\x7f""ELF", 4) != 0 || eh->e_ident[4] != 2 || eh->e_machine != 0x3e) {
+        fprintf(stderr, "not x86_64 ELF64\n"); return 1;
+    }
+
+    Elf64_Phdr* phdrs = (Elf64_Phdr*)(file + eh->e_phoff);
+    uint64_t span = 0;
+    for (int i = 0; i < eh->e_phnum; i++) {
+        if (phdrs[i].p_type != PT_LOAD) continue;
+        uint64_t end = phdrs[i].p_vaddr + phdrs[i].p_memsz;
+        if (end > span) span = end;
+    }
+    // Round up to 4K
+    span = (span + 0xFFF) & ~((uint64_t)0xFFF);
+    printf("image span: %.1f MiB\n", (double)span / (1024.0 * 1024.0));
+
+    // Reserve the image at any address; relative relocs will absorb the base.
+    uint8_t* base = (uint8_t*)VirtualAlloc(NULL, span, MEM_RESERVE, PAGE_NOACCESS);
+    if (!base) { fprintf(stderr, "reserve failed: %lu\n", GetLastError()); return 1; }
+    printf("image base: %p\n", base);
+
+    // Commit each PT_LOAD at its (base + vaddr) with RW first, copy, then set final prot.
+    for (int i = 0; i < eh->e_phnum; i++) {
+        if (phdrs[i].p_type != PT_LOAD) continue;
+        uint64_t va_start = (phdrs[i].p_vaddr) & ~((uint64_t)0xFFF);
+        uint64_t va_end   = (phdrs[i].p_vaddr + phdrs[i].p_memsz + 0xFFF) & ~((uint64_t)0xFFF);
+        void* commit = VirtualAlloc(base + va_start, va_end - va_start, MEM_COMMIT, PAGE_READWRITE);
+        if (!commit) { fprintf(stderr, "commit failed at off 0x%llx: %lu\n",
+                               (unsigned long long)va_start, GetLastError()); return 1; }
+        memcpy(base + phdrs[i].p_vaddr, file + phdrs[i].p_offset, phdrs[i].p_filesz);
+        // The rest (memsz - filesz) is BSS, already zeroed by VirtualAlloc.
+    }
+
+    img->base = base;
+    img->image_size = (size_t)span;
+
+    // Parse PT_DYNAMIC
+    Elf64_Dyn* dyn = NULL;
+    for (int i = 0; i < eh->e_phnum; i++) {
+        if (phdrs[i].p_type == PT_DYNAMIC) dyn = (Elf64_Dyn*)(file + phdrs[i].p_offset);
+        if (phdrs[i].p_type == PT_TLS) {
+            img->tls_vaddr = phdrs[i].p_vaddr;
+            img->tls_filesz = phdrs[i].p_filesz;
+            img->tls_memsz = phdrs[i].p_memsz;
+            img->tls_align = phdrs[i].p_align;
+        }
+    }
+    if (!dyn) { fprintf(stderr, "no PT_DYNAMIC\n"); return 1; }
+
+    uint64_t strtab_va = 0, symtab_va = 0, rela_va = 0, jmprel_va = 0, hash_va = 0;
+    for (Elf64_Dyn* d = dyn; d->d_tag != DT_NULL; d++) {
+        switch (d->d_tag) {
+            case DT_STRTAB: strtab_va = d->d_val; break;
+            case DT_STRSZ:  img->strsz = d->d_val; break;
+            case DT_SYMTAB: symtab_va = d->d_val; break;
+            case DT_RELA:   rela_va = d->d_val; break;
+            case DT_RELASZ: img->relasz = d->d_val; break;
+            case DT_JMPREL: jmprel_va = d->d_val; break;
+            case DT_PLTRELSZ: img->pltrelsz = d->d_val; break;
+            case DT_INIT:   img->init = d->d_val; break;
+            case DT_INIT_ARRAY: img->init_array = d->d_val; break;
+            case DT_INIT_ARRAYSZ: img->init_arraysz = d->d_val; break;
+            case DT_HASH:   hash_va = d->d_val; break;
+        }
+    }
+    img->strtab = (const char*)(base + strtab_va);
+    img->symtab = (Elf64_Sym*)(base + symtab_va);
+    img->rela   = (Elf64_Rela*)(base + rela_va);
+    img->jmprel = (Elf64_Rela*)(base + jmprel_va);
+    if (hash_va) {
+        uint32_t* h = (uint32_t*)(base + hash_va);
+        img->symcount = h[1]; // nchain
+    }
+
+    free(file);
+    return 0;
+}
+
+static void apply_relative_relocs(Image* img) {
+    uint64_t n = img->relasz / sizeof(Elf64_Rela);
+    uint64_t done = 0;
+    for (uint64_t i = 0; i < n; i++) {
+        uint32_t t = (uint32_t)ELF64_R_TYPE(img->rela[i].r_info);
+        if (t == R_X86_64_RELATIVE) {
+            uint64_t* slot = (uint64_t*)(img->base + img->rela[i].r_offset);
+            *slot = (uint64_t)img->base + (uint64_t)img->rela[i].r_addend;
+            done++;
+        }
+    }
+    printf("applied R_X86_64_RELATIVE: %llu\n", (unsigned long long)done);
+}
+
+// Point every undefined symbol in RELA (GLOB_DAT) and JMPREL (JUMP_SLOT) at a DIE stub.
+static void apply_symbol_relocs(Image* img) {
+    uint64_t n_rela = img->relasz / sizeof(Elf64_Rela);
+    uint64_t n_jmp  = img->pltrelsz / sizeof(Elf64_Rela);
+    img->stub_pool = alloc_stub_pool((int)(n_rela + n_jmp + 64));
+    int next_slot = 0;
+    uint64_t glob_dat_done = 0, jump_slot_done = 0, tls_done = 0, r64_done = 0, dtpmod_done = 0;
+
+    for (uint64_t i = 0; i < n_rela; i++) {
+        uint32_t t  = (uint32_t)ELF64_R_TYPE(img->rela[i].r_info);
+        uint64_t si = ELF64_R_SYM(img->rela[i].r_info);
+        uint64_t* slot = (uint64_t*)(img->base + img->rela[i].r_offset);
+        if (t == R_X86_64_GLOB_DAT) {
+            const char* name = img->strtab + img->symtab[si].st_name;
+            void* fn = shim_lookup(name);
+            // GLOB_DAT holds data: if unknown, 0 is safer than a code stub pointer
+            // (the CDM reads *slot as a value and may pass it to another function).
+            *slot = fn ? (uint64_t)fn : 0;
+            if (!fn) { fprintf(stderr, "[reloc] GLOB_DAT unresolved: %s → 0\n", name); }
+            glob_dat_done++;
+        } else if (t == R_X86_64_64) {
+            const char* name = img->strtab + img->symtab[si].st_name;
+            void* fn = shim_lookup(name);
+            *slot = (fn ? (uint64_t)fn : 0) + (uint64_t)img->rela[i].r_addend;
+            if (!fn) { fprintf(stderr, "[reloc] R_64 unresolved: %s → 0\n", name); }
+            r64_done++;
+        } else if (t == R_X86_64_DTPMOD64) {
+            // We are module 1 (TLS). Empty for now; the CDM only uses it through __tls_get_addr.
+            *slot = 1;
+            dtpmod_done++;
+        } else if (t == R_X86_64_TPOFF64) {
+            // Offset into the thread's TLS block.
+            *slot = img->symtab[si].st_value + (uint64_t)img->rela[i].r_addend;
+            tls_done++;
+        }
+    }
+    for (uint64_t i = 0; i < n_jmp; i++) {
+        uint32_t t = (uint32_t)ELF64_R_TYPE(img->jmprel[i].r_info);
+        uint64_t si = ELF64_R_SYM(img->jmprel[i].r_info);
+        uint64_t* slot = (uint64_t*)(img->base + img->jmprel[i].r_offset);
+        if (t == R_X86_64_JUMP_SLOT) {
+            const char* name = img->strtab + img->symtab[si].st_name;
+            void* fn = shim_lookup(name);
+            if (fn) {
+                *slot = (uint64_t)fn;
+            } else {
+                *slot = make_stub(img->stub_pool, next_slot++, name);
+                fprintf(stderr, "[reloc] JUMP_SLOT unresolved: %s → xor eax,eax;ret\n", name);
+            }
+            jump_slot_done++;
+        }
+    }
+    printf("applied GLOB_DAT=%llu JUMP_SLOT=%llu R_64=%llu TPOFF64=%llu DTPMOD64=%llu\n",
+           (unsigned long long)glob_dat_done, (unsigned long long)jump_slot_done,
+           (unsigned long long)r64_done, (unsigned long long)tls_done,
+           (unsigned long long)dtpmod_done);
+    printf("stubs installed: %d\n", next_slot);
+}
+
+// Set final segment protections after relocs.
+static void finalize_segments(Image* img, const char* path) {
+    size_t file_size = 0;
+    uint8_t* file = read_file(path, &file_size);
+    Elf64_Ehdr* eh = (Elf64_Ehdr*)file;
+    Elf64_Phdr* phdrs = (Elf64_Phdr*)(file + eh->e_phoff);
+    for (int i = 0; i < eh->e_phnum; i++) {
+        if (phdrs[i].p_type != PT_LOAD) continue;
+        uint64_t va_start = phdrs[i].p_vaddr & ~((uint64_t)0xFFF);
+        uint64_t va_end   = (phdrs[i].p_vaddr + phdrs[i].p_memsz + 0xFFF) & ~((uint64_t)0xFFF);
+        DWORD newProt = prot_from_flags(phdrs[i].p_flags);
+        DWORD oldProt;
+        if (!VirtualProtect(img->base + va_start, va_end - va_start, newProt, &oldProt)) {
+            fprintf(stderr, "VirtualProtect at 0x%llx failed: %lu\n",
+                    (unsigned long long)va_start, GetLastError());
+        }
+    }
+    free(file);
+}
+
+// Look up a symbol by name (linear scan — we do this once for the InitializeCdmModule_4 entry).
+static uint64_t find_symbol(Image* img, const char* name) {
+    for (uint64_t i = 1; i < img->symcount; i++) {
+        const char* n = img->strtab + img->symtab[i].st_name;
+        if (n && strcmp(n, name) == 0 && img->symtab[i].st_shndx != 0) {
+            return (uint64_t)img->base + img->symtab[i].st_value;
+        }
+    }
+    return 0;
+}
+
+// ---- TLS + VEH -----------------------------------------------------------------------------
+//
+// Linux TLS layout for the initial-exec model (what .so's use):
+//   [tls_data | tcbhead_t]   fs base points at tcbhead_t
+//   ^                 ^
+//   tp - tls_memsz    tp
+// The module's TLS variables are accessed via fs:[-tpoffset] where tpoffset = st_value from
+// the symbol table (positive). glibc's tcbhead_t has the stack canary at offset 0x28.
+
+// 4 KiB per-thread arena holds both tls data and tcbhead_t. 1024 bytes for tls is enough for
+// 0xC0-byte module TLS, 0x400 for tcbhead_t.
+static __thread uint8_t g_tls_arena[0x1000] __attribute__((aligned(64)));
+// |-------- TLS data (CDM's variables) --------|-- tcbhead_t (fs base points here) --|
+// at offsets:  [0 .. tp_offset)                  [tp_offset .. end)
+static const uint64_t TLS_TP_OFFSET = 0x800; // half-way split
+
+extern "C" uint8_t* loader_tls_for_current_thread(void) { return g_tls_arena + TLS_TP_OFFSET; }
+extern "C" uint64_t loader_tls_memsz(void);
+
+// Populated once by main() from the parsed image.
+static uint8_t* g_tls_init_image = NULL;
+static uint64_t g_tls_init_filesz = 0;
+static uint64_t g_tls_init_memsz  = 0;
+
+extern "C" uint64_t loader_tls_memsz(void) { return g_tls_init_memsz; }
+
+static void install_tls_bootstrap(void);
+
+static void install_tls_for_current_thread(void) {
+    memset(g_tls_arena, 0, sizeof(g_tls_arena));
+    // Copy the .so's initial TLS image into the slot [tp - memsz .. tp - memsz + filesz).
+    if (g_tls_init_image && g_tls_init_memsz <= TLS_TP_OFFSET) {
+        uint64_t data_start = TLS_TP_OFFSET - g_tls_init_memsz;
+        memcpy(g_tls_arena + data_start, g_tls_init_image,
+               g_tls_init_filesz < g_tls_init_memsz ? g_tls_init_filesz : g_tls_init_memsz);
+    }
+    // tcbhead_t at tp; glibc layout: [0x00] self-ptr, [0x08] dtv, [0x28] stack canary.
+    uint8_t* tp = g_tls_arena + TLS_TP_OFFSET;
+    *(uint64_t*)(tp + 0x00) = (uint64_t)tp;      // tcb.self
+    *(uint64_t*)(tp + 0x10) = (uint64_t)tp;      // tcb.self (alias slot)
+    uint64_t canary;
+    HCRYPTPROV hp;
+    if (CryptAcquireContextA(&hp, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+        CryptGenRandom(hp, sizeof(canary), (BYTE*)&canary);
+        CryptReleaseContext(hp, 0);
+    } else canary = 0xDEADBEEFC0FFEE42ULL;
+    *(uint64_t*)(tp + 0x28) = canary;
+    _writefsbase_u64((uint64_t)tp);
+}
+
+// fs: AV detector. Matches `64 48 8B` (mov r64, fs:[imm]) and `64 48 33` (xor r64, fs:[imm]).
+static int looks_like_fs_access(const uint8_t* rip) {
+    return rip[0] == 0x64 && rip[1] == 0x48 && (rip[2] == 0x8B || rip[2] == 0x33);
+}
+
+static volatile LONG64 g_veh_fires = 0, g_veh_restores = 0, g_veh_passthru = 0;
+
+static LONG CALLBACK fs_veh(PEXCEPTION_POINTERS ep) {
+    InterlockedIncrement64(&g_veh_fires);
+    if (ep->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION) {
+        InterlockedIncrement64(&g_veh_passthru);
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    uint64_t fa = (uint64_t)ep->ExceptionRecord->ExceptionInformation[1];
+    const uint8_t* rip = (const uint8_t*)ep->ContextRecord->Rip;
+    if (fa > 0x4000 || !looks_like_fs_access(rip)) {
+        InterlockedIncrement64(&g_veh_passthru);
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    _writefsbase_u64((uint64_t)(g_tls_arena + TLS_TP_OFFSET));
+    InterlockedIncrement64(&g_veh_restores);
+    return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+// Catch-all that logs any other AV with the symbolized PC-ish info before the process dies.
+static LONG CALLBACK diag_veh(PEXCEPTION_POINTERS ep) {
+    uint64_t code = ep->ExceptionRecord->ExceptionCode;
+    uint64_t rip  = ep->ContextRecord->Rip;
+    uint64_t fa   = ep->ExceptionRecord->NumberParameters >= 2
+                    ? (uint64_t)ep->ExceptionRecord->ExceptionInformation[1] : 0;
+    const uint8_t* ripb = (const uint8_t*)rip;
+    fprintf(stderr, "[diag] exception code=0x%llx rip=0x%llx fault_addr=0x%llx\n",
+            (unsigned long long)code, (unsigned long long)rip, (unsigned long long)fa);
+    if (rip && !IsBadReadPtr((void*)rip, 16)) {
+        fprintf(stderr, "[diag] rip bytes:");
+        for (int i = 0; i < 16; i++) fprintf(stderr, " %02x", ripb[i]);
+        fprintf(stderr, "\n");
+    }
+    // Register dump
+    CONTEXT* c = ep->ContextRecord;
+    fprintf(stderr, "[diag] rax=%016llx rcx=%016llx rdx=%016llx rbx=%016llx\n"
+                    "       rsp=%016llx rbp=%016llx rsi=%016llx rdi=%016llx\n"
+                    "       r8 =%016llx r9 =%016llx r10=%016llx r11=%016llx\n",
+            (unsigned long long)c->Rax, (unsigned long long)c->Rcx, (unsigned long long)c->Rdx, (unsigned long long)c->Rbx,
+            (unsigned long long)c->Rsp, (unsigned long long)c->Rbp, (unsigned long long)c->Rsi, (unsigned long long)c->Rdi,
+            (unsigned long long)c->R8,  (unsigned long long)c->R9,  (unsigned long long)c->R10, (unsigned long long)c->R11);
+    // Stack backtrace (up to 16 frames)
+    void* trace[16];
+    USHORT n = CaptureStackBackTrace(0, 16, trace, NULL);
+    fprintf(stderr, "[diag] backtrace (%u frames):\n", n);
+    for (int i = 0; i < n; i++) fprintf(stderr, "    %p\n", trace[i]);
+    fprintf(stderr, "[diag] VEH fires=%lld restores=%lld passthru=%lld\n",
+            (long long)g_veh_fires, (long long)g_veh_restores, (long long)g_veh_passthru);
+    fflush(stderr);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void install_tls_bootstrap(void) { install_tls_for_current_thread(); }
+
+static void call_init_array(Image* img) {
+    if (!img->init_array || !img->init_arraysz) return;
+    uint64_t* arr = (uint64_t*)(img->base + img->init_array);
+    uint64_t n = img->init_arraysz / 8;
+    fprintf(stderr, "calling init_array (%llu entries)...\n", (unsigned long long)n);
+    const char* skip_env = getenv("KT_SKIP_INIT");
+    uint64_t skip_mask = skip_env ? strtoull(skip_env, NULL, 16) : 0;
+    for (uint64_t i = 0; i < n; i++) {
+        uint64_t fn = arr[i];
+        if (!fn) continue;
+        if (skip_mask & (1ULL << i)) {
+            fprintf(stderr, "  init_array[%llu]: SKIPPED\n", (unsigned long long)i);
+            continue;
+        }
+        fprintf(stderr, "  init_array[%llu]: %p\n", (unsigned long long)i, (void*)fn);
+        ((void(*)(void))fn)();
+        fprintf(stderr, "  init_array[%llu]: returned\n", (unsigned long long)i);
+    }
+}
+
+int main(int argc, char** argv) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+    if (argc < 2) { fprintf(stderr, "usage: %s <libwidevinecdm.so>\n", argv[0]); return 2; }
+
+    // VEH goes first (last-registered runs first; we want fs_veh to try before diag_veh falls through).
+    AddVectoredExceptionHandler(0, diag_veh);  // last resort: just reports
+    AddVectoredExceptionHandler(1, fs_veh);    // first chance: handles fs resets
+
+    // The TLS setup can only run once we know the image's PT_TLS layout. For main()'s canary
+    // we do a minimal setup first (zero TLS, canary at 0x28), then redo it after load_image.
+    install_tls_for_current_thread();
+    register_thread_bootstrap(install_tls_bootstrap);
+    printf("fs base (bootstrap) set, VEH installed, shim has %d entries\n", shim_count());
+
+    Image img = {0};
+    if (load_image(argv[1], &img)) return 1;
+
+    // Now that we know the image's TLS data, redo install for main().
+    g_tls_init_image = img.base + img.tls_vaddr;
+    g_tls_init_filesz = img.tls_filesz;
+    g_tls_init_memsz  = img.tls_memsz;
+    install_tls_for_current_thread();
+    printf("fs base reset with TLS image (filesz=%llu memsz=%llu)\n",
+           (unsigned long long)img.tls_filesz, (unsigned long long)img.tls_memsz);
+    printf("TLS: va=0x%llx filesz=0x%llx memsz=0x%llx align=%llu\n",
+           (unsigned long long)img.tls_vaddr, (unsigned long long)img.tls_filesz,
+           (unsigned long long)img.tls_memsz, (unsigned long long)img.tls_align);
+    printf("relasz=%llu pltrelsz=%llu symcount=%llu\n",
+           (unsigned long long)img.relasz, (unsigned long long)img.pltrelsz,
+           (unsigned long long)img.symcount);
+
+    apply_relative_relocs(&img);
+    apply_symbol_relocs(&img);
+    finalize_segments(&img, argv[1]);
+
+    uint64_t addr = find_symbol(&img, "InitializeCdmModule_4");
+    printf("InitializeCdmModule_4: %p\n", (void*)addr);
+    if (!addr) { fprintf(stderr, "no InitializeCdmModule_4 export\n"); return 1; }
+
+    call_init_array(&img);
+
+    printf("--- about to call InitializeCdmModule_4 ---\n");
+    // No shim yet — expect a DIE from the first glibc function it reaches.
+    typedef void (*init_fn)(void);
+    ((init_fn)addr)();
+
+    printf("InitializeCdmModule_4 returned (unexpected without shim)\n");
+    printf("final VEH stats: fires=%lld restores=%lld passthru=%lld\n",
+           (long long)g_veh_fires, (long long)g_veh_restores, (long long)g_veh_passthru);
+    return 0;
+}
