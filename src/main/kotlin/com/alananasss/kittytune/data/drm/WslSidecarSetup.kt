@@ -91,6 +91,27 @@ internal object WslSidecarSetup {
     private val wslExe: File
         get() = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32\\wsl.exe")
 
+    /** Where the WSL package (the engine WSL2 runs on, Store or MSI) installs itself. */
+    private val wslPackageFile: File
+        get() = File(System.getenv("ProgramFiles") ?: "C:\\Program Files", "WSL\\wsl.exe")
+
+    /**
+     * Whether WSL is really installed — its package, or WSL1's built-in component — found **without running
+     * `wsl.exe`**. `System32\wsl.exe` exists on every Windows, WSL or not: without WSL it is only Windows'
+     * installer stub, and running it for anything (even `--list`) opens a terminal offering to install WSL,
+     * where a single key press reinstalls it. So nothing of ours ever runs it unless this is true.
+     */
+    val wslInstalled: Boolean
+        get() = windows && wslExe.isFile && (wslPackageFile.isFile || serviceRegistered("LxssManager"))
+
+    /** A Windows service is registered (read from the registry; starts nothing). */
+    private fun serviceRegistered(name: String): Boolean = runCatching {
+        val process = ProcessBuilder("reg.exe", "query", "HKLM\\SYSTEM\\CurrentControlSet\\Services\\$name")
+            .redirectErrorStream(true).start()
+        process.inputStream.readAllBytes()
+        process.waitFor(10, TimeUnit.SECONDS) && process.exitValue() == 0
+    }.getOrDefault(false)
+
     private val localAppData: File?
         get() = System.getenv("LOCALAPPDATA")?.let { File(it) }
 
@@ -158,11 +179,13 @@ internal object WslSidecarSetup {
         val wsl1 = featureEnabled(FEATURE_WSL1)
         val wsl2 = featureEnabled(FEATURE_WSL2)
         val pkg = wslPackagePresent()
-        if (!wsl1 && !wsl2) {
-            return@withContext Detection(State.FEATURE_OFF, wsl1Available = false, wsl2Available = false, wslPackage = pkg)
+        // Without WSL installed, every question to wsl.exe would wake the installer stub: answer from what
+        // Windows itself says (the components) and stop here.
+        if ((!wsl1 && !wsl2) || !wslInstalled) {
+            return@withContext Detection(State.FEATURE_OFF, wsl1Available = wsl1, wsl2Available = wsl2, wslPackage = pkg)
         }
         val imported = parseAllDistros(
-            runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+            listOutput()
         ).any { it.equals(DISTRO, ignoreCase = true) }
         if (!imported) {
             return@withContext Detection(State.NOT_SET_UP, wsl1, wsl2, wslPackage = pkg)
@@ -177,21 +200,26 @@ internal object WslSidecarSetup {
         Detection(if (ready) State.SET_UP else State.NOT_SET_UP, wsl1, wsl2, version, wslPackage = pkg)
     }
 
-    /** The WSL package (the engine WSL2 runs on) answers `--version`; the bare inbox stub does not. */
-    private fun wslPackagePresent(): Boolean = runCatching {
-        val builder = ProcessBuilder(wslExe.absolutePath, "--version").redirectErrorStream(true)
-        builder.environment()["WSL_UTF8"] = "1"
-        val process = builder.start()
-        process.inputStream.bufferedReader().readText()
-        process.waitFor(15, TimeUnit.SECONDS) && process.exitValue() == 0
-    }.getOrDefault(false)
+    /**
+     * The WSL package (the engine WSL2 runs on) is installed. Looked up on disk: asking `wsl --version` would
+     * run the installer stub on a PC without WSL (see [wslInstalled]).
+     */
+    private fun wslPackagePresent(): Boolean = wslPackageFile.isFile
+
+    /**
+     * `wsl --list` output — empty unless wsl.exe really answered. A failed or refused call (WSL not installed,
+     * see [wslInstalled]) must never be parsed into distribution names.
+     */
+    private suspend fun listOutput(mode: String = "--quiet"): String =
+        runCatching { run(listOf("--list", mode), timeoutMs = 20_000) }.getOrNull()
+            ?.takeIf { it.exit == 0 }?.output.orEmpty()
 
     /** The WSL version our distribution is registered as, read from `wsl -l -v`. */
     private suspend fun importedVersion(): Int? = registeredVersions()[DISTRO.lowercase()]
 
     /** Every registered distribution (lower-cased name) with its WSL version, from `wsl -l -v`. */
     private suspend fun registeredVersions(): Map<String, Int> {
-        val out = runCatching { run(listOf("--list", "--verbose"), timeoutMs = 20_000) }.getOrNull()?.output
+        val out = listOutput("--verbose").takeIf { it.isNotEmpty() }
             ?: return emptyMap()
         return parseVerbose(out)
     }
@@ -264,14 +292,14 @@ internal object WslSidecarSetup {
     suspend fun planWindowsSide(): WindowsSide = withContext(Dispatchers.IO) {
         if (!windows || !wslExe.isFile) return@withContext WindowsSide(false, emptyList(), false, false, null)
         val registered = parseAllDistros(
-            runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+            listOutput()
         )
         planWindowsSide(
             registered = registered,
             versions = registeredVersions(),
             wsl1On = featureEnabled(FEATURE_WSL1),
             wsl2On = featureEnabled(FEATURE_WSL2),
-            storeWsl = runCatching { run(listOf("--version"), timeoutMs = 15_000) }.getOrNull()?.exit == 0,
+            storeWsl = wslInstalled,
             enabledByApp = PlayerPreferences().getWslFeaturesEnabledByApp(),
         )
     }
@@ -532,7 +560,7 @@ internal object WslSidecarSetup {
     }
 
     private suspend fun otherDistributions(): List<String> = parseDistros(
-        runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+        listOutput()
     ).filterNot { it.equals(DISTRO, ignoreCase = true) }
 
     /** KittyTune files found in a distribution other than ours, outside the official setup. */
@@ -760,7 +788,7 @@ internal object WslSidecarSetup {
                     // Re-checked here, not trusted from when the page opened: never remove WSL under a
                     // distribution registered meanwhile.
                     val others = parseAllDistros(
-                        runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+                        listOutput()
                     ).filterNot { it.equals(DISTRO, ignoreCase = true) }
                     if (others.isNotEmpty()) {
                         throw UninstallException(step, "WSL is kept: ${others.joinToString(", ")} still use it")
@@ -857,6 +885,8 @@ internal object WslSidecarSetup {
         timeoutMs: Long,
         onLine: ((String) -> Unit)? = null,
     ): Result = runInterruptible(Dispatchers.IO) {
+        // The one gate every wsl.exe call of ours goes through: never wake the installer stub.
+        if (!wslInstalled) return@runInterruptible Result(-1, "KT_ERROR: WSL is not installed\n")
         val builder = ProcessBuilder(listOf(wslExe.absolutePath) + args).redirectErrorStream(true)
         builder.environment()["WSL_UTF8"] = "1"
         val process = builder.start()
