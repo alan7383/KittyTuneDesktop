@@ -265,15 +265,40 @@ object AppIconInstaller {
             // variant-specific icon name: Explorer caches by path, and pointing a shortcut at
             // a path it has never seen is the one cache bust that always works.
             val icoFile = File(iconDir, "app_icon_$variantKey.ico")
-            icoFile.writeBytes(IconEncoders.ico(source))
+            val ico = IconEncoders.ico(source)
 
             val links = findWindowsShortcuts()
+            // This runs at every launch. When the icon and every shortcut are already as they were left, there
+            // is nothing to do — and redoing it is not free: restarting the Start menu makes it reload every
+            // recent item it shows, which wakes whatever those point at (a `\\wsl.localhost` file from a removed
+            // distribution starts Windows' "install WSL" prompt). A shortcut rewritten since (an update, a
+            // reinstall) no longer matches, so it is patched again.
+            val stampFile = File(iconDir, "windows_applied.txt")
+            val before = windowsStamp(variantKey, ico, links)
+            if (icoFile.isFile && runCatching { stampFile.readText() }.getOrNull() == before) return
+            icoFile.writeBytes(ico)
+
             if (links.isNotEmpty()) WindowsAppIdHelper.patchShortcuts(links, appId = WindowsAppIdHelper.APP_ID, icoPath = icoFile.canonicalPath)
 
             notifyWindowsShell()
+            // Patching rewrites the shortcuts: the stamp records them as they are now.
+            runCatching { stampFile.writeText(windowsStamp(variantKey, ico, links)) }
         } catch (e: Throwable) {
             println("[AppIconInstaller] Failed to update Windows shortcut icons: ${e.message}")
         }
+    }
+
+    /**
+     * What the last Windows icon pass left: the variant, its icon, and each shortcut's content. Content, not
+     * date: the AppUserModelID pass touches every shortcut's date at each launch without changing it.
+     */
+    internal fun windowsStamp(variantKey: String, ico: ByteArray, links: List<File>): String = buildString {
+        fun sha(bytes: ByteArray) =
+            java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        append(variantKey).append('|').append(sha(ico))
+        links.map { it.absolutePath.lowercase() to (runCatching { sha(it.readBytes()) }.getOrNull() ?: "") }
+            .sortedBy { it.first }
+            .forEach { (path, content) -> append('\n').append(path).append('|').append(content) }
     }
 
     /**
