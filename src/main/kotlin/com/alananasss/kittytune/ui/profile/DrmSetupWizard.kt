@@ -198,7 +198,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
         else -> true
     }
     // Leaving the setup while it runs would kill it halfway; going back is offered once it is over.
-    val canGoBack = index > 0 && !wsl.running
+    val canGoBack = index > 0 && !wsl.running && !native.running
 
     BackHandler(onBack = close)
     Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {

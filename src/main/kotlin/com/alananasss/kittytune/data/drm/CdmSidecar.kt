@@ -699,12 +699,24 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
                 answers.put(if (status == 0) body else String(body, Charsets.UTF_8))
             }
         } catch (_: EOFException) {
-            answers.put("the CDM sidecar closed the pipe")
+            answers.put(closedMessage())
         } catch (e: IOException) {
             answers.put("the CDM sidecar pipe failed: ${e.message}")
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
         }
+    }
+
+    /**
+     * Why the daemon stopped answering, as far as it said. The native host explains its failures on
+     * stderr — a CPU without sgsbase, a module it cannot load — and an ending that only says "the
+     * pipe closed" hides exactly the line a bug report needs.
+     */
+    private fun closedMessage(): String {
+        val tail = synchronized(errors) { errors.toString() }.trim()
+        if (tail.isEmpty()) return "the CDM sidecar closed the pipe"
+        val last = tail.lineSequence().filter { it.isNotBlank() }.toList().takeLast(3)
+        return "the CDM sidecar closed the pipe: " + last.joinToString(" | ")
     }
 
     private fun readFully(input: InputStream, target: ByteArray) {
