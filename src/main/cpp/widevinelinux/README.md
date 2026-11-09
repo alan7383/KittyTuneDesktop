@@ -88,27 +88,30 @@ dans un objet Itanium désigne la **première fonction virtuelle** ; l'offset-to
 
 ## Construire et essayer
 
+Le démon est construit et livré par le build normal de l'app :
+
 ```powershell
-# MinGW-w64 (g++ 16), depuis n'importe quel shell
+./gradlew.bat processResources      # construit ktcdm.exe dans build/generated/.../native/widevinelinux
+```
+
+`NativeCdmSetup` (côté Kotlin) l'extrait dans `%LOCALAPPDATA%\KittyTune\cdm` au moment de
+l'installation, avec le module téléchargé. Rien à configurer à la main : l'assistant des titres
+protégés fait tout, puis l'app parle au démon par le protocole sidecar.
+
+Pour travailler sur le chargeur seul, `scripts/build-native-cdm.ps1` construit aussi un harnais :
+
+```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build-native-cdm.ps1
-```
-
-Le script construit `build/widevinelinux/probe.exe` (harnais du chargeur) et
-`build/widevinelinux/ktcdm.exe` (le démon).
-
-```powershell
 build\widevinelinux\ktcdm.exe <chemin>\libwidevinecdm.so --probe   # -> ok, code 0
-```
-
-Puis, côté application, le démon se branche comme n'importe quel sidecar :
-
-```powershell
-$env:KITTYTUNE_CDM_SIDECAR = 'C:\...\build\widevinelinux\ktcdm.exe C:\...\libwidevinecdm.so'
 ```
 
 Variables utiles : `KITTYTUNE_WIDEVINE_DEBUG=1` (trace des rappels de l'hôte), `KT_LOG=1` (trace de
 chaque appel du shim), `KT_TRACE=0` (coupe la trace), `KT_NOLOG=1` (le CDM n'écrit plus ses journaux),
-`KT_SKIP_INIT=<masque hexa>` (saute des entrées de `init_array`).
+`KT_SKIP_INIT=<masque hexa>` (saute des entrées de `init_array`), `KT_NOMSG=1` (l'hôte ne copie pas
+la requête de licence).
+
+`KITTYTUNE_CDM_SIDECAR='<ktcdm.exe> <libwidevinecdm.so>'` reste disponible et a priorité sur le
+fichier de configuration, pour pointer un autre démon (une machine Linux en SSH, par exemple).
 
 ## Le piège qui a coûté le plus de temps
 

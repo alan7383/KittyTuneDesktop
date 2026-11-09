@@ -15,31 +15,26 @@ import java.util.concurrent.TimeUnit
  *
  * ## Why
  *
- * On Windows the licence server refuses every CDM that is not hosted by a browser it recognises, so
- * the native bridge gets a `403` (`docs/SOUNDCLOUD_DRM_WINDOWS.md`, section 3). PlayReady does play
- * protected tracks — but inside the protected media path, which never hands a sample back, so the
- * equalizer, the filters, the pitch shifter and the visualizer stay dead on exactly those tracks.
+ * On Windows the licence server refuses every CDM that is not hosted by a browser it recognises when
+ * that CDM is a Windows build (`docs/SOUNDCLOUD_DRM_WINDOWS.md`, section 3). Chrome's **Linux**
+ * module is accepted, so KittyTune runs that one — natively, in its own process ([NativeCdmSetup]),
+ * or inside a tiny Linux distribution as the fallback ([WslSidecarSetup]). Either way the app
+ * decodes the audio itself: FFmpeg decode, DSP chain, WASAPI output, because it receives plaintext
+ * samples.
  *
- * The same bridge, running on Linux, is licensed and decrypts in-process. This transport is the
- * plug: the CDM runs wherever it is allowed to, and the JVM side keeps its whole pipeline —
- * FFmpeg decode, DSP chain, WASAPI output — because it receives plaintext samples.
+ * ## Where it runs
  *
- * ## It is an option, never the default
- *
- * On Windows it only runs when the user picked WSL ([ProtectedBackend.WSL], usually through the
- * setup in Settings, see [WslSidecarSetup]) or set `KITTYTUNE_CDM_SIDECAR`. Even then, nothing is
- * registered unless it answers a real round trip. With no WSL, no
- * daemon, a daemon that cannot load the CDM, or a mangled pipe, [installIfConfigured] returns false
- * and the app keeps playing through PlayReady exactly as before.
+ * Nothing is registered unless the daemon answers a real round trip. Without a daemon that can load
+ * the module, protected tracks are simply not offered — there is no OS renderer left to fall back to.
  *
  * ## Configuration
  *
  * Two sources, first match wins — nothing is ever guessed:
  *
  *  1. `KITTYTUNE_CDM_SIDECAR` — a quoted command line, e.g.
- *     `wsl.exe -d kittytune-cdm -u root --exec /opt/kittytune/ktcdm /opt/kittytune/libwidevinecdm.so`
- *  2. `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` — `{"command": ["wsl.exe", "-d", ...]}`,
- *     written by the in-app setup ([WslSidecarSetup]) and deleted by its uninstall.
+ *     `C:\...\ktcdm.exe C:\...\libwidevinecdm.so`
+ *  2. `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` — `{"command": ["ktcdm.exe", "libwidevinecdm.so"]}`,
+ *     written by the in-app setup ([NativeCdmSetup] or [WslSidecarSetup]) and deleted by its uninstall.
  *
  * ## Protocol
  *
@@ -98,7 +93,7 @@ internal object CdmSidecar {
      * This runs whenever a SoundCloud track is resolved, protected or not. Probing here used to start
      * `wsl.exe`, and with it the whole WSL VM, at the first track of every session, and keep it for the
      * run. Now nothing starts until a protected track opens a session ([SidecarWidevineCdm]); a daemon
-     * that fails then reports through [markFailed], and the next tracks fall back to PlayReady.
+     * that fails then reports through [markFailed], and the next tracks do not try it again.
      * [verify] is the explicit, real round trip, for the settings page and the setup.
      *
      * Only the environment variable and the configuration file count here: guessing a WSL command
@@ -109,7 +104,6 @@ internal object CdmSidecar {
     fun installIfConfigured(): Boolean {
         synchronized(lock) {
             installed?.let { return true }
-            if (!chosenByUser()) return false
             val now = System.currentTimeMillis()
             if (attempted && now - lastAttemptAt < RETRY_AFTER_MS) return false
             val command = explicitCommand() ?: return false
@@ -140,7 +134,6 @@ internal object CdmSidecar {
      */
     fun verify(): Boolean {
         synchronized(lock) {
-            if (!chosenByUser()) return false
             val command = explicitCommand()
             if (command == null) {
                 failureReason = null
@@ -164,7 +157,7 @@ internal object CdmSidecar {
 
     /**
      * Called when the daemon could not start or died while a track needed it: the sidecar is dropped
-     * for the retry window, so the next tracks go to PlayReady instead of failing the same way.
+     * for the retry window, so the next tracks do not fail the same way.
      */
     internal fun markFailed(cdm: SidecarWidevineCdm, reason: String) {
         synchronized(lock) {
@@ -228,13 +221,6 @@ internal object CdmSidecar {
         }
     }
 
-    /** Windows runs the sidecar only when WSL was chosen; elsewhere a configuration is enough. */
-    private fun chosenByUser(): Boolean {
-        if (!System.getenv("KITTYTUNE_CDM_SIDECAR").isNullOrBlank()) return true
-        if (!System.getProperty("os.name").startsWith("Windows", true)) return true
-        return ProtectedBackend.current == ProtectedBackend.WSL
-    }
-
     /**
      * Starts the daemon and performs one round trip.
      *
@@ -253,6 +239,16 @@ internal object CdmSidecar {
         } finally {
             runCatching { transport.close() }
         }
+    }
+
+    /**
+     * Proves that a command line really answers, without registering it.
+     *
+     * The setup calls this before it tells the user the method works: a daemon that starts but cannot
+     * load the module must fail there, where the reason can be shown, not on the first track.
+     */
+    internal fun probeCommand(command: List<String>): String? {
+        synchronized(lock) { return probe(command) }
     }
 
     /**

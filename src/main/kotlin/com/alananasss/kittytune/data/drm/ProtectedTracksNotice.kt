@@ -1,6 +1,6 @@
 package com.alananasss.kittytune.data.drm
 
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
+
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +18,7 @@ object ProtectedTracksNotice {
         /** Protected tracks are off (Windows' default) and this one went to another source: offer them, once. */
         OFFER_ENABLE,
 
-        /** Protected tracks are on but nothing can play them here (no CDM found, PlayReady missing). */
+        /** Protected tracks are on but nothing can play them here (no CDM installed or answering). */
         UNAVAILABLE,
     }
 
@@ -33,13 +33,21 @@ object ProtectedTracksNotice {
     }
 
     /**
-     * A protected-only track was resolved with protected tracks off. Offered once, on Windows, and only to someone
-     * who never set the switch: turning it off in the settings is a choice, and a choice needs no notice.
+     * A protected-only track was resolved without a CDM that can play it. Offered once, on Windows,
+     * and only to someone who never set the switch — turning it off in the settings is a choice, and
+     * a choice needs no notice.
+     *
+     * One exception, and it is the common case after this version: someone who *had* protected tracks
+     * on now has none, because the module has to be installed once now instead of PlayReady playing
+     * them. Nothing would tell them otherwise: their choice is already stored, and the track would
+     * simply fall back for ever.
      */
     internal fun onProtectedTrackSkipped() {
-        if (!WindowsPlayReadyRuntime.windows) return
+        if (!NativeCdmSetup.windows) return
         val prefs = PlayerPreferences()
-        if (prefs.hasProtectedTracksChoice() || prefs.getProtectedTracksHintShown()) return
+        val moduleMissing = !NativeCdmSetup.isInstalled()
+        if (prefs.getProtectedTracksHintShown()) return
+        if (prefs.hasProtectedTracksChoice() && !moduleMissing) return
         prefs.setProtectedTracksHintShown(true)
         _current.value = Notice(Kind.OFFER_ENABLE)
     }

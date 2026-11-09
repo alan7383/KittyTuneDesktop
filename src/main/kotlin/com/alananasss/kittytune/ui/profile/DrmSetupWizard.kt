@@ -106,22 +106,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.drm.DrmSelfTest
+import com.alananasss.kittytune.data.drm.NativeCdmSetup
 import com.alananasss.kittytune.data.drm.ProtectedBackend
 import com.alananasss.kittytune.data.drm.WslSidecarSetup
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.rounded.Bolt
 
-/** Where the assistant opens: the whole introduction, or straight at the WSL setup. */
-enum class DrmWizardStart { INTRO, WSL }
+/** Where the assistant opens: the whole introduction, or straight at one method's setup. */
+enum class DrmWizardStart { INTRO, NATIVE, WSL }
 
-private enum class WizardStep { INTRO, HOW, CHOOSE, WSL_CHECK, WSL_SETUP, DONE }
+private enum class WizardStep { INTRO, HOW, CHOOSE, NATIVE_SETUP, WSL_CHECK, WSL_SETUP, DONE }
 
 internal enum class StepState { PENDING, RUNNING, DONE, FAILED }
 
@@ -129,11 +130,10 @@ internal enum class StepState { PENDING, RUNNING, DONE, FAILED }
  * The protected tracks assistant.
  *
  * It opens by itself the first time the page is visited, and from the page afterwards. It explains
- * what SoundCloud protects and how KittyTune plays it, lets a Windows user choose between PlayReady
- * and WSL (WSL1 by default, WSL2 under "advanced options"), and, for WSL, does the whole setup: it
- * turns the Windows component on through its own UAC prompt, resumes by itself after the restart, then
- * downloads and imports KittyTune's tiny Linux image and fetches the Widevine module, without a single
- * command typed.
+ * what SoundCloud protects and how KittyTune plays it, then sets the chosen method up:
+ * the **native** one needs nothing but a download (no administrator, no restart, no virtual machine),
+ * and the WSL one — kept for machines where the loader cannot run — does its own heavy setup in the
+ * same place.
  *
  * Steps slide like the onboarding of essentials; the hero of each step is a Material shape.
  *
@@ -144,18 +144,25 @@ internal enum class StepState { PENDING, RUNNING, DONE, FAILED }
 @Composable
 fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
     val prefs = remember { PlayerPreferences() }
-    val windows = WindowsPlayReadyRuntime.windows
+    val windows = NativeCdmSetup.windows
     var choice by remember {
-        mutableStateOf(if (start == DrmWizardStart.WSL) ProtectedBackend.WSL else ProtectedBackend.current)
+        mutableStateOf(
+            when (start) {
+                DrmWizardStart.WSL -> ProtectedBackend.WSL
+                DrmWizardStart.NATIVE -> ProtectedBackend.NATIVE
+                else -> ProtectedBackend.current
+            }
+        )
     }
     val steps = when {
         start == DrmWizardStart.WSL -> listOf(WizardStep.WSL_CHECK, WizardStep.WSL_SETUP, WizardStep.DONE)
+        start == DrmWizardStart.NATIVE -> listOf(WizardStep.NATIVE_SETUP, WizardStep.DONE)
         !windows -> listOf(WizardStep.INTRO, WizardStep.HOW, WizardStep.DONE)
         choice == ProtectedBackend.WSL -> listOf(
             WizardStep.INTRO, WizardStep.HOW, WizardStep.CHOOSE,
             WizardStep.WSL_CHECK, WizardStep.WSL_SETUP, WizardStep.DONE,
         )
-        else -> listOf(WizardStep.INTRO, WizardStep.HOW, WizardStep.CHOOSE, WizardStep.DONE)
+        else -> listOf(WizardStep.INTRO, WizardStep.HOW, WizardStep.CHOOSE, WizardStep.NATIVE_SETUP, WizardStep.DONE)
     }
     // Resuming after the reboot the feature needed. The check step comes first; it is skipped for the setup
     // step only once WSL is really ready for the pending version — jumping on "pending" alone started an
@@ -167,7 +174,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
     }
     val index = steps.indexOf(step).coerceAtLeast(0)
 
-    // The WSL part keeps its state here, so going back and forth does not restart the setup.
+    // Each method keeps its state here, so going back and forth does not restart the setup.
     val wsl = remember {
         WslWizardState().apply {
             if (resuming) {
@@ -176,6 +183,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
             }
         }
     }
+    val native = remember { NativeWizardState() }
 
     val close = {
         prefs.setDrmOnboardingDone(true)
@@ -186,6 +194,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
     val canGoOn = when (step) {
         WizardStep.WSL_CHECK -> !wsl.checking && wsl.detection?.featureOn(wsl.version) == true
         WizardStep.WSL_SETUP -> wsl.succeeded
+        WizardStep.NATIVE_SETUP -> native.succeeded
         else -> true
     }
     // Leaving the setup while it runs would kill it halfway; going back is offered once it is over.
@@ -238,6 +247,7 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
                                     close()
                                 },
                             )
+                            WizardStep.NATIVE_SETUP -> NativeSetupStep(native)
                             WizardStep.WSL_CHECK -> WslCheckStep(wsl, showVersionChoice = WizardStep.CHOOSE !in steps)
                             WizardStep.WSL_SETUP -> WslSetupStep(wsl)
                             WizardStep.DONE -> DoneStep(windows, choice)
@@ -273,10 +283,8 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
                                 // Windows, the switch is turned on here rather than left for the user to find.
                                 prefs.setProtectedTracksEnabled(true)
                                 StreamResolver.forgetStreams()
-                                if (choice == ProtectedBackend.PLAYREADY) {
-                                    // WSL is only selected once its setup succeeds, never half-done.
-                                    ProtectedBackend.select(ProtectedBackend.PLAYREADY)
-                                }
+                                // The backend is only switched once its setup succeeds, never half-done:
+                                // both installers do it themselves.
                             }
                             if (last) close() else step = steps[index + 1]
                         },
@@ -439,7 +447,7 @@ internal fun ColumnScope.ChooseStep(
             )
         }
     }
-    // Only WSL is the heavy, experimental one: PlayReady needs no warning.
+    // Only WSL is the heavy, experimental one: the native module needs no warning.
     AnimatedVisibility(
         visible = choice == ProtectedBackend.WSL,
         enter = expandVertically() + fadeIn(),
@@ -632,14 +640,14 @@ internal fun MethodInfoDialog(method: ProtectedBackend, onDismiss: () -> Unit) {
     EscapableAlertDialog(
         onDismissRequest = onDismiss,
         icon = { MethodBadge(method, size = 48) },
-        title = { Text(str(if (wsl) "drm_info_wsl_title" else "drm_info_playready_title"), textAlign = TextAlign.Center) },
+        title = { Text(str(if (wsl) "drm_info_wsl_title" else "drm_info_native_title"), textAlign = TextAlign.Center) },
         text = {
             Column(
                 modifier = Modifier.heightIn(max = 540.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                InfoSection(Icons.Rounded.Tune, str("drm_info_how"), str(if (wsl) "drm_info_wsl_how" else "drm_info_playready_how"))
-                InfoSection(Icons.Rounded.Search, str("drm_info_found"), str(if (wsl) "drm_info_wsl_found" else "drm_info_playready_found"))
+                InfoSection(Icons.Rounded.Tune, str("drm_info_how"), str(if (wsl) "drm_info_wsl_how" else "drm_info_native_how"))
+                InfoSection(Icons.Rounded.Search, str("drm_info_found"), str(if (wsl) "drm_info_wsl_found" else "drm_info_native_found"))
                 if (wsl) InfoSection(Icons.Rounded.Memory, str("drm_info_linux_title"), str("drm_info_wsl_linux"))
             }
         },
@@ -662,10 +670,10 @@ private fun InfoSection(icon: ImageVector, title: String, body: String) {
     }
 }
 
-/** The method's icon in its own shape: a shield for Windows' renderer, a terminal for Linux. */
+/** The method's icon in its own shape: a terminal for the native loader, a cookie for WSL. */
 @Composable
 internal fun MethodBadge(method: ProtectedBackend, size: Int = 44) {
-    val shape = if (method == ProtectedBackend.PLAYREADY) MaterialShapes.Cookie4Sided else MaterialShapes.Pill
+    val shape = if (method == ProtectedBackend.NATIVE) MaterialShapes.Cookie4Sided else MaterialShapes.Pill
     Box(
         Modifier.size(size.dp).background(MaterialTheme.colorScheme.tertiaryContainer, shape.toShape()),
         contentAlignment = Alignment.Center,
@@ -680,17 +688,17 @@ internal fun MethodBadge(method: ProtectedBackend, size: Int = 44) {
 }
 
 internal fun methodIcon(method: ProtectedBackend): ImageVector =
-    if (method == ProtectedBackend.PLAYREADY) Icons.Rounded.Shield else Icons.Rounded.Terminal
+    if (method == ProtectedBackend.NATIVE) Icons.Rounded.Terminal else Icons.Rounded.Memory
 
 internal fun methodName(method: ProtectedBackend): String =
-    str(if (method == ProtectedBackend.PLAYREADY) "drm_method_playready" else "drm_method_wsl")
+    str(if (method == ProtectedBackend.NATIVE) "drm_method_native" else "drm_method_wsl")
 
 internal fun methodTagline(method: ProtectedBackend): String =
-    str(if (method == ProtectedBackend.PLAYREADY) "drm_method_playready_tagline" else "drm_method_wsl_tagline")
+    str(if (method == ProtectedBackend.NATIVE) "drm_method_native_tagline" else "drm_method_wsl_tagline")
 
 /**
- * What a method can and cannot do. The same four abilities on both sides, so the two lists read as a
- * comparison: PlayReady's missing ones are WSL's gains.
+ * What a method can and cannot do. The same abilities on both sides, so the two lists read as a
+ * comparison: what WSL costs is the one thing the native module does not.
  */
 @Composable
 internal fun MethodPoints(method: ProtectedBackend) {
@@ -700,8 +708,11 @@ internal fun MethodPoints(method: ProtectedBackend) {
         "pref_drm_platforms_download",
         "pref_drm_platforms_start",
     )
-    val points = if (method == ProtectedBackend.PLAYREADY) {
-        listOf("drm_method_pro_ready" to true) + abilities.map { it to false }
+    val points = if (method == ProtectedBackend.NATIVE) {
+        abilities.map { it to true } + listOf(
+            "drm_method_pro_light" to true,
+            "drm_method_pro_noreboot" to true,
+        )
     } else {
         abilities.map { it to true } + listOf("drm_method_pro_light" to true, "drm_method_con_setup" to false)
     }
@@ -895,6 +906,131 @@ private fun restartWindows() {
     runCatching { ProcessBuilder("shutdown.exe", "/r", "/t", "10").start() }
 }
 
+/** The native install's state, kept above the sliding content like the WSL one. */
+internal class NativeWizardState {
+    var running by mutableStateOf(false)
+    var succeeded by mutableStateOf(false)
+    var failure by mutableStateOf<String?>(null)
+    var log by mutableStateOf("")
+    var showLog by mutableStateOf(false)
+    var started by mutableStateOf(false)
+    val states = MutableList(NativeCdmSetup.Step.entries.size) { StepState.PENDING }
+}
+
+private fun nativeStepLabel(step: NativeCdmSetup.Step): String = str(
+    when (step) {
+        NativeCdmSetup.Step.CHECK -> "drm_wiz_native_step_check"
+        NativeCdmSetup.Step.HOST -> "drm_wiz_native_step_host"
+        NativeCdmSetup.Step.DOWNLOAD -> "drm_wiz_native_step_download"
+        NativeCdmSetup.Step.EXTRACT -> "drm_wiz_native_step_extract"
+        NativeCdmSetup.Step.CONFIG -> "drm_wiz_native_step_config"
+        NativeCdmSetup.Step.PROBE -> "drm_wiz_native_step_probe"
+        NativeCdmSetup.Step.CONNECT -> "drm_wiz_native_step_connect"
+    }
+)
+
+/**
+ * The native install: a download, an extraction, a configuration file and a probe. It starts by
+ * itself, because there is nothing to decide and nothing to accept — no administrator, no restart.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun NativeSetupStep(state: NativeWizardState) {
+    val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    val start: () -> Unit = start@{
+        if (state.running) return@start
+        scope.launch {
+            state.running = true
+            state.succeeded = false
+            state.failure = null
+            state.log = ""
+            for (i in state.states.indices) state.states[i] = StepState.PENDING
+            val log = StringBuilder()
+            var current: NativeCdmSetup.Step? = null
+            try {
+                val ok = NativeCdmSetup.provision(
+                    onStep = { next ->
+                        current?.let { state.states[it.ordinal] = StepState.DONE }
+                        current = next
+                        state.states[next.ordinal] = StepState.RUNNING
+                    },
+                    onLine = { line ->
+                        synchronized(log) { log.append(line).append('\n') }
+                        state.log = synchronized(log) { log.toString() }
+                    },
+                )
+                if (ok) {
+                    current?.let { state.states[it.ordinal] = StepState.DONE }
+                    state.succeeded = true
+                    // Setting the module up is asking for protected tracks.
+                    PlayerPreferences().setProtectedTracksEnabled(true)
+                } else {
+                    current?.let { state.states[it.ordinal] = StepState.FAILED }
+                    state.failure = state.log.lineSequence().lastOrNull { it.isNotBlank() }
+                        ?: str("drm_wiz_setup_failed", nativeStepLabel(current ?: NativeCdmSetup.Step.CHECK))
+                    state.showLog = true
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                current?.let { state.states[it.ordinal] = StepState.FAILED }
+                state.failure = e.message ?: e.javaClass.simpleName
+                state.showLog = true
+            } finally {
+                state.running = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!state.started) {
+            state.started = true
+            start()
+        }
+    }
+
+    Hero(MaterialShapes.Cookie4Sided, Icons.Rounded.Terminal)
+    StepTitle(str("drm_wiz_native_title"), str("drm_wiz_native_body"))
+    ExplainRow(Icons.Rounded.Bolt, str("drm_wiz_native_fast_title"), str("drm_wiz_native_fast"))
+
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            NativeCdmSetup.Step.entries.forEach { step ->
+                SetupStepRow(nativeStepLabel(step), state.states[step.ordinal])
+            }
+            if (state.running || state.succeeded) {
+                val done = state.states.count { it == StepState.DONE }
+                val progress by animateFloatAsState(done.toFloat() / state.states.size, label = "native-progress")
+                LinearWavyProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+            }
+        }
+    }
+
+    when {
+        state.succeeded -> ResultCard(ok = true, text = str("drm_wiz_native_done"))
+        state.failure != null -> ResultCard(ok = false, text = state.failure.orEmpty())
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!state.running && !state.succeeded) {
+            Button(shapes = ButtonDefaults.shapes(), onClick = start) {
+                Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(str(if (state.failure != null) "btn_retry" else "drm_wiz_setup_start"))
+            }
+        }
+        if (state.log.isNotEmpty()) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = { state.showLog = !state.showLog }) {
+                Text(str(if (state.showLog) "drm_wiz_details_hide" else "drm_wiz_details_show"))
+            }
+        }
+    }
+    AnimatedVisibility(state.showLog && state.log.isNotEmpty(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        LogBox(state.log, onCopy = { clipboard.setText(AnnotatedString(state.log)) })
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun WslSetupStep(wsl: WslWizardState) {
@@ -1009,7 +1145,7 @@ internal fun DoneStep(windows: Boolean, choice: ProtectedBackend) {
             when {
                 !windows -> "drm_wiz_done_desktop"
                 choice == ProtectedBackend.WSL -> "drm_wiz_done_wsl"
-                else -> "drm_wiz_done_playready"
+                else -> "drm_wiz_done_native"
             }
         ),
     )
@@ -1025,7 +1161,7 @@ internal fun DoneStep(windows: Boolean, choice: ProtectedBackend) {
                             passed = null
                             val lines = StringBuilder()
                             try {
-                                passed = DrmSelfTest.run(widevine = !windows || choice == ProtectedBackend.WSL) { line ->
+                                passed = DrmSelfTest.run { line ->
                                     synchronized(lines) { lines.append(line).append('\n') }
                                     log = synchronized(lines) { lines.toString() }
                                 }

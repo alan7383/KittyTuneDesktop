@@ -6,6 +6,13 @@
 > Les conclusions générales d'impossibilité ci-dessous sont historiques et ne
 > s'appliquent pas à ce nouveau pipeline de lecture protégée. Les limitations
 > concernant les échantillons clairs restent distinctes de la lecture.
+>
+> **Mise à jour du 10 novembre 2026 : PlayReady a été retiré de l'application.** Le module Widevine
+> **Linux** de Chrome est désormais chargé nativement sous Windows par KittyTune lui-même
+> (`src/main/cpp/widevinelinux`), l'assistant l'installe en une minute sans administrateur ni
+> redémarrage, et les titres protégés rendent des échantillons clairs à l'application. Cette voie est
+> décrite dans [SOUNDCLOUD_CDM_SIDECAR.md](SOUNDCLOUD_CDM_SIDECAR.md). Les sections ci-dessous, et
+> notamment le §6, décrivent l'état antérieur et restent comme trace des mesures.
 
 Ce document remplace l'enquête précédente (« du `403` Widevine à PlayReady ») et la clôt. Il existe
 pour qu'un prochain agent n'ait pas à refaire ces mesures : elles ont été refaites, complétées, et

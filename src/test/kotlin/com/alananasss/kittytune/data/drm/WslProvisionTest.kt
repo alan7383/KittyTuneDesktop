@@ -62,7 +62,7 @@ class WslProvisionTest {
             val local = java.io.File(System.getenv("LOCALAPPDATA"), "KittyTune")
             assertFalse("the distribution folder is left", java.io.File(local, "wsl/${WslSidecarSetup.DISTRO}").exists())
             assertFalse("the sidecar config is left", java.io.File(local, "cdm-sidecar.json").exists())
-            assertEquals(ProtectedBackend.PLAYREADY, ProtectedBackend.current)
+            assertEquals(ProtectedBackend.NATIVE, ProtectedBackend.current)
             assertFalse("still connected after uninstall", CdmSidecar.verify())
         } finally {
             // Leave the user's app as it was (the distro stays imported — a harmless head start).
