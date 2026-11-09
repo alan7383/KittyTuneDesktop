@@ -620,7 +620,9 @@ SYSV void host_on_session_message(HostObject* self, const char* id, uint32_t id_
     if (getenv("KITTYTUNE_WIDEVINE_DEBUG"))
         fprintf(stderr, "[ktwv-linux] session message type=%d size=%u\n", type, message_size);
     std::lock_guard<std::mutex> lock(bridge->mutex);
-    if (type == 1 && message && message_size) {  // kLicenseRequest
+    // kLicenseRequest is 0 in this header (measured: the CDM sends type 0 with the 1759-byte
+    // request; treating 1 as the request type silently waited for ever).
+    if (type == cdm::MessageType::kLicenseRequest && message && message_size) {
         bridge->license_request.assign((const uint8_t*)message,
                                        (const uint8_t*)message + message_size);
         bridge->license_requested = true;
