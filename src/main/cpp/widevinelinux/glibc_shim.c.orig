@@ -1,0 +1,647 @@
+// Minimal glibc shim for libwidevinecdm.so running under our ELF loader on Windows.
+//
+// Not a full glibc replacement — just enough of each family to get the CDM through
+// InitializeCdmModule_4, CreateCdmInstance, and one license round trip.
+//
+// CRITICAL ABI NOTE: the CDM is compiled for Linux (System V AMD64 ABI): args in
+// rdi/rsi/rdx/rcx/r8/r9. Our shim compiles under MinGW for Windows (MS AMD64 ABI):
+// args in rcx/rdx/r8/r9. Every shim entry the CDM can call is therefore marked
+// `__attribute__((sysv_abi))` so GCC emits a function that reads its args from the
+// Linux registers. Internal helpers that we call from our own code stay plain
+// Windows-ABI.
+
+#define SYSV __attribute__((sysv_abi))
+
+#include <windows.h>
+#include <bcrypt.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <errno.h>
+#include <wchar.h>
+#include <wctype.h>
+#include <sys/types.h>
+
+// ------------------------------------------------------------------------------------
+// errno, globals
+// ------------------------------------------------------------------------------------
+
+static __thread int my_errno;
+SYSV int* __errno_location(void) { return &my_errno; }
+
+static char* my_environ[] = { NULL };
+char** environ_shim = my_environ;
+
+// __libc_stack_end: a sentinel pointer. The CDM only reads it to know "high stack".
+void* my_libc_stack_end = (void*)0x7FFFFFFFFFFFULL;
+
+// ------------------------------------------------------------------------------------
+// Memory / string — most route straight to ucrt
+// ------------------------------------------------------------------------------------
+
+SYSV void* shim_malloc(size_t n)                    { return HeapAlloc(GetProcessHeap(), 0, n); }
+SYSV void  shim_free(void* p)                       { if (p) HeapFree(GetProcessHeap(), 0, p); }
+SYSV void* shim_calloc(size_t n, size_t s)          { return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, n*s); }
+SYSV void* shim_realloc(void* p, size_t n) {
+    if (!p) return shim_malloc(n);
+    if (!n) { shim_free(p); return NULL; }
+    return HeapReAlloc(GetProcessHeap(), 0, p, n);
+}
+SYSV int   shim_posix_memalign(void** out, size_t align, size_t n) {
+    *out = _aligned_malloc(n, align);
+    return *out ? 0 : ENOMEM;
+}
+
+// Thin sysv-abi trampolines around ucrt. GCC generates a tiny shim that reparks
+// the Linux-ABI args into Windows-ABI registers before the real call.
+SYSV void* sysv_memcpy(void* d, const void* s, size_t n) { return memcpy(d, s, n); }
+SYSV void* sysv_memmove(void* d, const void* s, size_t n) { return memmove(d, s, n); }
+SYSV void* sysv_memset(void* d, int c, size_t n) { return memset(d, c, n); }
+SYSV int   sysv_memcmp(const void* a, const void* b, size_t n) { return memcmp(a, b, n); }
+SYSV void* sysv_memchr(const void* s, int c, size_t n) { return memchr(s, c, n); }
+SYSV size_t sysv_strlen(const char* s) { return strlen(s); }
+SYSV int    sysv_strcmp(const char* a, const char* b) { return strcmp(a, b); }
+SYSV char*  sysv_strchr(const char* s, int c) { return strchr((char*)s, c); }
+SYSV char*  sysv_strrchr(const char* s, int c) { return strrchr((char*)s, c); }
+SYSV char*  sysv_strncpy(char* d, const char* s, size_t n) { return strncpy(d, s, n); }
+SYSV char*  sysv_strerror(int e) { return strerror(e); }
+SYSV long   sysv_strtol(const char* s, char** e, int b) { return strtol(s, e, b); }
+SYSV unsigned long sysv_strtoul(const char* s, char** e, int b) { return strtoul(s, e, b); }
+SYSV long long sysv_strtoll(const char* s, char** e, int b) { return strtoll(s, e, b); }
+SYSV unsigned long long sysv_strtoull(const char* s, char** e, int b) { return strtoull(s, e, b); }
+SYSV double sysv_strtod(const char* s, char** e) { return strtod(s, e); }
+SYSV float  sysv_strtof(const char* s, char** e) { return strtof(s, e); }
+SYSV size_t sysv_wcslen(const wchar_t* s) { return wcslen(s); }
+SYSV size_t sysv_wcsnrtombs(char* d, const wchar_t** src, size_t nwc, size_t len, mbstate_t* st) { return wcsrtombs(d, src, len, st); }
+SYSV wchar_t* sysv_wmemchr(const wchar_t* s, wchar_t c, size_t n) { return wmemchr((wchar_t*)s, c, n); }
+SYSV int    sysv_rand(void) { return rand(); }
+SYSV void   sysv_qsort(void* base, size_t n, size_t sz, int (*cmp)(const void*, const void*)) { qsort(base, n, sz, cmp); }
+
+// Math: ucrt has these; wrappers convert ABI.
+SYSV double sysv_ceil(double x)  { return ceil(x); }
+SYSV float  sysv_ceilf(float x)  { return ceilf(x); }
+SYSV double sysv_floor(double x) { return floor(x); }
+SYSV double sysv_exp(double x)   { return exp(x); }
+SYSV double sysv_log2(double x)  { return log2(x); }
+SYSV double sysv_frexp(double x, int* e) { return frexp(x, e); }
+SYSV double sysv_ldexp(double x, int e)  { return ldexp(x, e); }
+SYSV double sysv_rint(double x)  { return rint(x); }
+SYSV double sysv_round(double x) { return round(x); }
+
+// stdio: trampolines. fprintf is variadic; we forward via a single buffer.
+SYSV int sysv_snprintf(char* s, size_t n, const char* fmt, ...) __attribute__((format(printf, 3, 4)));
+SYSV int sysv_fprintf(FILE* f, const char* fmt, ...) __attribute__((format(printf, 2, 3)));
+SYSV int sysv_vsnprintf(char* s, size_t n, const char* fmt, va_list ap);
+SYSV int sysv_vfprintf(FILE* f, const char* fmt, va_list ap);
+SYSV size_t sysv_fwrite(const void* p, size_t sz, size_t n, FILE* f) { return fwrite(p, sz, n, f); }
+SYSV int    sysv_fflush(FILE* f) { return fflush(f); }
+SYSV int    sysv_fclose(FILE* f) { return fclose(f); }
+SYSV char*  sysv_fgets(char* s, int n, FILE* f) { return fgets(s, n, f); }
+SYSV int    sysv_fputc(int c, FILE* f) { return fputc(c, f); }
+SYSV int    sysv_getc(FILE* f) { return getc(f); }
+SYSV void   sysv_perror(const char* s) { perror(s); }
+SYSV int    sysv_ungetc(int c, FILE* f) { return ungetc(c, f); }
+SYSV int    sysv_sscanf(const char* s, const char* f, ...) __attribute__((format(scanf, 2, 3)));
+
+SYSV int sysv_snprintf(char* s, size_t n, const char* fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    int r = vsnprintf(s, n, fmt, ap);
+    va_end(ap); return r;
+}
+SYSV int sysv_fprintf(FILE* f, const char* fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    int r = vfprintf(f ? f : stderr, fmt, ap);
+    va_end(ap); return r;
+}
+SYSV int sysv_vsnprintf(char* s, size_t n, const char* fmt, va_list ap) { return vsnprintf(s, n, fmt, ap); }
+SYSV int sysv_vfprintf(FILE* f, const char* fmt, va_list ap) { return vfprintf(f ? f : stderr, fmt, ap); }
+SYSV int sysv_sscanf(const char* s, const char* f, ...) {
+    va_list ap; va_start(ap, f);
+    int r = vsscanf(s, f, ap);
+    va_end(ap); return r;
+}
+
+// __memcpy_chk / __vsnprintf_chk / __strncat_chk: the _FORTIFY_SOURCE wrappers.
+SYSV void* my_memcpy_chk(void* d, const void* s, size_t n, size_t dsz) { (void)dsz; return memcpy(d, s, n); }
+SYSV int   my_vsnprintf_chk(char* s, size_t n, int flag, size_t slen, const char* f, va_list ap) {
+    (void)flag; (void)slen; return vsnprintf(s, n, f, ap);
+}
+SYSV char* my_strncat_chk(char* d, const char* s, size_t n, size_t dsz) { (void)dsz; return strncat(d, s, n); }
+
+SYSV void __stack_chk_fail(void) {
+    fprintf(stderr, "[shim] __stack_chk_fail — canary mismatch (likely fs-base hiccup)\n");
+    ExitProcess(177);
+}
+
+// ------------------------------------------------------------------------------------
+// mmap/mprotect/munmap — VirtualAlloc-backed
+// ------------------------------------------------------------------------------------
+
+#define PROT_READ  1
+#define PROT_WRITE 2
+#define PROT_EXEC  4
+#define MAP_ANON   0x20
+#define MAP_PRIVATE 0x02
+#define MAP_FIXED   0x10
+
+static DWORD prot_posix_to_win(int p) {
+    int r = p & PROT_READ, w = p & PROT_WRITE, x = p & PROT_EXEC;
+    if (x && w) return PAGE_EXECUTE_READWRITE;
+    if (x && r) return PAGE_EXECUTE_READ;
+    if (x)      return PAGE_EXECUTE;
+    if (w)      return PAGE_READWRITE;
+    if (r)      return PAGE_READONLY;
+    return PAGE_NOACCESS;
+}
+
+SYSV void* my_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t off) {
+    (void)addr; (void)fd; (void)off;
+    if (!(flags & MAP_ANON)) { my_errno = EINVAL; return (void*)-1; }
+    void* p = VirtualAlloc(NULL, len, MEM_RESERVE | MEM_COMMIT, prot_posix_to_win(prot));
+    return p ? p : (void*)-1;
+}
+SYSV int my_munmap(void* p, size_t len) { (void)len; return VirtualFree(p, 0, MEM_RELEASE) ? 0 : -1; }
+SYSV int my_mprotect(void* p, size_t len, int prot) {
+    DWORD old; return VirtualProtect(p, len, prot_posix_to_win(prot), &old) ? 0 : -1;
+}
+SYSV int my_madvise(void* p, size_t len, int adv) { (void)p; (void)len; (void)adv; return 0; }
+
+// ------------------------------------------------------------------------------------
+// Random
+// ------------------------------------------------------------------------------------
+
+SYSV ssize_t my_getrandom(void* buf, size_t len, unsigned int flags) {
+    (void)flags;
+    if (BCryptGenRandom(NULL, (PUCHAR)buf, (ULONG)len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0)
+        return (ssize_t)len;
+    my_errno = EIO; return -1;
+}
+
+// ------------------------------------------------------------------------------------
+// Time
+// ------------------------------------------------------------------------------------
+
+struct timespec_shim { int64_t tv_sec; long tv_nsec; };
+
+// Internal MS-ABI helper for our own callers.
+static int clock_gettime_internal(struct timespec_shim* ts) {
+    FILETIME ft; GetSystemTimePreciseAsFileTime(&ft);
+    uint64_t v = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    v -= 116444736000000000ULL;
+    ts->tv_sec = v / 10000000ULL;
+    ts->tv_nsec = (long)((v % 10000000ULL) * 100);
+    return 0;
+}
+
+SYSV int my_clock_gettime(int clk, struct timespec_shim* ts) {
+    (void)clk;
+    return clock_gettime_internal(ts);
+}
+SYSV int my_gettimeofday(void* tv, void* tz) {
+    (void)tz;
+    struct timespec_shim ts; clock_gettime_internal(&ts);
+    struct timeval_shim { int64_t sec; int64_t usec; };
+    struct timeval_shim* t = (struct timeval_shim*)tv;
+    t->sec = ts.tv_sec; t->usec = ts.tv_nsec / 1000;
+    return 0;
+}
+
+SYSV int my_strerror_r(int e, char* buf, size_t n) { if (buf && n) strerror_s(buf, n, e); return 0; }
+SYSV struct tm* my_gmtime_r(const time_t* t, struct tm* r) { gmtime_s(r, t); return r; }
+SYSV struct tm* my_localtime_r(const time_t* t, struct tm* r) { localtime_s(r, t); return r; }
+SYSV int my_nanosleep(const struct timespec_shim* req, struct timespec_shim* rem) {
+    (void)rem;
+    uint64_t ms = (uint64_t)req->tv_sec * 1000 + req->tv_nsec / 1000000;
+    Sleep((DWORD)ms);
+    return 0;
+}
+SYSV int my_usleep(unsigned long us) { Sleep((DWORD)((us + 999) / 1000)); return 0; }
+
+// ------------------------------------------------------------------------------------
+// pthreads — mutex/cond via SRWLOCK + ConditionVariable, threads via CreateThread.
+// We use the fact that the Widevine CDM links PTHREAD_MUTEX_INITIALIZER by zero bytes:
+// a freshly-zeroed pthread_mutex_t = our lazy-init marker.
+// ------------------------------------------------------------------------------------
+
+typedef struct { SRWLOCK lock; LONG initialized; LONG owner_tid; int rec; } my_mutex;
+
+static void mutex_ensure(my_mutex* m) {
+    if (InterlockedCompareExchange(&m->initialized, 1, 0) == 0) {
+        InitializeSRWLock(&m->lock);
+    }
+}
+
+static void dbg_null(const char* fn) {
+    void* ra = __builtin_return_address(1); // skip the caller frame (my_mutex_lock itself)
+    fprintf(stderr, "[shim] %s called with NULL, caller=%p\n", fn, ra);
+    fflush(stderr);
+}
+#define DBG_INVALID(fn, val) do { \
+    void* ra = __builtin_return_address(0); \
+    fprintf(stderr, "[shim] " fn " invalid arg 0x%llx, caller=%p\n", (unsigned long long)(val), ra); \
+    fflush(stderr); \
+} while (0)
+// A pointer is "sensible" when it is page-aligned enough to be a heap/stack/global.
+// Values smaller than 0x1000 are offsets, not pointers.
+static int plausible_ptr(const void* p) { return (uintptr_t)p >= 0x1000; }
+
+SYSV int my_mutex_init(my_mutex* m, void* attr)      { (void)attr; if (!plausible_ptr(m)) { DBG_INVALID("mutex_init", m); return 0; } memset(m, 0, sizeof(*m)); InitializeSRWLock(&m->lock); m->initialized = 1; return 0; }
+SYSV int my_mutex_destroy(my_mutex* m)               { (void)m; return 0; }
+SYSV int my_mutex_lock(my_mutex* m)                  { if (!plausible_ptr(m)) { DBG_INVALID("mutex_lock", m); return 0; } mutex_ensure(m); AcquireSRWLockExclusive(&m->lock); return 0; }
+SYSV int my_mutex_trylock(my_mutex* m)               { if (!plausible_ptr(m)) return 0; mutex_ensure(m); return TryAcquireSRWLockExclusive(&m->lock) ? 0 : EBUSY; }
+SYSV int my_mutex_unlock(my_mutex* m)                { if (!plausible_ptr(m)) { DBG_INVALID("mutex_unlock", m); return 0; } ReleaseSRWLockExclusive(&m->lock); return 0; }
+
+typedef struct { CONDITION_VARIABLE cv; LONG initialized; } my_cond;
+static void cond_ensure(my_cond* c) {
+    if (InterlockedCompareExchange(&c->initialized, 1, 0) == 0)
+        InitializeConditionVariable(&c->cv);
+}
+SYSV int my_cond_init(my_cond* c, void* attr)        { (void)attr; if (!plausible_ptr(c)) { DBG_INVALID("cond_init", c); return 0; } memset(c, 0, sizeof(*c)); InitializeConditionVariable(&c->cv); c->initialized = 1; return 0; }
+SYSV int my_cond_destroy(my_cond* c)                 { (void)c; return 0; }
+SYSV int my_cond_signal(my_cond* c)                  { if (!plausible_ptr(c)) { DBG_INVALID("cond_signal", c); return 0; } cond_ensure(c); WakeConditionVariable(&c->cv); return 0; }
+SYSV int my_cond_broadcast(my_cond* c)               { if (!plausible_ptr(c)) { DBG_INVALID("cond_broadcast", c); return 0; } cond_ensure(c); WakeAllConditionVariable(&c->cv); return 0; }
+SYSV int my_cond_wait(my_cond* c, my_mutex* m) {
+    if (!plausible_ptr(c) || !plausible_ptr(m)) { DBG_INVALID("cond_wait", c); return 0; }
+    cond_ensure(c); mutex_ensure(m);
+    SleepConditionVariableSRW(&c->cv, &m->lock, INFINITE, 0);
+    return 0;
+}
+SYSV int my_cond_timedwait(my_cond* c, my_mutex* m, const struct timespec_shim* abs) {
+    if (!plausible_ptr(c) || !plausible_ptr(m)) { DBG_INVALID("cond_timedwait", c); return 0; }
+    cond_ensure(c); mutex_ensure(m);
+    struct timespec_shim now; clock_gettime_internal(&now);
+    int64_t ms = (abs->tv_sec - now.tv_sec) * 1000 + (abs->tv_nsec - now.tv_nsec) / 1000000;
+    if (ms < 0) ms = 0;
+    BOOL ok = SleepConditionVariableSRW(&c->cv, &m->lock, (DWORD)ms, 0);
+    return ok ? 0 : ETIMEDOUT;
+}
+
+typedef struct { SRWLOCK lock; LONG initialized; int write; } my_rwlock;
+static void rwlock_ensure(my_rwlock* r) {
+    if (InterlockedCompareExchange(&r->initialized, 1, 0) == 0) InitializeSRWLock(&r->lock);
+}
+SYSV int my_rwlock_init(my_rwlock* r, void* attr)   { (void)attr; if (!plausible_ptr(r)) { DBG_INVALID("rwlock_init", r); return 0; } memset(r, 0, sizeof(*r)); InitializeSRWLock(&r->lock); r->initialized = 1; return 0; }
+SYSV int my_rwlock_destroy(my_rwlock* r)            { (void)r; return 0; }
+SYSV int my_rwlock_rdlock(my_rwlock* r)             { if (!plausible_ptr(r)) { DBG_INVALID("rwlock_rdlock", r); return 0; } rwlock_ensure(r); AcquireSRWLockShared(&r->lock); r->write = 0; return 0; }
+SYSV int my_rwlock_wrlock(my_rwlock* r)             { if (!plausible_ptr(r)) { DBG_INVALID("rwlock_wrlock", r); return 0; } rwlock_ensure(r); AcquireSRWLockExclusive(&r->lock); r->write = 1; return 0; }
+SYSV int my_rwlock_unlock(my_rwlock* r)             { if (!plausible_ptr(r)) { DBG_INVALID("rwlock_unlock", r); return 0; } if (r->write) ReleaseSRWLockExclusive(&r->lock); else ReleaseSRWLockShared(&r->lock); return 0; }
+
+// Thread creation. We forward the start routine straight to CreateThread.
+// NOTE: this skips Linux TLS setup for the new thread — the thread_bootstrap
+// defined in elf_loader.c handles install_tls_for_current_thread() before the
+// start routine runs. We import that function via a function pointer set by the
+// loader at startup (see register_thread_bootstrap below).
+typedef void (*thread_init_fn)(void);
+static thread_init_fn g_thread_init = NULL;
+extern "C" void register_thread_bootstrap(thread_init_fn f) { g_thread_init = f; }
+
+typedef struct { void* (*start)(void*); void* arg; } thread_arg;
+static DWORD WINAPI thread_wrapper(LPVOID a) {
+    thread_arg* ta = (thread_arg*)a;
+    if (g_thread_init) g_thread_init();
+    ta->start(ta->arg);
+    HeapFree(GetProcessHeap(), 0, a);
+    return 0;
+}
+// pthread_create: the CDM-side start() is a Linux-ABI function, so we must call it with
+// sysv_abi. thread_wrapper is Windows-ABI (CreateThread's callback), it invokes a sysv
+// trampoline that calls the real start.
+typedef SYSV void* (*sysv_start_fn)(void*);
+
+SYSV int my_pthread_create(uint64_t* tid, void* attr, sysv_start_fn start, void* arg) {
+    (void)attr;
+    thread_arg* ta = (thread_arg*)HeapAlloc(GetProcessHeap(), 0, sizeof(*ta));
+    ta->start = (void*(*)(void*))start; ta->arg = arg;
+    DWORD win_tid = 0;
+    HANDLE h = CreateThread(NULL, 0, thread_wrapper, ta, 0, &win_tid);
+    if (!h) { HeapFree(GetProcessHeap(), 0, ta); return EAGAIN; }
+    *tid = (uint64_t)h;
+    return 0;
+}
+SYSV int my_pthread_join(uint64_t tid, void** retval) {
+    (void)retval;
+    HANDLE h = (HANDLE)tid;
+    WaitForSingleObject(h, INFINITE);
+    CloseHandle(h);
+    return 0;
+}
+SYSV uint64_t my_pthread_self(void) { return (uint64_t)GetCurrentThread(); }
+
+SYSV int my_pthread_attr_init(void* a)                    { (void)a; return 0; }
+SYSV int my_pthread_attr_destroy(void* a)                 { (void)a; return 0; }
+SYSV int my_pthread_attr_setdetachstate(void* a, int s)   { (void)a; (void)s; return 0; }
+SYSV int my_pthread_attr_setstacksize(void* a, size_t s)  { (void)a; (void)s; return 0; }
+SYSV int my_pthread_mutexattr_init(void* a)               { (void)a; return 0; }
+SYSV int my_pthread_mutexattr_destroy(void* a)            { (void)a; return 0; }
+SYSV int my_pthread_condattr_init(void* a)                { (void)a; return 0; }
+SYSV int my_pthread_condattr_destroy(void* a)             { (void)a; return 0; }
+SYSV int my_pthread_condattr_setclock(void* a, int c)     { (void)a; (void)c; return 0; }
+SYSV int my_pthread_setname_np(uint64_t t, const char* n) { (void)t; (void)n; return 0; }
+SYSV int my_pthread_getname_np(uint64_t t, char* n, size_t sz) { (void)t; if (sz) n[0] = 0; return 0; }
+SYSV int my_pthread_getschedparam(uint64_t t, int* p, void* s) { (void)t; if (p) *p = 0; (void)s; return 0; }
+SYSV int my_pthread_getaffinity_np(uint64_t t, size_t sz, void* set) { (void)t; (void)sz; if (set) memset(set, 0xFF, sz); return 0; }
+SYSV int my_pthread_sigmask(int how, const void* set, void* old) { (void)how; (void)set; (void)old; return 0; }
+
+// pthread_once: a 32-bit flag initialised to 0 = not run.
+typedef SYSV void (*sysv_void_fn)(void);
+SYSV int my_pthread_once(LONG* once, sysv_void_fn init) {
+    LONG state = *once;
+    if (state == 2) return 0;
+    while (InterlockedCompareExchange(once, 1, 0) == 1) Sleep(0);
+    if (*once != 2) { init(); *once = 2; }
+    return 0;
+}
+
+// pthread_key_create / getspecific / setspecific: Win32 TLS.
+SYSV int my_pthread_key_create(DWORD* key, void* dtor) { (void)dtor; *key = TlsAlloc(); return (*key == TLS_OUT_OF_INDEXES) ? EAGAIN : 0; }
+SYSV void* my_pthread_getspecific(DWORD key) { return TlsGetValue(key); }
+SYSV int my_pthread_setspecific(DWORD key, const void* val) { return TlsSetValue(key, (LPVOID)val) ? 0 : EINVAL; }
+
+// Semaphores
+typedef struct { HANDLE h; LONG initialized; } my_sem;
+SYSV int my_sem_init(my_sem* s, int pshared, unsigned value) {
+    (void)pshared;
+    s->h = CreateSemaphoreA(NULL, (LONG)value, LONG_MAX, NULL);
+    s->initialized = 1;
+    return s->h ? 0 : -1;
+}
+SYSV int my_sem_destroy(my_sem* s) { if (s->h) CloseHandle(s->h); s->h = NULL; return 0; }
+SYSV int my_sem_post(my_sem* s)    { return ReleaseSemaphore(s->h, 1, NULL) ? 0 : -1; }
+SYSV int my_sem_wait(my_sem* s)    { return (WaitForSingleObject(s->h, INFINITE) == WAIT_OBJECT_0) ? 0 : -1; }
+SYSV int my_sem_trywait(my_sem* s) { return (WaitForSingleObject(s->h, 0) == WAIT_OBJECT_0) ? 0 : (my_errno = EAGAIN, -1); }
+
+// ------------------------------------------------------------------------------------
+// cxa / unwind / itm — most are safe no-ops for in-process CDM use
+// ------------------------------------------------------------------------------------
+
+int  my_cxa_atexit(void (*fn)(void*), void* arg, void* dso) { (void)fn; (void)arg; (void)dso; return 0; }
+void my_cxa_finalize(void* dso) { (void)dso; }
+void my_gmon_start(void) {}
+void my_itm_deregister(void* p) { (void)p; }
+void my_itm_register(void* p)   { (void)p; }
+void my_gcov_dump(void)         {}
+void my_gcov_flush(void)        {}
+int  my_register_atfork(void* p, void* c, void* ch, void* d) { (void)p; (void)c; (void)ch; (void)d; return 0; }
+
+// Unwind stubs. The CDM does not raise C++ exceptions across the boundary in the
+// happy path; these fire only on failure. If the CDM ever throws, we'll see it.
+void  my_Unwind_RaiseException(void* p)          { fprintf(stderr, "[shim] Unwind_RaiseException called, aborting\n"); ExitProcess(199); }
+void  my_Unwind_Resume(void* p)                  { fprintf(stderr, "[shim] Unwind_Resume called, aborting\n"); ExitProcess(200); }
+uint64_t my_Unwind_GetIP(void* ctx)              { (void)ctx; return 0; }
+void  my_Unwind_SetIP(void* ctx, uint64_t ip)    { (void)ctx; (void)ip; }
+void  my_Unwind_SetGR(void* ctx, int r, uint64_t v) { (void)ctx; (void)r; (void)v; }
+uint64_t my_Unwind_GetLanguageSpecificData(void* ctx) { (void)ctx; return 0; }
+uint64_t my_Unwind_GetRegionStart(void* ctx)     { (void)ctx; return 0; }
+void  my_Unwind_DeleteException(void* exc)       { (void)exc; }
+
+// ------------------------------------------------------------------------------------
+// stdio / IO — the CDM uses stdio chiefly for its own log lines
+// ------------------------------------------------------------------------------------
+
+int my_fprintf_stub(FILE* f, const char* fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    int r = vfprintf(f ? f : stderr, fmt, ap);
+    va_end(ap); return r;
+}
+
+// ------------------------------------------------------------------------------------
+// ctype — the ucrt analogues cover this directly.
+// ------------------------------------------------------------------------------------
+
+#include <ctype.h>
+static const unsigned short* my_ctype_toupper(void) { static unsigned short tbl[384]; static int done; if (!done) { for (int i=-128;i<256;i++) tbl[i+128]=(unsigned short)toupper(i&0xFF); done=1; } return tbl+128; }
+static const unsigned short* my_ctype_tolower(void) { static unsigned short tbl[384]; static int done; if (!done) { for (int i=-128;i<256;i++) tbl[i+128]=(unsigned short)tolower(i&0xFF); done=1; } return tbl+128; }
+int my_ctype_mb_cur_max(void) { return MB_CUR_MAX; }
+
+// ------------------------------------------------------------------------------------
+// misc small stuff
+// ------------------------------------------------------------------------------------
+
+int    my_getauxval(unsigned long tag) { (void)tag; return 0; }
+char*  my_getenv(const char* name)     { return getenv(name); }
+int    my_getpagesize(void)            { SYSTEM_INFO si; GetSystemInfo(&si); return si.dwPageSize; }
+int    my_uname(void* buf)             { if (!buf) return -1; memset(buf, 0, 390); memcpy((char*)buf+0, "Linux", 6); memcpy((char*)buf+65, "localhost", 10); memcpy((char*)buf+130, "6.6.0", 6); memcpy((char*)buf+195, "#1 SMP", 7); memcpy((char*)buf+260, "x86_64", 7); return 0; }
+int    my_prctl(int opt, ...)          { (void)opt; return 0; }
+long   my_sysconf(int name)            { (void)name; return -1; }
+int    my_sched_getaffinity(int pid, size_t sz, void* set) { (void)pid; if (set && sz) memset(set, 0xFF, sz); return 0; }
+int    my_sched_yield(void)            { SwitchToThread(); return 0; }
+int    my_sched_setscheduler(int p, int pol, const void* par) { (void)p; (void)pol; (void)par; return 0; }
+int    my_setpriority(int w, int who, int p) { (void)w; (void)who; (void)p; return 0; }
+int    my_sigfillset(void* s)          { (void)s; return 0; }
+int    my_getpid(void)                 { return (int)GetCurrentProcessId(); }
+int    my_geteuid(void)                { return 0; }
+int    my_getrlimit(int res, void* r)  { (void)res; if (r) { uint64_t* p = (uint64_t*)r; p[0] = p[1] = (uint64_t)-1; } return 0; }
+void   my_exit(int code)               { ExitProcess((UINT)code); }
+void   my_abort(void)                  { fprintf(stderr, "[shim] abort() called\n"); ExitProcess(134); }
+
+// __tls_get_addr: handed a tls_index{module, offset}. For x86-64, offset is 0-based
+// from the start of the module's TLS data block, which lives at (tp - tls_memsz).
+typedef struct { uint64_t module; uint64_t offset; } tls_index;
+extern "C" uint8_t* loader_tls_for_current_thread(void);
+extern "C" uint64_t loader_tls_memsz(void);
+void* my_tls_get_addr(tls_index* idx) {
+    return loader_tls_for_current_thread() - loader_tls_memsz() + idx->offset;
+}
+
+// stat / fd I/O — the CDM uses these for its optional FileIO path, which the
+// bridge intercepts before reaching the CDM. Stubbed to "not found".
+int my_fxstat64(int vers, int fd, void* buf) { (void)vers; (void)fd; (void)buf; my_errno = ENOENT; return -1; }
+int my_xstat64(int vers, const char* path, void* buf) { (void)vers; (void)path; (void)buf; my_errno = ENOENT; return -1; }
+int my_fcntl(int fd, int cmd, ...) { (void)fd; (void)cmd; return 0; }
+ssize_t my_read(int fd, void* buf, size_t n) { (void)fd; (void)buf; (void)n; my_errno = EBADF; return -1; }
+ssize_t my_write(int fd, const void* buf, size_t n) {
+    // Stdio / stderr output from the CDM goes to our stderr.
+    if (fd == 1) { fwrite(buf, 1, n, stdout); return (ssize_t)n; }
+    if (fd == 2) { fwrite(buf, 1, n, stderr); return (ssize_t)n; }
+    my_errno = EBADF; return -1;
+}
+ssize_t my_pread64(int fd, void* buf, size_t n, int64_t off) { (void)fd; (void)buf; (void)n; (void)off; my_errno = EBADF; return -1; }
+
+// dl* — the CDM may dlsym itself. Stubbed; a real impl would walk our symbol table.
+void* my_dlsym(void* h, const char* name) { (void)h; (void)name; return NULL; }
+int   my_dlclose(void* h) { (void)h; return 0; }
+
+// OPENSSL_memory_* — boringssl uses these for custom allocator telemetry.
+void* my_openssl_alloc(size_t* n)       { void* p = shim_malloc(*n); if (p) *n = *n; return p; }
+void  my_openssl_free(void* p)          { shim_free(p); }
+size_t my_openssl_get_size(void* p)     { return p ? HeapSize(GetProcessHeap(), 0, p) : 0; }
+
+// setjmp/longjmp: Windows has them in the CRT but with a different jmp_buf size.
+// The CDM's _setjmp returns to whatever called it; we lean on the CRT's version.
+extern "C" int    _setjmp(void*);
+extern "C" void   longjmp(void*, int);
+
+// ------------------------------------------------------------------------------------
+// The lookup table — grepped against what the CDM imports.
+// ------------------------------------------------------------------------------------
+
+typedef struct { const char* name; void* fn; } shim_entry;
+
+#define S(name, fn) { name, (void*)(fn) }
+
+static const shim_entry g_shim[] = {
+    // errno, globals
+    S("__errno_location", __errno_location),
+    S("__libc_stack_end", &my_libc_stack_end),
+
+    // memory & string: route to ucrt directly where the sig matches
+    S("malloc", shim_malloc), S("free", shim_free), S("calloc", shim_calloc), S("realloc", shim_realloc),
+    S("posix_memalign", shim_posix_memalign),
+    S("memcpy", memcpy), S("memmove", memmove), S("memset", memset), S("memcmp", memcmp),
+    S("memchr", memchr), S("bcmp", memcmp),
+    S("strlen", strlen), S("strcmp", strcmp), S("strchr", strchr), S("strrchr", strrchr),
+    S("strncpy", strncpy), S("strerror", strerror), S("strerror_r", my_strerror_r),
+    S("strtol", strtol), S("strtoul", strtoul), S("strtoll_l", strtoll),
+    S("strtoull", strtoull), S("strtoull_l", strtoull),
+    S("strtod_l", strtod), S("strtof_l", strtof), S("strtold_l", strtold),
+    S("strftime_l", strftime),
+    S("wcslen", wcslen), S("wcsnrtombs", wcsrtombs), S("wmemchr", wmemchr),
+
+    // chk
+    S("__memcpy_chk", my_memcpy_chk), S("__vsnprintf_chk", my_vsnprintf_chk),
+    S("__strncat_chk", my_strncat_chk), S("__stack_chk_fail", __stack_chk_fail),
+
+    // ctype
+    S("__ctype_tolower_loc", my_ctype_tolower), S("__ctype_toupper_loc", my_ctype_toupper),
+    S("__ctype_get_mb_cur_max", my_ctype_mb_cur_max), S("__mbrlen", mbrlen),
+
+    // mmap family
+    S("mmap64", my_mmap), S("mmap", my_mmap), S("munmap", my_munmap),
+    S("mprotect", my_mprotect), S("madvise", my_madvise),
+
+    // time
+    S("clock_gettime", my_clock_gettime), S("gettimeofday", my_gettimeofday),
+    S("nanosleep", my_nanosleep), S("usleep", my_usleep),
+
+    // random
+    S("getrandom", my_getrandom), S("rand", rand),
+
+    // pthread
+    S("pthread_mutex_init", my_mutex_init), S("pthread_mutex_destroy", my_mutex_destroy),
+    S("pthread_mutex_lock", my_mutex_lock), S("pthread_mutex_trylock", my_mutex_trylock),
+    S("pthread_mutex_unlock", my_mutex_unlock),
+    S("pthread_mutexattr_init", my_pthread_mutexattr_init),
+    S("pthread_mutexattr_destroy", my_pthread_mutexattr_destroy),
+    S("pthread_cond_init", my_cond_init), S("pthread_cond_destroy", my_cond_destroy),
+    S("pthread_cond_signal", my_cond_signal), S("pthread_cond_broadcast", my_cond_broadcast),
+    S("pthread_cond_wait", my_cond_wait), S("pthread_cond_timedwait", my_cond_timedwait),
+    S("pthread_condattr_init", my_pthread_condattr_init),
+    S("pthread_condattr_destroy", my_pthread_condattr_destroy),
+    S("pthread_condattr_setclock", my_pthread_condattr_setclock),
+    S("pthread_rwlock_init", my_rwlock_init), S("pthread_rwlock_destroy", my_rwlock_destroy),
+    S("pthread_rwlock_rdlock", my_rwlock_rdlock), S("pthread_rwlock_wrlock", my_rwlock_wrlock),
+    S("pthread_rwlock_unlock", my_rwlock_unlock),
+    S("pthread_create", my_pthread_create), S("pthread_join", my_pthread_join),
+    S("pthread_self", my_pthread_self),
+    S("pthread_attr_init", my_pthread_attr_init), S("pthread_attr_destroy", my_pthread_attr_destroy),
+    S("pthread_attr_setdetachstate", my_pthread_attr_setdetachstate),
+    S("pthread_attr_setstacksize", my_pthread_attr_setstacksize),
+    S("pthread_setname_np", my_pthread_setname_np),
+    S("pthread_getname_np", my_pthread_getname_np),
+    S("pthread_getschedparam", my_pthread_getschedparam),
+    S("pthread_getaffinity_np", my_pthread_getaffinity_np),
+    S("pthread_sigmask", my_pthread_sigmask),
+    S("pthread_once", my_pthread_once),
+    S("pthread_key_create", my_pthread_key_create),
+    S("pthread_getspecific", my_pthread_getspecific),
+    S("pthread_setspecific", my_pthread_setspecific),
+    S("sem_init", my_sem_init), S("sem_destroy", my_sem_destroy),
+    S("sem_post", my_sem_post), S("sem_wait", my_sem_wait), S("sem_trywait", my_sem_trywait),
+
+    // cxa / unwind / itm
+    S("__cxa_atexit", my_cxa_atexit), S("__cxa_finalize", my_cxa_finalize),
+    S("__gmon_start__", my_gmon_start),
+    S("_ITM_deregisterTMCloneTable", my_itm_deregister),
+    S("_ITM_registerTMCloneTable", my_itm_register),
+    S("__gcov_dump", my_gcov_dump), S("__gcov_flush", my_gcov_flush),
+    S("__register_atfork", my_register_atfork),
+    S("_Unwind_RaiseException", my_Unwind_RaiseException),
+    S("_Unwind_Resume", my_Unwind_Resume),
+    S("_Unwind_GetIP", my_Unwind_GetIP),
+    S("_Unwind_SetIP", my_Unwind_SetIP),
+    S("_Unwind_SetGR", my_Unwind_SetGR),
+    S("_Unwind_GetLanguageSpecificData", my_Unwind_GetLanguageSpecificData),
+    S("_Unwind_GetRegionStart", my_Unwind_GetRegionStart),
+    S("_Unwind_DeleteException", my_Unwind_DeleteException),
+
+    // stdio — give the CDM real printing and real file access for its logs
+    S("fprintf", my_fprintf_stub), S("snprintf", snprintf),
+    S("fflush", fflush), S("fclose", fclose), S("fwrite", fwrite), S("fgets", fgets),
+    S("fputc", fputc), S("getc", getc), S("perror", perror),
+    S("vsnprintf", vsnprintf), S("vfprintf", vfprintf), S("vasprintf", NULL),
+    // stderr/stdin/stdout are macros in ucrt — expose a small holder that resolves on first read.
+    // Most CDM code does `fprintf(stderr, ...)` which goes via my_fprintf_stub.
+    S("stderr", NULL), S("stdin", NULL), S("stdout", NULL),
+
+    // proc
+    S("getpid", my_getpid), S("geteuid", my_geteuid),
+    S("sched_yield", my_sched_yield), S("sched_getaffinity", my_sched_getaffinity),
+    S("prctl", my_prctl),
+    S("abort", my_abort), S("_exit", my_exit),
+
+    // files / fd
+    S("__fxstat64", my_fxstat64), S("__xstat64", my_xstat64),
+    S("fcntl", my_fcntl), S("read", my_read), S("write", my_write), S("pread64", my_pread64),
+
+    // dl
+    S("dlsym", my_dlsym), S("dlclose", my_dlclose),
+
+    // openssl
+    S("OPENSSL_memory_alloc", my_openssl_alloc),
+    S("OPENSSL_memory_free", my_openssl_free),
+    S("OPENSSL_memory_get_size", my_openssl_get_size),
+
+    // math + locale + wide + misc
+    S("ceil",  (double(*)(double))(double(*)(double))ceil),
+    S("ceilf", (float(*)(float))(float(*)(float))ceilf),
+    S("floor", (double(*)(double))(double(*)(double))floor),
+    S("exp",   (double(*)(double))(double(*)(double))exp),
+    S("log2",  (double(*)(double))(double(*)(double))log2),
+    S("frexp", (double(*)(double,int*))(double(*)(double,int*))frexp),
+    S("ldexp", (double(*)(double,int))(double(*)(double,int))ldexp),
+    S("rint",  (double(*)(double))(double(*)(double))rint),
+    S("round", (double(*)(double))(double(*)(double))round),
+    S("qsort", qsort),
+    S("newlocale", NULL), S("freelocale", NULL), S("uselocale", NULL),
+    S("mbtowc", mbtowc), S("mbrtowc", mbrtowc), S("mbsrtowcs", mbsrtowcs), S("mbsnrtowcs", NULL),
+    S("wcrtomb", wcrtomb), S("getwc", getwc), S("ungetwc", ungetwc), S("fputwc", fputwc),
+    S("ungetc", ungetc), S("gmtime_r", my_gmtime_r), S("localtime_r", my_localtime_r),
+    S("mktime", mktime), S("timegm", _mkgmtime),
+    S("getenv", my_getenv), S("getauxval", my_getauxval), S("getpagesize", my_getpagesize),
+    S("uname", my_uname), S("sysconf", my_sysconf), S("sigfillset", my_sigfillset),
+    S("sched_setscheduler", my_sched_setscheduler), S("setpriority", my_setpriority),
+    S("syscall", NULL),
+    S("creat64", NULL), S("open64", NULL), S("fopen64", NULL),
+    S("getrlimit64", my_getrlimit), S("__sched_cpucount", NULL),
+    S("__isoc99_sscanf", sscanf), S("__isoc99_vsscanf", vsscanf),
+    S("__udivti3", NULL), S("_setjmp", _setjmp), S("longjmp", longjmp),
+    S("catclose", NULL), S("catgets", NULL), S("catopen", NULL),
+
+    // TLS
+    S("__tls_get_addr", my_tls_get_addr),
+};
+
+#define SHIM_COUNT (sizeof(g_shim) / sizeof(g_shim[0]))
+
+// Called via GLOB_DAT when the CDM reads stderr/stdin/stdout as variables. The reloc
+// stores *slot = runtime-resolved pointer so when the CDM code does `FILE* f = stderr`
+// it gets a real FILE*, not a stub code pointer.
+extern "C" void* shim_lookup(const char* name) {
+    if (strcmp(name, "stderr") == 0) return (void*)stderr;
+    if (strcmp(name, "stdout") == 0) return (void*)stdout;
+    if (strcmp(name, "stdin")  == 0) return (void*)stdin;
+    for (size_t i = 0; i < SHIM_COUNT; i++)
+        if (strcmp(g_shim[i].name, name) == 0) return g_shim[i].fn;
+    return NULL;
+}
+
+extern "C" int shim_count(void) { return (int)SHIM_COUNT; }
+
+// Called by the loader's VEH to dump which shim fn is currently running.
+// Useful as a call-site tag when debugging crashes.
+static __thread const char* g_last_shim = NULL;
+extern "C" const char* shim_last(void) { return g_last_shim; }
+#define SHIM_ENTER(n) do { g_last_shim = n; } while(0)
