@@ -110,6 +110,22 @@ class WslSidecarSetupTest {
     }
 
     @Test
+    fun `the set-up check only runs what the minimal rootfs has`() {
+        // The rootfs ships /bin/sh (dash) and our daemon, no coreutils: `test` exists only as the shell's builtin.
+        assertEquals("/bin/sh", WslSidecarSetup.SET_UP_CHECK.first())
+        assertTrue(WslSidecarSetup.SET_UP_CHECK.last().contains(WslSidecarSetup.DAEMON))
+        assertTrue(WslSidecarSetup.SET_UP_CHECK.last().contains(WslSidecarSetup.CDM))
+    }
+
+    /** On a machine where KittyTune's distribution is set up: the page must say so. */
+    @Test(timeout = 120_000)
+    fun `a real setup is detected as set up`() = kotlinx.coroutines.runBlocking {
+        assumeTrue("WSL is not installed here", WslSidecarSetup.wslInstalled)
+        assumeTrue("KittyTune's distribution is not here", WslSidecarSetup.imported())
+        assertEquals(WslSidecarSetup.State.SET_UP, WslSidecarSetup.detect().state)
+    }
+
+    @Test
     fun `the WSL package for this architecture is picked from a GitHub release`() {
         val release = """{"tag_name":"3.0.3","assets":[
             {"name":"Microsoft.WSL_3.0.3.0_x64_ARM64.msixbundle","browser_download_url":"https://x/bundle","digest":null},

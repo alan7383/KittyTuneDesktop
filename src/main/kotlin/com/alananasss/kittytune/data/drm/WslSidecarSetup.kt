@@ -193,7 +193,7 @@ internal object WslSidecarSetup {
         }
         val ready = runCatching {
             run(
-                listOf("-d", DISTRO, "-u", "root", "--exec", "test", "-x", DAEMON, "-a", "-f", CDM),
+                listOf("-d", DISTRO, "-u", "root", "--exec") + SET_UP_CHECK,
                 timeoutMs = 60_000,
             )
         }.getOrNull()?.exit == 0
@@ -214,6 +214,13 @@ internal object WslSidecarSetup {
     private suspend fun listOutput(mode: String = "--quiet"): String =
         runCatching { run(listOf("--list", mode), timeoutMs = 20_000) }.getOrNull()
             ?.takeIf { it.exit == 0 }?.output.orEmpty()
+
+    /**
+     * What tells that the daemon and the module are in place, run inside the distribution. Through the shell,
+     * whose `test` is built in: the minimal rootfs has no `test` binary, and `--exec test` always failed there —
+     * the page then said "not installed yet" over a working setup.
+     */
+    internal val SET_UP_CHECK = listOf("/bin/sh", "-c", "test -x $DAEMON -a -f $CDM")
 
     /** The WSL version our distribution is registered as, read from `wsl -l -v`. */
     private suspend fun importedVersion(): Int? = registeredVersions()[DISTRO.lowercase()]
