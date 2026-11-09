@@ -3293,6 +3293,14 @@
     <string name="drm_unwiz_leftover_title">Tệp KittyTune trong %1$s</string>
     <string name="drm_unwiz_leftover_body">Do một phiên bản cũ, một tập lệnh hoặc một lần cài thủ công để lại. Chỉ các thư mục này bị xóa, không gì khác trong bản phân phối đó:</string>
     <string name="drm_unwiz_step_leftovers">Đang dọn các bản phân phối Linux khác</string>
+    <string name="drm_unwiz_wsl_title">Gỡ luôn WSL khỏi Windows</string>
+    <string name="drm_unwiz_wsl_body">Không có Linux nào khác dùng nó trên máy này. WSL và các thành phần Windows của nó sẽ bị gỡ, để hệ thống như trước khi có KittyTune. Cần quyền quản trị và khởi động lại.</string>
+    <string name="drm_unwiz_wsl_platform_kept">Nền tảng máy ảo vẫn bật: nó đã được bật từ trước khi có KittyTune.</string>
+    <string name="drm_unwiz_wsl_kept_title">WSL được giữ lại</string>
+    <string name="drm_unwiz_wsl_kept_body">Các bản phân phối Linux khác vẫn dùng nó: %1$s. Để gỡ cả WSL, hãy gỡ chúng trước.</string>
+    <string name="drm_unwiz_step_wsl">Đang gỡ WSL</string>
+    <string name="drm_unwiz_wsl_refused">Windows không được cấp quyền gỡ WSL. Mọi thứ khác đã được gỡ; bạn có thể thử lại.</string>
+    <string name="drm_unwiz_wsl_restart">Khởi động lại Windows để hoàn tất việc gỡ WSL.</string>
     <string name="drm_wiz_step_probe">Kiểm tra mô-đun</string>
     <string name="drm_wiz_step_connect">Kết nối với KittyTune</string>
     <string name="drm_wiz_details_show">Hiện chi tiết</string>
@@ -3353,7 +3361,7 @@
     <string name="pref_drm_wsl_uninstall_title">Gỡ mô-đun WSL</string>
     <string name="pref_drm_wsl_uninstall_desc">Gỡ ảnh Linux của KittyTune và trả lại hệ thống sạch</string>
     <string name="drm_unwiz_title">Gỡ mô-đun WSL</string>
-    <string name="drm_unwiz_body">Ảnh Linux của KittyTune và liên kết của nó trong KittyTune sẽ bị gỡ, không có gì khác trên máy bạn bị đụng tới. Nhạc được bảo vệ vẫn phát qua PlayReady.</string>
+    <string name="drm_unwiz_body">Ảnh Linux của KittyTune và liên kết của nó trong KittyTune sẽ bị gỡ, cùng với những gì bạn đánh dấu bên dưới. Nhạc được bảo vệ vẫn phát qua PlayReady.</string>
     <string name="drm_unwiz_files_title">Ảnh Linux của KittyTune (%1$s)</string>
     <string name="drm_unwiz_files_body">Bản phân phối siêu nhỏ chứa mô-đun Widevine và chương trình ktcdm.</string>
     <string name="drm_unwiz_settings_title">Cài đặt WSL của KittyTune</string>

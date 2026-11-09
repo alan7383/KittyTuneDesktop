@@ -3211,6 +3211,14 @@
     <string name="drm_unwiz_leftover_title">KittyTune-fájlok itt: %1$s</string>
     <string name="drm_unwiz_leftover_body">Egy régebbi verzió, egy szkript vagy egy kézi telepítés hagyta itt. Csak ezek a mappák törlődnek, a disztribúcióban más semmi:</string>
     <string name="drm_unwiz_step_leftovers">A többi Linux-disztribúció kitakarítása</string>
+    <string name="drm_unwiz_wsl_title">A WSL eltávolítása is a Windowsból</string>
+    <string name="drm_unwiz_wsl_body">Más Linux nem használja ezen a gépen. A WSL és a Windows-összetevői törlődnek, hogy a rendszer olyan legyen, mint a KittyTune előtt. Rendszergazdai engedély és újraindítás kell hozzá.</string>
+    <string name="drm_unwiz_wsl_platform_kept">A virtuálisgép-platform bekapcsolva marad: már a KittyTune előtt is be volt kapcsolva.</string>
+    <string name="drm_unwiz_wsl_kept_title">A WSL megmarad</string>
+    <string name="drm_unwiz_wsl_kept_body">Más Linux-disztribúciók még használják: %1$s. A WSL eltávolításához előbb ezeket távolítsd el.</string>
+    <string name="drm_unwiz_step_wsl">A WSL eltávolítása</string>
+    <string name="drm_unwiz_wsl_refused">A Windows nem kapott engedélyt a WSL eltávolítására. Minden más törölve; újra megpróbálhatod.</string>
+    <string name="drm_unwiz_wsl_restart">Indítsd újra a Windowst a WSL eltávolításának befejezéséhez.</string>
     <string name="drm_wiz_step_probe">A modul ellenőrzése</string>
     <string name="drm_wiz_step_connect">Csatlakozás a KittyTune-hoz</string>
     <string name="drm_wiz_details_show">Részletek megjelenítése</string>
@@ -3271,7 +3279,7 @@
     <string name="pref_drm_wsl_uninstall_title">A WSL-modul eltávolítása</string>
     <string name="pref_drm_wsl_uninstall_desc">Eltávolítja a KittyTune Linux-képét, és tiszta rendszert hagy</string>
     <string name="drm_unwiz_title">A WSL-modul eltávolítása</string>
-    <string name="drm_unwiz_body">A KittyTune Linux-képe és a hozzá tartozó kapcsolat a KittyTune-ban törlődik, más semmi a gépeden. A védett számok továbbra is a PlayReadyn keresztül szólnak.</string>
+    <string name="drm_unwiz_body">A KittyTune Linux-képe és a hozzá tartozó kapcsolat a KittyTune-ban törlődik, valamint minden, amit alább bejelölsz. A védett számok továbbra is a PlayReadyn keresztül szólnak.</string>
     <string name="drm_unwiz_files_title">A KittyTune Linux-képe (%1$s)</string>
     <string name="drm_unwiz_files_body">Az apró disztribúció, amely a Widevine-modult és a ktcdm programot tartalmazza.</string>
     <string name="drm_unwiz_settings_title">A KittyTune WSL-beállításai</string>

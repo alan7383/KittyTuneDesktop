@@ -84,8 +84,20 @@ internal class UninstallState {
      */
     var featureVersion by mutableStateOf<Int?>(null)
 
-    /** What [WslSidecarSetup.uninstall] is asked to turn off: nothing unless offered and ticked. */
-    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature }
+    /** What the Windows side allows (remove WSL entirely, or one component); null while checking. */
+    var windowsSide by mutableStateOf<WslSidecarSetup.WindowsSide?>(null)
+
+    /** Remove WSL itself too, for a system as it was before; only offered when no other distribution is left. */
+    var removeWsl by mutableStateOf(false)
+
+    /** Whether the removal that ran included WSL itself, for the messages after it. */
+    var wslRemoved by mutableStateOf(false)
+
+    val removingWsl: Boolean get() = removeWsl && windowsSide?.wslRemovable == true
+
+    /** What [WslSidecarSetup.uninstall] is asked to turn off: nothing unless offered and ticked, and never
+     *  alongside removing WSL, which covers it. */
+    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature && !removingWsl }
 
     /** Whether KittyTune's own distribution is there; null while checking. */
     var ourDistroPresent by mutableStateOf<Boolean?>(null)
@@ -127,7 +139,9 @@ fun WslUninstallWizard(onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         un.ourDistroPresent = WslSidecarSetup.imported()
-        un.featureVersion = WslSidecarSetup.removableFeature()
+        val side = WslSidecarSetup.planWindowsSide()
+        un.windowsSide = side
+        un.featureVersion = side.featureVersion
         if (un.featureVersion == null) un.removeFeature = false
         // Files an older version, a script or a manual install left in other distributions.
         val found = WslSidecarSetup.findLeftovers()
@@ -136,9 +150,11 @@ fun WslUninstallWizard(onClose: () -> Unit) {
     }
 
     val start: () -> Unit = start@{
-        if (un.leftovers == null) return@start
+        if (un.leftovers == null || un.windowsSide == null) return@start
         val leftovers = un.chosenLeftovers
-        un.steps = WslSidecarSetup.uninstallSteps(un.featureToRemove != null, leftovers.isNotEmpty())
+        val removeWsl = un.removingWsl
+        un.wslRemoved = removeWsl
+        un.steps = WslSidecarSetup.uninstallSteps(un.featureToRemove != null, leftovers.isNotEmpty(), removeWsl)
         un.states.clear()
         un.states.addAll(List(un.steps.size) { StepState.PENDING })
         un.failure = null
@@ -151,6 +167,7 @@ fun WslUninstallWizard(onClose: () -> Unit) {
                 un.restartNeeded = WslSidecarSetup.uninstall(
                     featureVersion = un.featureToRemove,
                     leftovers = leftovers,
+                    removeWsl = removeWsl,
                     onStep = { next ->
                         current?.let { un.states[un.steps.indexOf(it)] = StepState.DONE }
                         current = next
@@ -165,7 +182,9 @@ fun WslUninstallWizard(onClose: () -> Unit) {
                 un.succeeded = true
             } catch (e: WslSidecarSetup.UninstallException) {
                 un.states[un.steps.indexOf(e.step)] = StepState.FAILED
-                un.failure = if (e.refused) str("drm_unwiz_refused", un.featureVersion ?: 1)
+                un.failure = if (e.refused) {
+                    if (e.step == UninstallStep.WSL) str("drm_unwiz_wsl_refused") else str("drm_unwiz_refused", un.featureVersion ?: 1)
+                }
                 else str("drm_unwiz_failed", uninstallStepLabel(e.step, un.featureVersion)) + "\n" + e.message
                 un.showLog = !e.refused
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -307,9 +326,28 @@ internal fun WhatPage(un: UninstallState) {
         }
     }
 
-    // The Windows component is left on by default: it is harmless, and turning it off needs admin + a
-    // restart. Only offered when nothing else runs on it.
-    un.featureVersion?.let { version ->
+    // WSL itself, for a system as it was before: only when no other distribution would lose it. Otherwise,
+    // say which ones keep it, so the user knows what to remove first.
+    val side = un.windowsSide
+    if (side != null && side.wslRemovable) {
+        ChoiceCard(
+            checked = un.removeWsl,
+            title = str("drm_unwiz_wsl_title"),
+            body = str("drm_unwiz_wsl_body") + if (side.platformKept) "\n" + str("drm_unwiz_wsl_platform_kept") else "",
+            warning = true,
+            onToggle = { un.removeWsl = it },
+        )
+    } else if (side != null && side.otherDistros.isNotEmpty()) {
+        ExplainRow(
+            Icons.Rounded.Verified,
+            str("drm_unwiz_wsl_kept_title"),
+            str("drm_unwiz_wsl_kept_body", side.otherDistros.joinToString(", ")),
+        )
+    }
+
+    // A single component, when WSL itself stays: left on by default (harmless; turning it off needs admin +
+    // a restart), and only offered when nothing else runs on it.
+    if (!un.removingWsl) un.featureVersion?.let { version ->
         ChoiceCard(
             checked = un.removeFeature,
             title = str("drm_unwiz_feature_title", version),
@@ -415,7 +453,10 @@ internal fun DonePage(un: UninstallState) {
     if (un.restartNeeded) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(str("drm_unwiz_restart", un.featureVersion ?: 1), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    if (un.wslRemoved) str("drm_unwiz_wsl_restart") else str("drm_unwiz_restart", un.featureVersion ?: 1),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
                 FilledTonalButton(
                     shapes = ButtonDefaults.shapes(),
                     enabled = !restarting,
@@ -441,4 +482,5 @@ private fun uninstallStepLabel(step: UninstallStep, featureVersion: Int?): Strin
     UninstallStep.SETTINGS -> str("drm_unwiz_step_settings")
     UninstallStep.LEFTOVERS -> str("drm_unwiz_step_leftovers")
     UninstallStep.FEATURE -> str("drm_unwiz_step_feature", featureVersion ?: 1)
+    UninstallStep.WSL -> str("drm_unwiz_step_wsl")
 }

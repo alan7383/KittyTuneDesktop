@@ -226,6 +226,62 @@ internal object WslSidecarSetup {
         return version.takeIf { on && !othersNeedIt }
     }
 
+    /** What uninstalling may do on the Windows side, as found when the assistant opens. */
+    data class WindowsSide(
+        /** WSL can go entirely: it is there and no distribution but ours remains (Docker's would count). */
+        val wslRemovable: Boolean,
+        /** The distributions that keep WSL when it cannot go, for the page to name them. */
+        val otherDistros: List<String>,
+        /** Removing WSL leaves the virtual machine platform on: it was on before KittyTune turned it on. */
+        val platformKept: Boolean,
+        /** The single component that may be turned off on its own (see [removableFeature]), or null. */
+        val featureVersion: Int?,
+    )
+
+    suspend fun planWindowsSide(): WindowsSide = withContext(Dispatchers.IO) {
+        if (!windows || !wslExe.isFile) return@withContext WindowsSide(false, emptyList(), false, null)
+        val registered = parseAllDistros(
+            runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+        )
+        planWindowsSide(
+            registered = registered,
+            versions = registeredVersions(),
+            wsl1On = featureEnabled(FEATURE_WSL1),
+            wsl2On = featureEnabled(FEATURE_WSL2),
+            storeWsl = runCatching { run(listOf("--version"), timeoutMs = 15_000) }.getOrNull()?.exit == 0,
+            enabledByApp = PlayerPreferences().getWslFeaturesEnabledByApp(),
+        )
+    }
+
+    internal fun planWindowsSide(
+        registered: List<String>,
+        versions: Map<String, Int>,
+        wsl1On: Boolean,
+        wsl2On: Boolean,
+        storeWsl: Boolean,
+        enabledByApp: Set<String>,
+    ): WindowsSide {
+        val others = registered.filterNot { it.equals(DISTRO, ignoreCase = true) }
+        return WindowsSide(
+            wslRemovable = (storeWsl || wsl1On || wsl2On) && others.isEmpty(),
+            otherDistros = others,
+            platformKept = wsl2On && FEATURE_WSL2 !in enabledByApp,
+            featureVersion = removableFeature(versions[DISTRO.lowercase()], wsl1On, wsl2On, versions),
+        )
+    }
+
+    /**
+     * Removes WSL itself: the WSL package, its own component, and the virtual machine platform only when
+     * [disablePlatform] — when KittyTune is the one that turned it on, since it may serve something else.
+     */
+    internal fun removeWslScript(disablePlatform: Boolean): String = buildString {
+        appendLine("& \"\$env:SystemRoot\\System32\\wsl.exe\" --uninstall")
+        appendLine("Disable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL1 -NoRestart | Out-String")
+        if (disablePlatform) {
+            appendLine("Disable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL2 -NoRestart | Out-String")
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------
     // Enabling the Windows feature (UAC), then resuming after the reboot it needs
     // ------------------------------------------------------------------------------------------------
@@ -245,6 +301,8 @@ internal object WslSidecarSetup {
             PlayerPreferences().apply {
                 setWslSetupPending(true)
                 setWslSetupVersion(version)
+                // Only ever called while the component is off: KittyTune is the one turning it on.
+                setWslFeaturesEnabledByApp(getWslFeaturesEnabledByApp() + feature)
             }
         }
         return result
@@ -517,33 +575,43 @@ internal object WslSidecarSetup {
         runCatching { run(listOf("--list", "--running", "--quiet"), timeoutMs = 20_000) }.getOrNull()
             ?.takeIf { it.exit == 0 || it.output.isBlank() }?.output?.let(::parseAllDistros)
 
-    enum class UninstallStep { STOP, DISTRO, LEFTOVERS, SETTINGS, FEATURE }
+    enum class UninstallStep { STOP, DISTRO, LEFTOVERS, SETTINGS, FEATURE, WSL }
 
     class UninstallException(val step: UninstallStep, message: String, val refused: Boolean = false) : Exception(message)
 
-    fun uninstallSteps(removeFeature: Boolean, cleanLeftovers: Boolean = false): List<UninstallStep> = buildList {
+    /** Removing WSL entirely covers its components: then no single component is turned off on its own. */
+    fun uninstallSteps(
+        removeFeature: Boolean,
+        cleanLeftovers: Boolean = false,
+        removeWsl: Boolean = false,
+    ): List<UninstallStep> = buildList {
         add(UninstallStep.STOP)
         add(UninstallStep.DISTRO)
         if (cleanLeftovers) add(UninstallStep.LEFTOVERS)
         add(UninstallStep.SETTINGS)
-        if (removeFeature) add(UninstallStep.FEATURE)
+        when {
+            removeWsl -> add(UninstallStep.WSL)
+            removeFeature -> add(UninstallStep.FEATURE)
+        }
     }
 
     /**
      * Removes the distribution and KittyTune's link to it; protected tracks go back to PlayReady. Also
-     * deletes the [leftovers] chosen — KittyTune files found in other distributions — and, when
-     * [featureVersion] is set, turns that version's Windows component back off (elevated, needs a restart).
+     * deletes the [leftovers] chosen — KittyTune files found in other distributions — and then either removes
+     * WSL entirely ([removeWsl], only offered when no other distribution remains) or, when [featureVersion] is
+     * set, turns that version's Windows component back off. Both are elevated and need a restart.
      *
-     * @return true when Windows must restart to finish (the component was removed).
+     * @return true when Windows must restart to finish.
      */
     suspend fun uninstall(
         featureVersion: Int?,
         leftovers: List<Leftover> = emptyList(),
+        removeWsl: Boolean = false,
         onStep: (UninstallStep) -> Unit,
         onLine: (String) -> Unit,
     ): Boolean = withContext(Dispatchers.IO) {
         var restart = false
-        for (step in uninstallSteps(featureVersion != null, leftovers.isNotEmpty())) {
+        for (step in uninstallSteps(featureVersion != null, leftovers.isNotEmpty(), removeWsl)) {
             onStep(step)
             onLine("== ${step.name.lowercase()}")
             when (step) {
@@ -596,8 +664,28 @@ internal object WslSidecarSetup {
                     )
                     if (result.refused) throw UninstallException(step, "permission refused", refused = true)
                     if (!result.ok) throw UninstallException(step, "the Windows feature could not be removed")
+                    PlayerPreferences().apply { setWslFeaturesEnabledByApp(getWslFeaturesEnabledByApp() - feature) }
                     restart = true
                     onLine("$feature turned off; Windows finishes after a restart")
+                }
+                UninstallStep.WSL -> {
+                    // Re-checked here, not trusted from when the page opened: never remove WSL under a
+                    // distribution registered meanwhile.
+                    val others = parseAllDistros(
+                        runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+                    ).filterNot { it.equals(DISTRO, ignoreCase = true) }
+                    if (others.isNotEmpty()) {
+                        throw UninstallException(step, "WSL is kept: ${others.joinToString(", ")} still use it")
+                    }
+                    runCatching { run(listOf("--shutdown"), timeoutMs = 60_000) }
+                    val prefs = PlayerPreferences()
+                    val result = runElevated(removeWslScript(disablePlatform = FEATURE_WSL2 in prefs.getWslFeaturesEnabledByApp()))
+                    if (result.refused) throw UninstallException(step, "permission refused", refused = true)
+                    if (!result.ok) throw UninstallException(step, "WSL could not be removed")
+                    result.log.lineSequence().map { it.trimEnd() }.filter { it.isNotBlank() }.forEach(onLine)
+                    prefs.setWslFeaturesEnabledByApp(emptySet())
+                    restart = true
+                    onLine("WSL removed; Windows finishes after a restart")
                 }
             }
         }

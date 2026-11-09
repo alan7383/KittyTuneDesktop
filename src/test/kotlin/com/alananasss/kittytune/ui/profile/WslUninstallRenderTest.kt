@@ -32,9 +32,19 @@ class WslUninstallRenderTest {
     @Test
     fun whatPageOffersTurningTheFeatureOff() = render("wsl-uninstall-what") {
         WhatPage(UninstallState().apply {
-            featureVersion = 2; removeFeature = true; ourDistroPresent = true
+            // This machine as it is: a WSL2 Ubuntu keeps WSL and its VM platform; WSL1's component is off.
+            featureVersion = null; removeFeature = false; ourDistroPresent = true
             leftovers = listOf(WslSidecarSetup.Leftover("Ubuntu", listOf("/opt/kittytune", "/home/alan/.local/share/kittytune")))
             cleanDistros = setOf("Ubuntu")
+            windowsSide = WslSidecarSetup.WindowsSide(false, listOf("Ubuntu"), platformKept = true, featureVersion = null)
+        })
+    }
+
+    @Test
+    fun whatPageOffersRemovingWslWhenNothingElseUsesIt() = render("wsl-uninstall-remove-wsl") {
+        WhatPage(UninstallState().apply {
+            ourDistroPresent = true; leftovers = emptyList(); removeWsl = true
+            windowsSide = WslSidecarSetup.WindowsSide(true, emptyList(), platformKept = true, featureVersion = 1)
         })
     }
 

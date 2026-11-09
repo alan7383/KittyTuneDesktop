@@ -3213,6 +3213,14 @@
     <string name="drm_unwiz_leftover_title">%1$s içindeki KittyTune dosyaları</string>
     <string name="drm_unwiz_leftover_body">Eski bir sürüm, bir betik ya da elle yapılan bir kurulumdan kaldı. Yalnızca bu klasörler silinir, o dağıtımdaki başka hiçbir şey değil:</string>
     <string name="drm_unwiz_step_leftovers">Diğer Linux dağıtımları temizleniyor</string>
+    <string name="drm_unwiz_wsl_title">WSL’i de Windows’tan kaldır</string>
+    <string name="drm_unwiz_wsl_body">Bu bilgisayarda başka hiçbir Linux onu kullanmıyor. WSL ve Windows bileşenleri kaldırılır, sistem KittyTune’dan önceki haline döner. Yönetici izni ve yeniden başlatma gerektirir.</string>
+    <string name="drm_unwiz_wsl_platform_kept">Sanal makine platformu açık kalır: KittyTune’dan önce de açıktı.</string>
+    <string name="drm_unwiz_wsl_kept_title">WSL korunuyor</string>
+    <string name="drm_unwiz_wsl_kept_body">Başka Linux dağıtımları hâlâ onu kullanıyor: %1$s. WSL’i de kaldırmak için önce onları kaldır.</string>
+    <string name="drm_unwiz_step_wsl">WSL kaldırılıyor</string>
+    <string name="drm_unwiz_wsl_refused">Windows’a WSL’i kaldırma izni verilmedi. Geri kalan her şey kaldırıldı; yeniden deneyebilirsin.</string>
+    <string name="drm_unwiz_wsl_restart">WSL’i kaldırmayı bitirmek için Windows’u yeniden başlat.</string>
     <string name="drm_wiz_step_probe">Modülün doğrulanması</string>
     <string name="drm_wiz_step_connect">KittyTune’a bağlanma</string>
     <string name="drm_wiz_details_show">Ayrıntıları göster</string>
@@ -3273,7 +3281,7 @@
     <string name="pref_drm_wsl_uninstall_title">WSL modülünü kaldır</string>
     <string name="pref_drm_wsl_uninstall_desc">KittyTune’un Linux kalıbını kaldırır ve temiz bir sistem bırakır</string>
     <string name="drm_unwiz_title">WSL modülünü kaldır</string>
-    <string name="drm_unwiz_body">KittyTune’un Linux kalıbı ve KittyTune’daki bağlantısı kaldırılır; bilgisayarındaki başka hiçbir şeye dokunulmaz. Korumalı parçalar PlayReady üzerinden çalmaya devam eder.</string>
+    <string name="drm_unwiz_body">KittyTune’un Linux kalıbı ve KittyTune’daki bağlantısı, aşağıda işaretlediklerinle birlikte kaldırılır. Korumalı parçalar PlayReady üzerinden çalmaya devam eder.</string>
     <string name="drm_unwiz_files_title">KittyTune’un Linux kalıbı (%1$s)</string>
     <string name="drm_unwiz_files_body">Widevine modülünü ve ktcdm programını içeren minik dağıtım.</string>
     <string name="drm_unwiz_settings_title">KittyTune’un WSL ayarları</string>

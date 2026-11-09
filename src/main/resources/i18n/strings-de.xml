@@ -3432,6 +3432,14 @@
     <string name="drm_unwiz_leftover_title">Die KittyTune-Dateien in %1$s</string>
     <string name="drm_unwiz_leftover_body">Dort hinterlassen von einer älteren Version, einem Skript oder einer manuellen Installation. Nur diese Ordner werden gelöscht, sonst nichts in dieser Distribution:</string>
     <string name="drm_unwiz_step_leftovers">Andere Linux-Distributionen werden bereinigt</string>
+    <string name="drm_unwiz_wsl_title">WSL auch aus Windows entfernen</string>
+    <string name="drm_unwiz_wsl_body">Kein anderes Linux nutzt es auf diesem PC. WSL und seine Windows-Komponenten werden entfernt, für ein System wie vor KittyTune. Erfordert Administratorrechte und einen Neustart.</string>
+    <string name="drm_unwiz_wsl_platform_kept">Die Plattform für virtuelle Computer bleibt aktiviert: Sie war schon vor KittyTune aktiviert.</string>
+    <string name="drm_unwiz_wsl_kept_title">WSL bleibt erhalten</string>
+    <string name="drm_unwiz_wsl_kept_body">Andere Linux-Distributionen nutzen es noch: %1$s. Um auch WSL zu entfernen, entferne sie zuerst.</string>
+    <string name="drm_unwiz_step_wsl">WSL wird entfernt</string>
+    <string name="drm_unwiz_wsl_refused">Windows hat keine Berechtigung erhalten, WSL zu entfernen. Alles andere ist entfernt; du kannst es erneut versuchen.</string>
+    <string name="drm_unwiz_wsl_restart">Starte Windows neu, um das Entfernen von WSL abzuschließen.</string>
     <string name="drm_wiz_step_probe">Modul prüfen</string>
     <string name="drm_wiz_step_connect">Mit KittyTune verbinden</string>
     <string name="drm_wiz_details_show">Details anzeigen</string>
@@ -3492,7 +3500,7 @@
     <string name="pref_drm_wsl_uninstall_title">WSL-Modul entfernen</string>
     <string name="pref_drm_wsl_uninstall_desc">Entfernt das Linux-Abbild von KittyTune und hinterlässt ein sauberes System</string>
     <string name="drm_unwiz_title">WSL-Modul entfernen</string>
-    <string name="drm_unwiz_body">Das Linux-Abbild von KittyTune und seine Verknüpfung in KittyTune werden entfernt, sonst nichts auf deinem PC. Geschützte Titel laufen weiter über PlayReady.</string>
+    <string name="drm_unwiz_body">Das Linux-Abbild von KittyTune und seine Verknüpfung in KittyTune werden entfernt, dazu alles, was du unten ankreuzt. Geschützte Titel laufen weiter über PlayReady.</string>
     <string name="drm_unwiz_files_title">Das Linux-Abbild von KittyTune (%1$s)</string>
     <string name="drm_unwiz_files_body">Die winzige Distribution mit dem Widevine-Modul und dem Programm ktcdm.</string>
     <string name="drm_unwiz_settings_title">Die WSL-Einstellungen von KittyTune</string>
