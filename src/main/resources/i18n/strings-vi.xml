@@ -3286,9 +3286,13 @@
     <string name="drm_wiz_step_download">Đang tải Linux</string>
     <string name="drm_wiz_step_import">Đang cài Linux</string>
     <string name="drm_resume_toast">Nhạc được bảo vệ: có thể tiếp tục cài đặt. Mở Cài đặt › Khác › Nhạc được bảo vệ.</string>
-    <string name="drm_unwiz_feature_title">Tắt luôn thành phần WSL1 của Windows</string>
+    <string name="drm_unwiz_feature_title">Tắt luôn thành phần WSL%1$d của Windows</string>
     <string name="drm_unwiz_feature_body">Không có Linux nào khác dùng nó trên máy này. Tắt nó cần quyền quản trị và khởi động lại. Hãy để bật nếu bạn có thể dùng lại nhạc được bảo vệ.</string>
-    <string name="drm_unwiz_step_feature">Đang tắt thành phần WSL1</string>
+    <string name="drm_unwiz_step_feature">Đang tắt thành phần WSL%1$d</string>
+    <string name="drm_unwiz_scanning">Đang tìm tệp KittyTune trong các bản phân phối Linux của bạn…</string>
+    <string name="drm_unwiz_leftover_title">Tệp KittyTune trong %1$s</string>
+    <string name="drm_unwiz_leftover_body">Do một phiên bản cũ, một tập lệnh hoặc một lần cài thủ công để lại. Chỉ các thư mục này bị xóa, không gì khác trong bản phân phối đó:</string>
+    <string name="drm_unwiz_step_leftovers">Đang dọn các bản phân phối Linux khác</string>
     <string name="drm_wiz_step_probe">Kiểm tra mô-đun</string>
     <string name="drm_wiz_step_connect">Kết nối với KittyTune</string>
     <string name="drm_wiz_details_show">Hiện chi tiết</string>
@@ -3361,11 +3365,11 @@
     <string name="drm_unwiz_step_distro">Đang xóa ảnh Linux</string>
     <string name="drm_unwiz_step_settings">Đặt lại KittyTune</string>
     <string name="drm_unwiz_failed">Việc gỡ đã dừng ở bước “%1$s”.</string>
-    <string name="drm_unwiz_refused">Windows không được cấp quyền tắt thành phần WSL1. Mọi thứ khác đã được gỡ; bạn có thể thử lại.</string>
+    <string name="drm_unwiz_refused">Windows không được cấp quyền tắt thành phần WSL%1$d. Mọi thứ khác đã được gỡ; bạn có thể thử lại.</string>
     <string name="drm_unwiz_removed">Đã xóa tất cả.</string>
     <string name="drm_unwiz_done_title">Máy của bạn đã sạch</string>
     <string name="drm_unwiz_done_body">Không còn gì của mô-đun WSL của KittyTune. Nhạc được bảo vệ phát qua PlayReady.</string>
-    <string name="drm_unwiz_restart">Khởi động lại Windows để hoàn tất việc tắt thành phần WSL1.</string>
+    <string name="drm_unwiz_restart">Khởi động lại Windows để hoàn tất việc tắt thành phần WSL%1$d.</string>
     <string name="drm_unwiz_restart_now">Khởi động lại ngay</string>
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Nhạc được bảo vệ</string>

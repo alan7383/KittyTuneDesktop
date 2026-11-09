@@ -3205,9 +3205,13 @@
     <string name="drm_wiz_step_download">Загрузка Linux</string>
     <string name="drm_wiz_step_import">Установка Linux</string>
     <string name="drm_resume_toast">Защищённые треки: настройку можно продолжить. Откройте Настройки › Разное › Защищённые треки.</string>
-    <string name="drm_unwiz_feature_title">Также отключить компонент WSL1 в Windows</string>
+    <string name="drm_unwiz_feature_title">Также отключить компонент WSL%1$d в Windows</string>
     <string name="drm_unwiz_feature_body">На этом ПК его не использует ни один другой Linux. Для отключения нужны права администратора и перезагрузка. Оставьте его включённым, если, возможно, снова будете слушать защищённые треки.</string>
-    <string name="drm_unwiz_step_feature">Отключение компонента WSL1</string>
+    <string name="drm_unwiz_step_feature">Отключение компонента WSL%1$d</string>
+    <string name="drm_unwiz_scanning">Поиск файлов KittyTune в ваших дистрибутивах Linux…</string>
+    <string name="drm_unwiz_leftover_title">Файлы KittyTune в %1$s</string>
+    <string name="drm_unwiz_leftover_body">Остались от старой версии, скрипта или ручной установки. Удаляются только эти папки, больше ничего в этом дистрибутиве:</string>
+    <string name="drm_unwiz_step_leftovers">Очистка других дистрибутивов Linux</string>
     <string name="drm_wiz_step_probe">Проверка модуля</string>
     <string name="drm_wiz_step_connect">Подключение к KittyTune</string>
     <string name="drm_wiz_details_show">Показать подробности</string>
@@ -3280,11 +3284,11 @@
     <string name="drm_unwiz_step_distro">Удаление образа Linux</string>
     <string name="drm_unwiz_step_settings">Сброс KittyTune</string>
     <string name="drm_unwiz_failed">Удаление остановилось на шаге «%1$s».</string>
-    <string name="drm_unwiz_refused">Windows не получила разрешения отключить компонент WSL1. Всё остальное удалено; можно попробовать снова.</string>
+    <string name="drm_unwiz_refused">Windows не получила разрешения отключить компонент WSL%1$d. Всё остальное удалено; можно попробовать снова.</string>
     <string name="drm_unwiz_removed">Всё удалено.</string>
     <string name="drm_unwiz_done_title">Ваш ПК чист</string>
     <string name="drm_unwiz_done_body">От модуля WSL KittyTune ничего не осталось. Защищённые треки воспроизводятся через PlayReady.</string>
-    <string name="drm_unwiz_restart">Перезагрузите Windows, чтобы завершить отключение компонента WSL1.</string>
+    <string name="drm_unwiz_restart">Перезагрузите Windows, чтобы завершить отключение компонента WSL%1$d.</string>
     <string name="drm_unwiz_restart_now">Перезагрузить сейчас</string>
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Защищённые треки</string>

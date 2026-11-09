@@ -3206,9 +3206,13 @@
     <string name="drm_wiz_step_download">Linux indiriliyor</string>
     <string name="drm_wiz_step_import">Linux kuruluyor</string>
     <string name="drm_resume_toast">Korumalı parçalar: kurulum devam etmeye hazır. Ayarlar › Diğer › Korumalı parçalar’ı aç.</string>
-    <string name="drm_unwiz_feature_title">Windows’un WSL1 bileşenini de kapat</string>
+    <string name="drm_unwiz_feature_title">Windows’un WSL%1$d bileşenini de kapat</string>
     <string name="drm_unwiz_feature_body">Bu bilgisayarda başka hiçbir Linux onu kullanmıyor. Kapatmak yönetici izni ve yeniden başlatma gerektirir. Korumalı parçaları yeniden kullanabileceksen açık bırak.</string>
-    <string name="drm_unwiz_step_feature">WSL1 bileşeni kapatılıyor</string>
+    <string name="drm_unwiz_step_feature">WSL%1$d bileşeni kapatılıyor</string>
+    <string name="drm_unwiz_scanning">Linux dağıtımlarında KittyTune dosyaları aranıyor…</string>
+    <string name="drm_unwiz_leftover_title">%1$s içindeki KittyTune dosyaları</string>
+    <string name="drm_unwiz_leftover_body">Eski bir sürüm, bir betik ya da elle yapılan bir kurulumdan kaldı. Yalnızca bu klasörler silinir, o dağıtımdaki başka hiçbir şey değil:</string>
+    <string name="drm_unwiz_step_leftovers">Diğer Linux dağıtımları temizleniyor</string>
     <string name="drm_wiz_step_probe">Modülün doğrulanması</string>
     <string name="drm_wiz_step_connect">KittyTune’a bağlanma</string>
     <string name="drm_wiz_details_show">Ayrıntıları göster</string>
@@ -3281,11 +3285,11 @@
     <string name="drm_unwiz_step_distro">Linux kalıbı siliniyor</string>
     <string name="drm_unwiz_step_settings">KittyTune sıfırlanıyor</string>
     <string name="drm_unwiz_failed">Kaldırma “%1$s” adımında durdu.</string>
-    <string name="drm_unwiz_refused">Windows’a WSL1 bileşenini kapatma izni verilmedi. Geri kalan her şey kaldırıldı; yeniden deneyebilirsin.</string>
+    <string name="drm_unwiz_refused">Windows’a WSL%1$d bileşenini kapatma izni verilmedi. Geri kalan her şey kaldırıldı; yeniden deneyebilirsin.</string>
     <string name="drm_unwiz_removed">Her şey kaldırıldı.</string>
     <string name="drm_unwiz_done_title">Bilgisayarın temiz</string>
     <string name="drm_unwiz_done_body">KittyTune’un WSL modülünden hiçbir şey kalmadı. Korumalı parçalar PlayReady üzerinden çalar.</string>
-    <string name="drm_unwiz_restart">WSL1 bileşenini kapatmayı bitirmek için Windows’u yeniden başlat.</string>
+    <string name="drm_unwiz_restart">WSL%1$d bileşenini kapatmayı bitirmek için Windows’u yeniden başlat.</string>
     <string name="drm_unwiz_restart_now">Şimdi yeniden başlat</string>
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Korumalı parçalar</string>

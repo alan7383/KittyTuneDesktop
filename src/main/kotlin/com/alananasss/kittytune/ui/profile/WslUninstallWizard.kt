@@ -76,13 +76,28 @@ private enum class UninstallPage { WHAT, REMOVE, DONE }
 
 /** State kept above the sliding pages, so going back does not lose a check that took seconds. */
 internal class UninstallState {
-    /** Also turn the WSL1 Windows component back off (admin + restart); off by default — it is harmless to leave. */
+    /** Also turn the Windows component back off (admin + restart); off by default — it is harmless to leave. */
     var removeFeature by mutableStateOf(false)
     /**
-     * Whether that choice is offered at all: the component is on and no other distribution runs on it.
-     * Null while it is being checked.
+     * The WSL version (1 or 2) whose component that choice turns off — the one KittyTune's distribution
+     * ran on — or null when it is not offered (off already, or another distribution still needs it).
      */
-    var featureRemovable by mutableStateOf<Boolean?>(null)
+    var featureVersion by mutableStateOf<Int?>(null)
+
+    /** What [WslSidecarSetup.uninstall] is asked to turn off: nothing unless offered and ticked. */
+    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature }
+
+    /** Whether KittyTune's own distribution is there; null while checking. */
+    var ourDistroPresent by mutableStateOf<Boolean?>(null)
+
+    /** KittyTune files found in other distributions; null while the scan runs. */
+    var leftovers by mutableStateOf<List<WslSidecarSetup.Leftover>?>(null)
+
+    /** The distributions whose leftovers are ticked for removal (all of them by default: they are ours). */
+    var cleanDistros by mutableStateOf<Set<String>>(emptySet())
+
+    val chosenLeftovers: List<WslSidecarSetup.Leftover>
+        get() = leftovers.orEmpty().filter { it.distro in cleanDistros }
 
     var steps by mutableStateOf<List<UninstallStep>>(emptyList())
     val states = mutableStateListOf<StepState>()
@@ -98,9 +113,9 @@ internal class UninstallState {
  * Removes the WSL method from the PC, for whoever chose it and wants their machine back as it was.
  *
  * It says first, in plain words, what goes: KittyTune's own Linux image (the `kittytune-cdm`
- * distribution) and its link in KittyTune. Turning the WSL1 Windows component back off is offered as a
- * choice, unticked, and only when no other distribution runs on it. Then it does all of it, and protected
- * tracks go back to PlayReady.
+ * distribution) and its link in KittyTune. Turning back off the Windows component it ran on (WSL1's, or
+ * WSL2's virtual machine platform) is offered as a choice, unticked, and only when no other distribution
+ * runs on it. Then it does all of it, and protected tracks go back to PlayReady.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -111,13 +126,19 @@ fun WslUninstallWizard(onClose: () -> Unit) {
     val index = pages.indexOf(page)
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
-        val removable = WslSidecarSetup.wsl1FeatureRemovable()
-        un.featureRemovable = removable
-        if (!removable) un.removeFeature = false
+        un.ourDistroPresent = WslSidecarSetup.imported()
+        un.featureVersion = WslSidecarSetup.removableFeature()
+        if (un.featureVersion == null) un.removeFeature = false
+        // Files an older version, a script or a manual install left in other distributions.
+        val found = WslSidecarSetup.findLeftovers()
+        un.cleanDistros = found.map { it.distro }.toSet()
+        un.leftovers = found
     }
 
     val start: () -> Unit = start@{
-        un.steps = WslSidecarSetup.uninstallSteps(un.removeFeature)
+        if (un.leftovers == null) return@start
+        val leftovers = un.chosenLeftovers
+        un.steps = WslSidecarSetup.uninstallSteps(un.featureToRemove != null, leftovers.isNotEmpty())
         un.states.clear()
         un.states.addAll(List(un.steps.size) { StepState.PENDING })
         un.failure = null
@@ -128,7 +149,8 @@ fun WslUninstallWizard(onClose: () -> Unit) {
             var current: UninstallStep? = null
             try {
                 un.restartNeeded = WslSidecarSetup.uninstall(
-                    removeFeature = un.removeFeature,
+                    featureVersion = un.featureToRemove,
+                    leftovers = leftovers,
                     onStep = { next ->
                         current?.let { un.states[un.steps.indexOf(it)] = StepState.DONE }
                         current = next
@@ -143,8 +165,8 @@ fun WslUninstallWizard(onClose: () -> Unit) {
                 un.succeeded = true
             } catch (e: WslSidecarSetup.UninstallException) {
                 un.states[un.steps.indexOf(e.step)] = StepState.FAILED
-                un.failure = if (e.refused) str("drm_unwiz_refused")
-                else str("drm_unwiz_failed", uninstallStepLabel(e.step)) + "\n" + e.message
+                un.failure = if (e.refused) str("drm_unwiz_refused", un.featureVersion ?: 1)
+                else str("drm_unwiz_failed", uninstallStepLabel(e.step, un.featureVersion)) + "\n" + e.message
                 un.showLog = !e.refused
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -218,6 +240,8 @@ fun WslUninstallWizard(onClose: () -> Unit) {
                     when (page) {
                         UninstallPage.WHAT -> Button(
                             shapes = ButtonDefaults.shapes(),
+                            // Not before the scan has said what there is to remove.
+                            enabled = un.leftovers != null,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error,
                                 contentColor = MaterialTheme.colorScheme.onError,
@@ -260,15 +284,35 @@ internal fun WhatPage(un: UninstallState) {
     Hero(MaterialShapes.Cookie9Sided, Icons.Rounded.DeleteSweep)
     StepTitle(str("drm_unwiz_title"), str("drm_unwiz_body"))
 
-    ExplainRow(Icons.Rounded.Folder, str("drm_unwiz_files_title", WslSidecarSetup.DISTRO), str("drm_unwiz_files_body"))
+    if (un.ourDistroPresent != false) {
+        ExplainRow(Icons.Rounded.Folder, str("drm_unwiz_files_title", WslSidecarSetup.DISTRO), str("drm_unwiz_files_body"))
+    }
     ExplainRow(Icons.Rounded.Settings, str("drm_unwiz_settings_title"), str("drm_unwiz_settings_body"))
+
+    // KittyTune files outside the official setup, in the user's other distributions: theirs to tick off.
+    val leftovers = un.leftovers
+    if (leftovers == null) {
+        WaitingCard(str("drm_unwiz_scanning"))
+    } else {
+        leftovers.forEach { leftover ->
+            ChoiceCard(
+                checked = leftover.distro in un.cleanDistros,
+                title = str("drm_unwiz_leftover_title", leftover.distro),
+                body = str("drm_unwiz_leftover_body") + "\n" + leftover.paths.joinToString("\n"),
+                warning = false,
+                onToggle = { on ->
+                    un.cleanDistros = if (on) un.cleanDistros + leftover.distro else un.cleanDistros - leftover.distro
+                },
+            )
+        }
+    }
 
     // The Windows component is left on by default: it is harmless, and turning it off needs admin + a
     // restart. Only offered when nothing else runs on it.
-    if (un.featureRemovable == true) {
+    un.featureVersion?.let { version ->
         ChoiceCard(
             checked = un.removeFeature,
-            title = str("drm_unwiz_feature_title"),
+            title = str("drm_unwiz_feature_title", version),
             body = str("drm_unwiz_feature_body"),
             warning = true,
             onToggle = { un.removeFeature = it },
@@ -327,7 +371,7 @@ internal fun RemovePage(un: UninstallState, onRetry: () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             un.steps.forEachIndexed { i, s ->
-                SetupStepRow(uninstallStepLabel(s), un.states.getOrElse(i) { StepState.PENDING })
+                SetupStepRow(uninstallStepLabel(s, un.featureVersion), un.states.getOrElse(i) { StepState.PENDING })
             }
             if (un.running || un.succeeded) {
                 val done = un.states.count { it == StepState.DONE }
@@ -371,7 +415,7 @@ internal fun DonePage(un: UninstallState) {
     if (un.restartNeeded) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(str("drm_unwiz_restart"), style = MaterialTheme.typography.bodyLarge)
+                Text(str("drm_unwiz_restart", un.featureVersion ?: 1), style = MaterialTheme.typography.bodyLarge)
                 FilledTonalButton(
                     shapes = ButtonDefaults.shapes(),
                     enabled = !restarting,
@@ -391,11 +435,10 @@ internal fun DonePage(un: UninstallState) {
     }
 }
 
-private fun uninstallStepLabel(step: UninstallStep): String = str(
-    when (step) {
-        UninstallStep.STOP -> "drm_unwiz_step_stop"
-        UninstallStep.DISTRO -> "drm_unwiz_step_distro"
-        UninstallStep.SETTINGS -> "drm_unwiz_step_settings"
-        UninstallStep.FEATURE -> "drm_unwiz_step_feature"
-    }
-)
+private fun uninstallStepLabel(step: UninstallStep, featureVersion: Int?): String = when (step) {
+    UninstallStep.STOP -> str("drm_unwiz_step_stop")
+    UninstallStep.DISTRO -> str("drm_unwiz_step_distro")
+    UninstallStep.SETTINGS -> str("drm_unwiz_step_settings")
+    UninstallStep.LEFTOVERS -> str("drm_unwiz_step_leftovers")
+    UninstallStep.FEATURE -> str("drm_unwiz_step_feature", featureVersion ?: 1)
+}

@@ -3206,9 +3206,13 @@
     <string name="drm_wiz_reboot_now">Redémarrer maintenant</string>
     <string name="drm_wiz_step_download">Téléchargement de Linux</string>
     <string name="drm_wiz_step_import">Installation de Linux</string>
-    <string name="drm_unwiz_feature_title">Désactiver aussi le composant WSL1 de Windows</string>
+    <string name="drm_unwiz_feature_title">Désactiver aussi le composant WSL%1$d de Windows</string>
     <string name="drm_unwiz_feature_body">Aucun autre Linux ne l’utilise sur ce PC. Le désactiver demande l’autorisation administrateur et un redémarrage. Laisse-le activé si tu risques de réutiliser les titres protégés.</string>
-    <string name="drm_unwiz_step_feature">Désactivation du composant WSL1</string>
+    <string name="drm_unwiz_step_feature">Désactivation du composant WSL%1$d</string>
+    <string name="drm_unwiz_scanning">Recherche de fichiers KittyTune dans tes distributions Linux…</string>
+    <string name="drm_unwiz_leftover_title">Les fichiers KittyTune dans %1$s</string>
+    <string name="drm_unwiz_leftover_body">Laissés par une ancienne version, un script ou une installation manuelle. Seuls ces dossiers sont supprimés, rien d’autre dans cette distribution :</string>
+    <string name="drm_unwiz_step_leftovers">Nettoyage des autres distributions Linux</string>
     <string name="drm_wiz_setup_title">Installer le module Linux</string>
     <string name="drm_wiz_setup_body">KittyTune s’occupe de tout, aucune commande à taper : il télécharge son image Linux (environ 11 Mo), récupère le module Widevine de Chrome pour Linux (environ 140 Mo depuis les serveurs de Google, seul le module est gardé), puis vérifie qu’il fonctionne. Environ 60 Mo restent sur le disque.</string>
     <string name="drm_wiz_setup_start">Lancer la configuration</string>
@@ -3281,11 +3285,11 @@
     <string name="drm_unwiz_step_distro">Suppression de l’image Linux</string>
     <string name="drm_unwiz_step_settings">Réinitialisation de KittyTune</string>
     <string name="drm_unwiz_failed">La suppression s’est arrêtée à l’étape « %1$s ».</string>
-    <string name="drm_unwiz_refused">Windows n’a pas reçu l’autorisation de désactiver le composant WSL1. Tout le reste est supprimé ; tu peux réessayer.</string>
+    <string name="drm_unwiz_refused">Windows n’a pas reçu l’autorisation de désactiver le composant WSL%1$d. Tout le reste est supprimé ; tu peux réessayer.</string>
     <string name="drm_unwiz_removed">Tout est supprimé.</string>
     <string name="drm_unwiz_done_title">Ton PC est propre</string>
     <string name="drm_unwiz_done_body">Il ne reste rien du module WSL de KittyTune. Les titres protégés passent par PlayReady.</string>
-    <string name="drm_unwiz_restart">Redémarre Windows pour finir de désactiver le composant WSL1.</string>
+    <string name="drm_unwiz_restart">Redémarre Windows pour finir de désactiver le composant WSL%1$d.</string>
     <string name="drm_unwiz_restart_now">Redémarrer maintenant</string>
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Titres protégés</string>

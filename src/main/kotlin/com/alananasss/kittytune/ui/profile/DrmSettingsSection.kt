@@ -287,7 +287,12 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
         }
         // Offered whenever something of the WSL method may still be on the PC, including after switching
         // back to PlayReady: that is exactly when someone wants it gone.
-        val hasWslLeftovers = remember(backend) { WslSidecarSetup.hasLeftovers() }
+        // Also when other distributions exist: an older version, a script or a manual install may have left
+        // KittyTune files in them, which the removal assistant finds. Listing them starts nothing.
+        var hasWslLeftovers by remember(backend) { mutableStateOf(WslSidecarSetup.hasLeftovers()) }
+        LaunchedEffect(backend) {
+            if (!hasWslLeftovers) hasWslLeftovers = WslSidecarSetup.otherDistributionsRegistered()
+        }
         val wslUninstallRow: @Composable (Shape) -> Unit = { shape ->
             SettingsItem(
                 shape = shape,

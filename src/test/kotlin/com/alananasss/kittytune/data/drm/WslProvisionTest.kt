@@ -5,6 +5,8 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.utils.Config
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -16,7 +18,11 @@ import java.net.URL
  * track decrypts through *that config* (not an env override). Opt-in and heavy (downloads the rootfs and
  * Chrome's .deb), and it restores the user's backend preference afterwards.
  *
- *   KITTYTUNE_RUN_PROVISION=1 KITTYTUNE_SC_CLIENT_ID=<fresh web id> \
+ * Then it uninstalls, and checks nothing is left: the distribution unregistered (WSL1's files or
+ * WSL2's virtual disk), its folder, the config, and protected tracks back on PlayReady.
+ * KITTYTUNE_PROVISION_VERSION picks WSL1 (default) or WSL2.
+ *
+ *   KITTYTUNE_RUN_PROVISION=1 KITTYTUNE_PROVISION_VERSION=2 KITTYTUNE_SC_CLIENT_ID=<fresh web id> \
  *     ./gradlew :test --tests "*WslProvisionTest" --no-daemon --no-configuration-cache --rerun-tasks
  */
 class WslProvisionTest {
@@ -28,12 +34,13 @@ class WslProvisionTest {
         val clientId = System.getenv("KITTYTUNE_SC_CLIENT_ID")
         assumeTrue("set KITTYTUNE_SC_CLIENT_ID", !clientId.isNullOrBlank())
 
+        val version = System.getenv("KITTYTUNE_PROVISION_VERSION")?.toIntOrNull() ?: 1
         val prefs = PlayerPreferences()
         val originalBackend = prefs.getProtectedBackend()
         try {
             Config.updateClientId(clientId!!)
             WslSidecarSetup.provision(
-                version = 1,
+                version = version,
                 onStep = { println("step: $it") },
                 onLine = { println("  $it") },
             )
@@ -44,6 +51,19 @@ class WslProvisionTest {
             val bytes = adapter.getInputStream(0).use { it.readBytes() }
             println("  decrypted the whole track: ${bytes.size} B")
             assertTrue("too few bytes; decryption failed", bytes.size > 100_000)
+            assertEquals(version, WslSidecarSetup.detect().installedVersion)
+
+            // And the uninstall leaves nothing behind.
+            CdmSidecar.reset()
+            WslSidecarSetup.uninstall(featureVersion = null, onStep = { println("uninstall: $it") }, onLine = { println("  $it") })
+            val after = WslSidecarSetup.detect()
+            println("  after uninstall: ${after.state}")
+            assertTrue("the distribution is still registered", after.state != WslSidecarSetup.State.SET_UP && after.installedVersion == null)
+            val local = java.io.File(System.getenv("LOCALAPPDATA"), "KittyTune")
+            assertFalse("the distribution folder is left", java.io.File(local, "wsl/${WslSidecarSetup.DISTRO}").exists())
+            assertFalse("the sidecar config is left", java.io.File(local, "cdm-sidecar.json").exists())
+            assertEquals(ProtectedBackend.PLAYREADY, ProtectedBackend.current)
+            assertFalse("still connected after uninstall", CdmSidecar.verify())
         } finally {
             // Leave the user's app as it was (the distro stays imported — a harmless head start).
             prefs.setProtectedBackend(originalBackend)
