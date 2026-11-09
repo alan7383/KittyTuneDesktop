@@ -1,6 +1,6 @@
 package com.alananasss.kittytune.data.drm
 
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
+import com.alananasss.kittytune.data.drm.NativeCdmSetup
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.domain.Transcoding
@@ -46,13 +46,13 @@ class ProtectedTracksNoticeTest {
 
     @Test
     fun `off by default on Windows only`() {
-        assertEquals(!WindowsPlayReadyRuntime.windows, PlayerPreferences().getProtectedTracksEnabled())
+        assertEquals(!NativeCdmSetup.windows, PlayerPreferences().getProtectedTracksEnabled())
         assertFalse(PlayerPreferences().hasProtectedTracksChoice())
     }
 
     @Test
     fun `the offer is made once, and never to someone who chose`() {
-        assumeTrue("the offer is Windows-only", WindowsPlayReadyRuntime.windows)
+        assumeTrue("the offer is Windows-only", NativeCdmSetup.windows)
         ProtectedTracksNotice.onProtectedTrackSkipped()
         assertEquals(ProtectedTracksNotice.Kind.OFFER_ENABLE, ProtectedTracksNotice.current.value?.kind)
 

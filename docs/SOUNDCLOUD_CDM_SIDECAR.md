@@ -76,33 +76,61 @@ $env:KITTYTUNE_CDM_SIDECAR = 'C:\tools\ktcdm.exe C:\tools\libwidevinecdm.so'
 
 Sans variable, sans fichier, et sans distribution WSL détectable, l'option est simplement absente.
 
-## Variante mesurée : le module Linux chargé directement sous Windows
+## La méthode par défaut : le module Linux chargé directement sous Windows
 
 Depuis le 10 novembre 2026, le `.so` Linux tourne **nativement sous Windows**, sans WSL, sans machine
 virtuelle et sans processus Linux : `src/main/cpp/widevinelinux/` mappe le binaire, applique ses
 relocations, installe un TCB Linux par thread et fournit les 184 symboles qu'il importe de la glibc.
 
-`ktcdm.exe` (construit par `scripts/build-native-cdm.ps1`) est le **même démon** : il compile
-`cdmsidecar/CdmSidecar.cpp` et `WidevineBridge.cpp` est remplacé par `cdm_bridge.c`, qui expose
-exactement la même ABI C. Le protocole, les opcodes et le probe `RESET_SESSION` sont identiques, donc
-l'app n'a rien à changer : c'est encore un sidecar, simplement local et natif.
+C'est la méthode par défaut, et **PlayReady a été retiré** : il ne rendait aucun échantillon, donc ni
+égaliseur, ni effets, ni visualiseur, ni téléchargement.
 
-```powershell
-$env:KITTYTUNE_CDM_SIDECAR = 'C:\...\build\widevinelinux\ktcdm.exe C:\...\libwidevinecdm.so'
+### Ce que voit l'utilisateur
+
+Réglages › Divers › Titres protégés : l'assistant s'ouvre, propose **Natif** (par défaut) ou **WSL**
+(avancé), et, pour le natif, fait tout seul :
+
+1. il écrit le démon `ktcdm.exe` (livré dans l'app, 1,4 Mo) dans `%LOCALAPPDATA%\KittyTune\cdm` ;
+2. il télécharge le paquet de Chrome depuis Google (140 Mo), en extrait `libwidevinecdm.so` avec
+   `tar.exe` de Windows et le garde là (20 Mo) ;
+3. il écrit `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` ;
+4. il vérifie que le démon répond (`RESET_SESSION`), puis active les titres protégés.
+
+**Aucune invite administrateur, aucun composant Windows, aucun redémarrage.** Le paquet Chrome est
+supprimé après extraction ; il ne reste que le module.
+
+### Pourquoi le module n'est pas livré avec l'app
+
+`libwidevinecdm.so` est un binaire propriétaire de Google. Le redistribuer n'est pas permis, et il
+change à chaque version de Chrome — une copie figée dans un installeur serait à la fois un problème de
+licence et un problème de version. Le paquet est donc récupéré sur les serveurs de Google au moment de
+l'installation, exactement comme le faisait la méthode WSL. Le démon, lui, est libre : c'est le code
+de ce dépôt.
+
+### Ce qui a été mesuré
+
+Le test `NativeCdmSetupLiveTest` fait tout le parcours depuis le JVM de l'app :
+
+```
+step: DOWNLOAD   download: 140 MiB
+step: EXTRACT    extract: 20 MiB
+step: PROBE      probe: the daemon answers
+step: CONNECT    result: OK
+audio test: https://soundcloud.com/bladee1000/it-girl
+  licence: granted in 483 ms
+  decrypted: 209260 B -> 202311 B
+  decoded: aac, 44100 Hz, 2 ch, 20 frames
+  result: OK
 ```
 
-Ou, sans variable d'environnement, le fichier habituel `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` :
+C'est la chaîne du lecteur : `NativeCdmSetup` → `CdmSidecar` → `SoundCloudDrm` → `CencDecrypter` →
+FFmpeg. Le démon est le **même** que celui de WSL : `cdmsidecar/CdmSidecar.cpp` est compilé tel quel,
+seul le backend du CDM change (`cdm_bridge.c` remplace `WidevineBridge.cpp`).
 
-```json
-{ "command": ["C:\\...\\ktcdm.exe", "C:\\...\\libwidevinecdm.so"] }
-```
+### La méthode WSL reste
 
-Mesuré le 10 novembre 2026 sur `bladee1000/it-girl` : requête de licence de 1 702 octets, `HTTP 200`
-avec 615 octets de licence, 431 échantillons déchiffrés sur 431 (200 403 octets), **identiques octet
-pour octet** à ce que la configuration WSL1 produisait le 8 novembre. Trois sessions successives sur
-le même démon passent, ce qui est le rythme d'usage réel de l'app.
-
-Le module reste non redistribuable : `ktcdm.exe` ne l'embarque pas, il reçoit son chemin en argument.
+Elle n'est plus proposée en premier : elle garde son assistant, et sert aux machines où le chargeur ne
+peut pas tourner. Le même protocole, la même configuration, le même démon.
 
 ## Ce que le protocole transporte, et ce qu'il ne transporte pas
 

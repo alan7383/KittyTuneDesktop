@@ -17,20 +17,22 @@ import java.util.concurrent.TimeUnit
 /**
  * How protected tracks are played on Windows, chosen by the user.
  *
- * [PLAYREADY] is the OS renderer: nothing to install, but it never hands a sample back, so effects,
- * the visualizer and downloads stay off. [WSL] runs Chrome's Linux Widevine CDM inside a tiny Linux
- * distribution through [CdmSidecar]: the app decodes the audio itself, so everything works. When WSL
- * is chosen but does not answer, playback still falls back to PlayReady rather than skipping the track.
+ * [NATIVE] is the default and needs nothing but a download: Chrome's Linux Widevine module, run
+ * inside a Windows process by KittyTune's own loader ([NativeCdmSetup]). No virtual machine, no
+ * Windows feature, no administrator prompt, no restart — and the app decodes the audio itself, so
+ * effects, the visualizer and downloads all work. [WSL] is the same daemon inside a tiny Linux
+ * distribution, kept for machines where the loader cannot run (a CPU without `fsgsbase`, for
+ * instance); it is the advanced path now.
  *
  * Other platforms ignore this: they load the browser's CDM in-process.
  */
 enum class ProtectedBackend(val key: String) {
-    PLAYREADY("playready"),
+    NATIVE("native"),
     WSL("wsl");
 
     companion object {
         val current: ProtectedBackend
-            get() = if (PlayerPreferences().getProtectedBackend() == WSL.key) WSL else PLAYREADY
+            get() = if (PlayerPreferences().getProtectedBackend() == WSL.key) WSL else NATIVE
 
         /** Switches the method and drops everything resolved or licensed under the previous one. */
         fun select(backend: ProtectedBackend) {
@@ -805,7 +807,7 @@ internal object WslSidecarSetup {
     }
 
     /**
-     * Removes the distribution and KittyTune's link to it; protected tracks go back to PlayReady. Also
+     * Removes the distribution and KittyTune's link to it; protected tracks fall back to the native module. Also
      * deletes the [leftovers] chosen (KittyTune files in other distributions), the other distributions in
      * [deleteDistros] — the user's own, only ever when ticked — and then either removes WSL entirely
      * ([removeWsl], once no other distribution is left) or, when [featureVersion] is set, turns that version's
@@ -832,9 +834,9 @@ internal object WslSidecarSetup {
             onLine("== ${step.name.lowercase()}")
             when (step) {
                 UninstallStep.STOP -> {
-                    ProtectedBackend.select(ProtectedBackend.PLAYREADY)
+                    ProtectedBackend.select(ProtectedBackend.NATIVE)
                     runCatching { run(listOf("--terminate", DISTRO), timeoutMs = 30_000) }
-                    onLine("module stopped, protected tracks play through PlayReady")
+                    onLine("module stopped; protected tracks use the native module")
                 }
                 UninstallStep.DISTRO -> {
                     if (DISTRO.lowercase() !in registeredVersions()) {

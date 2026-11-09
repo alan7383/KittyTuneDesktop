@@ -89,7 +89,6 @@ private fun AudioFxDefinition.tooltip(): String {
 @Composable
 fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val isPrecise = viewModel.isPreciseSpeedEnabled
-    val protectedPlayback = protectedPlaybackInUse()
 
     var showBassBoostDialog by remember { mutableStateOf(false) }
     var showEarrapeDialog by remember { mutableStateOf(false) }
@@ -446,7 +445,9 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
         )
     }
 
-    val availableEffects = if (protectedPlayback) allEffects.filter { it.id in setOf("eight_d", "trance_gate", "rain") } else allEffects
+    // Every effect runs on protected tracks too: the CDM hands back plaintext samples, so the
+    // whole DSP chain is in the path.
+    val availableEffects = allEffects
     val pinnedTiles = remember(viewModel.pinnedAudioFx, availableEffects) {
         viewModel.pinnedAudioFx.mapNotNull { id -> availableEffects.find { it.id == id } }
     }
@@ -466,11 +467,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 .padding(bottom = 24.dp)
         ) {
             // The tab already says what this is, so the speed card leads (issue #66).
-            SpeedCard(viewModel, allowPitch = !protectedPlayback)
-            if (protectedPlayback) {
-                Text(str("drm_native_fx_available"), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
-            }
+            SpeedCard(viewModel, allowPitch = true)
             Spacer(Modifier.height(24.dp))
 
             // Special Effects Header

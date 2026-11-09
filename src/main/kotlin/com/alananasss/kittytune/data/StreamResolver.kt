@@ -10,7 +10,6 @@ import com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality
 import com.alananasss.kittytune.data.drm.SoundCloudDrm
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
 import com.alananasss.kittytune.data.drm.ProtectedBackend
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.CookieStore
@@ -269,7 +268,6 @@ object StreamResolver {
             val cached = streamCache[track.id]
             if (cached != null) {
                 if (cached.isUsable() && (!isRestricted(track) || (cached.stream.source != "soundcloud" && cached.stream.source != null))) {
-                    WindowsPlayReadyRuntime.rememberStream(cached.stream.url, cached.stream.licenseAuthToken)
                     return cached.stream
                 }
                 streamCache.remove(track.id)
@@ -820,11 +818,9 @@ object StreamResolver {
         // straight on to its other sources.
         val preferences = PlayerPreferences()
         val protectedEnabled = preferences.getProtectedTracksEnabled()
-        // On Windows the in-process Widevine CDM is always refused, so Widevine only counts when the
-        // user chose WSL; PlayReady stays the playback fallback while WSL does not answer.
-        val widevineAllowed = !WindowsPlayReadyRuntime.windows || ProtectedBackend.current == ProtectedBackend.WSL
-        val allowDrm = protectedEnabled &&
-            ((!forDownload && WindowsPlayReadyRuntime.isAvailable) || (widevineAllowed && SoundCloudDrm.canLicense))
+        // On Windows the in-process CDM is refused, so protected transcodings are offered only when a
+        // CDM that answers is registered — the licence and the samples have to come back here.
+        val allowDrm = protectedEnabled && SoundCloudDrm.canLicense
         val candidates = buildTranscodingCandidates(transcodingsWithMobile, qualityPref, forDownload, allowDrm)
 
         if (candidates.isEmpty()) {
@@ -930,13 +926,11 @@ object StreamResolver {
 
                 val isHlsLike = protocol == "hls" || protocol.contains("encrypted-hls") || streamInfoUrl.contains(".m3u8")
                 if (isHlsLike) {
-                    WindowsPlayReadyRuntime.rememberStream(streamInfoUrl, licenseAuthToken)
                     return ResolvedStream(streamInfoUrl, licenseAuthToken, mimeType = resolvedMime, source = "soundcloud")
                 }
 
                 // Progressive stream: if already a CDN media URL (sndcdn.com or .mp3), return directly without extra network request
                 if (streamInfoUrl.contains("sndcdn.com") || streamInfoUrl.contains(".mp3") || streamInfoUrl.contains("media-streaming.soundcloud.cloud")) {
-                    WindowsPlayReadyRuntime.rememberStream(streamInfoUrl, licenseAuthToken)
                     return ResolvedStream(streamInfoUrl, licenseAuthToken, mimeType = resolvedMime, source = "soundcloud")
                 }
 
@@ -953,7 +947,6 @@ object StreamResolver {
                     finalUrl.contains(".ogg") -> "audio/ogg"
                     else -> resolvedMime
                 }
-                WindowsPlayReadyRuntime.rememberStream(finalUrl, licenseAuthToken)
                 return ResolvedStream(finalUrl, licenseAuthToken, mimeType = finalMime, source = "soundcloud")
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1094,7 +1087,7 @@ object StreamResolver {
     suspend fun resolveStreamForBeatAnalysis(track: Track): ResolvedStream? {
         return withContext(Dispatchers.IO) {
             val cached = cachedStreamUrl(track.id)
-            if (!cached.isNullOrBlank() && WindowsPlayReadyRuntime.tokenFor(cached) == null) {
+            if (!cached.isNullOrBlank()) {
                 Logger.d("StreamResolver", "[BeatAnalysis] Using cached stream for '${track.title}'")
                 return@withContext ResolvedStream(cached)
             }

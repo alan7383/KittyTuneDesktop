@@ -2,9 +2,8 @@ package com.alananasss.kittytune.data.drm
 
 import com.alananasss.kittytune.utils.Config
 import com.alananasss.kittytune.utils.Logger
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
-import com.alananasss.kittytune.audio.WindowsProtectedPlayback
-import kotlinx.coroutines.CompletableDeferred
+
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -33,15 +32,12 @@ object DrmSelfTest {
     private const val FRAMES_TO_DECODE = 20
 
     /**
-     * Runs the whole chain and reports what happened.
+     * Runs the whole chain and reports what happened: resolve, licence, decrypt, decode.
      *
-     * @param widevine test the Widevine path (in-process CDM or the WSL sidecar) even on Windows,
-     *   where the PlayReady renderer is tested otherwise.
      * @param onLine called for each step, on a background thread, in order.
      * @return true when audio was actually decoded.
      */
     suspend fun run(
-        widevine: Boolean = SoundCloudDrm.usesSidecar,
         onLine: (String) -> Unit,
     ): Boolean = withContext(Dispatchers.IO) {
         val report = { line: String ->
@@ -81,25 +77,6 @@ object DrmSelfTest {
             val playlistUrl = stream.optString("url")
             if (licenseToken.isBlank() || playlistUrl.isBlank()) {
                 return@withContext fail(report, "no license token came back with the stream")
-            }
-
-            WindowsPlayReadyRuntime.bridgeDirectory?.takeIf { !widevine }?.let { root ->
-                report("  renderer: Windows PlayReady / protected audio")
-                val played = CompletableDeferred<Unit>()
-                val success = WindowsProtectedPlayback(root, playlistUrl, licenseToken, 0,
-                    onStatus = { status ->
-                        if (status.state == 3 && status.positionMs >= 500 && status.durationMs > 0) played.complete(Unit)
-                    },
-                    onError = { played.completeExceptionally(it) },
-                ).use { playback ->
-                    playback.volume(0.0) // Test a separate player without interrupting the current track.
-                    playback.play()
-                    kotlinx.coroutines.withTimeoutOrNull(30_000) { played.await(); true } == true
-                }
-                if (!success) return@withContext fail(report, "Windows protected player timed out")
-                report("  licence and protected playback: OK")
-                report("  result: OK")
-                return@withContext true
             }
 
             val playlist = getText(playlistUrl)

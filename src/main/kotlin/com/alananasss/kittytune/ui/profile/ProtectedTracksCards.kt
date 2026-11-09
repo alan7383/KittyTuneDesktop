@@ -54,7 +54,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.drm.ProtectedTracksNotice
@@ -62,18 +61,18 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import com.alananasss.kittytune.data.drm.NativeCdmSetup
 
 /** Whether the "protected tracks are here" card is still owed to this user. */
 internal fun protectedTracksAnnouncementDue(prefs: PlayerPreferences = PlayerPreferences()): Boolean =
     !prefs.getProtectedTracksAnnounced() && !prefs.hasProtectedTracksChoice() && !prefs.getDrmOnboardingDone()
 
 /**
- * Turns protected tracks on from a card or a notice: straight away with PlayReady on Windows, which needs nothing
- * installed. Returns false when that cannot work here (no PlayReady renderer), for the caller to open the
- * assistant instead, which explains why and offers WSL.
+ * Turns protected tracks on from a card or a notice. On Windows the module has to be downloaded once, so
+ * this returns false until it is: the caller then opens the assistant, which installs it.
  */
 private suspend fun enableProtectedTracks(): Boolean {
-    if (WindowsPlayReadyRuntime.windows && !withContext(Dispatchers.IO) { WindowsPlayReadyRuntime.isAvailable }) return false
+    if (NativeCdmSetup.windows && !withContext(Dispatchers.IO) { NativeCdmSetup.isInstalled() }) return false
     val prefs = PlayerPreferences()
     prefs.setProtectedTracksEnabled(true)
     prefs.setProtectedTracksAnnounced(true)
@@ -91,7 +90,7 @@ private suspend fun enableProtectedTracks(): Boolean {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing: androidx.compose.ui.unit.Dp = 0.dp) {
-    val windows = WindowsPlayReadyRuntime.windows
+    val windows = NativeCdmSetup.windows
     var visible by remember { mutableStateOf(protectedTracksAnnouncementDue()) }
     var enabled by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -268,7 +267,7 @@ fun ProtectedTracksNoticeHost(modifier: Modifier = Modifier) {
                         text = when {
                             enabled -> str("protected_ann_enabled")
                             kind == ProtectedTracksNotice.Kind.OFFER_ENABLE -> str("protected_hint_offer")
-                            WindowsPlayReadyRuntime.windows -> str("drm_unavailable_toast_windows").removePrefix("🔒").trim()
+                            NativeCdmSetup.windows -> str("drm_unavailable_toast_windows").removePrefix("🔒").trim()
                             else -> str("drm_unavailable_toast").removePrefix("🔒").trim()
                         },
                         style = MaterialTheme.typography.bodyMedium,

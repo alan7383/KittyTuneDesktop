@@ -70,7 +70,6 @@ import com.alananasss.kittytune.data.drm.DrmSelfTest
 import com.alananasss.kittytune.data.drm.NativeWidevineCdm
 import com.alananasss.kittytune.data.drm.ProtectedBackend
 import com.alananasss.kittytune.data.drm.WslSidecarSetup
-import com.alananasss.kittytune.audio.WindowsPlayReadyRuntime
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.SettingsGroup
@@ -80,13 +79,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.swing.JFileChooser
+import androidx.compose.material.icons.rounded.Download
+import com.alananasss.kittytune.data.drm.NativeCdmSetup
 
 /**
  * The page's name: Windows has no CDM to manage, so "Widevine CDM" would name something it never uses.
  * A getter, because the settings enum and the search index both read it.
  */
 internal val drmSettingsTitleKey: String
-    get() = if (WindowsPlayReadyRuntime.windows) "pref_drm_title_windows" else "pref_drm_title"
+    get() = if (NativeCdmSetup.windows) "pref_drm_title_windows" else "pref_drm_title"
 
 /**
  * Settings → protected SoundCloud tracks, whose page depends on who does the decrypting.
@@ -116,7 +117,7 @@ fun DrmSettingsSection() {
     var uninstalling by remember { mutableStateOf(false) }
 
     key(generation) {
-        if (WindowsPlayReadyRuntime.windows) {
+        if (NativeCdmSetup.windows) {
             WindowsDrmSection(onOpenWizard = { wizard = it }, onOpenUninstall = { uninstalling = true })
         } else {
             WidevineDrmSection(onOpenWizard = { wizard = it })
@@ -138,16 +139,19 @@ fun DrmSettingsSection() {
 }
 
 /**
- * Windows: pick the method, see where it stands, test it.
+ * Windows: pick the method, see where it stands, set it up, test it.
  *
- * WSL that is chosen but not (or no longer) answering is not an error the user caused: playback
- * quietly falls back to PlayReady meanwhile, and the page says so next to the way to fix it.
+ * [ProtectedBackend.NATIVE] is the default and asks for nothing but a download: no administrator, no
+ * restart, no virtual machine. [ProtectedBackend.WSL] runs the same daemon inside a small Linux
+ * distribution, for the machines where the loader cannot run.
+ *
+ * A method that is chosen but not answering is not an error the user caused: protected tracks are
+ * simply not offered until it is set up, and the page says so next to the way to fix it.
  */
 @Composable
 internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUninstall: () -> Unit = {}) {
     var backend by remember { mutableStateOf(ProtectedBackend.current) }
-    // Null until checked: the first check extracts the renderer, which is file work.
-    var playReady by remember { mutableStateOf<Boolean?>(null) }
+    var nativeReady by remember { mutableStateOf(false) }
     var detection by remember { mutableStateOf<WslSidecarSetup.Detection?>(null) }
     var wslConnected by remember { mutableStateOf(CdmSidecar.isInstalled) }
     var testing by remember { mutableStateOf(false) }
@@ -156,13 +160,16 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
     var showLog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        val ready = withContext(Dispatchers.IO) { WindowsPlayReadyRuntime.isAvailable }
-        playReady = ready
-        if (!ready && report == null) report = WindowsPlayReadyRuntime.failureReason
-    }
+    // Where the chosen method stands. The native one is a probe away; WSL needs its distribution
+    // looked at first. Both run off the UI thread: the probe starts a process.
     LaunchedEffect(backend) {
-        if (backend != ProtectedBackend.WSL) return@LaunchedEffect
+        if (backend == ProtectedBackend.NATIVE) {
+            nativeReady = withContext(Dispatchers.IO) {
+                NativeCdmSetup.isInstalled() && CdmSidecar.verify()
+            }
+            if (!nativeReady && report == null) report = CdmSidecar.lastFailure
+            return@LaunchedEffect
+        }
         detection = null
         val found = WslSidecarSetup.detect()
         detection = found
@@ -177,6 +184,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
             wslConnected = false
         }
     }
+    val connected = if (backend == ProtectedBackend.NATIVE) nativeReady else wslConnected
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         DrmBanner(
@@ -202,6 +210,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                             if (method != backend) {
                                 ProtectedBackend.select(method)
                                 backend = method
+                                nativeReady = false
                                 wslConnected = CdmSidecar.isInstalled
                                 passed = null
                             }
@@ -228,11 +237,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                                 )
                                 MethodInfoButton(method)
                             }
-                            if (method == ProtectedBackend.PLAYREADY) {
-                                PlayReadyStatus(playReady)
-                            } else {
-                                WslStatus(detection, wslConnected)
-                            }
+                            if (method == ProtectedBackend.NATIVE) NativeStatus(nativeReady) else WslStatus(detection, wslConnected)
                             MethodPoints(method)
                         }
                     }
@@ -253,11 +258,13 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 },
                 icon = Icons.Rounded.PlayCircle,
                 titleColor = if (result == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                enabled = !testing && if (backend == ProtectedBackend.WSL) wslConnected else playReady == true,
+                enabled = !testing && connected,
                 trailingContent = if (testing) ({ DrmSpinner() }) else null,
                 onClick = {
-                    val widevine = backend == ProtectedBackend.WSL
-                    val title = if (widevine) "WSL (${CdmSidecar.describe})" else "Windows PlayReady"
+                    val title = when (backend) {
+                        ProtectedBackend.NATIVE -> str("drm_method_native")
+                        ProtectedBackend.WSL -> "WSL (${CdmSidecar.describe})"
+                    }
                     report = title
                     showLog = true
                     scope.launch {
@@ -265,13 +272,40 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                         passed = null
                         val log = StringBuilder(title)
                         try {
-                            passed = DrmSelfTest.run(widevine = widevine) { line ->
+                            passed = DrmSelfTest.run { line ->
                                 log.append('\n').append(line)
                                 report = log.toString()
                             }
                         } finally {
                             testing = false
                         }
+                    }
+                },
+            )
+        }
+        val nativeSetupRow: @Composable (Shape) -> Unit = { shape ->
+            SettingsItem(
+                shape = shape,
+                title = str(if (nativeReady) "pref_drm_native_redo_title" else "pref_drm_native_setup_title"),
+                subtitle = str(if (nativeReady) "pref_drm_native_redo_desc" else "pref_drm_native_setup_desc"),
+                icon = Icons.Rounded.Download,
+                onClick = { onOpenWizard(DrmWizardStart.NATIVE) },
+            )
+        }
+        val nativeRemoveRow: @Composable (Shape) -> Unit = { shape ->
+            SettingsItem(
+                shape = shape,
+                title = str("pref_drm_native_remove_title"),
+                subtitle = str("pref_drm_native_remove_desc"),
+                icon = Icons.Rounded.DeleteSweep,
+                titleColor = MaterialTheme.colorScheme.error,
+                onClick = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { NativeCdmSetup.uninstall() }
+                        nativeReady = false
+                        passed = null
+                        report = str("pref_drm_native_removed")
+                        com.alananasss.kittytune.core.Toaster.show(str("pref_drm_native_removed"))
                     }
                 },
             )
@@ -285,10 +319,8 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 onClick = { onOpenWizard(DrmWizardStart.WSL) },
             )
         }
-        // Offered whenever something of the WSL method may still be on the PC, including after switching
-        // back to PlayReady: that is exactly when someone wants it gone.
-        // Also when other distributions exist: an older version, a script or a manual install may have left
-        // KittyTune files in them, which the removal assistant finds. Listing them starts nothing.
+        // Offered whenever something of the WSL method may still be on the PC: that is exactly when
+        // someone wants it gone. Listing them starts nothing.
         var hasWslLeftovers by remember(backend) { mutableStateOf(WslSidecarSetup.hasLeftovers()) }
         LaunchedEffect(backend) {
             if (!hasWslLeftovers) {
@@ -305,12 +337,14 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 onClick = onOpenUninstall,
             )
         }
+        val setupRow = if (backend == ProtectedBackend.NATIVE) nativeSetupRow else wslSetupRow
         SettingsGroup(
             items = when {
-                backend == ProtectedBackend.PLAYREADY -> listOf(testRow)
-                wslConnected -> listOf(testRow, wslSetupRow)
-                else -> listOf(wslSetupRow)
-            } + (if (hasWslLeftovers) listOf(wslUninstallRow) else emptyList()) + drmLogRow(report) { showLog = true },
+                connected -> listOf(testRow, setupRow)
+                else -> listOf(setupRow) + (if (backend == ProtectedBackend.NATIVE && NativeCdmSetup.isInstalled()) listOf(testRow) else emptyList())
+            } + (if (backend == ProtectedBackend.NATIVE && NativeCdmSetup.isInstalled()) listOf(nativeRemoveRow) else emptyList()) +
+                (if (hasWslLeftovers) listOf(wslUninstallRow) else emptyList()) +
+                drmLogRow(report) { showLog = true },
         )
 
         DrmHelpGroup(onOpenWizard, experimental = backend == ProtectedBackend.WSL)
@@ -334,16 +368,25 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
     }
 }
 
+/** Where the native module stands. */
 @Composable
-private fun PlayReadyStatus(available: Boolean?) {
-    when (available) {
-        null -> DrmStatusLine(str("pref_drm_searching"), Icons.Rounded.Search, MaterialTheme.colorScheme.onSurfaceVariant)
-        true -> DrmStatusLine(str("pref_drm_windows_ready"), Icons.Rounded.CheckCircle, MaterialTheme.colorScheme.primary)
-        false -> DrmStatusLine(str("pref_drm_windows_unavailable"), Icons.Rounded.ErrorOutline, MaterialTheme.colorScheme.error)
+private fun NativeStatus(ready: Boolean) {
+    if (ready) {
+        DrmStatusLine(str("pref_drm_native_ready"), Icons.Rounded.CheckCircle, MaterialTheme.colorScheme.primary)
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            DrmStatusLine(str("pref_drm_native_not_set_up"), Icons.Rounded.ErrorOutline, MaterialTheme.colorScheme.error)
+            Text(
+                str("pref_drm_native_not_set_up_hint"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 28.dp),
+            )
+        }
     }
 }
 
-/** Where WSL stands, and, when it is not answering, that PlayReady covers for it meanwhile. */
+/** Where WSL stands. */
 @Composable
 internal fun WslStatus(detection: WslSidecarSetup.Detection?, connected: Boolean) {
     val error = MaterialTheme.colorScheme.error
@@ -394,7 +437,7 @@ private fun DrmHelpGroup(onOpenWizard: (DrmWizardStart) -> Unit, experimental: B
     )
     AnimatedVisibility(experimental, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
         DrmExperimentalCard(
-            windows = WindowsPlayReadyRuntime.windows,
+            windows = NativeCdmSetup.windows,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
     }

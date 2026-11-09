@@ -49,7 +49,6 @@ object TrackLoudnessRepository {
         headers: Map<String, String> = emptyMap(),
         onComplete: ((TrackLoudnessInfo) -> Unit)? = null
     ) {
-        if (com.alananasss.kittytune.audio.WindowsPlayReadyRuntime.tokenFor(url) != null) return
         // getLoudness is now suspend, but we want scanTrackAsync to stay non-suspend (it's called
         // from non-suspend contexts). Check the cache synchronously; the DB miss is handled by the
         // launched scan below. The previous `if (getLoudness(track.id) != null) return` would have

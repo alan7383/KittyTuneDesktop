@@ -626,16 +626,18 @@ val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") 
         "-OutDir", outDir.get().asFile.absolutePath)
 }
 
-val compileWindowsPlayReady = tasks.register<Exec>("compileWindowsPlayReady") {
-    description = "Builds the unpackaged Windows PlayReady renderer from source."
+val compileCdmNativeHost = tasks.register<Exec>("compileCdmNativeHost") {
+    description = "Builds the native Linux-CDM host (ktcdm.exe) from source into generated resources."
     enabled = desktopIsWindows
-    val outDir = layout.buildDirectory.dir("generated/native-resources/native/playready")
-    inputs.files("scripts/build-windows-playready.ps1", "src/main/cpp/playready/DesktopProtectedPlayer.cpp",
-        "src/main/cpp/playready/PlayReadyCdm.h", "src/main/cpp/playready/MediaFoundationCompat.h")
-    outputs.file(outDir.map { it.file("KittyTuneProtectedPlayer.exe") })
+    val outDir = layout.buildDirectory.dir("generated/native-resources/native/widevinelinux")
+    inputs.dir("src/main/cpp/widevinelinux")
+    inputs.files("src/main/cpp/cdmsidecar/CdmSidecar.cpp", "src/main/cpp/widevine/content_decryption_module.h",
+        "scripts/build-native-cdm.ps1")
+    outputs.file(outDir.map { it.file("ktcdm.exe") })
     commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-        "-File", project.file("scripts/build-windows-playready.ps1").absolutePath,
-        "-OutputDirectory", outDir.get().asFile.absolutePath)
+        "-File", project.file("scripts/build-native-cdm.ps1").absolutePath,
+        "-OutputDirectory", outDir.get().asFile.absolutePath,
+        "-OnlyHost")
 }
 
 val compileMacNowPlayingHelper = tasks.register<Exec>("compileMacNowPlayingHelper") {
@@ -690,10 +692,10 @@ tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
     dependsOn(compileNativeWidevine)
     if (desktopIsWindows) dependsOn(compileWindowsSmtcBridge)
-    if (desktopIsWindows) dependsOn(compileWindowsPlayReady)
+    if (desktopIsWindows) dependsOn(compileCdmNativeHost)
     from(layout.buildDirectory.dir("generated/native-resources")) {
         if (desktopIsWindows) {
-            include("native/*.dll", "native/WindowsSmtcBridge.exe", "native/playready/KittyTuneProtectedPlayer.exe")
+            include("native/*.dll", "native/WindowsSmtcBridge.exe", "native/widevinelinux/ktcdm.exe")
         } else if (System.getProperty("os.name").lowercase().contains("mac")) {
             include("native/*.dylib")
         } else {

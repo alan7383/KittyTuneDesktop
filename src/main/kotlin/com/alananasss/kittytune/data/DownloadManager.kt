@@ -986,19 +986,7 @@ object DownloadManager {
                         // that would otherwise look like a click that did nothing at all.
                         Logger.e("DownloadManager", "Protected download failed for ${track.id}: ${e.message}")
                         withContext(Dispatchers.Main) {
-                            com.alananasss.kittytune.core.Toaster.show(
-                                str(
-                                    // PlayReady never downloads; with WSL a download can, so its failure
-                                    // is an ordinary one.
-                                    if (com.alananasss.kittytune.audio.WindowsPlayReadyRuntime.windows &&
-                                        !com.alananasss.kittytune.data.drm.SoundCloudDrm.usesSidecar
-                                    ) {
-                                        "drm_unavailable_toast_windows"
-                                    } else {
-                                        "drm_download_failed"
-                                    }
-                                )
-                            )
+                            com.alananasss.kittytune.core.Toaster.show(str("drm_download_failed"))
                         }
                         throw e
                     } finally {
