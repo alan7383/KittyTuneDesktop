@@ -1,8 +1,11 @@
 package com.alananasss.kittytune.data.drm
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 
@@ -41,6 +44,22 @@ class CdmSidecarTest {
         "-cp", daemonClasspath(),
         "com.alananasss.kittytune.data.drm.CdmSidecarTestKt",
     )
+
+    /**
+     * After "Remove the WSL module", no configuration is left. The page then used to say "Connected to WSL
+     * (kittytune-cdm)": verify() fell back to auto-detecting the first WSL distribution and found a leftover
+     * daemon in the user's Ubuntu. Without a configuration, nothing may be guessed, started or registered.
+     */
+    @Test
+    fun `without a configuration nothing is guessed or connected`() {
+        assumeTrue("an explicit override is set", System.getenv("KITTYTUNE_CDM_SIDECAR").isNullOrBlank())
+        val local = System.getenv("LOCALAPPDATA")
+        assumeTrue("a real setup is configured here", local == null || !File(local, "KittyTune/cdm-sidecar.json").isFile)
+        CdmSidecar.reset()
+        assertFalse(CdmSidecar.verify())
+        assertFalse(CdmSidecar.isInstalled)
+        assertNull(CdmSidecar.connectedDistro)
+    }
 
     @Test
     fun licenseRequestCarriesThePsshAndReturnsTheDaemonAnswer() {

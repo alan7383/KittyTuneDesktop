@@ -34,14 +34,12 @@ import java.util.concurrent.TimeUnit
  *
  * ## Configuration
  *
- * Three sources, first match wins:
+ * Two sources, first match wins — nothing is ever guessed:
  *
  *  1. `KITTYTUNE_CDM_SIDECAR` — a quoted command line, e.g.
  *     `wsl.exe -d kittytune-cdm -u root --exec /opt/kittytune/ktcdm /opt/kittytune/libwidevinecdm.so`
  *  2. `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` — `{"command": ["wsl.exe", "-d", ...]}`,
- *     written by the in-app setup ([WslSidecarSetup]).
- *  3. WSL auto-detection — the first installed distribution, with the daemon at the path the setup
- *     uses.
+ *     written by the in-app setup ([WslSidecarSetup]) and deleted by its uninstall.
  *
  * ## Protocol
  *
@@ -57,10 +55,6 @@ internal object CdmSidecar {
 
     /** How long a failed probe is trusted before the next track may retry it. */
     private const val RETRY_AFTER_MS = 5 * 60_000L
-
-    /** The daemon and CDM paths `scripts/setup-cdm-sidecar.sh` installs under `$HOME`. */
-    private const val DAEMON_SUFFIX = "/.local/share/kittytune/ktcdm"
-    private const val CDM_SUFFIX = "/.local/share/kittytune/libwidevinecdm.so"
 
     private val lock = Any()
     private var installed: SidecarWidevineCdm? = null
@@ -90,6 +84,10 @@ internal object CdmSidecar {
 
     /** Why the configured backend is not in use, or null when nothing is configured. */
     val lastFailure: String? get() = failureReason
+
+    /** The WSL distribution the registered sidecar really runs in, or null (not over WSL, or none). */
+    val connectedDistro: String?
+        get() = installedCommand?.let { WslVmLifecycle.distroOf(it) }
 
     /** What is registered, for diagnostics: `sidecar over WSL (kittytune-cdm)`. */
     val describe: String get() = installed?.name ?: (failureReason ?: "not configured")
@@ -130,7 +128,7 @@ internal object CdmSidecar {
     fun verify(): Boolean {
         synchronized(lock) {
             if (!chosenByUser()) return false
-            val command = explicitCommand() ?: configuredCommand()
+            val command = explicitCommand()
             if (command == null) {
                 failureReason = null
                 return false
@@ -243,10 +241,15 @@ internal object CdmSidecar {
         }
     }
 
-    /** The command that starts the daemon, from the environment, the setup script, or WSL itself. */
-    private fun configuredCommand(): List<String>? = explicitCommand() ?: wslCommand()
-
-    /** The environment variable or the configuration file: what can be known without starting WSL. */
+    /**
+     * The environment variable or the configuration file the in-app setup writes — and nothing else.
+     *
+     * There used to be a third source, auto-detection: the first WSL distribution, with a daemon in its
+     * home. It served the old setup script, and it picked whichever distribution came first — on a
+     * machine where KittyTune's own `kittytune-cdm` had just been removed, it silently fell back to a
+     * leftover daemon in the user's Ubuntu (a WSL2 VM, the heavy path) while the page said "connected".
+     * Only what the setup or the user configured counts now.
+     */
     private fun explicitCommand(): List<String>? {
         val fromEnvironment = System.getenv("KITTYTUNE_CDM_SIDECAR")?.trim().orEmpty()
         if (fromEnvironment.isNotEmpty()) {
@@ -263,35 +266,6 @@ internal object CdmSidecar {
         return null
     }
 
-    /**
-     * A command that runs the daemon in the first WSL distribution.
-     *
-     * Windows only, and cheap to reject: no `wsl.exe`, no distribution, no `$HOME` and this returns
-     * null and the app never notices.
-     */
-    private fun wslCommand(): List<String>? {
-        if (!System.getProperty("os.name").startsWith("Windows", true)) return null
-        val wsl = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32/wsl.exe")
-        if (!wsl.isFile) return null
-        val distro = runCatching {
-            ProcessBuilder(wsl.absolutePath, "-l", "-q")
-                .redirectErrorStream(true)
-                .start()
-                .inputStream.bufferedReader(Charsets.UTF_16LE).use { it.readText() }
-                .replace("\u0000", "")
-                .lineSequence()
-                .map { it.trim().trim('"') }
-                .firstOrNull { it.isNotEmpty() }
-        }.getOrNull() ?: return null
-        val home = runCatching {
-            ProcessBuilder(wsl.absolutePath, "-d", distro, "--", "sh", "-lc", "printf %s \"\$HOME\"")
-                .redirectErrorStream(true)
-                .start()
-                .inputStream.bufferedReader().use { it.readText() }
-                .trim()
-        }.getOrNull()?.takeIf { it.startsWith("/") } ?: return null
-        return listOf(wsl.absolutePath, "-d", distro, "--", home + DAEMON_SUFFIX, home + CDM_SUFFIX)
-    }
 
     /**
      * Splits a command line on spaces, honouring double quotes, so a Windows path with a space in it
