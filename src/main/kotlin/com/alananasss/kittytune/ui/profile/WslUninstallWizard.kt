@@ -87,17 +87,32 @@ internal class UninstallState {
     /** What the Windows side allows (remove WSL entirely, or one component); null while checking. */
     var windowsSide by mutableStateOf<WslSidecarSetup.WindowsSide?>(null)
 
-    /** Remove WSL itself too, for a system as it was before; only offered when no other distribution is left. */
+    /** Remove WSL itself too, for a system as it was before. Takes every other distribution with it. */
     var removeWsl by mutableStateOf(false)
+
+    /** The user's other distributions ticked for deletion — never by default; always shown, in red. */
+    var deleteDistros by mutableStateOf<Set<String>>(emptySet())
+
+    /** Also turn the virtual machine platform off when removing WSL, when it was on before KittyTune. */
+    var disablePlatform by mutableStateOf(false)
 
     /** Whether the removal that ran included WSL itself, for the messages after it. */
     var wslRemoved by mutableStateOf(false)
 
-    val removingWsl: Boolean get() = removeWsl && windowsSide?.wslRemovable == true
+    /** WSL goes only when every other distribution is ticked for deletion too: nothing is lost unseen. */
+    val removingWsl: Boolean
+        get() = removeWsl && windowsSide?.wslPresent == true &&
+            windowsSide?.otherDistros.orEmpty().all { it in deleteDistros }
 
-    /** What [WslSidecarSetup.uninstall] is asked to turn off: nothing unless offered and ticked, and never
-     *  alongside removing WSL, which covers it. */
-    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature && windowsSide?.wslRemovable != true }
+    /**
+     * The single-component choice makes sense only when WSL stays because other distributions are kept:
+     * when nothing else is there, removing WSL covers it, and two overlapping boxes would only confuse.
+     */
+    val featureChoiceShown: Boolean
+        get() = !removeWsl && windowsSide?.otherDistros.orEmpty().isNotEmpty()
+
+    /** What [WslSidecarSetup.uninstall] is asked to turn off on its own: only that choice, when shown and ticked. */
+    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature && featureChoiceShown }
 
     /** Whether KittyTune's own distribution is there; null while checking. */
     var ourDistroPresent by mutableStateOf<Boolean?>(null)
@@ -151,10 +166,13 @@ fun WslUninstallWizard(onClose: () -> Unit) {
 
     val start: () -> Unit = start@{
         if (un.leftovers == null || un.windowsSide == null) return@start
-        val leftovers = un.chosenLeftovers
+        val deleteDistros = un.windowsSide?.otherDistros.orEmpty().filter { it in un.deleteDistros }
+        val leftovers = un.chosenLeftovers.filterNot { it.distro in deleteDistros }
         val removeWsl = un.removingWsl
         un.wslRemoved = removeWsl
-        un.steps = WslSidecarSetup.uninstallSteps(un.featureToRemove != null, leftovers.isNotEmpty(), removeWsl)
+        un.steps = WslSidecarSetup.uninstallSteps(
+            un.featureToRemove != null, leftovers.isNotEmpty(), removeWsl, deleteDistros.isNotEmpty(),
+        )
         un.states.clear()
         un.states.addAll(List(un.steps.size) { StepState.PENDING })
         un.failure = null
@@ -168,6 +186,8 @@ fun WslUninstallWizard(onClose: () -> Unit) {
                     featureVersion = un.featureToRemove,
                     leftovers = leftovers,
                     removeWsl = removeWsl,
+                    deleteDistros = deleteDistros,
+                    disablePlatform = removeWsl && un.disablePlatform,
                     onStep = { next ->
                         current?.let { un.states[un.steps.indexOf(it)] = StepState.DONE }
                         current = next
@@ -309,11 +329,12 @@ internal fun WhatPage(un: UninstallState) {
     ExplainRow(Icons.Rounded.Settings, str("drm_unwiz_settings_title"), str("drm_unwiz_settings_body"))
 
     // KittyTune files outside the official setup, in the user's other distributions: theirs to tick off.
+    // Not for a distribution ticked for deletion below: deleting it takes them anyway.
     val leftovers = un.leftovers
     if (leftovers == null) {
         WaitingCard(str("drm_unwiz_scanning"))
     } else {
-        leftovers.forEach { leftover ->
+        leftovers.filterNot { it.distro in un.deleteDistros }.forEach { leftover ->
             ChoiceCard(
                 checked = leftover.distro in un.cleanDistros,
                 title = str("drm_unwiz_leftover_title", leftover.distro),
@@ -326,30 +347,52 @@ internal fun WhatPage(un: UninstallState) {
         }
     }
 
-    // WSL itself, for a system as it was before: only when no other distribution would lose it. Otherwise,
-    // say which ones keep it, so the user knows what to remove first.
+    // The user's other distributions — an Ubuntu an older KittyTune installed, or their own. Deleting one
+    // erases everything in it, so never ticked by default, always in red. Removing WSL needs them all gone.
     val side = un.windowsSide
-    if (side != null && side.wslRemovable) {
+    side?.otherDistros?.forEach { distro ->
         ChoiceCard(
-            checked = un.removeWsl,
-            title = str("drm_unwiz_wsl_title"),
-            body = str("drm_unwiz_wsl_body") + if (side.platformKept) "\n" + str("drm_unwiz_wsl_platform_kept") else "",
+            checked = distro in un.deleteDistros,
+            title = str("drm_unwiz_distro_delete_title", distro),
+            body = str("drm_unwiz_distro_delete_body"),
             warning = true,
-            onToggle = { un.removeWsl = it },
-        )
-    } else if (side != null && side.otherDistros.isNotEmpty()) {
-        ExplainRow(
-            Icons.Rounded.Verified,
-            str("drm_unwiz_wsl_kept_title"),
-            str("drm_unwiz_wsl_kept_body", side.otherDistros.joinToString(", ")),
+            onToggle = { on ->
+                un.deleteDistros = if (on) un.deleteDistros + distro else un.deleteDistros - distro
+                // WSL cannot go while a distribution stays.
+                if (!on) un.removeWsl = false
+            },
         )
     }
 
-    // A single component, only when WSL itself has to stay (another distribution uses it): when WSL can go,
-    // removing it already turns its components off, and a second, overlapping box would only confuse. Left
-    // on by default (harmless; turning it off needs admin + a restart), and only offered when nothing else
-    // runs on it.
-    if (side?.wslRemovable != true) un.featureVersion?.let { version ->
+    // WSL itself, for a system as it was before KittyTune. Ticking it ticks the distributions it would take
+    // with it, visibly, so nothing is lost unseen.
+    if (side != null && side.wslPresent) {
+        ChoiceCard(
+            checked = un.removingWsl,
+            title = str("drm_unwiz_wsl_title"),
+            body = str("drm_unwiz_wsl_body") +
+                if (side.otherDistros.isNotEmpty()) "\n" + str("drm_unwiz_wsl_needs", side.otherDistros.joinToString(", ")) else "",
+            warning = true,
+            onToggle = { on ->
+                un.removeWsl = on
+                if (on) un.deleteDistros = un.deleteDistros + side.otherDistros
+            },
+        )
+        // The VM platform, when it was on before KittyTune: may serve something else, so the user's choice.
+        if (un.removingWsl && side.platformOn && !side.platformByApp) {
+            ChoiceCard(
+                checked = un.disablePlatform,
+                title = str("drm_unwiz_platform_title"),
+                body = str("drm_unwiz_platform_body"),
+                warning = true,
+                onToggle = { un.disablePlatform = it },
+            )
+        }
+    }
+
+    // A single component, when WSL stays for the distributions kept. Left on by default (harmless; turning it
+    // off needs admin + a restart), and only offered when nothing else runs on it.
+    if (un.featureChoiceShown) un.featureVersion?.let { version ->
         ChoiceCard(
             checked = un.removeFeature,
             title = str("drm_unwiz_feature_title", version),
@@ -483,6 +526,7 @@ private fun uninstallStepLabel(step: UninstallStep, featureVersion: Int?): Strin
     UninstallStep.DISTRO -> str("drm_unwiz_step_distro")
     UninstallStep.SETTINGS -> str("drm_unwiz_step_settings")
     UninstallStep.LEFTOVERS -> str("drm_unwiz_step_leftovers")
+    UninstallStep.DISTROS -> str("drm_unwiz_step_distros")
     UninstallStep.FEATURE -> str("drm_unwiz_step_feature", featureVersion ?: 1)
     UninstallStep.WSL -> str("drm_unwiz_step_wsl")
 }

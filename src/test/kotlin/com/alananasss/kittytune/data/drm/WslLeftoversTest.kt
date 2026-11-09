@@ -60,6 +60,17 @@ class WslLeftoversTest {
             assertFalse("leftover still there:\n$after", after.contains("/home/tester/.local/share/kittytune"))
             assertTrue("the decoy was deleted", after.contains("/opt/decoy/file"))
             assertEquals("the user's other distributions changed", before, othersSnapshot())
+
+            // And deleting a whole distribution through the uninstall — the throwaway one, never the user's.
+            WslSidecarSetup.uninstall(
+                featureVersion = null,
+                deleteDistros = listOf(throwaway),
+                onStep = { println("uninstall: $it") },
+                onLine = { println("  $it") },
+            )
+            val registered = exec("--list", "--quiet")
+            assertFalse("the throwaway distribution is still registered", registered.lines().any { it.trim() == throwaway })
+            assertEquals("the user's other distributions changed", before, othersSnapshot())
         } finally {
             runCatching { exec("--unregister", throwaway) }
             work.deleteRecursively()
