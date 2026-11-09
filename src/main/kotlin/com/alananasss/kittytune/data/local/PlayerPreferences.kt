@@ -488,6 +488,7 @@ class PlayerPreferences {
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
         private const val KEY_WSL_SETUP_PENDING = "wsl_setup_pending_reboot"
         private const val KEY_WSL_SETUP_VERSION = "wsl_setup_version"
+        private const val KEY_WSL_FEATURES_BY_APP = "wsl_features_enabled_by_kittytune"
         private const val KEY_WIDEVINE_CDM_PATH = "widevine_cdm_path"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
@@ -821,6 +822,13 @@ class PlayerPreferences {
     fun setWslSetupPending(pending: Boolean) = Prefs.putBoolean(KEY_WSL_SETUP_PENDING, pending)
     fun getWslSetupVersion(): Int = Prefs.getInt(KEY_WSL_SETUP_VERSION, 1)
     fun setWslSetupVersion(version: Int) = Prefs.putInt(KEY_WSL_SETUP_VERSION, version)
+
+    /**
+     * The Windows components KittyTune turned on itself, so removing WSL turns off exactly those and never a
+     * component the user already had on (the virtual machine platform may serve something else).
+     */
+    fun getWslFeaturesEnabledByApp(): Set<String> = Prefs.getStringSet(KEY_WSL_FEATURES_BY_APP, emptySet())
+    fun setWslFeaturesEnabledByApp(features: Set<String>) = Prefs.putStringSet(KEY_WSL_FEATURES_BY_APP, features)
 
     /** Whether the protected tracks introduction was shown, so it opens by itself only once. */
     fun getDrmOnboardingDone(): Boolean = Prefs.getBoolean(KEY_DRM_ONBOARDING_DONE, false)

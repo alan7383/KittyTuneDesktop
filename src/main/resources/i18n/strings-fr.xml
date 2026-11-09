@@ -3213,6 +3213,14 @@
     <string name="drm_unwiz_leftover_title">Les fichiers KittyTune dans %1$s</string>
     <string name="drm_unwiz_leftover_body">Laissés par une ancienne version, un script ou une installation manuelle. Seuls ces dossiers sont supprimés, rien d’autre dans cette distribution :</string>
     <string name="drm_unwiz_step_leftovers">Nettoyage des autres distributions Linux</string>
+    <string name="drm_unwiz_wsl_title">Supprimer aussi WSL de Windows</string>
+    <string name="drm_unwiz_wsl_body">Aucun autre Linux ne l’utilise sur ce PC. WSL et ses composants Windows sont supprimés, pour un système comme avant KittyTune. Demande l’autorisation administrateur et un redémarrage.</string>
+    <string name="drm_unwiz_wsl_platform_kept">La plateforme de machine virtuelle reste activée : elle l’était déjà avant KittyTune.</string>
+    <string name="drm_unwiz_wsl_kept_title">WSL est conservé</string>
+    <string name="drm_unwiz_wsl_kept_body">D’autres distributions Linux l’utilisent encore : %1$s. Pour supprimer aussi WSL, supprime-les d’abord.</string>
+    <string name="drm_unwiz_step_wsl">Suppression de WSL</string>
+    <string name="drm_unwiz_wsl_refused">Windows n’a pas reçu l’autorisation de supprimer WSL. Tout le reste est supprimé ; tu peux réessayer.</string>
+    <string name="drm_unwiz_wsl_restart">Redémarre Windows pour finir de supprimer WSL.</string>
     <string name="drm_wiz_setup_title">Installer le module Linux</string>
     <string name="drm_wiz_setup_body">KittyTune s’occupe de tout, aucune commande à taper : il télécharge son image Linux (environ 11 Mo), récupère le module Widevine de Chrome pour Linux (environ 140 Mo depuis les serveurs de Google, seul le module est gardé), puis vérifie qu’il fonctionne. Environ 60 Mo restent sur le disque.</string>
     <string name="drm_wiz_setup_start">Lancer la configuration</string>
@@ -3273,7 +3281,7 @@
     <string name="pref_drm_wsl_uninstall_title">Supprimer le module WSL</string>
     <string name="pref_drm_wsl_uninstall_desc">Supprime l’image Linux de KittyTune et rend un système propre</string>
     <string name="drm_unwiz_title">Supprimer le module WSL</string>
-    <string name="drm_unwiz_body">L’image Linux de KittyTune et son lien dans KittyTune sont supprimés, et rien d’autre sur ton PC. Les titres protégés continuent de passer par PlayReady.</string>
+    <string name="drm_unwiz_body">L’image Linux de KittyTune et son lien dans KittyTune sont supprimés, ainsi que ce que tu coches ci-dessous. Les titres protégés continuent de passer par PlayReady.</string>
     <string name="drm_unwiz_files_title">L’image Linux de KittyTune (%1$s)</string>
     <string name="drm_unwiz_files_body">La mini distribution qui contient le module Widevine et le programme ktcdm.</string>
     <string name="drm_unwiz_settings_title">Les réglages WSL de KittyTune</string>

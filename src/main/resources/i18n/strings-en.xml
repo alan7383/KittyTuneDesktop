@@ -3212,6 +3212,14 @@
     <string name="drm_unwiz_leftover_title">KittyTune’s files in %1$s</string>
     <string name="drm_unwiz_leftover_body">Left there by an older version, a script or a manual install. Only these folders are deleted, nothing else in that distribution:</string>
     <string name="drm_unwiz_step_leftovers">Cleaning other Linux distributions</string>
+    <string name="drm_unwiz_wsl_title">Also remove WSL from Windows</string>
+    <string name="drm_unwiz_wsl_body">No other Linux uses it on this PC. WSL and its Windows components are removed, for a system as it was before KittyTune. Needs administrator permission and a restart.</string>
+    <string name="drm_unwiz_wsl_platform_kept">The virtual machine platform stays on: it was already on before KittyTune.</string>
+    <string name="drm_unwiz_wsl_kept_title">WSL is kept</string>
+    <string name="drm_unwiz_wsl_kept_body">Other Linux distributions still use it: %1$s. To remove WSL too, remove them first.</string>
+    <string name="drm_unwiz_step_wsl">Removing WSL</string>
+    <string name="drm_unwiz_wsl_refused">Windows was not given permission to remove WSL. Everything else is removed; you can try again.</string>
+    <string name="drm_unwiz_wsl_restart">Restart Windows to finish removing WSL.</string>
     <string name="drm_wiz_setup_title">Install the Linux module</string>
     <string name="drm_wiz_setup_body">KittyTune does everything, no command to type: it downloads its Linux image (about 11 MB), takes the Widevine module from Chrome for Linux (about 140 MB from Google’s servers, only the module is kept), then checks that it works. About 60 MB stay on disk.</string>
     <string name="drm_wiz_setup_start">Start the setup</string>
@@ -3272,7 +3280,7 @@
     <string name="pref_drm_wsl_uninstall_title">Remove the WSL module</string>
     <string name="pref_drm_wsl_uninstall_desc">Remove KittyTune’s Linux image and get a clean system back</string>
     <string name="drm_unwiz_title">Remove the WSL module</string>
-    <string name="drm_unwiz_body">KittyTune’s Linux image and its link in KittyTune are removed, and nothing else on your PC. Protected tracks keep playing through PlayReady.</string>
+    <string name="drm_unwiz_body">KittyTune’s Linux image and its link in KittyTune are removed, along with whatever you tick below. Protected tracks keep playing through PlayReady.</string>
     <string name="drm_unwiz_files_title">KittyTune’s Linux image (%1$s)</string>
     <string name="drm_unwiz_files_body">The tiny distribution holding the Widevine module and the ktcdm program.</string>
     <string name="drm_unwiz_settings_title">KittyTune’s WSL settings</string>

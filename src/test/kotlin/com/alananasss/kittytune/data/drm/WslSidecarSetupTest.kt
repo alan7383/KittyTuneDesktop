@@ -151,6 +151,52 @@ class WslSidecarSetupTest {
     }
 
     @Test
+    fun `WSL itself is only offered for removal when no other distribution would lose it`() {
+        val ours = WslSidecarSetup.DISTRO
+        fun plan(registered: List<String>, wsl2On: Boolean = true, byApp: Set<String> = emptySet()) =
+            WslSidecarSetup.planWindowsSide(registered, registered.associate { it.lowercase() to 2 }, wsl1On = false,
+                wsl2On = wsl2On, storeWsl = true, enabledByApp = byApp)
+        // Only KittyTune's distribution (or none left): WSL can go.
+        assertEquals(true, plan(listOf(ours)).wslRemovable)
+        assertEquals(true, plan(emptyList()).wslRemovable)
+        // The user's Ubuntu, or Docker's, keeps it — and is named.
+        plan(listOf(ours, "Ubuntu")).let { assertEquals(false, it.wslRemovable); assertEquals(listOf("Ubuntu"), it.otherDistros) }
+        assertEquals(false, plan(listOf("docker-desktop")).wslRemovable)
+        // No WSL at all: nothing to remove.
+        assertEquals(false, WslSidecarSetup.planWindowsSide(emptyList(), emptyMap(), false, false, storeWsl = false, enabledByApp = emptySet()).wslRemovable)
+        // The VM platform is only turned off when KittyTune turned it on.
+        assertEquals(true, plan(listOf(ours)).platformKept)
+        assertEquals(false, plan(listOf(ours), byApp = setOf(WslSidecarSetup.FEATURE_WSL2)).platformKept)
+    }
+
+    @Test
+    fun `removing WSL covers its components, and its script is valid PowerShell`() {
+        assertEquals(
+            listOf(U.STOP, U.DISTRO, U.SETTINGS, U.WSL),
+            WslSidecarSetup.uninstallSteps(removeFeature = true, removeWsl = true),
+        )
+        val keep = WslSidecarSetup.removeWslScript(disablePlatform = false)
+        val all = WslSidecarSetup.removeWslScript(disablePlatform = true)
+        assertTrue(keep.contains("--uninstall") && keep.contains(WslSidecarSetup.FEATURE_WSL1))
+        assertTrue(!keep.contains(WslSidecarSetup.FEATURE_WSL2) && all.contains(WslSidecarSetup.FEATURE_WSL2))
+        val powershell = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+        assumeTrue("PowerShell is not available", powershell.isFile)
+        for (script in listOf(keep, all)) {
+            val file = File.createTempFile("kt-remove-wsl", ".ps1").apply { writeText(script) }
+            try {
+                val check = "\$e=\$null; [void][System.Management.Automation.Language.Parser]::ParseFile('${file.absolutePath}',[ref]\$null,[ref]\$e); \$e.Count"
+                val process = ProcessBuilder(powershell.absolutePath, "-NoProfile", "-NonInteractive", "-Command", check)
+                    .redirectErrorStream(true).start()
+                val out = process.inputStream.bufferedReader().readText().trim()
+                assertTrue(process.waitFor(60, TimeUnit.SECONDS))
+                assertEquals("parse errors in:\n$script", "0", out)
+            } finally {
+                file.delete()
+            }
+        }
+    }
+
+    @Test
     fun `leftovers are cleaned right after the distribution`() {
         assertEquals(
             listOf(U.STOP, U.DISTRO, U.LEFTOVERS, U.SETTINGS, U.FEATURE),

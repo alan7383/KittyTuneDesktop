@@ -3212,6 +3212,14 @@
     <string name="drm_unwiz_leftover_title">Файлы KittyTune в %1$s</string>
     <string name="drm_unwiz_leftover_body">Остались от старой версии, скрипта или ручной установки. Удаляются только эти папки, больше ничего в этом дистрибутиве:</string>
     <string name="drm_unwiz_step_leftovers">Очистка других дистрибутивов Linux</string>
+    <string name="drm_unwiz_wsl_title">Также удалить WSL из Windows</string>
+    <string name="drm_unwiz_wsl_body">На этом ПК её не использует ни один другой Linux. WSL и её компоненты Windows удаляются, чтобы система стала как до KittyTune. Нужны права администратора и перезагрузка.</string>
+    <string name="drm_unwiz_wsl_platform_kept">Платформа виртуальных машин остаётся включённой: она была включена ещё до KittyTune.</string>
+    <string name="drm_unwiz_wsl_kept_title">WSL сохраняется</string>
+    <string name="drm_unwiz_wsl_kept_body">Её ещё используют другие дистрибутивы Linux: %1$s. Чтобы удалить и WSL, сначала удалите их.</string>
+    <string name="drm_unwiz_step_wsl">Удаление WSL</string>
+    <string name="drm_unwiz_wsl_refused">Windows не получила разрешения удалить WSL. Всё остальное удалено; можно попробовать снова.</string>
+    <string name="drm_unwiz_wsl_restart">Перезагрузите Windows, чтобы завершить удаление WSL.</string>
     <string name="drm_wiz_step_probe">Проверка модуля</string>
     <string name="drm_wiz_step_connect">Подключение к KittyTune</string>
     <string name="drm_wiz_details_show">Показать подробности</string>
@@ -3272,7 +3280,7 @@
     <string name="pref_drm_wsl_uninstall_title">Удалить модуль WSL</string>
     <string name="pref_drm_wsl_uninstall_desc">Удаляет образ Linux от KittyTune и возвращает чистую систему</string>
     <string name="drm_unwiz_title">Удалить модуль WSL</string>
-    <string name="drm_unwiz_body">Удаляются образ Linux от KittyTune и его связь в KittyTune — больше ничего на вашем ПК. Защищённые треки продолжат воспроизводиться через PlayReady.</string>
+    <string name="drm_unwiz_body">Удаляются образ Linux от KittyTune и его связь в KittyTune, а также всё, что вы отметите ниже. Защищённые треки продолжат воспроизводиться через PlayReady.</string>
     <string name="drm_unwiz_files_title">Образ Linux от KittyTune (%1$s)</string>
     <string name="drm_unwiz_files_body">Крошечный дистрибутив с модулем Widevine и программой ktcdm.</string>
     <string name="drm_unwiz_settings_title">Настройки WSL в KittyTune</string>
