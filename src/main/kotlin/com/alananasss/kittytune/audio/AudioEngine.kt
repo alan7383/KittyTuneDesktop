@@ -1367,6 +1367,33 @@ class AudioEngine {
         }
     }
 
+    /**
+     * Stops a line at once and closes it off the calling thread. [stop] runs on the UI thread when a track is
+     * tapped, and closing a Windows DirectSound line (`DirectAudioDevice.nClose`) can take a second or more: the
+     * whole app froze for that long on every tap. Flushing and stopping is what silences it, and is quick; the
+     * worker opens a fresh line for the next track, so nothing waits for the old one to close.
+     */
+    private fun silenceAndCloseLater(localLine: SourceDataLine?) {
+        if (localLine == null) return
+        if (line == localLine) line = null
+        try {
+            localLine.flush()
+            localLine.stop()
+        } catch (_: Exception) {
+        }
+        lineCloser.execute {
+            try {
+                localLine.close()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** One thread, so lines close one after another rather than piling up threads on a burst of taps. */
+    private val lineCloser = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "audio-line-closer").apply { isDaemon = true }
+    }
+
     @Synchronized
     private fun stopInternal() {
         val native = protectedPlayback
@@ -1392,7 +1419,7 @@ class AudioEngine {
         }
         worker = null
         reapFinishedWorkers()
-        closeLineInstance(line, drain = false)
+        silenceAndCloseLater(line)
         stretcher.flush()
         limiter.flush()
         chain.forEach { it.flush() }
