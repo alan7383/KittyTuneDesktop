@@ -148,8 +148,8 @@ internal object WslSidecarSetup {
         /** The version our distribution is imported as, when [State.SET_UP] (1 or 2), else null. */
         val installedVersion: Int? = null,
         /**
-         * The WSL engine itself (the WSL package) answers. WSL2 needs it besides its component: on a PC that
-         * never had WSL, the virtual machine platform alone imports nothing.
+         * The WSL engine is usable (see [wslInstalled]). Both versions need it besides their component: on current
+         * Windows, with only the component on, `wsl.exe` is the installer stub and imports nothing — WSL1 included.
          */
         val wslPackage: Boolean = true,
     ) {
@@ -157,7 +157,7 @@ internal object WslSidecarSetup {
          * Whether everything [version] needs is in place. Readiness is always judged for the version the user
          * picked: WSL2's component being on does not make a WSL1 import possible, and vice versa.
          */
-        fun featureOn(version: Int): Boolean = if (version == 1) wsl1Available else wsl2Available && wslPackage
+        fun featureOn(version: Int): Boolean = (if (version == 1) wsl1Available else wsl2Available) && wslPackage
     }
 
     enum class Step { DOWNLOAD, IMPORT, CDM, PROBE, CONNECT }
@@ -178,7 +178,8 @@ internal object WslSidecarSetup {
         }
         val wsl1 = featureEnabled(FEATURE_WSL1)
         val wsl2 = featureEnabled(FEATURE_WSL2)
-        val pkg = wslPackagePresent()
+        // The engine is usable: the package, or (older Windows) the inbox WSL behind the component.
+        val pkg = wslInstalled
         // Without WSL installed, every question to wsl.exe would wake the installer stub: answer from what
         // Windows itself says (the components) and stop here.
         if ((!wsl1 && !wsl2) || !wslInstalled) {
@@ -329,6 +330,13 @@ internal object WslSidecarSetup {
      */
     internal fun removeWslScript(disablePlatform: Boolean): String = buildString {
         appendLine("& \"\$env:SystemRoot\\System32\\wsl.exe\" --uninstall")
+        // The engine (the WSL package, ≈ 370 MB): `wsl --uninstall` takes it; when it was installed from its MSI
+        // and is still there, its own uninstaller goes too.
+        appendLine("if (Test-Path (Join-Path \$env:ProgramFiles 'WSL\\wsl.exe')) {")
+        appendLine("  Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue |")
+        appendLine("    Where-Object { \$_.DisplayName -like 'Windows Subsystem for Linux*' -and \$_.PSChildName -like '{*}' } |")
+        appendLine("    ForEach-Object { Start-Process -FilePath msiexec.exe -ArgumentList @('/x', \$_.PSChildName, '/quiet', '/norestart') -Wait }")
+        appendLine("}")
         appendLine("Disable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL1 -NoRestart | Out-String")
         if (disablePlatform) {
             appendLine("Disable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL2 -NoRestart | Out-String")
@@ -345,13 +353,24 @@ internal object WslSidecarSetup {
      *
      * @param version 1 for WSL1 (the light default), 2 for the WSL2 fallback.
      */
-    fun enable(version: Int): EnableResult {
+    fun enable(version: Int, onProgress: (Int) -> Unit = {}): EnableResult {
         val feature = if (version == 1) FEATURE_WSL1 else FEATURE_WSL2
         val wasOn = featureEnabled(feature)
-        var result = runElevated(if (version == 1) enableWsl1Script() else installWsl2Script())
-        // WSL2 is only usable once the engine answers; a component switched on alone is not a success.
-        if (result.ok && version == 2 && !wslPackagePresent()) {
-            result = result.copy(ok = false, log = result.log.ifBlank { "WSL could not be installed" })
+        // On current Windows, wsl.exe runs nothing — WSL1 included — without the WSL package (the engine): the
+        // component alone leaves the installer stub answering "not installed". Downloaded here, with progress,
+        // when it is missing; installed by the elevated step below after checking Microsoft's signature.
+        val msi = if (wslPackagePresent()) null else runCatching { downloadWslPackage(onProgress) }.getOrElse {
+            return EnableResult(ok = false, refused = false, log = "the WSL engine could not be downloaded: ${it.message}")
+        }
+        var result = try {
+            runElevated(enableScript(version, msi?.absolutePath))
+        } finally {
+            msi?.delete()
+        }
+        // Usable only once the engine is there: a component switched on alone is not a success.
+        if (result.ok && !wslInstalled) {
+            val reason = result.log.lineSequence().firstOrNull { it.startsWith("KT_ERROR:") }?.removePrefix("KT_ERROR:")?.trim()
+            result = result.copy(ok = false, log = reason ?: result.log.ifBlank { "the WSL engine could not be installed" })
         }
         if (result.ok) {
             PlayerPreferences().apply {
@@ -365,16 +384,93 @@ internal object WslSidecarSetup {
         return result
     }
 
-    internal fun enableWsl1Script(): String =
-        "Enable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL1 -All -NoRestart | Out-String\n"
-
     /**
-     * Installs what WSL2 needs and nothing more: the WSL engine (downloaded when the PC never had WSL) and its
-     * virtual machine platform — `--no-distribution`, so no Ubuntu or any other distribution comes with it.
+     * The elevated step of turning [version] on: install the WSL package from [msiPath] when given — only if it
+     * carries Microsoft's valid signature — then turn on that version's component and nothing else (WSL1 never
+     * gets the virtual machine platform). No distribution of any kind comes with it. Failures are printed as
+     * `KT_ERROR:` lines rather than thrown, so the transcript reaches the app.
      */
-    internal fun installWsl2Script(): String = buildString {
-        appendLine("& \"\$env:SystemRoot\\System32\\wsl.exe\" --install --no-distribution")
-        appendLine("Enable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL2 -All -NoRestart | Out-String")
+    internal fun enableScript(version: Int, msiPath: String?): String = buildString {
+        appendLine("\$ok = \$true")
+        if (msiPath != null) {
+            appendLine("\$msi = '${msiPath.replace("'", "''")}'")
+            appendLine("\$sig = Get-AuthenticodeSignature -FilePath \$msi")
+            appendLine("if (\$sig.Status -ne 'Valid' -or \$sig.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {")
+            appendLine("  'KT_ERROR: the WSL package is not signed by Microsoft'; \$ok = \$false")
+            appendLine("}")
+            appendLine("if (\$ok) {")
+            appendLine("  \$p = Start-Process -FilePath msiexec.exe -ArgumentList @('/i', ('\"' + \$msi + '\"'), '/quiet', '/norestart') -Wait -PassThru")
+            appendLine("  if (\$p.ExitCode -ne 0 -and \$p.ExitCode -ne 3010) { 'KT_ERROR: the WSL package did not install (msiexec ' + \$p.ExitCode + ')'; \$ok = \$false }")
+            appendLine("}")
+        }
+        val feature = if (version == 1) FEATURE_WSL1 else FEATURE_WSL2
+        appendLine("if (\$ok) { Enable-WindowsOptionalFeature -Online -FeatureName $feature -All -NoRestart | Out-String }")
+    }
+
+    /** The WSL package of a GitHub release, for this PC's architecture. */
+    internal data class WslPackage(val name: String, val url: String, val sha256: String?)
+
+    /** Picks the `wsl.<version>.<arch>.msi` asset out of a GitHub release (JSON), with its digest when given. */
+    internal fun pickWslPackage(releaseJson: String, arch: String): WslPackage? {
+        val assets = JSONObject(releaseJson).optJSONArray("assets") ?: return null
+        val pattern = Regex("""wsl\.[0-9.]+\.${Regex.escape(arch)}\.msi""", RegexOption.IGNORE_CASE)
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            val name = asset.optString("name")
+            if (!pattern.matches(name)) continue
+            val digest = asset.optString("digest").removePrefix("sha256:").takeIf { Regex("[0-9a-fA-F]{64}").matches(it) }
+            return WslPackage(name, asset.optString("browser_download_url"), digest)
+        }
+        return null
+    }
+
+    private val windowsArch: String
+        get() = if (listOf(System.getenv("PROCESSOR_ARCHITEW6432"), System.getenv("PROCESSOR_ARCHITECTURE"))
+                .any { it.equals("ARM64", ignoreCase = true) }
+        ) "arm64" else "x64"
+
+    /** Downloads Microsoft's latest WSL package (≈ 370 MB), reporting whole percents, and checks its digest. */
+    private fun downloadWslPackage(onProgress: (Int) -> Unit): File {
+        val client = ProxyManager.getOkHttpClient()
+        val release = client.newCall(
+            Request.Builder().url("https://api.github.com/repos/microsoft/WSL/releases/latest")
+                .header("User-Agent", "KittyTune").header("Accept", "application/vnd.github+json").build()
+        ).execute().use { response ->
+            if (!response.isSuccessful) error("GitHub answered HTTP ${response.code}")
+            response.body?.string() ?: error("empty answer from GitHub")
+        }
+        val pkg = pickWslPackage(release, windowsArch) ?: error("no WSL package for $windowsArch in the latest release")
+        val target = File(System.getProperty("java.io.tmpdir"), pkg.name)
+        try {
+            client.newCall(Request.Builder().url(pkg.url).header("User-Agent", "KittyTune").build()).execute().use { response ->
+                if (!response.isSuccessful) error("download answered HTTP ${response.code}")
+                val body = response.body ?: error("empty download")
+                val total = body.contentLength()
+                target.outputStream().use { out ->
+                    val input = body.byteStream()
+                    val buffer = ByteArray(1 shl 16)
+                    var done = 0L
+                    var last = -1
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        out.write(buffer, 0, read)
+                        done += read
+                        if (total > 0) {
+                            val percent = (done * 100 / total).toInt()
+                            if (percent != last) { last = percent; onProgress(percent) }
+                        }
+                    }
+                }
+            }
+            if (pkg.sha256 != null && !sha256(target).equals(pkg.sha256, ignoreCase = true)) {
+                error("the WSL package did not match its checksum")
+            }
+            return target
+        } catch (e: Throwable) {
+            target.delete()
+            throw e
+        }
     }
 
     /** The version to resume setting up after a reboot, or null when nothing is pending. */
@@ -387,7 +483,7 @@ internal object WslSidecarSetup {
     /** True once the feature the pending setup needs is actually enabled (the reboot has happened). */
     suspend fun pendingReady(): Boolean = withContext(Dispatchers.IO) {
         val version = pendingVersion() ?: return@withContext false
-        if (version == 1) featureEnabled(FEATURE_WSL1) else featureEnabled(FEATURE_WSL2) && wslPackagePresent()
+        featureEnabled(if (version == 1) FEATURE_WSL1 else FEATURE_WSL2) && wslInstalled
     }
 
     fun clearPending() {
@@ -498,7 +594,12 @@ internal object WslSidecarSetup {
             timeoutMs = 300_000,
             onLine = onLine,
         )
-        if (result.exit != 0) throw SetupException(Step.IMPORT, lastLine(result))
+        if (result.exit != 0) {
+            // A failed import must not leave its empty folder behind: it would read as something to uninstall.
+            runCatching { if (dir.list()?.isEmpty() == true) dir.delete() }
+            runCatching { dir.parentFile?.let { if (it.list()?.isEmpty() == true) it.delete() } }
+            throw SetupException(Step.IMPORT, lastLine(result))
+        }
     }
 
     private suspend fun fetchCdm(onLine: (String) -> Unit) {
@@ -546,7 +647,8 @@ internal object WslSidecarSetup {
      */
     fun hasLeftovers(): Boolean {
         if (!windows) return false
-        return configFile?.isFile == true || distroDir?.exists() == true
+        // An empty folder (a failed import) holds nothing to remove.
+        return configFile?.isFile == true || distroDir?.list()?.isNotEmpty() == true
     }
 
     /**

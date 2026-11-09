@@ -3191,6 +3191,8 @@
     <string name="drm_wiz_enable_failed">A Windows nem tudta bekapcsolni az összetevőt.</string>
     <string name="drm_wiz_enable_refused">A Windows-engedélyt elutasították. Semmi sem változott.</string>
     <string name="drm_wiz_enabling">A Windows-összetevő bekapcsolása…</string>
+    <string name="drm_wiz_engine_needed">Ezen a gépen hiányzik a WSL-motor: a KittyTune előbb letölti a Microsofttól (kb. 370 MB, egyszer).</string>
+    <string name="drm_wiz_engine_downloading">A WSL-motor letöltése a Microsofttól… %1$d %%</string>
     <string name="drm_wiz_wsl_enabled">A Windows-összetevő be van kapcsolva.</string>
     <string name="drm_wiz_reboot_step1">Indítsd újra a gépet a bekapcsolás befejezéséhez.</string>
     <string name="drm_wiz_reboot_step2">Az újraindítás után nyisd meg újra a KittyTune-t.</string>
@@ -3212,7 +3214,7 @@
     <string name="drm_unwiz_leftover_body">Egy régebbi verzió, egy szkript vagy egy kézi telepítés hagyta itt. Csak ezek a mappák törlődnek, a disztribúcióban más semmi:</string>
     <string name="drm_unwiz_step_leftovers">A többi Linux-disztribúció kitakarítása</string>
     <string name="drm_unwiz_wsl_title">A WSL eltávolítása is a Windowsból</string>
-    <string name="drm_unwiz_wsl_body">A WSL és a Windows-összetevői törlődnek, hogy a rendszer olyan legyen, mint a KittyTune előtt. Rendszergazdai engedély és újraindítás kell hozzá.</string>
+    <string name="drm_unwiz_wsl_body">A WSL-motor (kb. 370 MB) és a Windows-összetevői törlődnek, hogy a rendszer olyan legyen, mint a KittyTune előtt. Rendszergazdai engedély és újraindítás kell hozzá.</string>
     <string name="drm_unwiz_step_wsl">A WSL eltávolítása</string>
     <string name="drm_unwiz_distro_delete_title">%1$s törlése is, mindenestül</string>
     <string name="drm_unwiz_distro_delete_body">A benne lévő fájlok, programok és beállítások végleg törlődnek. A WSL eltávolításához szükséges.</string>

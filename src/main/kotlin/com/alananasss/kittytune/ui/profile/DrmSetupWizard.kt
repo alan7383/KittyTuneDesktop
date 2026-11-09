@@ -157,10 +157,13 @@ fun DrmSetupWizard(start: DrmWizardStart, onClose: () -> Unit) {
         )
         else -> listOf(WizardStep.INTRO, WizardStep.HOW, WizardStep.CHOOSE, WizardStep.DONE)
     }
-    // Resuming after the reboot the feature needed: jump straight to the setup step, which auto-starts.
+    // Resuming after the reboot the feature needed. The check step comes first; it is skipped for the setup
+    // step only once WSL is really ready for the pending version — jumping on "pending" alone started an
+    // import that could only fail when part of WSL (its engine) was still missing.
     val resuming = remember { start == DrmWizardStart.WSL && WslSidecarSetup.pendingVersion() != null }
-    var step by remember {
-        mutableStateOf(if (resuming && WizardStep.WSL_SETUP in steps) WizardStep.WSL_SETUP else steps.first())
+    var step by remember { mutableStateOf(steps.first()) }
+    LaunchedEffect(Unit) {
+        if (resuming && WizardStep.WSL_SETUP in steps && WslSidecarSetup.pendingReady()) step = WizardStep.WSL_SETUP
     }
     val index = steps.indexOf(step).coerceAtLeast(0)
 
@@ -734,6 +737,8 @@ internal class WslWizardState {
     var enableRefused by mutableStateOf(false)
     /** Why turning the component on failed (not a refusal), or null. */
     var enableError by mutableStateOf<String?>(null)
+    /** How far the WSL engine's download is, in percent, while it runs; null otherwise. */
+    var enableProgress by mutableStateOf<Int?>(null)
     /** True once the Windows feature was turned on and the machine must restart for the setup to go on. */
     var awaitingReboot by mutableStateOf(false)
 
@@ -788,18 +793,26 @@ internal fun WslCheckStep(wsl: WslWizardState, showVersionChoice: Boolean) {
             wsl.enabling = true
             wsl.enableRefused = false
             wsl.enableError = null
+            wsl.enableProgress = null
             try {
                 val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    WslSidecarSetup.enable(version)
+                    WslSidecarSetup.enable(version) { percent -> wsl.enableProgress = percent }
                 }
                 wsl.version = version
                 wsl.enableRefused = result.refused
                 if (!result.ok && !result.refused) {
                     wsl.enableError = result.log.lineSequence().lastOrNull { it.isNotBlank() } ?: ""
                 }
-                wsl.awaitingReboot = result.ok
+                if (result.ok) {
+                    // Nothing left for a restart to do (the component was already on, only the engine was
+                    // missing): carry straight on instead of asking for one.
+                    val found = WslSidecarSetup.detect()
+                    wsl.detection = found
+                    wsl.awaitingReboot = !found.featureOn(version)
+                }
             } finally {
                 wsl.enabling = false
+                wsl.enableProgress = null
             }
         }
     }
@@ -837,7 +850,7 @@ internal fun WslCheckStep(wsl: WslWizardState, showVersionChoice: Boolean) {
                 str(if (version == 1) "drm_wiz_version_wsl1_desc" else "drm_wiz_version_wsl2_desc"),
             )
             Text(
-                str("drm_wiz_enable_how"),
+                str("drm_wiz_enable_how") + if (!detection.wslPackage) "\n" + str("drm_wiz_engine_needed") else "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -851,7 +864,8 @@ internal fun WslCheckStep(wsl: WslWizardState, showVersionChoice: Boolean) {
                 Text(problem, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             }
             if (wsl.enabling) {
-                WaitingCard(str("drm_wiz_enabling"))
+                val progress = wsl.enableProgress
+                WaitingCard(if (progress != null && progress < 100) str("drm_wiz_engine_downloading", progress) else str("drm_wiz_enabling"))
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(shapes = ButtonDefaults.shapes(), onClick = { enable(version) }) {
@@ -932,7 +946,7 @@ internal fun WslSetupStep(wsl: WslWizardState) {
     // Resuming after the reboot the feature needed: the setup picks up by itself, no button to find.
     LaunchedEffect(Unit) {
         val pending = WslSidecarSetup.pendingVersion()
-        if (pending != null && !wsl.running && !wsl.succeeded && wsl.failure == null) {
+        if (pending != null && WslSidecarSetup.pendingReady() && !wsl.running && !wsl.succeeded && wsl.failure == null) {
             wsl.version = pending
             start()
         }

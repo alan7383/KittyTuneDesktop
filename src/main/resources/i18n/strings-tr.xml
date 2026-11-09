@@ -3193,6 +3193,8 @@
     <string name="drm_wiz_enable_failed">Windows bileşeni açamadı.</string>
     <string name="drm_wiz_enable_refused">Windows izni reddedildi. Hiçbir şey değiştirilmedi.</string>
     <string name="drm_wiz_enabling">Windows bileşeni açılıyor…</string>
+    <string name="drm_wiz_engine_needed">Bu bilgisayarda WSL motoru yok: KittyTune önce onu Microsoft’tan indirir (yaklaşık 370 MB, bir kez).</string>
+    <string name="drm_wiz_engine_downloading">WSL motoru Microsoft’tan indiriliyor… %%%1$d</string>
     <string name="drm_wiz_wsl_enabled">Windows bileşeni açık.</string>
     <string name="drm_wiz_reboot_step1">Açma işlemini bitirmek için bilgisayarını yeniden başlat.</string>
     <string name="drm_wiz_reboot_step2">Yeniden başlattıktan sonra KittyTune’u tekrar aç.</string>
@@ -3214,7 +3216,7 @@
     <string name="drm_unwiz_leftover_body">Eski bir sürüm, bir betik ya da elle yapılan bir kurulumdan kaldı. Yalnızca bu klasörler silinir, o dağıtımdaki başka hiçbir şey değil:</string>
     <string name="drm_unwiz_step_leftovers">Diğer Linux dağıtımları temizleniyor</string>
     <string name="drm_unwiz_wsl_title">WSL’i de Windows’tan kaldır</string>
-    <string name="drm_unwiz_wsl_body">WSL ve Windows bileşenleri kaldırılır, sistem KittyTune’dan önceki haline döner. Yönetici izni ve yeniden başlatma gerektirir.</string>
+    <string name="drm_unwiz_wsl_body">WSL motoru (yaklaşık 370 MB) ve Windows bileşenleri kaldırılır, sistem KittyTune’dan önceki haline döner. Yönetici izni ve yeniden başlatma gerektirir.</string>
     <string name="drm_unwiz_step_wsl">WSL kaldırılıyor</string>
     <string name="drm_unwiz_distro_delete_title">%1$s ve içindeki her şeyi de sil</string>
     <string name="drm_unwiz_distro_delete_body">Dosyaları, programları ve ayarları kalıcı olarak silinir. WSL’i kaldırmak için gerekli.</string>

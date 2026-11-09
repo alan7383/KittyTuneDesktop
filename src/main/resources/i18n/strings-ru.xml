@@ -3192,6 +3192,8 @@
     <string name="drm_wiz_enable_failed">Windows не удалось включить компонент.</string>
     <string name="drm_wiz_enable_refused">Разрешение Windows отклонено. Ничего не изменено.</string>
     <string name="drm_wiz_enabling">Включение компонента Windows…</string>
+    <string name="drm_wiz_engine_needed">На этом ПК нет движка WSL: KittyTune сначала загрузит его у Microsoft (около 370 МБ, один раз).</string>
+    <string name="drm_wiz_engine_downloading">Загрузка движка WSL у Microsoft… %1$d %%</string>
     <string name="drm_wiz_wsl_enabled">Компонент Windows включён.</string>
     <string name="drm_wiz_reboot_step1">Перезагрузите ПК, чтобы завершить включение.</string>
     <string name="drm_wiz_reboot_step2">После перезагрузки снова откройте KittyTune.</string>
@@ -3213,7 +3215,7 @@
     <string name="drm_unwiz_leftover_body">Остались от старой версии, скрипта или ручной установки. Удаляются только эти папки, больше ничего в этом дистрибутиве:</string>
     <string name="drm_unwiz_step_leftovers">Очистка других дистрибутивов Linux</string>
     <string name="drm_unwiz_wsl_title">Также удалить WSL из Windows</string>
-    <string name="drm_unwiz_wsl_body">WSL и её компоненты Windows удаляются, чтобы система стала как до KittyTune. Нужны права администратора и перезагрузка.</string>
+    <string name="drm_unwiz_wsl_body">Движок WSL (около 370 МБ) и его компоненты Windows удаляются, чтобы система стала как до KittyTune. Нужны права администратора и перезагрузка.</string>
     <string name="drm_unwiz_step_wsl">Удаление WSL</string>
     <string name="drm_unwiz_distro_delete_title">Также удалить %1$s со всем содержимым</string>
     <string name="drm_unwiz_distro_delete_body">Его файлы, программы и настройки удаляются навсегда. Нужно, чтобы удалить WSL.</string>

@@ -93,6 +93,8 @@ object R {
         const val drm_wiz_enable_failed = "drm_wiz_enable_failed"
         const val drm_wiz_enable_refused = "drm_wiz_enable_refused"
         const val drm_wiz_enabling = "drm_wiz_enabling"
+        const val drm_wiz_engine_needed = "drm_wiz_engine_needed"
+        const val drm_wiz_engine_downloading = "drm_wiz_engine_downloading"
         const val drm_wiz_wsl_enabled = "drm_wiz_wsl_enabled"
         const val drm_wiz_reboot_step1 = "drm_wiz_reboot_step1"
         const val drm_wiz_reboot_step2 = "drm_wiz_reboot_step2"
