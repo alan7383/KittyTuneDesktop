@@ -481,7 +481,8 @@ jobs:
       - name: Get previous tag
         id: prev_tag
         run: |
-          PREV=$(git describe --tags --abbrev=0 "${{ github.ref_name }}^" 2>/dev/null || echo "")
+          # app tags only: the CDM rootfs prereleases (cdm-rootfs-v*) are not app versions
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${{ github.ref_name }}^" 2>/dev/null || echo "")
           if [ -z "$PREV" ]; then
             echo "range=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
