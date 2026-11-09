@@ -622,7 +622,9 @@ SYSV void host_on_session_message(HostObject* self, const char* id, uint32_t id_
     std::lock_guard<std::mutex> lock(bridge->mutex);
     // kLicenseRequest is 0 in this header (measured: the CDM sends type 0 with the 1759-byte
     // request; treating 1 as the request type silently waited for ever).
-    if (type == cdm::MessageType::kLicenseRequest && message && message_size) {
+    static int skip_copy = -1;
+    if (skip_copy < 0) skip_copy = getenv("KT_NOMSG") != nullptr;
+    if (!skip_copy && type == cdm::MessageType::kLicenseRequest && message && message_size) {
         bridge->license_request.assign((const uint8_t*)message,
                                        (const uint8_t*)message + message_size);
         bridge->license_requested = true;
