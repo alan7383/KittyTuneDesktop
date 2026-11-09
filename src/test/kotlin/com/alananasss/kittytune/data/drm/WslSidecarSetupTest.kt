@@ -83,6 +83,36 @@ class WslSidecarSetupTest {
         val onlyWsl1 = WslSidecarSetup.Detection(WslSidecarSetup.State.NOT_SET_UP, wsl1Available = true, wsl2Available = false)
         assertEquals(true, onlyWsl1.featureOn(1))
         assertEquals(false, onlyWsl1.featureOn(2))
+        // A PC that never had WSL: the VM platform on, but no WSL engine to import into — not ready for WSL2.
+        val noEngine = WslSidecarSetup.Detection(WslSidecarSetup.State.NOT_SET_UP, wsl1Available = false, wsl2Available = true, wslPackage = false)
+        assertEquals(false, noEngine.featureOn(2))
+    }
+
+    @Test
+    fun `turning WSL2 on installs the engine without any distribution, and both scripts are valid PowerShell`() {
+        val wsl2 = WslSidecarSetup.installWsl2Script()
+        assertTrue(wsl2.contains("--install --no-distribution"))
+        assertTrue("no distribution may come with it", !Regex("--install\\s+(?!--)").containsMatchIn(wsl2))
+        assertTrue(wsl2.contains(WslSidecarSetup.FEATURE_WSL2))
+        assertTrue(WslSidecarSetup.enableWsl1Script().contains(WslSidecarSetup.FEATURE_WSL1))
+        assertParses(wsl2)
+        assertParses(WslSidecarSetup.enableWsl1Script())
+    }
+
+    private fun assertParses(script: String) {
+        val powershell = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+        assumeTrue("PowerShell is not available", powershell.isFile)
+        val file = File.createTempFile("kt-ps", ".ps1").apply { writeText(script) }
+        try {
+            val check = "\$e=\$null; [void][System.Management.Automation.Language.Parser]::ParseFile('${file.absolutePath}',[ref]\$null,[ref]\$e); \$e.Count"
+            val process = ProcessBuilder(powershell.absolutePath, "-NoProfile", "-NonInteractive", "-Command", check)
+                .redirectErrorStream(true).start()
+            val out = process.inputStream.bufferedReader().readText().trim()
+            assertTrue(process.waitFor(60, TimeUnit.SECONDS))
+            assertEquals("parse errors in:\n$script", "0", out)
+        } finally {
+            file.delete()
+        }
     }
 
     @Test

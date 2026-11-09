@@ -126,12 +126,17 @@ internal object WslSidecarSetup {
         val wsl2Available: Boolean,
         /** The version our distribution is imported as, when [State.SET_UP] (1 or 2), else null. */
         val installedVersion: Int? = null,
+        /**
+         * The WSL engine itself (the WSL package) answers. WSL2 needs it besides its component: on a PC that
+         * never had WSL, the virtual machine platform alone imports nothing.
+         */
+        val wslPackage: Boolean = true,
     ) {
         /**
-         * Whether the Windows component [version] needs is on. Readiness is always judged for the version
-         * the user picked: WSL2's component being on does not make a WSL1 import possible, and vice versa.
+         * Whether everything [version] needs is in place. Readiness is always judged for the version the user
+         * picked: WSL2's component being on does not make a WSL1 import possible, and vice versa.
          */
-        fun featureOn(version: Int): Boolean = if (version == 1) wsl1Available else wsl2Available
+        fun featureOn(version: Int): Boolean = if (version == 1) wsl1Available else wsl2Available && wslPackage
     }
 
     enum class Step { DOWNLOAD, IMPORT, CDM, PROBE, CONNECT }
@@ -152,14 +157,15 @@ internal object WslSidecarSetup {
         }
         val wsl1 = featureEnabled(FEATURE_WSL1)
         val wsl2 = featureEnabled(FEATURE_WSL2)
+        val pkg = wslPackagePresent()
         if (!wsl1 && !wsl2) {
-            return@withContext Detection(State.FEATURE_OFF, wsl1Available = false, wsl2Available = false)
+            return@withContext Detection(State.FEATURE_OFF, wsl1Available = false, wsl2Available = false, wslPackage = pkg)
         }
         val imported = parseAllDistros(
             runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
         ).any { it.equals(DISTRO, ignoreCase = true) }
         if (!imported) {
-            return@withContext Detection(State.NOT_SET_UP, wsl1, wsl2)
+            return@withContext Detection(State.NOT_SET_UP, wsl1, wsl2, wslPackage = pkg)
         }
         val ready = runCatching {
             run(
@@ -168,8 +174,17 @@ internal object WslSidecarSetup {
             )
         }.getOrNull()?.exit == 0
         val version = runCatching { importedVersion() }.getOrNull()
-        Detection(if (ready) State.SET_UP else State.NOT_SET_UP, wsl1, wsl2, version)
+        Detection(if (ready) State.SET_UP else State.NOT_SET_UP, wsl1, wsl2, version, wslPackage = pkg)
     }
+
+    /** The WSL package (the engine WSL2 runs on) answers `--version`; the bare inbox stub does not. */
+    private fun wslPackagePresent(): Boolean = runCatching {
+        val builder = ProcessBuilder(wslExe.absolutePath, "--version").redirectErrorStream(true)
+        builder.environment()["WSL_UTF8"] = "1"
+        val process = builder.start()
+        process.inputStream.bufferedReader().readText()
+        process.waitFor(15, TimeUnit.SECONDS) && process.exitValue() == 0
+    }.getOrDefault(false)
 
     /** The WSL version our distribution is registered as, read from `wsl -l -v`. */
     private suspend fun importedVersion(): Int? = registeredVersions()[DISTRO.lowercase()]
@@ -294,18 +309,34 @@ internal object WslSidecarSetup {
      */
     fun enable(version: Int): EnableResult {
         val feature = if (version == 1) FEATURE_WSL1 else FEATURE_WSL2
-        val result = runElevated(
-            "Enable-WindowsOptionalFeature -Online -FeatureName $feature -All -NoRestart | Out-String"
-        )
+        val wasOn = featureEnabled(feature)
+        var result = runElevated(if (version == 1) enableWsl1Script() else installWsl2Script())
+        // WSL2 is only usable once the engine answers; a component switched on alone is not a success.
+        if (result.ok && version == 2 && !wslPackagePresent()) {
+            result = result.copy(ok = false, log = result.log.ifBlank { "WSL could not be installed" })
+        }
         if (result.ok) {
             PlayerPreferences().apply {
                 setWslSetupPending(true)
                 setWslSetupVersion(version)
-                // Only ever called while the component is off: KittyTune is the one turning it on.
-                setWslFeaturesEnabledByApp(getWslFeaturesEnabledByApp() + feature)
+                // Recorded only when KittyTune is the one turning it on, so removing WSL later turns off
+                // exactly that and never a component the user already had.
+                if (!wasOn) setWslFeaturesEnabledByApp(getWslFeaturesEnabledByApp() + feature)
             }
         }
         return result
+    }
+
+    internal fun enableWsl1Script(): String =
+        "Enable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL1 -All -NoRestart | Out-String\n"
+
+    /**
+     * Installs what WSL2 needs and nothing more: the WSL engine (downloaded when the PC never had WSL) and its
+     * virtual machine platform — `--no-distribution`, so no Ubuntu or any other distribution comes with it.
+     */
+    internal fun installWsl2Script(): String = buildString {
+        appendLine("& \"\$env:SystemRoot\\System32\\wsl.exe\" --install --no-distribution")
+        appendLine("Enable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL2 -All -NoRestart | Out-String")
     }
 
     /** The version to resume setting up after a reboot, or null when nothing is pending. */
@@ -318,7 +349,7 @@ internal object WslSidecarSetup {
     /** True once the feature the pending setup needs is actually enabled (the reboot has happened). */
     suspend fun pendingReady(): Boolean = withContext(Dispatchers.IO) {
         val version = pendingVersion() ?: return@withContext false
-        featureEnabled(if (version == 1) FEATURE_WSL1 else FEATURE_WSL2)
+        if (version == 1) featureEnabled(FEATURE_WSL1) else featureEnabled(FEATURE_WSL2) && wslPackagePresent()
     }
 
     fun clearPending() {
