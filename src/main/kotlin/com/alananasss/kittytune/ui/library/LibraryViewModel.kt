@@ -621,6 +621,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
+        // Back online with nothing loaded yet (offline at launch, or every attempt failed): load it now.
+        viewModelScope.launch {
+            com.alananasss.kittytune.core.NetworkMonitor.isOnline.collect { online ->
+                if (online && userProfile == null && SessionManager.isClientIdValid.value) loadData()
+            }
+        }
+
         viewModelScope.launch {
             SessionManager.sessionReadyEvent.collect {
                 loadData(forceRefresh = true)
@@ -810,6 +817,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     private var loadJob: Job? = null
 
+    private companion object {
+        /** Waits between library load attempts; null = last attempt. */
+        val LOAD_RETRY_DELAYS_MS = listOf(3_000L, 10_000L, 30_000L, null)
+    }
+
     fun loadData(forceRefresh: Boolean = false) {
         if (!forceRefresh && userProfile != null) return
         if (loadJob?.isActive == true && !forceRefresh) return
@@ -836,17 +848,28 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         loadJob = viewModelScope.launch {
             isLoading = true
             if (NetworkUtils.isInternetAvailable()) {
-                try {
-                    isOfflineMode = false
-                    val user = userProfile ?: api.getMe()
-                    userProfile = user
-                    val pPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-                    pPrefs.setCachedUserId(user.id)
-                    pPrefs.setCachedUsername(user.username)
-                    loadOnlineData(user)
-                } catch (e: Exception) {
-                    println("online error or not connected: ${e.message}")
-                    isLoading = false
+                isOfflineMode = false
+                // The library is only fetched here: one failed /me (SoundCloud answers the odd 500) used to leave it
+                // empty until the app was restarted. Try again a few times; the network watcher covers the rest.
+                for ((attempt, wait) in LOAD_RETRY_DELAYS_MS.withIndex()) {
+                    try {
+                        val user = userProfile ?: api.getMe()
+                        userProfile = user
+                        val pPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                        pPrefs.setCachedUserId(user.id)
+                        pPrefs.setCachedUsername(user.username)
+                        loadOnlineData(user)
+                        break
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Logger.e("LibraryVM", "Library load failed (attempt ${attempt + 1})", e)
+                        if (wait == null || !NetworkUtils.isInternetAvailable()) {
+                            isLoading = false
+                            break
+                        }
+                        kotlinx.coroutines.delay(wait)
+                    }
                 }
             } else {
                 isOfflineMode = true
@@ -888,11 +911,27 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         }
                         allCreated
                     }
-                    val repostedPlaylistsDeferred = async { api.getMyPlaylistPosts() }
+                    // Each call stays on its own: an unguarded one failing here took every other list down with it.
+                    val repostedPlaylistsDeferred = async {
+                        try {
+                            api.getMyPlaylistPosts()
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Logger.e("LibraryVM", "Failed to fetch reposted playlists", e)
+                            com.alananasss.kittytune.domain.RepostCollection(emptyList(), null)
+                        }
+                    }
                     val libraryAllDeferred = async {
                         val allItems = mutableListOf<StationLibraryItem>()
                         try {
-                            var resp = api.getMyLibraryAll(limit = 200)
+                            // SoundCloud sometimes answers a 200-item page of library/all with a 500 that 100 does not get.
+                            var resp = try {
+                                api.getMyLibraryAll(limit = 200)
+                            } catch (e: retrofit2.HttpException) {
+                                Logger.e("LibraryVM", "library/all failed with 200 items, retrying with 100", e)
+                                api.getMyLibraryAll(limit = 100)
+                            }
                             allItems.addAll(resp.collection)
                             while (!resp.next_href.isNullOrEmpty()) {
                                 resp = api.getStationLibraryNextPage(resp.next_href!!)
