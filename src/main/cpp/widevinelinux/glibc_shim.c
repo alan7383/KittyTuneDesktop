@@ -66,24 +66,6 @@ static __attribute__((noinline)) void shim_trace(const char* function, void* cal
     entry->argument1 = argument1;
     entry->caller = caller;
 
-    // Stack depth watch: a runaway recursion inside the CDM shows up here as a descending stack
-    // pointer across successive imports, one line every 64 KiB. Without it a stack overflow dies
-    // before any exception handler runs, and leaves nothing to read.
-    {
-        uintptr_t stack_pointer;
-        __asm__ __volatile__("movq %%rsp, %0" : "=r"(stack_pointer));
-        static __thread uintptr_t start;
-        static __thread uintptr_t reported;
-        if (!start) { start = stack_pointer; reported = stack_pointer; }
-        if (stack_pointer + 0x10000 < reported) {
-            reported = stack_pointer;
-            char where[256];
-            winelf_describe_address(caller, where, sizeof(where));
-            fprintf(stderr, "[shim] stack down %llu KiB (from %s, in %s)\n",
-                    (unsigned long long)((start - stack_pointer) / 1024), where, function);
-            fflush(stderr);
-        }
-    }
     if (g_trace_verbose) {
         char where[256];
         winelf_describe_address(caller, where, sizeof(where));
@@ -865,16 +847,14 @@ typedef struct {
 
 static DWORD WINAPI thread_entry(LPVOID parameter) {
     shim_thread* thread = (shim_thread*)parameter;
-    fprintf(stderr, "[shim] CDM thread %lu started, routine %p\n", (unsigned long)GetCurrentThreadId(),
-            (void*)thread->start);
-    fflush(stderr);
+    if (g_trace_verbose)
+        fprintf(stderr, "[shim] CDM thread %lu started\n", (unsigned long)GetCurrentThreadId());
     // Every thread that runs CDM code needs its own Linux TCB, and `fs` pointing at it, before the
     // first prologue reads the canary.
     winelf_tls_install_for_current_thread();
     thread->result = thread->start(thread->argument);
-    fprintf(stderr, "[shim] CDM thread %lu finished, result %p\n",
-            (unsigned long)GetCurrentThreadId(), thread->result);
-    fflush(stderr);
+    if (g_trace_verbose)
+        fprintf(stderr, "[shim] CDM thread %lu finished\n", (unsigned long)GetCurrentThreadId());
     if (!thread->detached) {
         // Keep the descriptor alive for pthread_join; the OS handle already holds the result.
         return 0;
@@ -886,8 +866,8 @@ static DWORD WINAPI thread_entry(LPVOID parameter) {
 SYSV int sysv_pthread_create(uint64_t* thread_out, const void* attributes,
                              linux_thread_start start, void* argument) {
     T2("pthread_create", start, argument);
-    fprintf(stderr, "[shim] pthread_create start=%p arg=%p\n", (void*)start, argument);
-    fflush(stderr);
+    if (g_trace_verbose)
+        fprintf(stderr, "[shim] pthread_create start=%p arg=%p\n", (void*)start, argument);
     (void)attributes;
     if (!thread_out || !start) return EINVAL;
     shim_thread* thread = (shim_thread*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
@@ -1063,6 +1043,80 @@ enum {
     LINUX_SYS_getentropy = 318
 };
 
+// The CDM's locks reach the kernel through `syscall(SYS_futex, …)` directly. Answering ENOSYS is not
+// harmless: it turns a real wait into "someone woke you", and the code that owns the lock then runs
+// on a structure nobody finished initialising (measured: a 0xaa poison pointer used as an object two
+// calls later). Windows' address wait is the same primitive.
+//
+// It is resolved at run time: the import library for it is not in every MinGW toolchain, while the
+// functions themselves ship with Windows 8 and later.
+typedef BOOL(WINAPI* WaitOnAddressFn)(volatile void*, void*, SIZE_T, DWORD);
+typedef void(WINAPI* WakeByAddressFn)(void*);
+
+static WaitOnAddressFn g_wait_on_address;
+static WakeByAddressFn g_wake_single;
+static WakeByAddressFn g_wake_all;
+static int g_futex_loaded;
+
+static void load_futex_functions(void) {
+    if (g_futex_loaded) return;
+    g_futex_loaded = 1;
+    HMODULE kernel = GetModuleHandleA("kernel32.dll");
+    HMODULE synch = LoadLibraryA("api-ms-win-core-synch-l1-2-0.dll");
+    HMODULE modules[2] = {kernel, synch};
+    for (int i = 0; i < 2; i++) {
+        if (!modules[i]) continue;
+        if (!g_wait_on_address)
+            g_wait_on_address = (WaitOnAddressFn)GetProcAddress(modules[i], "WaitOnAddress");
+        if (!g_wake_single)
+            g_wake_single = (WakeByAddressFn)GetProcAddress(modules[i], "WakeByAddressSingle");
+        if (!g_wake_all)
+            g_wake_all = (WakeByAddressFn)GetProcAddress(modules[i], "WakeByAddressAll");
+    }
+    if (synch) FreeLibrary(synch);
+}
+
+static long futex_call(uint64_t address, int operation, uint32_t value, uint64_t timeout_address) {
+    load_futex_functions();
+    const int command = operation & 0x7f;
+    if (command == 0) {  // FUTEX_WAIT
+        DWORD milliseconds = INFINITE;
+        if (timeout_address) {
+            const struct shim_timespec* timeout = (const struct shim_timespec*)(uintptr_t)timeout_address;
+            uint64_t ms = (uint64_t)timeout->seconds * 1000 + (uint64_t)(timeout->nanoseconds / 1000000);
+            if (ms > 0x7fffffff) ms = 0x7fffffff;
+            milliseconds = (DWORD)ms;
+        }
+        if (!g_wait_on_address) {  // no primitive: report "woken", the caller re-checks its state
+            Sleep(0);
+            return 0;
+        }
+        if (g_wait_on_address((volatile void*)(uintptr_t)address, &value, 4, milliseconds)) return 0;
+        if (GetLastError() == ERROR_TIMEOUT) { g_errno = ETIMEDOUT; return -1; }
+        g_errno = EAGAIN;  // the value changed before we slept
+        return -1;
+    }
+    if (command == 1) {  // FUTEX_WAKE
+        const long woke = (long)(value ? value : 1);
+        if (g_wake_all && g_wake_single) {
+            if (value <= 1) g_wake_single((void*)(uintptr_t)address);
+            else g_wake_all((void*)(uintptr_t)address);
+        }
+        return woke;
+    }
+    g_errno = ENOSYS;
+    return -1;
+}
+
+SYSV long sysv_futex(uint32_t* address, int operation, uint32_t value,
+                     const struct shim_timespec* timeout, uint32_t* address2, uint32_t value3) {
+    T2("futex", address, operation);
+    (void)address2;
+    (void)value3;
+    return futex_call((uint64_t)(uintptr_t)address, operation, value,
+                      (uint64_t)(uintptr_t)timeout);
+}
+
 // Fixed parameters rather than `...`: a System V variadic definition cannot be read by this
 // compiler (see shim_printf.c). Arguments seven and beyond arrive on the stack in both conventions,
 // so declaring them by position is exact.
@@ -1099,15 +1153,14 @@ SYSV long sysv_syscall(long number, uint64_t a1, uint64_t a2, uint64_t a3, uint6
             break;
         }
         case LINUX_SYS_futex:
-            T0("syscall(futex)");
-            g_errno = ENOSYS;
+            T2("syscall(futex)", a1, a2);
+            result = futex_call(a1, (int)a2, (uint32_t)a3, a4);
             break;
         default:
             T1("syscall(unhandled)", number);
             g_errno = ENOSYS;
             break;
     }
-    (void)a4;
     (void)a5;
     (void)a6;
     return result;

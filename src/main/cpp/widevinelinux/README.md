@@ -21,8 +21,29 @@ en clair reçoit `200`. Le module Linux est le seul qui rende des échantillons 
 | `CreateCdmInstance(11, "com.widevine.alpha", …)` retourne une instance | ✅ |
 | `cdm->Initialize()` → `Host::OnInitialized(true)` | ✅ |
 | `ktcdm.exe <so> --probe` → `ok`, code de sortie 0 | ✅ |
-| Le protocole sidecar (`RESET_SESSION`) répond | ✅ |
-| `CreateSessionAndGenerateRequest` avec un PSSH SoundCloud | ❌ plante (voir plus bas) |
+| Le protocole sidecar répond (`RESET_SESSION`, le probe de l'app) | ✅ |
+| `CreateSessionAndGenerateRequest` avec le PSSH SoundCloud | ✅ 1702 octets |
+| `SetServerCertificate` / `UpdateSession` (licence) | ✅ clés utilisables |
+| `Decrypt` sur un fragment CENC SoundCloud réel | ✅ 431/431 échantillons |
+
+**Résultat de bout en bout, `bladee1000/it-girl`, 10 novembre 2026 :**
+
+```
+resolve: HTTP 200, 'It Girl'
+stream: HTTP 200, token 524 chars
+fetched: init 2008 B, fragment 209260 B, PSSH 107 B
+licence request: 1702 bytes
+licence server: HTTP 200, 615 bytes      ← l'identité Linux est acceptée
+provide_licence: status=0
+  samples: 431, 195.7 KiB
+decrypted 431/431 samples, 200403 bytes
+```
+
+Les 200 403 octets sont **identiques octet pour octet** à ceux que la configuration WSL1 produisait
+le 8 novembre (`sha256 f38f26235202bb558367b75e23a8226f…`), qui étaient déjà documentés comme se
+décodant en PCM dans l'app. Trois sessions successives sur le même démon (création → `RESET_SESSION`
+→ création) passent aussi, ce qui est le rythme d'usage réel de l'app.
+
 
 ## Les trois pièces
 
@@ -89,42 +110,37 @@ Variables utiles : `KITTYTUNE_WIDEVINE_DEBUG=1` (trace des rappels de l'hôte), 
 chaque appel du shim), `KT_TRACE=0` (coupe la trace), `KT_NOLOG=1` (le CDM n'écrit plus ses journaux),
 `KT_SKIP_INIT=<masque hexa>` (saute des entrées de `init_array`).
 
-## Le blocage actuel
+## Le piège qui a coûté le plus de temps
 
-`CreateSessionAndGenerateRequest` (101 octets de PSSH SoundCloud, session `kTemporary`, init `kCenc`)
-va loin — le CDM alloue ses pools, tire de l'aléa, construit sa requête — puis meurt sur :
+Le PSSH de SoundCloud ne contient pas seulement l'identifiant de clé : il porte aussi un
+`provider_id` (`buydrmkeyos`) et un `content_id`. Dès que Widevine voit un `provider_id`, il prend un
+chemin spécifique au fournisseur, et ce chemin meurt ici sur un pointeur non initialisé :
 
 ```
 exception 0xc0000005 at cdm+0x101b686, fault address 0x13
 code: 49 3b 71 10     ; cmp 0x10(%r9), %rsi   avec r9 = 3
-rbx = 0xaaaaaaaa      ; valeur de remplissage « non initialisé »
+rbx = 0xaaaaaaaa      ; valeur de poison « non initialisé »
 ```
 
-Un pointeur non initialisé (`0xaaaaaaaa`, la valeur de poison que le CDM pose sur ses locales) est
-déréférencé. Ce n'est donc plus une question de chargement : quelque chose, en amont, rend une
-valeur que le CDM n'attendait pas, et il l'utilise comme adresse.
+Le serveur de licences identifie la requête par identifiant de clé, pas par ces métadonnées : le
+pont réduit donc le PSSH à ses `key_id` (`sanitize_pssh()` dans `cdm_bridge.c`) avant de le donner au
+CDM. C'est transparent pour l'app, qui continue d'envoyer le PSSH de la playlist.
 
-Deux corrections ont déjà été nécessaires dans cette étape, et sont en place :
+## Deux autres pièges, tous deux dus à Linux≠Windows
 
 1. **Fautes `fs` prises pour des accès TLS.** Le gestionnaire restaurait la base `fs` dès que
-   l'adresse fautive « ressemblait » à un décalage TLS. Une écriture dans la pile non commitée
-   (adresse `0xffff…` ou petite) était donc réessayée indéfiniment, et le processus mourait sans
-   qu'aucun diagnostic ne s'affiche. Le test est maintenant : l'instruction porte-t-elle le préfixe
-   `fs:` (`0x64`) ? Rien d'autre n'est une lecture TLS.
+   l'adresse fautive « ressemblait » à un décalage TLS. Une écriture dans la pile non commitée était
+   donc réessayée indéfiniment, et le processus mourait sans diagnostic. Le test est maintenant :
+   l'instruction porte-t-elle le préfixe `fs:` (`0x64`) ?
 
 2. **Piles non commitées.** Le code du CDM soustrait de grands cadres (16 Kio mesurés) de `rsp` puis
-   écrit loin en dessous : Linux agrandit la pile pour cela, Windows non — une écriture sous la page
-   de garde est une faute. Les threads du CDM ont maintenant 4 Mio de réserve et les 256 premiers Kio
-   sont pré-touchés au démarrage du thread, ce qui les rend commités.
+   écrit loin en dessous : Linux agrandit la pile pour cela, Windows non. Les threads du CDM ont
+   maintenant 4 Mio de réserve, les 256 premiers Kio sont pré-touchés au démarrage du thread, et le
+   binaire principal demande 32 Mio.
 
-Pistes pour la suite, dans l'ordre :
+3. **`futex` par `syscall` direct.** Le CDM atteint le noyau par `syscall(SYS_futex, …)` pour ses
+   verrous. Répondre `ENOSYS` transforme une attente réelle en « on t'a réveillé », et le code qui
+   possède le verrou travaille alors sur une structure que personne n'a fini d'initialiser. C'est
+   `WaitOnAddress`/`WakeByAddress` (résolus à l'exécution, tous les MinGW ne les exportent pas).
 
-1. Trouver quel import rend une valeur inattendue : `clock_gettime` (`urandom`/seed), `uname`,
-   `getpid`, `sysconf`, ou le bloc de `getrandom`. Comparer avec ce que le CDM fait d'un PSSH
-   synthétique minimal (une clé de 16 octets, système Widevine) pour distinguer « parseur » de
-   « construction de requête ».
-2. Vérifier `Host::Allocate` : le CDM demande parfois des tailles surprenantes ; un tampon trop petit
-   ou non remis à zéro produirait exactement ce genre de poison.
-3. Instrumenter la valeur `0xaaaaaaaa` : `KT_LOG=1` trace chaque appel du shim, et le ring de trace
-   est vidé au moment de la faute.
 

@@ -893,6 +893,88 @@ int ktwv_set_server_certificate(KtwvCdm handle, const uint8_t* certificate, int 
     return 1;
 }
 
+namespace {
+
+// SoundCloud's PSSH carries a provider id ("buydrmkeyos") and a content id besides the key id.
+// Widevine takes a provider-specific path when it sees them, and that path dies in this process with
+// an uninitialised pointer (measured: 0xc0000005 at cdm+0x101b686, rbx = 0xaaaaaaaa). The licence
+// server identifies the request by key id, so the PSSH is reduced to exactly that before the CDM
+// sees it. Returns false when the input is not a PSSH box, in which case it is passed through.
+bool sanitize_pssh(const uint8_t* data, size_t size, std::vector<uint8_t>& out) {
+    if (!data || size < 32) return false;
+    if (memcmp(data + 4, "pssh", 4) != 0) return false;
+    const uint32_t data_size = ((uint32_t)data[28] << 24) | ((uint32_t)data[29] << 16) |
+                               ((uint32_t)data[30] << 8) | data[31];
+    if (32 + (size_t)data_size > size) return false;
+
+    const uint8_t* payload = data + 32;
+    const size_t payload_size = data_size;
+    std::vector<std::pair<const uint8_t*, size_t>> key_ids;
+    size_t at = 0;
+    while (at < payload_size) {
+        uint64_t tag = 0;
+        int shift = 0;
+        while (at < payload_size) {
+            const uint8_t byte = payload[at++];
+            tag |= (uint64_t)(byte & 0x7f) << shift;
+            if (!(byte & 0x80)) break;
+            shift += 7;
+        }
+        const uint64_t field = tag >> 3;
+        const uint64_t wire = tag & 7;
+        if (wire == 0) {
+            while (at < payload_size && (payload[at++] & 0x80)) {
+            }
+        } else if (wire == 2) {
+            uint64_t length = 0;
+            shift = 0;
+            while (at < payload_size) {
+                const uint8_t byte = payload[at++];
+                length |= (uint64_t)(byte & 0x7f) << shift;
+                if (!(byte & 0x80)) break;
+                shift += 7;
+            }
+            if (at + length > payload_size) return false;
+            if (field == 2 && length > 0 && length <= 64)
+                key_ids.emplace_back(payload + at, (size_t)length);
+            at += (size_t)length;
+        } else if (wire == 1) {
+            at += 8;
+        } else if (wire == 5) {
+            at += 4;
+        } else {
+            return false;
+        }
+    }
+    if (key_ids.empty()) return false;
+
+    std::vector<uint8_t> inner;
+    for (const auto& key : key_ids) {
+        inner.push_back(0x12);  // field 2, length-delimited
+        inner.push_back((uint8_t)key.second);
+        inner.insert(inner.end(), key.first, key.first + key.second);
+    }
+    const uint32_t box_size = 8 + 4 + 16 + 4 + (uint32_t)inner.size();
+    out.clear();
+    out.reserve(box_size);
+    out.push_back((uint8_t)(box_size >> 24));
+    out.push_back((uint8_t)(box_size >> 16));
+    out.push_back((uint8_t)(box_size >> 8));
+    out.push_back((uint8_t)box_size);
+    out.insert(out.end(), {'p', 's', 's', 'h'});
+    out.push_back(0);  // version
+    out.push_back(0); out.push_back(0); out.push_back(0);  // flags
+    out.insert(out.end(), data + 12, data + 28);  // system id
+    out.push_back((uint8_t)(inner.size() >> 24));
+    out.push_back((uint8_t)(inner.size() >> 16));
+    out.push_back((uint8_t)(inner.size() >> 8));
+    out.push_back((uint8_t)inner.size());
+    out.insert(out.end(), inner.begin(), inner.end());
+    return true;
+}
+
+}  // namespace
+
 int ktwv_license_request(KtwvCdm handle, const uint8_t* pssh, int pssh_length, uint8_t** out,
                          int* out_length, char* error, int error_length) {
     Bridge* bridge = (Bridge*)handle;
@@ -900,12 +982,18 @@ int ktwv_license_request(KtwvCdm handle, const uint8_t* pssh, int pssh_length, u
         set_error(error, error_length, "bad arguments");
         return 0;
     }
+    std::vector<uint8_t> minimal;
+    const bool reduced = sanitize_pssh(pssh, (size_t)pssh_length, minimal);
+    const uint8_t* init_data = reduced ? minimal.data() : pssh;
+    const uint32_t init_size = reduced ? (uint32_t)minimal.size() : (uint32_t)pssh_length;
+    if (host_debug())
+        fprintf(stderr, "[ktwv-linux] CreateSessionAndGenerateRequest: %u bytes of init data (%s)\n",
+                init_size, reduced ? "PSSH reduced to its key ids" : "passed through");
     // This header's enums are the old ones: kTemporary is 0 here and 1 in current Chromium. The CDM
     // we load is 4.10, so it speaks the old numbering (measured: kTemporary=1 is rejected with
     // kExceptionTypeError, system code 45).
-    if (host_debug()) fprintf(stderr, "[ktwv-linux] CreateSessionAndGenerateRequest: %d bytes of PSSH\n", pssh_length);
-    cdm_generate_request(bridge)(bridge->cdm, 1, 0 /* kTemporary */, 0 /* kCenc */, pssh,
-                                 (uint32_t)pssh_length);
+    cdm_generate_request(bridge)(bridge->cdm, 1, 0 /* kTemporary */, 0 /* kCenc */, init_data,
+                                 init_size);
     if (host_debug()) fprintf(stderr, "[ktwv-linux] CreateSessionAndGenerateRequest returned\n");
     std::unique_lock<std::mutex> lock(bridge->mutex);
     if (!bridge->condition.wait_for(lock, std::chrono::seconds(30), [bridge] {
