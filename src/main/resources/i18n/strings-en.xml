@@ -3190,6 +3190,8 @@
     <string name="drm_wiz_wsl_ready">WSL%1$d is ready on this PC.</string>
     <string name="drm_wiz_wsl_needs_enable">WSL%1$d has to be turned on once in Windows.</string>
     <string name="drm_wiz_enabling">Turning the Windows component on…</string>
+    <string name="drm_wiz_engine_needed">The WSL engine is missing on this PC: KittyTune first downloads it from Microsoft (about 370 MB, once).</string>
+    <string name="drm_wiz_engine_downloading">Downloading the WSL engine from Microsoft… %1$d %%</string>
     <string name="drm_wiz_enable">Turn on WSL%1$d</string>
     <string name="drm_wiz_advanced">Advanced options</string>
     <string name="drm_wiz_version_wsl1">WSL1 — the lightest (recommended)</string>
@@ -3213,7 +3215,7 @@
     <string name="drm_unwiz_leftover_body">Left there by an older version, a script or a manual install. Only these folders are deleted, nothing else in that distribution:</string>
     <string name="drm_unwiz_step_leftovers">Cleaning other Linux distributions</string>
     <string name="drm_unwiz_wsl_title">Also remove WSL from Windows</string>
-    <string name="drm_unwiz_wsl_body">WSL and its Windows components are removed, for a system as it was before KittyTune. Needs administrator permission and a restart.</string>
+    <string name="drm_unwiz_wsl_body">The WSL engine (about 370 MB) and its Windows components are removed, for a system as it was before KittyTune. Needs administrator permission and a restart.</string>
     <string name="drm_unwiz_step_wsl">Removing WSL</string>
     <string name="drm_unwiz_distro_delete_title">Also delete %1$s and everything in it</string>
     <string name="drm_unwiz_distro_delete_body">Its files, programs and settings are deleted for good. Removing WSL needs it gone.</string>

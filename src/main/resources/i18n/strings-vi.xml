@@ -3273,6 +3273,8 @@
     <string name="drm_wiz_enable_failed">Windows không bật được thành phần này.</string>
     <string name="drm_wiz_enable_refused">Quyền Windows đã bị từ chối. Không có gì thay đổi.</string>
     <string name="drm_wiz_enabling">Đang bật thành phần Windows…</string>
+    <string name="drm_wiz_engine_needed">Máy này thiếu bộ máy WSL: KittyTune sẽ tải nó từ Microsoft trước (khoảng 370 MB, một lần).</string>
+    <string name="drm_wiz_engine_downloading">Đang tải bộ máy WSL từ Microsoft… %1$d %%</string>
     <string name="drm_wiz_wsl_enabled">Thành phần Windows đã được bật.</string>
     <string name="drm_wiz_reboot_step1">Khởi động lại máy để hoàn tất việc bật.</string>
     <string name="drm_wiz_reboot_step2">Mở lại KittyTune sau khi khởi động lại.</string>
@@ -3294,7 +3296,7 @@
     <string name="drm_unwiz_leftover_body">Do một phiên bản cũ, một tập lệnh hoặc một lần cài thủ công để lại. Chỉ các thư mục này bị xóa, không gì khác trong bản phân phối đó:</string>
     <string name="drm_unwiz_step_leftovers">Đang dọn các bản phân phối Linux khác</string>
     <string name="drm_unwiz_wsl_title">Gỡ luôn WSL khỏi Windows</string>
-    <string name="drm_unwiz_wsl_body">WSL và các thành phần Windows của nó sẽ bị gỡ, để hệ thống như trước khi có KittyTune. Cần quyền quản trị và khởi động lại.</string>
+    <string name="drm_unwiz_wsl_body">Bộ máy WSL (khoảng 370 MB) và các thành phần Windows của nó sẽ bị gỡ, để hệ thống như trước khi có KittyTune. Cần quyền quản trị và khởi động lại.</string>
     <string name="drm_unwiz_step_wsl">Đang gỡ WSL</string>
     <string name="drm_unwiz_distro_delete_title">Xóa luôn %1$s và mọi thứ bên trong</string>
     <string name="drm_unwiz_distro_delete_body">Tệp, chương trình và cài đặt trong đó sẽ bị xóa vĩnh viễn. Cần thiết để gỡ WSL.</string>

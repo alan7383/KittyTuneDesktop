@@ -89,14 +89,51 @@ class WslSidecarSetupTest {
     }
 
     @Test
-    fun `turning WSL2 on installs the engine without any distribution, and both scripts are valid PowerShell`() {
-        val wsl2 = WslSidecarSetup.installWsl2Script()
-        assertTrue(wsl2.contains("--install --no-distribution"))
-        assertTrue("no distribution may come with it", !Regex("--install\\s+(?!--)").containsMatchIn(wsl2))
-        assertTrue(wsl2.contains(WslSidecarSetup.FEATURE_WSL2))
-        assertTrue(WslSidecarSetup.enableWsl1Script().contains(WslSidecarSetup.FEATURE_WSL1))
-        assertParses(wsl2)
-        assertParses(WslSidecarSetup.enableWsl1Script())
+    fun `turning a version on installs the engine only when signed, its own component only, and no distribution`() {
+        val msi = "C:\\Users\\o'brien\\AppData\\Local\\Temp\\wsl.3.0.3.0.x64.msi"
+        val wsl1 = WslSidecarSetup.enableScript(1, msi)
+        val wsl2 = WslSidecarSetup.enableScript(2, msi)
+        val componentOnly = WslSidecarSetup.enableScript(1, null)
+        for (script in listOf(wsl1, wsl2, componentOnly)) {
+            assertTrue("no distribution, nor wsl --install, may come with it", !script.contains("--install"))
+            assertParses(script)
+        }
+        // The package goes in only behind Microsoft's valid signature, before the component.
+        assertTrue(wsl1.contains("Get-AuthenticodeSignature") && wsl1.contains("O=Microsoft Corporation"))
+        assertTrue(wsl1.indexOf("msiexec") in 0 until wsl1.indexOf("Enable-WindowsOptionalFeature"))
+        assertTrue("an apostrophe in the path is escaped", wsl1.contains("o''brien"))
+        // WSL1 never gets the virtual machine platform; WSL2 gets it, not WSL1's component.
+        assertTrue(wsl1.contains(WslSidecarSetup.FEATURE_WSL1) && !wsl1.contains(WslSidecarSetup.FEATURE_WSL2))
+        assertTrue(wsl2.contains(WslSidecarSetup.FEATURE_WSL2) && !wsl2.contains(WslSidecarSetup.FEATURE_WSL1))
+        // Engine already there: only the component.
+        assertTrue(!componentOnly.contains("msiexec") && componentOnly.contains(WslSidecarSetup.FEATURE_WSL1))
+    }
+
+    @Test
+    fun `the WSL package for this architecture is picked from a GitHub release`() {
+        val release = """{"tag_name":"3.0.3","assets":[
+            {"name":"Microsoft.WSL_3.0.3.0_x64_ARM64.msixbundle","browser_download_url":"https://x/bundle","digest":null},
+            {"name":"wsl.3.0.3.0.arm64.msi","browser_download_url":"https://x/arm","digest":"sha256:${"b".repeat(64)}"},
+            {"name":"wsl.3.0.3.0.x64.msi","browser_download_url":"https://x/x64","digest":"sha256:${"a".repeat(64)}"}]}"""
+        WslSidecarSetup.pickWslPackage(release, "x64")!!.let {
+            assertEquals("wsl.3.0.3.0.x64.msi", it.name); assertEquals("https://x/x64", it.url); assertEquals("a".repeat(64), it.sha256)
+        }
+        assertEquals("https://x/arm", WslSidecarSetup.pickWslPackage(release, "arm64")!!.url)
+        assertEquals(null, WslSidecarSetup.pickWslPackage("""{"assets":[]}""", "x64"))
+    }
+
+    @Test
+    fun `the engine download progress formats in every language`() {
+        val previous = com.alananasss.kittytune.core.Strings.appLanguage
+        try {
+            for (language in listOf("en", "fr", "de", "hu", "ru", "tr", "vi")) {
+                com.alananasss.kittytune.core.Strings.appLanguage = language
+                val text = com.alananasss.kittytune.core.str("drm_wiz_engine_downloading", 45)
+                assertTrue("$language: $text", text.contains("45") && text.contains("%") && !text.contains("%1"))
+            }
+        } finally {
+            com.alananasss.kittytune.core.Strings.appLanguage = previous
+        }
     }
 
     private fun assertParses(script: String) {

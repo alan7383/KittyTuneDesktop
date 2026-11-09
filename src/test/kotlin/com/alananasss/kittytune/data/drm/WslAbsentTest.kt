@@ -32,11 +32,14 @@ class WslAbsentTest {
             val detection = WslSidecarSetup.detect()
             assertEquals(WslSidecarSetup.State.FEATURE_OFF, detection.state)
             assertFalse(detection.featureOn(1) || detection.featureOn(2))
-            assertFalse(WslSidecarSetup.planWindowsSide().wslPresent)
+            // A component may still be on without the engine (it is then what "remove WSL" turns off), but no
+            // distribution can be listed.
+            assertTrue(WslSidecarSetup.planWindowsSide().otherDistros.isEmpty())
             assertFalse(WslSidecarSetup.otherDistributionsRegistered())
             assertFalse(WslSidecarSetup.imported())
             assertTrue(WslSidecarSetup.findLeftovers().isEmpty())
-            assertEquals(null, WslSidecarSetup.removableFeature())
+            // Only WSL1's component can still be on here (no engine, no distribution): offered for removal, or nothing.
+            WslSidecarSetup.removableFeature().let { assertTrue("$it", it == null || it == 1) }
             assertFalse(WslSidecarSetup.pendingReady())
             // The WSL tab picked again after a removal is not something left to remove.
             prefs.setProtectedBackend(ProtectedBackend.WSL.key)

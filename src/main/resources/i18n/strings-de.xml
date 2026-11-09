@@ -3412,6 +3412,8 @@
     <string name="drm_wiz_enable_failed">Windows konnte die Komponente nicht aktivieren.</string>
     <string name="drm_wiz_enable_refused">Die Windows-Berechtigung wurde verweigert. Nichts wurde geändert.</string>
     <string name="drm_wiz_enabling">Windows-Komponente wird aktiviert…</string>
+    <string name="drm_wiz_engine_needed">Auf diesem PC fehlt die WSL-Engine: KittyTune lädt sie zuerst von Microsoft herunter (etwa 370 MB, einmalig).</string>
+    <string name="drm_wiz_engine_downloading">WSL-Engine wird von Microsoft heruntergeladen… %1$d %%</string>
     <string name="drm_wiz_wsl_enabled">Die Windows-Komponente ist aktiviert.</string>
     <string name="drm_wiz_reboot_step1">Starte deinen PC neu, um die Aktivierung abzuschließen.</string>
     <string name="drm_wiz_reboot_step2">Öffne KittyTune nach dem Neustart wieder.</string>
@@ -3433,7 +3435,7 @@
     <string name="drm_unwiz_leftover_body">Dort hinterlassen von einer älteren Version, einem Skript oder einer manuellen Installation. Nur diese Ordner werden gelöscht, sonst nichts in dieser Distribution:</string>
     <string name="drm_unwiz_step_leftovers">Andere Linux-Distributionen werden bereinigt</string>
     <string name="drm_unwiz_wsl_title">WSL auch aus Windows entfernen</string>
-    <string name="drm_unwiz_wsl_body">WSL und seine Windows-Komponenten werden entfernt, für ein System wie vor KittyTune. Erfordert Administratorrechte und einen Neustart.</string>
+    <string name="drm_unwiz_wsl_body">Die WSL-Engine (etwa 370 MB) und ihre Windows-Komponenten werden entfernt, für ein System wie vor KittyTune. Erfordert Administratorrechte und einen Neustart.</string>
     <string name="drm_unwiz_step_wsl">WSL wird entfernt</string>
     <string name="drm_unwiz_distro_delete_title">Auch %1$s mit allem Inhalt löschen</string>
     <string name="drm_unwiz_distro_delete_body">Dateien, Programme und Einstellungen darin werden endgültig gelöscht. Nötig, um WSL zu entfernen.</string>
