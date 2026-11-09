@@ -383,13 +383,23 @@ void* winelf_symbol_at(const WinElfImage* image, uint64_t index) {
 // Microsoft-ABI call, so an untyped call lets the CDM overwrite the caller's locals.
 typedef void (__attribute__((sysv_abi)) *linux_void_function)(void);
 
+// One line per initialiser is noise in a daemon; KT_LOG=1 brings it back when bring-up is the task.
+static int loader_verbose(void) {
+    static int verbose = -1;
+    if (verbose < 0) {
+        const char* value = getenv("KT_LOG");
+        verbose = value && *value && strcmp(value, "0") != 0;
+    }
+    return verbose;
+}
+
 void winelf_run_initializers(const WinElfImage* image) {
     if (!image || !image->base) return;
     if (image->init_fn) {
         linux_void_function fn = (linux_void_function)(image->base + image->init_fn);
-        fprintf(stderr, "[winelf] DT_INIT %p\n", (void*)fn);
+        if (loader_verbose()) fprintf(stderr, "[winelf] DT_INIT %p\n", (void*)fn);
         fn();
-        fprintf(stderr, "[winelf] DT_INIT returned\n");
+        if (loader_verbose()) fprintf(stderr, "[winelf] DT_INIT returned\n");
     }
     if (!image->init_array || !image->init_arraysz) return;
     uint64_t* entries = (uint64_t*)(image->base + image->init_array);
@@ -404,16 +414,11 @@ void winelf_run_initializers(const WinElfImage* image) {
             fprintf(stderr, "[winelf] init_array[%llu] skipped\n", (unsigned long long)i);
             continue;
         }
-        fprintf(stderr, "[winelf] init_array[%llu] %p ...\n", (unsigned long long)i, (void*)fn);
-        uint64_t stack_before = 0, stack_after = 0;
-        __asm__ __volatile__("movq %%rsp, %0" : "=r"(stack_before));
+        if (loader_verbose())
+            fprintf(stderr, "[winelf] init_array[%llu] %p\n", (unsigned long long)i, (void*)fn);
         ((linux_void_function)fn)();
-        __asm__ __volatile__("movq %%rsp, %0" : "=r"(stack_after));
-        if (stack_before != stack_after)
-            fprintf(stderr, "[winelf]   stack pointer moved by %lld during this initialiser\n",
-                    (long long)(stack_after - stack_before));
-        fprintf(stderr, "[winelf] init_array[%llu] returned (next entry now %p)\n",
-                (unsigned long long)i, (void*)(i + 1 < count ? entries[i + 1] : 0));
+        if (loader_verbose()) fprintf(stderr, "[winelf] init_array[%llu] returned\n",
+                                      (unsigned long long)i);
     }
 }
 

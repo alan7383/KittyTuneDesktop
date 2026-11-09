@@ -76,6 +76,34 @@ $env:KITTYTUNE_CDM_SIDECAR = 'C:\tools\ktcdm.exe C:\tools\libwidevinecdm.so'
 
 Sans variable, sans fichier, et sans distribution WSL détectable, l'option est simplement absente.
 
+## Variante mesurée : le module Linux chargé directement sous Windows
+
+Depuis le 10 novembre 2026, le `.so` Linux tourne **nativement sous Windows**, sans WSL, sans machine
+virtuelle et sans processus Linux : `src/main/cpp/widevinelinux/` mappe le binaire, applique ses
+relocations, installe un TCB Linux par thread et fournit les 184 symboles qu'il importe de la glibc.
+
+`ktcdm.exe` (construit par `scripts/build-native-cdm.ps1`) est le **même démon** : il compile
+`cdmsidecar/CdmSidecar.cpp` et `WidevineBridge.cpp` est remplacé par `cdm_bridge.c`, qui expose
+exactement la même ABI C. Le protocole, les opcodes et le probe `RESET_SESSION` sont identiques, donc
+l'app n'a rien à changer : c'est encore un sidecar, simplement local et natif.
+
+```powershell
+$env:KITTYTUNE_CDM_SIDECAR = 'C:\...\build\widevinelinux\ktcdm.exe C:\...\libwidevinecdm.so'
+```
+
+Ou, sans variable d'environnement, le fichier habituel `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` :
+
+```json
+{ "command": ["C:\\...\\ktcdm.exe", "C:\\...\\libwidevinecdm.so"] }
+```
+
+Mesuré le 10 novembre 2026 sur `bladee1000/it-girl` : requête de licence de 1 702 octets, `HTTP 200`
+avec 615 octets de licence, 431 échantillons déchiffrés sur 431 (200 403 octets), **identiques octet
+pour octet** à ce que la configuration WSL1 produisait le 8 novembre. Trois sessions successives sur
+le même démon passent, ce qui est le rythme d'usage réel de l'app.
+
+Le module reste non redistribuable : `ktcdm.exe` ne l'embarque pas, il reçoit son chemin en argument.
+
 ## Ce que le protocole transporte, et ce qu'il ne transporte pas
 
 `src/main/cpp/cdmsidecar/CdmSidecar.cpp` expose six appels sur `stdin`/`stdout`, en trames
