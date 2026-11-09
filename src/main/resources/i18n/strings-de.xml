@@ -3425,9 +3425,13 @@
     <string name="drm_wiz_step_download">Linux wird heruntergeladen</string>
     <string name="drm_wiz_step_import">Linux wird installiert</string>
     <string name="drm_resume_toast">Geschützte Titel: Die Einrichtung kann fortgesetzt werden. Öffne Einstellungen › Sonstiges › Geschützte Titel.</string>
-    <string name="drm_unwiz_feature_title">Auch die WSL1-Komponente von Windows deaktivieren</string>
+    <string name="drm_unwiz_feature_title">Auch die WSL%1$d-Komponente von Windows deaktivieren</string>
     <string name="drm_unwiz_feature_body">Kein anderes Linux nutzt sie auf diesem PC. Das Deaktivieren erfordert Administratorrechte und einen Neustart. Lass sie aktiviert, falls du geschützte Titel wieder nutzen möchtest.</string>
-    <string name="drm_unwiz_step_feature">WSL1-Komponente wird deaktiviert</string>
+    <string name="drm_unwiz_step_feature">WSL%1$d-Komponente wird deaktiviert</string>
+    <string name="drm_unwiz_scanning">Suche nach KittyTune-Dateien in deinen Linux-Distributionen…</string>
+    <string name="drm_unwiz_leftover_title">Die KittyTune-Dateien in %1$s</string>
+    <string name="drm_unwiz_leftover_body">Dort hinterlassen von einer älteren Version, einem Skript oder einer manuellen Installation. Nur diese Ordner werden gelöscht, sonst nichts in dieser Distribution:</string>
+    <string name="drm_unwiz_step_leftovers">Andere Linux-Distributionen werden bereinigt</string>
     <string name="drm_wiz_step_probe">Modul prüfen</string>
     <string name="drm_wiz_step_connect">Mit KittyTune verbinden</string>
     <string name="drm_wiz_details_show">Details anzeigen</string>
@@ -3500,11 +3504,11 @@
     <string name="drm_unwiz_step_distro">Linux-Abbild wird gelöscht</string>
     <string name="drm_unwiz_step_settings">KittyTune wird zurückgesetzt</string>
     <string name="drm_unwiz_failed">Das Entfernen wurde beim Schritt „%1$s“ abgebrochen.</string>
-    <string name="drm_unwiz_refused">Windows hat keine Berechtigung erhalten, die WSL1-Komponente zu deaktivieren. Alles andere ist entfernt; du kannst es erneut versuchen.</string>
+    <string name="drm_unwiz_refused">Windows hat keine Berechtigung erhalten, die WSL%1$d-Komponente zu deaktivieren. Alles andere ist entfernt; du kannst es erneut versuchen.</string>
     <string name="drm_unwiz_removed">Alles ist entfernt.</string>
     <string name="drm_unwiz_done_title">Dein PC ist sauber</string>
     <string name="drm_unwiz_done_body">Vom WSL-Modul von KittyTune ist nichts mehr übrig. Geschützte Titel laufen über PlayReady.</string>
-    <string name="drm_unwiz_restart">Starte Windows neu, um die Deaktivierung der WSL1-Komponente abzuschließen.</string>
+    <string name="drm_unwiz_restart">Starte Windows neu, um die Deaktivierung der WSL%1$d-Komponente abzuschließen.</string>
     <string name="drm_unwiz_restart_now">Jetzt neu starten</string>
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Geschützte Titel</string>

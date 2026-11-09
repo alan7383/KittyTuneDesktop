@@ -198,12 +198,32 @@ internal object WslSidecarSetup {
         .toMap()
 
     /**
-     * Whether uninstalling may offer to turn the WSL1 component back off: it is on, and no distribution
-     * other than ours runs on it (turning it off would break that one).
+     * The WSL version (1 or 2) whose Windows component uninstalling may offer to turn back off, or null:
+     * the component our distribution runs on, when it is on and no other distribution needs it (turning
+     * it off would break that one).
      */
-    suspend fun wsl1FeatureRemovable(): Boolean = withContext(Dispatchers.IO) {
-        if (!windows || !wslExe.isFile || !featureEnabled(FEATURE_WSL1)) return@withContext false
-        registeredVersions().none { (name, version) -> version == 1 && name != DISTRO.lowercase() }
+    suspend fun removableFeature(): Int? = withContext(Dispatchers.IO) {
+        if (!windows || !wslExe.isFile) return@withContext null
+        val versions = registeredVersions()
+        removableFeature(
+            ours = versions[DISTRO.lowercase()],
+            wsl1On = featureEnabled(FEATURE_WSL1),
+            wsl2On = featureEnabled(FEATURE_WSL2),
+            versions = versions,
+        )
+    }
+
+    /**
+     * The pure decision behind [removableFeature]: the component of the version our distribution runs on
+     * (WSL1 when it is already gone, the default), provided it is on and no other distribution of that
+     * version needs it. For WSL2 that component, `VirtualMachinePlatform`, is what every WSL2 distribution
+     * runs on (the user's own, Docker's…), so it is only ever offered when ours was the last one.
+     */
+    internal fun removableFeature(ours: Int?, wsl1On: Boolean, wsl2On: Boolean, versions: Map<String, Int>): Int? {
+        val version = ours ?: 1
+        val on = if (version == 1) wsl1On else wsl2On
+        val othersNeedIt = versions.any { (name, v) -> v == version && name != DISTRO.lowercase() }
+        return version.takeIf { on && !othersNeedIt }
     }
 
     // ------------------------------------------------------------------------------------------------
@@ -399,30 +419,131 @@ internal object WslSidecarSetup {
             distroDir?.exists() == true
     }
 
-    enum class UninstallStep { STOP, DISTRO, SETTINGS, FEATURE }
+    /**
+     * Whether another WSL distribution is registered, where KittyTune files may have been left (by an older
+     * version, a script or a manual install). Only lists them: no distribution is started.
+     */
+    suspend fun otherDistributionsRegistered(): Boolean = withContext(Dispatchers.IO) {
+        windows && wslExe.isFile && otherDistributions().isNotEmpty()
+    }
+
+    /** Whether KittyTune's own distribution is registered. Only lists: nothing is started. */
+    suspend fun imported(): Boolean = withContext(Dispatchers.IO) {
+        windows && wslExe.isFile && DISTRO.lowercase() in registeredVersions()
+    }
+
+    private suspend fun otherDistributions(): List<String> = parseDistros(
+        runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
+    ).filterNot { it.equals(DISTRO, ignoreCase = true) }
+
+    /** KittyTune files found in a distribution other than ours, outside the official setup. */
+    data class Leftover(val distro: String, val paths: List<String>)
+
+    /**
+     * The only places KittyTune ever put files in a distribution: the old in-app setup (`/opt/kittytune`) and
+     * the old setup script or the daemon's own storage (`~/.local/share/kittytune`). Anything read back from a
+     * distribution must match exactly before it goes near `rm`: no other path is ever removed.
+     */
+    internal val LEFTOVER_PATH = Regex("""/opt/kittytune|/root/\.local/share/kittytune|/home/[A-Za-z0-9._-]+/\.local/share/kittytune""")
+
+    /** Prints `KT_PATH:<path>` for each of those places that exists. Read-only. */
+    internal val SCAN_SCRIPT = """
+        for p in /opt/kittytune /root/.local/share/kittytune /home/*/.local/share/kittytune; do
+          if [ -e "${'$'}p" ]; then echo "KT_PATH:${'$'}p"; fi
+        done
+        exit 0
+    """.trimIndent() + "\n"
+
+    internal fun parseLeftoverScan(output: String): List<String> = output
+        .replace("\u0000", "").replace("﻿", "")
+        .lineSequence()
+        .map { it.trim() }
+        .filter { it.startsWith("KT_PATH:") }
+        .map { it.removePrefix("KT_PATH:").trim() }
+        .filter { LEFTOVER_PATH.matches(it) }
+        .distinct()
+        .toList()
+
+    /** Removes exactly [paths] (each re-validated), then lists what is still there. */
+    internal fun removeScript(paths: List<String>): String {
+        val safe = paths.filter { LEFTOVER_PATH.matches(it) }
+        return buildString {
+            if (safe.isNotEmpty()) appendLine("rm -rf -- ${safe.joinToString(" ") { "'$it'" }}")
+            append(SCAN_SCRIPT)
+        }
+    }
+
+    /**
+     * Looks in every other distribution for KittyTune files. Starting a distribution to look costs a moment
+     * (and, for WSL2, its VM), so this only runs when the removal assistant opens; every distribution it
+     * had to start is stopped again afterwards.
+     */
+    suspend fun findLeftovers(onLine: (String) -> Unit = {}): List<Leftover> = withContext(Dispatchers.IO) {
+        if (!windows || !wslExe.isFile) return@withContext emptyList()
+        val distros = otherDistributions()
+        withDistributionsRestored(distros) {
+            distros.mapNotNull { distro ->
+                onLine("looking in $distro")
+                val result = runCatching {
+                    run(listOf("-d", distro, "-u", "root", "--exec", "/bin/sh", "-s"), SCAN_SCRIPT, timeoutMs = 60_000)
+                }.getOrNull()
+                parseLeftoverScan(result?.output.orEmpty()).takeIf { it.isNotEmpty() }?.let { Leftover(distro, it) }
+            }
+        }
+    }
+
+    /**
+     * Runs [block] in the given distributions, then stops those of them that were not running before, and
+     * the WSL VM when nothing ran at all — unless another program started using WSL meanwhile.
+     */
+    private suspend fun <T> withDistributionsRestored(distros: List<String>, block: suspend () -> T): T {
+        val runningBefore = runningDistributions()
+        try {
+            return block()
+        } finally {
+            if (runningBefore != null) {
+                for (distro in distros) {
+                    if (distro !in runningBefore) runCatching { run(listOf("--terminate", distro), timeoutMs = 30_000) }
+                }
+                if (runningBefore.isEmpty() && runningDistributions()?.isEmpty() == true) {
+                    runCatching { run(listOf("--shutdown"), timeoutMs = 60_000) }
+                }
+            }
+        }
+    }
+
+    /** The running distributions, or null when that could not be told (then nothing is stopped). */
+    private suspend fun runningDistributions(): List<String>? =
+        runCatching { run(listOf("--list", "--running", "--quiet"), timeoutMs = 20_000) }.getOrNull()
+            ?.takeIf { it.exit == 0 || it.output.isBlank() }?.output?.let(::parseAllDistros)
+
+    enum class UninstallStep { STOP, DISTRO, LEFTOVERS, SETTINGS, FEATURE }
 
     class UninstallException(val step: UninstallStep, message: String, val refused: Boolean = false) : Exception(message)
 
-    fun uninstallSteps(removeFeature: Boolean): List<UninstallStep> = buildList {
+    fun uninstallSteps(removeFeature: Boolean, cleanLeftovers: Boolean = false): List<UninstallStep> = buildList {
         add(UninstallStep.STOP)
         add(UninstallStep.DISTRO)
+        if (cleanLeftovers) add(UninstallStep.LEFTOVERS)
         add(UninstallStep.SETTINGS)
         if (removeFeature) add(UninstallStep.FEATURE)
     }
 
     /**
-     * Removes the distribution and KittyTune's link to it; protected tracks go back to PlayReady. When
-     * [removeFeature], also turns the Windows component back off (elevated), which needs a restart.
+     * Removes the distribution and KittyTune's link to it; protected tracks go back to PlayReady. Also
+     * deletes the [leftovers] chosen — KittyTune files found in other distributions — and, when
+     * [featureVersion] is set, turns that version's Windows component back off (elevated, needs a restart).
      *
      * @return true when Windows must restart to finish (the component was removed).
      */
     suspend fun uninstall(
-        removeFeature: Boolean,
+        featureVersion: Int?,
+        leftovers: List<Leftover> = emptyList(),
         onStep: (UninstallStep) -> Unit,
         onLine: (String) -> Unit,
     ): Boolean = withContext(Dispatchers.IO) {
         var restart = false
-        for (step in uninstallSteps(removeFeature)) {
+        for (step in uninstallSteps(featureVersion != null, leftovers.isNotEmpty())) {
             onStep(step)
             onLine("== ${step.name.lowercase()}")
             when (step) {
@@ -432,17 +553,33 @@ internal object WslSidecarSetup {
                     onLine("module stopped, protected tracks play through PlayReady")
                 }
                 UninstallStep.DISTRO -> {
+                    // WSL1 keeps the files in the folder, WSL2 an ext4.vhdx disk there: --unregister removes both.
                     val result = runCatching { run(listOf("--unregister", DISTRO), timeoutMs = 300_000, onLine = onLine) }
                         .getOrNull()
-                    // A distribution that was never imported is not an error.
-                    if (result != null && result.exit != 0 &&
-                        !result.output.contains("no such", true) &&
-                        !result.output.contains("introuvable", true)
-                    ) {
-                        throw UninstallException(step, lastLine(result))
+                    // Judged by what is registered afterwards, not by wsl.exe's message, which is translated:
+                    // a distribution that was already gone is not an error, one still registered is.
+                    if (DISTRO.lowercase() in registeredVersions()) {
+                        throw UninstallException(step, result?.let { lastLine(it) } ?: "wsl --unregister did not answer")
                     }
                     runCatching { distroDir?.deleteRecursively() }
                     onLine("the KittyTune Linux image is removed")
+                }
+                UninstallStep.LEFTOVERS -> withDistributionsRestored(leftovers.map { it.distro }) {
+                    for (leftover in leftovers) {
+                        onLine("cleaning ${leftover.distro}: ${leftover.paths.joinToString(", ")}")
+                        val result = runCatching {
+                            run(
+                                listOf("-d", leftover.distro, "-u", "root", "--exec", "/bin/sh", "-s"),
+                                removeScript(leftover.paths), timeoutMs = 120_000,
+                            )
+                        }.getOrNull()
+                        // What is still there afterwards decides, not the exit code.
+                        val still = parseLeftoverScan(result?.output.orEmpty()).filter { it in leftover.paths }
+                        if (result == null || still.isNotEmpty()) {
+                            throw UninstallException(step, "${leftover.distro}: could not remove ${still.ifEmpty { leftover.paths }.joinToString(", ")}")
+                        }
+                    }
+                    onLine("KittyTune's files are removed from the other distributions")
                 }
                 UninstallStep.SETTINGS -> {
                     configFile?.let { file ->
@@ -453,13 +590,14 @@ internal object WslSidecarSetup {
                     onLine("KittyTune no longer points at WSL")
                 }
                 UninstallStep.FEATURE -> {
+                    val feature = if (featureVersion == 1) FEATURE_WSL1 else FEATURE_WSL2
                     val result = runElevated(
-                        "Disable-WindowsOptionalFeature -Online -FeatureName $FEATURE_WSL1 -NoRestart | Out-String"
+                        "Disable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart | Out-String"
                     )
                     if (result.refused) throw UninstallException(step, "permission refused", refused = true)
                     if (!result.ok) throw UninstallException(step, "the Windows feature could not be removed")
                     restart = true
-                    onLine("WSL1 feature removed; Windows finishes after a restart")
+                    onLine("$feature turned off; Windows finishes after a restart")
                 }
             }
         }

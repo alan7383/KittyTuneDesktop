@@ -3204,9 +3204,13 @@
     <string name="drm_wiz_step_download">Linux letöltése</string>
     <string name="drm_wiz_step_import">Linux telepítése</string>
     <string name="drm_resume_toast">Védett számok: a beállítás folytatható. Nyisd meg: Beállítások › Egyéb › Védett számok.</string>
-    <string name="drm_unwiz_feature_title">A Windows WSL1-összetevőjének kikapcsolása is</string>
+    <string name="drm_unwiz_feature_title">A Windows WSL%1$d-összetevőjének kikapcsolása is</string>
     <string name="drm_unwiz_feature_body">Más Linux nem használja ezen a gépen. A kikapcsoláshoz rendszergazdai engedély és újraindítás kell. Hagyd bekapcsolva, ha még használnád a védett számokat.</string>
-    <string name="drm_unwiz_step_feature">A WSL1-összetevő kikapcsolása</string>
+    <string name="drm_unwiz_step_feature">A WSL%1$d-összetevő kikapcsolása</string>
+    <string name="drm_unwiz_scanning">KittyTune-fájlok keresése a Linux-disztribúcióidban…</string>
+    <string name="drm_unwiz_leftover_title">KittyTune-fájlok itt: %1$s</string>
+    <string name="drm_unwiz_leftover_body">Egy régebbi verzió, egy szkript vagy egy kézi telepítés hagyta itt. Csak ezek a mappák törlődnek, a disztribúcióban más semmi:</string>
+    <string name="drm_unwiz_step_leftovers">A többi Linux-disztribúció kitakarítása</string>
     <string name="drm_wiz_step_probe">A modul ellenőrzése</string>
     <string name="drm_wiz_step_connect">Csatlakozás a KittyTune-hoz</string>
     <string name="drm_wiz_details_show">Részletek megjelenítése</string>
@@ -3279,11 +3283,11 @@
     <string name="drm_unwiz_step_distro">A Linux-kép törlése</string>
     <string name="drm_unwiz_step_settings">A KittyTune visszaállítása</string>
     <string name="drm_unwiz_failed">Az eltávolítás a(z) „%1$s” lépésnél megállt.</string>
-    <string name="drm_unwiz_refused">A Windows nem kapott engedélyt a WSL1-összetevő kikapcsolására. Minden más törölve; újra megpróbálhatod.</string>
+    <string name="drm_unwiz_refused">A Windows nem kapott engedélyt a WSL%1$d-összetevő kikapcsolására. Minden más törölve; újra megpróbálhatod.</string>
     <string name="drm_unwiz_removed">Minden törölve.</string>
     <string name="drm_unwiz_done_title">A géped tiszta</string>
     <string name="drm_unwiz_done_body">A KittyTune WSL-moduljából semmi sem maradt. A védett számok a PlayReadyn keresztül szólnak.</string>
-    <string name="drm_unwiz_restart">Indítsd újra a Windowst a WSL1-összetevő kikapcsolásának befejezéséhez.</string>
+    <string name="drm_unwiz_restart">Indítsd újra a Windowst a WSL%1$d-összetevő kikapcsolásának befejezéséhez.</string>
     <string name="drm_unwiz_restart_now">Újraindítás most</string>
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Védett számok</string>

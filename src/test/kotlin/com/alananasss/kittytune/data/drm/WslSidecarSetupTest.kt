@@ -92,6 +92,73 @@ class WslSidecarSetupTest {
     }
 
     @Test
+    fun `uninstall only offers the component our distribution ran on, and only when nothing else needs it`() {
+        val ours = WslSidecarSetup.DISTRO
+        // WSL2 install, ours the last WSL2 distribution: its VM platform may go.
+        assertEquals(2, WslSidecarSetup.removableFeature(2, wsl1On = false, wsl2On = true, versions = mapOf(ours to 2)))
+        // WSL2 install next to the user's own WSL2 Ubuntu: never offer to break it.
+        assertEquals(null, WslSidecarSetup.removableFeature(2, wsl1On = true, wsl2On = true, versions = mapOf(ours to 2, "ubuntu" to 2)))
+        // WSL1 install next to a WSL2 Ubuntu: WSL1's component is ours alone.
+        assertEquals(1, WslSidecarSetup.removableFeature(1, wsl1On = true, wsl2On = true, versions = mapOf(ours to 1, "ubuntu" to 2)))
+        // Component already off: nothing to offer.
+        assertEquals(null, WslSidecarSetup.removableFeature(1, wsl1On = false, wsl2On = true, versions = mapOf(ours to 1)))
+        // Distribution already gone: WSL1's, the default, if nothing else runs on it.
+        assertEquals(1, WslSidecarSetup.removableFeature(null, wsl1On = true, wsl2On = false, versions = emptyMap()))
+    }
+
+    @Test
+    fun `only exact KittyTune locations are ever taken from a scan`() {
+        val output = listOf(
+            "KT_PATH:/opt/kittytune",
+            "KT_PATH:/home/alan/.local/share/kittytune",
+            "KT_PATH:/root/.local/share/kittytune",
+            // Anything else, however it got there, is dropped.
+            "KT_PATH:/",
+            "KT_PATH:/opt",
+            "KT_PATH:/opt/kittytune/../../etc",
+            "KT_PATH:/home/a b/.local/share/kittytune",
+            "KT_PATH:/home/x/.local/share/kittytune'; rm -rf / #",
+            "KT_PATH:/home/../root/.local/share/kittytune",
+            "some noise",
+        ).joinToString("\n")
+        assertEquals(
+            listOf("/opt/kittytune", "/home/alan/.local/share/kittytune", "/root/.local/share/kittytune"),
+            WslSidecarSetup.parseLeftoverScan(output),
+        )
+        val script = WslSidecarSetup.removeScript(listOf("/opt/kittytune", "/", "/etc/x'; reboot"))
+        assertTrue(script.contains("rm -rf -- '/opt/kittytune'\n"))
+        assertTrue(!script.contains("reboot") && !script.contains("'/'"))
+        assertEquals("nothing valid: no rm at all", false, WslSidecarSetup.removeScript(listOf("/")).contains("rm -rf"))
+    }
+
+    @Test
+    fun `the leftover scan is valid shell`() {
+        val bash = listOf("C:\\Program Files\\Git\\bin\\bash.exe", "/bin/bash", "/usr/bin/bash").map(::File).firstOrNull { it.isFile }
+        assumeTrue("bash is not available", bash != null)
+        for (script in listOf(WslSidecarSetup.SCAN_SCRIPT, WslSidecarSetup.removeScript(listOf("/opt/kittytune")))) {
+            assertTrue('\r' !in script)
+            val file = File.createTempFile("kt-scan", ".sh")
+            try {
+                file.writeText(script)
+                val process = ProcessBuilder(bash!!.absolutePath, "-n", file.absolutePath).redirectErrorStream(true).start()
+                val out = process.inputStream.bufferedReader().readText()
+                assertTrue(process.waitFor(30, TimeUnit.SECONDS))
+                assertEquals(out, 0, process.exitValue())
+            } finally {
+                file.delete()
+            }
+        }
+    }
+
+    @Test
+    fun `leftovers are cleaned right after the distribution`() {
+        assertEquals(
+            listOf(U.STOP, U.DISTRO, U.LEFTOVERS, U.SETTINGS, U.FEATURE),
+            WslSidecarSetup.uninstallSteps(removeFeature = true, cleanLeftovers = true),
+        )
+    }
+
+    @Test
     fun `uninstall steps follow whether the Windows feature is removed too`() {
         assertEquals(listOf(U.STOP, U.DISTRO, U.SETTINGS), WslSidecarSetup.uninstallSteps(removeFeature = false))
         assertEquals(listOf(U.STOP, U.DISTRO, U.SETTINGS, U.FEATURE), WslSidecarSetup.uninstallSteps(removeFeature = true))

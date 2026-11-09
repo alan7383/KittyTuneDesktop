@@ -31,7 +31,16 @@ class WslUninstallRenderTest {
 
     @Test
     fun whatPageOffersTurningTheFeatureOff() = render("wsl-uninstall-what") {
-        WhatPage(UninstallState().apply { featureRemovable = true; removeFeature = true })
+        WhatPage(UninstallState().apply {
+            featureVersion = 2; removeFeature = true; ourDistroPresent = true
+            leftovers = listOf(WslSidecarSetup.Leftover("Ubuntu", listOf("/opt/kittytune", "/home/alan/.local/share/kittytune")))
+            cleanDistros = setOf("Ubuntu")
+        })
+    }
+
+    @Test
+    fun whatPageWhileScanning() = render("wsl-uninstall-scanning") {
+        WhatPage(UninstallState().apply { ourDistroPresent = false })
     }
 
     @Test
