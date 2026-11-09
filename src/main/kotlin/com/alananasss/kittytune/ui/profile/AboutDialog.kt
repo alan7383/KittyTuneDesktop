@@ -261,7 +261,7 @@ fun AboutDialog(
                                     shape = shape,
                                     icon = Icons.Rounded.Code,
                                     title = str("about_github"),
-                                    onClick = { uriHandler.openUri("https://github.com/alan7383/kittytune") }
+                                    onClick = { uriHandler.openUri("https://github.com/alan7383/KittyTuneDesktop") }
                                 )
                             },
                             { shape ->
@@ -269,7 +269,7 @@ fun AboutDialog(
                                     shape = shape,
                                     icon = Icons.Filled.BugReport,
                                     title = str("about_bug_report"),
-                                    onClick = { uriHandler.openUri("https://github.com/alan7383/kittytune/issues") }
+                                    onClick = { uriHandler.openUri("https://github.com/alan7383/KittyTuneDesktop/issues") }
                                 )
                             }
                         )

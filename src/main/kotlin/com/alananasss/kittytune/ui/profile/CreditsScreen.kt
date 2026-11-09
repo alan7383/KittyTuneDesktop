@@ -286,7 +286,7 @@ internal fun CreditsContent(modifier: Modifier = Modifier) {
                     title = str(R.string.about_credits_github_title),
                     subtitle = str(R.string.about_credits_github_desc),
                     badge = "GitHub",
-                    onClick = { uriHandler.openUri("https://github.com/alan7383/kittytune") }
+                    onClick = { uriHandler.openUri("https://github.com/alan7383/KittyTuneDesktop") }
                 )
             }
 
