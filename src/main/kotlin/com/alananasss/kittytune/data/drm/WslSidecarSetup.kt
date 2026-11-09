@@ -243,18 +243,26 @@ internal object WslSidecarSetup {
 
     /** What uninstalling may do on the Windows side, as found when the assistant opens. */
     data class WindowsSide(
-        /** WSL can go entirely: it is there and no distribution but ours remains (Docker's would count). */
-        val wslRemovable: Boolean,
-        /** The distributions that keep WSL when it cannot go, for the page to name them. */
+        /** WSL is on this PC at all (its engine or one of its components), so it can be removed. */
+        val wslPresent: Boolean,
+        /**
+         * Every distribution but ours (Docker's included). Removing WSL takes them with it, so the page lists
+         * them and they are deleted only when the user ticks them.
+         */
         val otherDistros: List<String>,
-        /** Removing WSL leaves the virtual machine platform on: it was on before KittyTune turned it on. */
-        val platformKept: Boolean,
+        /** The virtual machine platform is on. */
+        val platformOn: Boolean,
+        /** KittyTune turned that platform on itself: removing WSL turns it off without asking. */
+        val platformByApp: Boolean,
         /** The single component that may be turned off on its own (see [removableFeature]), or null. */
         val featureVersion: Int?,
-    )
+    ) {
+        /** WSL can be removed without deleting any distribution of the user's. */
+        val wslRemovable: Boolean get() = wslPresent && otherDistros.isEmpty()
+    }
 
     suspend fun planWindowsSide(): WindowsSide = withContext(Dispatchers.IO) {
-        if (!windows || !wslExe.isFile) return@withContext WindowsSide(false, emptyList(), false, null)
+        if (!windows || !wslExe.isFile) return@withContext WindowsSide(false, emptyList(), false, false, null)
         val registered = parseAllDistros(
             runCatching { run(listOf("--list", "--quiet"), timeoutMs = 20_000) }.getOrNull()?.output.orEmpty()
         )
@@ -278,16 +286,18 @@ internal object WslSidecarSetup {
     ): WindowsSide {
         val others = registered.filterNot { it.equals(DISTRO, ignoreCase = true) }
         return WindowsSide(
-            wslRemovable = (storeWsl || wsl1On || wsl2On) && others.isEmpty(),
+            wslPresent = storeWsl || wsl1On || wsl2On,
             otherDistros = others,
-            platformKept = wsl2On && FEATURE_WSL2 !in enabledByApp,
+            platformOn = wsl2On,
+            platformByApp = FEATURE_WSL2 in enabledByApp,
             featureVersion = removableFeature(versions[DISTRO.lowercase()], wsl1On, wsl2On, versions),
         )
     }
 
     /**
-     * Removes WSL itself: the WSL package, its own component, and the virtual machine platform only when
-     * [disablePlatform] — when KittyTune is the one that turned it on, since it may serve something else.
+     * Removes WSL itself: the WSL package, its own component, and the virtual machine platform when
+     * [disablePlatform] — KittyTune turned it on, or the user chose to turn it off too (it may serve something
+     * else, so it is never assumed).
      */
     internal fun removeWslScript(disablePlatform: Boolean): String = buildString {
         appendLine("& \"\$env:SystemRoot\\System32\\wsl.exe\" --uninstall")
@@ -606,7 +616,7 @@ internal object WslSidecarSetup {
         runCatching { run(listOf("--list", "--running", "--quiet"), timeoutMs = 20_000) }.getOrNull()
             ?.takeIf { it.exit == 0 || it.output.isBlank() }?.output?.let(::parseAllDistros)
 
-    enum class UninstallStep { STOP, DISTRO, LEFTOVERS, SETTINGS, FEATURE, WSL }
+    enum class UninstallStep { STOP, DISTRO, LEFTOVERS, DISTROS, SETTINGS, FEATURE, WSL }
 
     class UninstallException(val step: UninstallStep, message: String, val refused: Boolean = false) : Exception(message)
 
@@ -615,10 +625,12 @@ internal object WslSidecarSetup {
         removeFeature: Boolean,
         cleanLeftovers: Boolean = false,
         removeWsl: Boolean = false,
+        deleteDistros: Boolean = false,
     ): List<UninstallStep> = buildList {
         add(UninstallStep.STOP)
         add(UninstallStep.DISTRO)
         if (cleanLeftovers) add(UninstallStep.LEFTOVERS)
+        if (deleteDistros) add(UninstallStep.DISTROS)
         add(UninstallStep.SETTINGS)
         when {
             removeWsl -> add(UninstallStep.WSL)
@@ -627,22 +639,40 @@ internal object WslSidecarSetup {
     }
 
     /**
+     * The Store app a distribution came with, removed along with it so it does not linger in the Start menu
+     * (launching it would even recreate the distribution). Only the well-known publishers; others keep theirs.
+     */
+    internal fun storePackageOf(distro: String): String? = when {
+        distro.startsWith("Ubuntu", ignoreCase = true) -> "CanonicalGroupLimited.Ubuntu*"
+        distro.startsWith("Debian", ignoreCase = true) -> "TheDebianProject.DebianGNULinux*"
+        distro.startsWith("kali", ignoreCase = true) -> "KaliLinux.*"
+        else -> null
+    }
+
+    /**
      * Removes the distribution and KittyTune's link to it; protected tracks go back to PlayReady. Also
-     * deletes the [leftovers] chosen — KittyTune files found in other distributions — and then either removes
-     * WSL entirely ([removeWsl], only offered when no other distribution remains) or, when [featureVersion] is
-     * set, turns that version's Windows component back off. Both are elevated and need a restart.
+     * deletes the [leftovers] chosen (KittyTune files in other distributions), the other distributions in
+     * [deleteDistros] — the user's own, only ever when ticked — and then either removes WSL entirely
+     * ([removeWsl], once no other distribution is left) or, when [featureVersion] is set, turns that version's
+     * Windows component back off. Both are elevated and need a restart.
      *
+     * @param disablePlatform also turn the virtual machine platform off when removing WSL; it is turned off
+     *   anyway when KittyTune is the one that turned it on.
      * @return true when Windows must restart to finish.
      */
     suspend fun uninstall(
         featureVersion: Int?,
         leftovers: List<Leftover> = emptyList(),
         removeWsl: Boolean = false,
+        deleteDistros: List<String> = emptyList(),
+        disablePlatform: Boolean = false,
         onStep: (UninstallStep) -> Unit,
         onLine: (String) -> Unit,
     ): Boolean = withContext(Dispatchers.IO) {
         var restart = false
-        for (step in uninstallSteps(featureVersion != null, leftovers.isNotEmpty(), removeWsl)) {
+        // Cleaning KittyTune's files out of a distribution about to be deleted would be pointless.
+        val cleaned = leftovers.filterNot { l -> deleteDistros.any { it.equals(l.distro, ignoreCase = true) } }
+        for (step in uninstallSteps(featureVersion != null, cleaned.isNotEmpty(), removeWsl, deleteDistros.isNotEmpty())) {
             onStep(step)
             onLine("== ${step.name.lowercase()}")
             when (step) {
@@ -652,19 +682,46 @@ internal object WslSidecarSetup {
                     onLine("module stopped, protected tracks play through PlayReady")
                 }
                 UninstallStep.DISTRO -> {
-                    // WSL1 keeps the files in the folder, WSL2 an ext4.vhdx disk there: --unregister removes both.
-                    val result = runCatching { run(listOf("--unregister", DISTRO), timeoutMs = 300_000, onLine = onLine) }
-                        .getOrNull()
-                    // Judged by what is registered afterwards, not by wsl.exe's message, which is translated:
-                    // a distribution that was already gone is not an error, one still registered is.
-                    if (DISTRO.lowercase() in registeredVersions()) {
-                        throw UninstallException(step, result?.let { lastLine(it) } ?: "wsl --unregister did not answer")
+                    if (DISTRO.lowercase() !in registeredVersions()) {
+                        // Already gone (an earlier removal): nothing to unregister, and no WSL error to show.
+                        runCatching { distroDir?.deleteRecursively() }
+                        onLine("the KittyTune Linux image was already removed")
+                    } else {
+                        // WSL1 keeps the files in the folder, WSL2 an ext4.vhdx disk there: --unregister removes both.
+                        val result = runCatching { run(listOf("--unregister", DISTRO), timeoutMs = 300_000, onLine = onLine) }
+                            .getOrNull()
+                        // Judged by what is registered afterwards, not by wsl.exe's message, which is translated.
+                        if (DISTRO.lowercase() in registeredVersions()) {
+                            throw UninstallException(step, result?.let { lastLine(it) } ?: "wsl --unregister did not answer")
+                        }
+                        runCatching { distroDir?.deleteRecursively() }
+                        onLine("the KittyTune Linux image is removed")
                     }
-                    runCatching { distroDir?.deleteRecursively() }
-                    onLine("the KittyTune Linux image is removed")
                 }
-                UninstallStep.LEFTOVERS -> withDistributionsRestored(leftovers.map { it.distro }) {
-                    for (leftover in leftovers) {
+                UninstallStep.DISTROS -> {
+                    for (distro in deleteDistros) {
+                        onLine("deleting $distro")
+                        runCatching { run(listOf("--terminate", distro), timeoutMs = 30_000) }
+                        val result = runCatching { run(listOf("--unregister", distro), timeoutMs = 300_000) }.getOrNull()
+                        if (distro.lowercase() in registeredVersions()) {
+                            throw UninstallException(step, "$distro: ${result?.let { lastLine(it) } ?: "wsl --unregister did not answer"}")
+                        }
+                        // Its Store app too, or the Start menu keeps a launcher that would recreate it.
+                        storePackageOf(distro)?.let { pattern ->
+                            runCatching {
+                                val process = ProcessBuilder(
+                                    "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                                    "Get-AppxPackage -Name '$pattern' | Remove-AppxPackage",
+                                ).redirectErrorStream(true).start()
+                                process.inputStream.bufferedReader().readText()
+                                process.waitFor(120, TimeUnit.SECONDS)
+                            }
+                        }
+                        onLine("$distro is deleted")
+                    }
+                }
+                UninstallStep.LEFTOVERS -> withDistributionsRestored(cleaned.map { it.distro }) {
+                    for (leftover in cleaned) {
                         onLine("cleaning ${leftover.distro}: ${leftover.paths.joinToString(", ")}")
                         val result = runCatching {
                             run(
@@ -710,7 +767,8 @@ internal object WslSidecarSetup {
                     }
                     runCatching { run(listOf("--shutdown"), timeoutMs = 60_000) }
                     val prefs = PlayerPreferences()
-                    val result = runElevated(removeWslScript(disablePlatform = FEATURE_WSL2 in prefs.getWslFeaturesEnabledByApp()))
+                    val platform = disablePlatform || FEATURE_WSL2 in prefs.getWslFeaturesEnabledByApp()
+                    val result = runElevated(removeWslScript(disablePlatform = platform))
                     if (result.refused) throw UninstallException(step, "permission refused", refused = true)
                     if (!result.ok) throw UninstallException(step, "WSL could not be removed")
                     result.log.lineSequence().map { it.trimEnd() }.filter { it.isNotBlank() }.forEach(onLine)

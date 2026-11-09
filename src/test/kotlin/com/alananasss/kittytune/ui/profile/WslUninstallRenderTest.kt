@@ -36,7 +36,7 @@ class WslUninstallRenderTest {
             featureVersion = null; removeFeature = false; ourDistroPresent = true
             leftovers = listOf(WslSidecarSetup.Leftover("Ubuntu", listOf("/opt/kittytune", "/home/alan/.local/share/kittytune")))
             cleanDistros = setOf("Ubuntu")
-            windowsSide = WslSidecarSetup.WindowsSide(false, listOf("Ubuntu"), platformKept = true, featureVersion = null)
+            windowsSide = WslSidecarSetup.WindowsSide(true, listOf("Ubuntu"), platformOn = true, platformByApp = false, featureVersion = null)
         })
     }
 
@@ -44,7 +44,17 @@ class WslUninstallRenderTest {
     fun whatPageOffersRemovingWslWhenNothingElseUsesIt() = render("wsl-uninstall-remove-wsl") {
         WhatPage(UninstallState().apply {
             ourDistroPresent = true; leftovers = emptyList(); removeWsl = true
-            windowsSide = WslSidecarSetup.WindowsSide(true, emptyList(), platformKept = true, featureVersion = 1)
+            windowsSide = WslSidecarSetup.WindowsSide(true, emptyList(), platformOn = true, platformByApp = false, featureVersion = 1)
+        })
+    }
+
+    @Test
+    fun whatPageRemovingEverythingWithTheUsersUbuntu() = render("wsl-uninstall-everything") {
+        WhatPage(UninstallState().apply {
+            ourDistroPresent = false; removeWsl = true; deleteDistros = setOf("Ubuntu")
+            leftovers = listOf(WslSidecarSetup.Leftover("Ubuntu", listOf("/opt/kittytune")))
+            cleanDistros = setOf("Ubuntu")
+            windowsSide = WslSidecarSetup.WindowsSide(true, listOf("Ubuntu"), platformOn = true, platformByApp = false, featureVersion = null)
         })
     }
 

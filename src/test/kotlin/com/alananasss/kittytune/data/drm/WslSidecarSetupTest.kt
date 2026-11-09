@@ -181,22 +181,34 @@ class WslSidecarSetupTest {
     }
 
     @Test
-    fun `WSL itself is only offered for removal when no other distribution would lose it`() {
+    fun `removing WSL is always offered, and only goes once every other distribution is ticked for deletion`() {
         val ours = WslSidecarSetup.DISTRO
         fun plan(registered: List<String>, wsl2On: Boolean = true, byApp: Set<String> = emptySet()) =
             WslSidecarSetup.planWindowsSide(registered, registered.associate { it.lowercase() to 2 }, wsl1On = false,
                 wsl2On = wsl2On, storeWsl = true, enabledByApp = byApp)
-        // Only KittyTune's distribution (or none left): WSL can go.
+        // Only KittyTune's distribution (or none left): WSL can go as it is.
         assertEquals(true, plan(listOf(ours)).wslRemovable)
         assertEquals(true, plan(emptyList()).wslRemovable)
-        // The user's Ubuntu, or Docker's, keeps it — and is named.
-        plan(listOf(ours, "Ubuntu")).let { assertEquals(false, it.wslRemovable); assertEquals(listOf("Ubuntu"), it.otherDistros) }
-        assertEquals(false, plan(listOf("docker-desktop")).wslRemovable)
+        // The user's Ubuntu: WSL is still offered, but only goes with Ubuntu ticked — and Ubuntu is named.
+        plan(listOf(ours, "Ubuntu")).let {
+            assertEquals(true, it.wslPresent); assertEquals(false, it.wslRemovable); assertEquals(listOf("Ubuntu"), it.otherDistros)
+        }
+        assertEquals(listOf("docker-desktop"), plan(listOf("docker-desktop")).otherDistros)
         // No WSL at all: nothing to remove.
-        assertEquals(false, WslSidecarSetup.planWindowsSide(emptyList(), emptyMap(), false, false, storeWsl = false, enabledByApp = emptySet()).wslRemovable)
-        // The VM platform is only turned off when KittyTune turned it on.
-        assertEquals(true, plan(listOf(ours)).platformKept)
-        assertEquals(false, plan(listOf(ours), byApp = setOf(WslSidecarSetup.FEATURE_WSL2)).platformKept)
+        assertEquals(false, WslSidecarSetup.planWindowsSide(emptyList(), emptyMap(), false, false, storeWsl = false, enabledByApp = emptySet()).wslPresent)
+        // The VM platform: KittyTune's to turn off when it turned it on, otherwise the user's choice.
+        assertEquals(false, plan(listOf(ours)).platformByApp)
+        assertEquals(true, plan(listOf(ours), byApp = setOf(WslSidecarSetup.FEATURE_WSL2)).platformByApp)
+    }
+
+    @Test
+    fun `deleting other distributions comes before WSL, and takes their Store app`() {
+        assertEquals(
+            listOf(U.STOP, U.DISTRO, U.DISTROS, U.SETTINGS, U.WSL),
+            WslSidecarSetup.uninstallSteps(removeFeature = false, removeWsl = true, deleteDistros = true),
+        )
+        assertEquals("CanonicalGroupLimited.Ubuntu*", WslSidecarSetup.storePackageOf("Ubuntu-24.04"))
+        assertEquals(null, WslSidecarSetup.storePackageOf("docker-desktop"))
     }
 
     @Test
