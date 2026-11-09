@@ -291,7 +291,9 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
         // KittyTune files in them, which the removal assistant finds. Listing them starts nothing.
         var hasWslLeftovers by remember(backend) { mutableStateOf(WslSidecarSetup.hasLeftovers()) }
         LaunchedEffect(backend) {
-            if (!hasWslLeftovers) hasWslLeftovers = WslSidecarSetup.otherDistributionsRegistered()
+            if (!hasWslLeftovers) {
+                hasWslLeftovers = WslSidecarSetup.imported() || WslSidecarSetup.otherDistributionsRegistered()
+            }
         }
         val wslUninstallRow: @Composable (Shape) -> Unit = { shape ->
             SettingsItem(

@@ -251,4 +251,31 @@ class WslSidecarSetupTest {
         assertEquals(listOf(U.STOP, U.DISTRO, U.SETTINGS), WslSidecarSetup.uninstallSteps(removeFeature = false))
         assertEquals(listOf(U.STOP, U.DISTRO, U.SETTINGS, U.FEATURE), WslSidecarSetup.uninstallSteps(removeFeature = true))
     }
+
+    @Test
+    fun `feature state reads the elevated and the non-elevated answers`() {
+        assertTrue(WslSidecarSetup.parseFeatureState("STATE:Enabled\r\n"))
+        assertTrue(!WslSidecarSetup.parseFeatureState("STATE:EnablePending\r\n"))
+        assertTrue(!WslSidecarSetup.parseFeatureState("STATE:DisablePending\r\n"))
+        assertTrue(!WslSidecarSetup.parseFeatureState("STATE:Disabled\r\n"))
+        // Without elevation: Win32_OptionalFeature, and not while a servicing restart is pending.
+        assertTrue(WslSidecarSetup.parseFeatureState("CIM:1\r\n"))
+        assertTrue(!WslSidecarSetup.parseFeatureState("CIM:1\r\nREBOOT_PENDING\r\n"))
+        assertTrue(!WslSidecarSetup.parseFeatureState("CIM:2\r\n"))
+        assertTrue(!WslSidecarSetup.parseFeatureState("Get-WindowsOptionalFeature : The requested operation requires elevation."))
+        assertTrue(!WslSidecarSetup.parseFeatureState(""))
+    }
+
+    /** The script itself, run by Windows' PowerShell: it must answer one of the two forms, elevated or not. */
+    @Test
+    fun `feature state script answers on this Windows`() {
+        assumeTrue("Windows only", System.getProperty("os.name").startsWith("Windows", true))
+        val process = ProcessBuilder(
+            "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+            WslSidecarSetup.featureStateScript(WslSidecarSetup.FEATURE_WSL1),
+        ).redirectErrorStream(true).start()
+        val out = process.inputStream.bufferedReader().readText()
+        process.waitFor(60, TimeUnit.SECONDS)
+        assertTrue(out, Regex("""(?m)^(STATE:(Enabled|Disabled|EnablePending|DisablePending)|CIM:[1-4])\s*$""").containsMatchIn(out))
+    }
 }
