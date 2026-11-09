@@ -38,6 +38,10 @@ class WslAbsentTest {
             assertTrue(WslSidecarSetup.findLeftovers().isEmpty())
             assertEquals(null, WslSidecarSetup.removableFeature())
             assertFalse(WslSidecarSetup.pendingReady())
+            // The WSL tab picked again after a removal is not something left to remove.
+            prefs.setProtectedBackend(ProtectedBackend.WSL.key)
+            assertFalse("only the method is picked, nothing is on disk", WslSidecarSetup.hasLeftovers())
+            prefs.setProtectedBackend(backend)
             // A full uninstall must still go through, quietly.
             WslSidecarSetup.uninstall(featureVersion = null, onStep = {}, onLine = { println("  $it") })
             // The sidecar with a config left pointing at WSL (WSL removed outside the app): unavailable, never started.

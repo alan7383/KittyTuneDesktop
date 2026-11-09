@@ -508,6 +508,9 @@ internal fun DonePage(un: UninstallState) {
                     onClick = {
                         // The user's own click, after the dialog said why; Windows still gives a few seconds.
                         restarting = true
+                        // Nothing of WSL may be open as Windows restarts: it would be relaunched at sign-in,
+                        // as the "install WSL" stub.
+                        if (un.wslRemoved) WslSidecarSetup.closeWslProcesses()
                         runCatching { ProcessBuilder("shutdown.exe", "/r", "/t", "10").start() }
                             .onFailure { restarting = false }
                     },

@@ -538,12 +538,30 @@ internal object WslSidecarSetup {
     // Uninstalling
     // ------------------------------------------------------------------------------------------------
 
-    /** Whether there is anything to remove, without starting WSL. Cheap enough to ask on every visit. */
+    /**
+     * Whether KittyTune left anything of the WSL method on disk, without starting WSL. Cheap enough to ask on
+     * every visit. Only what is really there counts: the method merely being picked (the tab clicked, after a
+     * removal) is not something to remove, and offering the removal again then read as "WSL is never gone".
+     * The distribution itself is asked separately ([imported]), since that lists WSL's registrations.
+     */
     fun hasLeftovers(): Boolean {
         if (!windows) return false
-        return ProtectedBackend.current == ProtectedBackend.WSL ||
-            configFile?.isFile == true ||
-            distroDir?.exists() == true
+        return configFile?.isFile == true || distroDir?.exists() == true
+    }
+
+    /**
+     * Ends every WSL process still running once WSL is removed: none of them can work any more, and one left open
+     * when Windows restarts is relaunched by Windows at the next sign-in (it restores the terminal windows that
+     * were open), where `wsl.exe` is now only the installer stub — the "WSL is not installed, press a key to
+     * install it" terminal at every boot. Called only right after removing WSL, before the restart: WSL itself
+     * is gone by then, though [wslInstalled] still says otherwise until the restart retires its service.
+     */
+    fun closeWslProcesses() {
+        if (!windows) return
+        val names = setOf("wsl.exe", "wslhost.exe", "wslrelay.exe")
+        ProcessHandle.allProcesses()
+            .filter { handle -> handle.info().command().orElse("").substringAfterLast('\\').lowercase() in names }
+            .forEach { runCatching { it.destroyForcibly() } }
     }
 
     /**
@@ -770,6 +788,8 @@ internal object WslSidecarSetup {
                         if (file.exists() && !file.delete()) throw UninstallException(step, "could not delete ${file.path}")
                     }
                     clearPending()
+                    // The folder our distribution lived in, once empty: nothing of the method stays on disk.
+                    distroDir?.parentFile?.let { dir -> if (dir.list()?.isEmpty() == true) dir.delete() }
                     StreamResolver.forgetStreams()
                     onLine("KittyTune no longer points at WSL")
                 }
@@ -801,6 +821,7 @@ internal object WslSidecarSetup {
                     if (!result.ok) throw UninstallException(step, "WSL could not be removed")
                     result.log.lineSequence().map { it.trimEnd() }.filter { it.isNotBlank() }.forEach(onLine)
                     prefs.setWslFeaturesEnabledByApp(emptySet())
+                    closeWslProcesses()
                     restart = true
                     onLine("WSL removed; Windows finishes after a restart")
                 }
@@ -813,16 +834,37 @@ internal object WslSidecarSetup {
     // Windows feature state + elevation (one reusable elevated-PowerShell runner)
     // ------------------------------------------------------------------------------------------------
 
-    /** Reads an optional component's state without elevation. */
+    /**
+     * Whether an optional component is on (and its restart done), readable **without elevation**.
+     *
+     * `Get-WindowsOptionalFeature` needs an administrator: from a normal session it only answers "the requested
+     * operation requires elevation", which read as "off" for every user not running KittyTune as admin — WSL then
+     * never looked enabled, even right after the setup's restart. It is still asked first (it alone tells the
+     * pending states apart); without elevation, `Win32_OptionalFeature` answers, and a component servicing restart
+     * still pending means the change is not in effect yet.
+     */
     private fun featureEnabled(feature: String): Boolean = runCatching {
         val process = ProcessBuilder(
-            "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-            "(Get-WindowsOptionalFeature -Online -FeatureName $feature).State",
+            "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", featureStateScript(feature),
         ).redirectErrorStream(true).start()
         val output = process.inputStream.bufferedReader().readText()
         process.waitFor(30, TimeUnit.SECONDS)
-        output.contains("Enabled", ignoreCase = true) && !output.contains("DisablePending", ignoreCase = true)
+        parseFeatureState(output)
     }.getOrDefault(false)
+
+    internal fun featureStateScript(feature: String): String =
+        "try { 'STATE:' + (Get-WindowsOptionalFeature -Online -FeatureName $feature -ErrorAction Stop).State } catch { " +
+            "'CIM:' + (Get-CimInstance Win32_OptionalFeature -Filter \"Name='$feature'\").InstallState; " +
+            "if (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Component Based Servicing\\RebootPending') { 'REBOOT_PENDING' } }"
+
+    /** `STATE:Enabled` (DISM, elevated) or `CIM:1` with no servicing restart pending (not elevated). */
+    internal fun parseFeatureState(output: String): Boolean {
+        val lines = output.lineSequence().map { it.trim() }.toList()
+        lines.firstOrNull { it.startsWith("STATE:") }?.let { return it.removePrefix("STATE:").trim().equals("Enabled", true) }
+        val cim = lines.firstOrNull { it.startsWith("CIM:") }?.removePrefix("CIM:")?.trim()
+        // Win32_OptionalFeature.InstallState: 1 enabled, 2 disabled, 3 absent.
+        return cim == "1" && lines.none { it == "REBOOT_PENDING" }
+    }
 
     /**
      * Runs [psBody] as administrator through Windows' own UAC prompt, hidden, and waits.
