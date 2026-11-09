@@ -113,9 +113,22 @@ internal object CdmSidecar {
             val now = System.currentTimeMillis()
             if (attempted && now - lastAttemptAt < RETRY_AFTER_MS) return false
             val command = explicitCommand() ?: return false
+            if (wslMissingFor(command)) return false
             register(command)
             return true
         }
+    }
+
+    /**
+     * A command that goes through WSL while WSL is not installed (removed since the config was written):
+     * starting it would only wake Windows' installer stub, which opens a terminal offering to install WSL.
+     */
+    private fun wslMissingFor(command: List<String>): Boolean {
+        if (WslVmLifecycle.distroOf(command) == null || WslSidecarSetup.wslInstalled) return false
+        failureReason = "${commandLabel(command)}: WSL is not installed"
+        attempted = true
+        lastAttemptAt = System.currentTimeMillis()
+        return true
     }
 
     /**
@@ -133,6 +146,7 @@ internal object CdmSidecar {
                 failureReason = null
                 return false
             }
+            if (wslMissingFor(command)) return false
             val label = commandLabel(command)
             val error = probe(command)
             attempted = true
@@ -574,7 +588,8 @@ internal object WslVmLifecycle {
 
     /** Runs `wsl.exe` and returns its output, or null when it failed or WSL is not there. */
     private fun run(args: List<String>): String? = runCatching {
-        if (!wslExe.isFile) return null
+        // Never the installer stub that System32\wsl.exe is on a PC without WSL (see WslSidecarSetup.wslInstalled).
+        if (!WslSidecarSetup.wslInstalled) return null
         val builder = ProcessBuilder(listOf(wslExe.absolutePath) + args).redirectErrorStream(true)
         builder.environment()["WSL_UTF8"] = "1"
         val process = builder.start()
