@@ -97,7 +97,7 @@ internal class UninstallState {
 
     /** What [WslSidecarSetup.uninstall] is asked to turn off: nothing unless offered and ticked, and never
      *  alongside removing WSL, which covers it. */
-    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature && !removingWsl }
+    val featureToRemove: Int? get() = featureVersion?.takeIf { removeFeature && windowsSide?.wslRemovable != true }
 
     /** Whether KittyTune's own distribution is there; null while checking. */
     var ourDistroPresent by mutableStateOf<Boolean?>(null)
@@ -345,9 +345,11 @@ internal fun WhatPage(un: UninstallState) {
         )
     }
 
-    // A single component, when WSL itself stays: left on by default (harmless; turning it off needs admin +
-    // a restart), and only offered when nothing else runs on it.
-    if (!un.removingWsl) un.featureVersion?.let { version ->
+    // A single component, only when WSL itself has to stay (another distribution uses it): when WSL can go,
+    // removing it already turns its components off, and a second, overlapping box would only confuse. Left
+    // on by default (harmless; turning it off needs admin + a restart), and only offered when nothing else
+    // runs on it.
+    if (side?.wslRemovable != true) un.featureVersion?.let { version ->
         ChoiceCard(
             checked = un.removeFeature,
             title = str("drm_unwiz_feature_title", version),
