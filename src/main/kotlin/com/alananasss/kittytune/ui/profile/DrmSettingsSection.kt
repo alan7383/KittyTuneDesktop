@@ -166,13 +166,15 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
         detection = null
         val found = WslSidecarSetup.detect()
         detection = found
-        // NOT_SET_UP too: a configuration written by scripts/setup-cdm-sidecar.ps1 points at a daemon
-        // in the user's home rather than at ours, and works just as well.
-        if (found.state == WslSidecarSetup.State.SET_UP || found.state == WslSidecarSetup.State.NOT_SET_UP) {
+        // Only a real setup (or the expert override) can be connected: anything else is "not set up",
+        // never a guess at some other distribution.
+        val overridden = !System.getenv("KITTYTUNE_CDM_SIDECAR").isNullOrBlank()
+        if (found.state == WslSidecarSetup.State.SET_UP || overridden) {
             wslConnected = withContext(Dispatchers.IO) { CdmSidecar.verify() }
             if (!wslConnected) report = CdmSidecar.lastFailure
         } else {
-            wslConnected = CdmSidecar.isInstalled
+            CdmSidecar.reset()
+            wslConnected = false
         }
     }
 
@@ -340,7 +342,8 @@ internal fun WslStatus(detection: WslSidecarSetup.Detection?, connected: Boolean
     val error = MaterialTheme.colorScheme.error
     when {
         connected -> DrmStatusLine(
-            str("pref_drm_wsl_connected", WslSidecarSetup.DISTRO),
+            // The distribution it really runs in, never an assumed name.
+            str("pref_drm_wsl_connected", CdmSidecar.connectedDistro ?: "WSL"),
             Icons.Rounded.CheckCircle,
             MaterialTheme.colorScheme.primary,
         )
