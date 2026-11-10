@@ -156,10 +156,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        DrmBanner(
-            lines = listOf(str("pref_drm_windows_intro"), str("pref_drm_windows_beta")),
-            beta = true,
-        )
+        DrmBanner(lines = listOf(str("pref_drm_windows_intro")))
 
         SettingsGroup(
             title = str("pref_drm_group_playback"),
@@ -353,12 +350,6 @@ private fun DrmHelpGroup(onOpenWizard: (DrmWizardStart) -> Unit) {
                 onClick = { onOpenWizard(DrmWizardStart.INTRO) },
             )
         }),
-    )
-    // The card says this is still a beta: on Windows the module is fetched and run by the app, and
-    // the code is open for anyone with a better idea.
-    DrmExperimentalCard(
-        windows = NativeCdmSetup.windows,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
 
@@ -630,7 +621,7 @@ private fun DrmSpinner() {
  * where the user learns what the page is for.
  */
 @Composable
-private fun DrmBanner(lines: List<String>, beta: Boolean = false, status: (@Composable () -> Unit)? = null) {
+private fun DrmBanner(lines: List<String>, status: (@Composable () -> Unit)? = null) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(24.dp),
@@ -668,20 +659,6 @@ private fun DrmBanner(lines: List<String>, beta: Boolean = false, status: (@Comp
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    if (beta) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                        ) {
-                            Text(
-                                text = str("pref_drm_beta_badge"),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
                 }
                 lines.forEach { line ->
                     Text(
