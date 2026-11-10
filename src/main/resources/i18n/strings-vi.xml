@@ -1119,6 +1119,9 @@
     <string name="pref_home_cards_group_title">Thẻ trên màn hình chính</string>
     <string name="pref_home_listening_stats_desc">Hiển thị thẻ thống kê nghe nhạc trên màn hình chính</string>
     <string name="pref_home_your_mix_desc">Hiển thị thẻ mix cá nhân trên màn hình chính</string>
+    <string name="pref_home_my_wave_desc">Hiển thị thẻ Làn sóng của tôi trên màn hình chính</string>
+    <string name="pref_home_charts">Bảng xếp hạng</string>
+    <string name="pref_home_charts_desc">Hiển thị mục bảng xếp hạng trên màn hình chính</string>
     <string name="listening_stats_period_week">Tuần này</string>
     <string name="listening_stats_period_all">Mọi thời đại</string>
     <string name="listening_stats_time_listened">Thời gian đã nghe</string>

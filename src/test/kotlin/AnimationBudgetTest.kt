@@ -78,9 +78,12 @@ class AnimationBudgetTest {
     }
 
     @Test
-    fun `the wave on the My Wave card rides the ambient pulse`() {
-        val wave = source("com/alananasss/kittytune/ui/main/MyWaveCard.kt")
-        assertTrue(wave.contains("rememberAmbientLoop"), "the wave must be sampled on the shared pulse")
+    fun `the My Wave card no longer draws its decorative waves`() {
+        val card = source("com/alananasss/kittytune/ui/main/MyWaveCard.kt")
+        assertTrue(
+            !card.contains("WaveBackground") && !card.contains("waveShift"),
+            "the card is a plain themed surface now; the drifting waves were removed",
+        )
     }
 
     @Test

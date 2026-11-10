@@ -837,6 +837,9 @@
     <string name="pref_home_cards_group_title">Home screen cards</string>
     <string name="pref_home_listening_stats_desc">Show listening statistics card on the home screen</string>
     <string name="pref_home_your_mix_desc">Show personalized mix card on the home screen</string>
+    <string name="pref_home_my_wave_desc">Show the My Wave card on the home screen</string>
+    <string name="pref_home_charts">Charts</string>
+    <string name="pref_home_charts_desc">Show the charts section on the home screen</string>
     <string name="mix_title">Your mix</string>
     <string name="mix_start">Start mixing</string>
     <string name="mix_building">Building your mix…</string>

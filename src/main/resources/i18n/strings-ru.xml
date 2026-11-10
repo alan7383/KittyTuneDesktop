@@ -837,6 +837,9 @@
     <string name="pref_home_cards_group_title">Карточки главного экрана</string>
     <string name="pref_home_listening_stats_desc">Показывать карточку статистики прослушиваний на главном экране</string>
     <string name="pref_home_your_mix_desc">Показывать карточку персонального микса на главном экране</string>
+    <string name="pref_home_my_wave_desc">Показывать карточку «Моя волна» на главном экране</string>
+    <string name="pref_home_charts">Чарты</string>
+    <string name="pref_home_charts_desc">Показывать чарты на главном экране</string>
     <string name="mix_title">Твой микс</string>
     <string name="mix_start">Запустить микс</string>
     <string name="mix_building">Собираем микс…</string>

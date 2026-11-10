@@ -77,6 +77,8 @@ internal fun HomeFeed(
     val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
     val showHomeYourMix by prefs.showHomeYourMixFlow().collectAsState(initial = prefs.getShowHomeYourMix())
     val showHomeListeningStats by prefs.showHomeListeningStatsFlow().collectAsState(initial = prefs.getShowHomeListeningStats())
+    val showHomeMyWave by prefs.showHomeMyWaveFlow().collectAsState(initial = prefs.getShowHomeMyWave())
+    val showHomeCharts by prefs.showHomeChartsFlow().collectAsState(initial = prefs.getShowHomeCharts())
 
     val homeClips by com.alananasss.kittytune.data.artist.ArtistClips.homeClips.collectAsState()
     val likes by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
@@ -95,7 +97,9 @@ internal fun HomeFeed(
         history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
             .distinctBy { it.id }
     }
-    LaunchedEffect(Unit) { if (vm.chartPreview.isEmpty() && !vm.isChartPreviewLoading) vm.loadChartPreview() }
+    LaunchedEffect(showHomeCharts) {
+        if (showHomeCharts && vm.chartPreview.isEmpty() && !vm.isChartPreviewLoading) vm.loadChartPreview()
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -118,7 +122,9 @@ internal fun HomeFeed(
                     bottomSpacing = 16.dp,
                 )
             }
-            MyWaveCard(playerViewModel, Modifier.padding(horizontal = HOME_PADDING))
+            if (showHomeMyWave) {
+                MyWaveCard(playerViewModel, Modifier.padding(horizontal = HOME_PADDING))
+            }
         }
 
         if (contextHistory.isNotEmpty()) {
@@ -132,8 +138,10 @@ internal fun HomeFeed(
             item(key = "stats") { Box(Modifier.padding(horizontal = HOME_PADDING)) { ListeningStatsCard(navController) } }
         }
 
-        item(key = "chart") {
-            com.alananasss.kittytune.ui.home.HomeChartSection(vm, playerViewModel, onOpenCharts = { navController.navigate("charts") })
+        if (showHomeCharts) {
+            item(key = "chart") {
+                com.alananasss.kittytune.ui.home.HomeChartSection(vm, playerViewModel, onOpenCharts = { navController.navigate("charts") })
+            }
         }
 
         // New videos of the artists being listened to, on the home page as on an artist's own (round 3, 24), under the chart.
