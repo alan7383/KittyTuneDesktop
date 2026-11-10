@@ -484,7 +484,6 @@ class PlayerPreferences {
         private const val KEY_PROTECTED_TRACKS = "protected_tracks_enabled"
         private const val KEY_PROTECTED_ANNOUNCED = "protected_tracks_announced"
         private const val KEY_PROTECTED_HINT_SHOWN = "protected_tracks_hint_shown"
-        private const val KEY_PROTECTED_BACKEND = "protected_backend"
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
         private const val KEY_WSL_SETUP_PENDING = "wsl_setup_pending_reboot"
         private const val KEY_WSL_SETUP_VERSION = "wsl_setup_version"
@@ -812,8 +811,6 @@ class PlayerPreferences {
     fun setProtectedTracksHintShown(shown: Boolean) = Prefs.putBoolean(KEY_PROTECTED_HINT_SHOWN, shown)
 
     /** Windows only: "playready" (the OS renderer) or "wsl" (the Widevine sidecar in WSL). */
-    fun getProtectedBackend(): String = Prefs.getString(KEY_PROTECTED_BACKEND, "playready") ?: "playready"
-    fun setProtectedBackend(backend: String) = Prefs.putString(KEY_PROTECTED_BACKEND, backend)
     /**
      * Whether the WSL setup is waiting for the restart that enabling the Windows feature needs, so the
      * assistant resumes by itself when the user comes back. [getWslSetupVersion] is 1 (WSL1) or 2 (WSL2).

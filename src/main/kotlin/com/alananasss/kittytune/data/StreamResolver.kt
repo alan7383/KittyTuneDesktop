@@ -10,7 +10,6 @@ import com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality
 import com.alananasss.kittytune.data.drm.SoundCloudDrm
-import com.alananasss.kittytune.data.drm.ProtectedBackend
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.CookieStore
 import com.alananasss.kittytune.data.network.RetrofitClient

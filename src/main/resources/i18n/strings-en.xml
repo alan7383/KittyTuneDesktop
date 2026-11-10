@@ -3344,4 +3344,9 @@
     <string name="drm_wiz_native_step_probe">Checking the module answers</string>
     <string name="drm_wiz_native_step_connect">Turning protected tracks on</string>
     <string name="drm_wiz_done_native">Protected tracks now play through the native module. Run a test to check on a real track.</string>
+    <string name="pref_drm_wsl_cleanup_title">Remove the old WSL setup</string>
+    <string name="pref_drm_wsl_cleanup_desc">Deletes the Linux distribution an earlier version installed; protected tracks now use the native module</string>
+    <string name="pref_drm_wsl_cleanup_running">Removing it…</string>
+    <string name="pref_drm_wsl_cleanup_done">Old WSL setup removed</string>
+    <string name="pref_drm_wsl_cleanup_partial">Partly removed: open the details to see why</string>
 </resources>

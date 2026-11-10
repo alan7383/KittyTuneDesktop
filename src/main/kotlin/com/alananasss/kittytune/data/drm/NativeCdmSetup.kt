@@ -166,8 +166,10 @@ internal object NativeCdmSetup {
             report("  probe: the daemon answers")
 
             onStep(Step.CONNECT)
-            ProtectedBackend.select(ProtectedBackend.NATIVE)
+            // The method is the native one by construction now: drop anything resolved or licensed
+            // under the previous configuration (an old WSL sidecar, a different module).
             CdmSidecar.reset()
+            com.alananasss.kittytune.data.StreamResolver.forgetStreams()
             report("  result: OK")
             true
         } catch (e: Throwable) {

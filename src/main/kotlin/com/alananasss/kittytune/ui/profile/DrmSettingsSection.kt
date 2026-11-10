@@ -68,8 +68,7 @@ import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.drm.CdmSidecar
 import com.alananasss.kittytune.data.drm.DrmSelfTest
 import com.alananasss.kittytune.data.drm.NativeWidevineCdm
-import com.alananasss.kittytune.data.drm.ProtectedBackend
-import com.alananasss.kittytune.data.drm.WslSidecarSetup
+import com.alananasss.kittytune.data.drm.WslCleanup
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.SettingsGroup
@@ -104,21 +103,13 @@ fun DrmSettingsSection() {
     var wizard by remember {
         mutableStateOf(if (prefs.getDrmOnboardingDone()) null else DrmWizardStart.INTRO)
     }
-    // Coming back after the reboot the WSL feature needed: reopen the assistant straight at the setup
-    // step, which resumes by itself. Only when the feature is actually on now (the restart happened).
-    LaunchedEffect(Unit) {
-        if (WslSidecarSetup.pendingVersion() != null && WslSidecarSetup.pendingReady()) {
-            wizard = DrmWizardStart.WSL
-        }
-    }
     // Bumped when the assistant closes: it may have changed the method or turned protected tracks
     // off, and the page's rows keep their own state.
     var generation by remember { mutableIntStateOf(0) }
-    var uninstalling by remember { mutableStateOf(false) }
 
     key(generation) {
         if (NativeCdmSetup.windows) {
-            WindowsDrmSection(onOpenWizard = { wizard = it }, onOpenUninstall = { uninstalling = true })
+            WindowsDrmSection(onOpenWizard = { wizard = it })
         } else {
             WidevineDrmSection(onOpenWizard = { wizard = it })
         }
@@ -130,61 +121,39 @@ fun DrmSettingsSection() {
             generation++
         })
     }
-    if (uninstalling) {
-        WslUninstallWizard(onClose = {
-            uninstalling = false
-            generation++
-        })
-    }
 }
 
 /**
- * Windows: pick the method, see where it stands, set it up, test it.
+ * Windows: where the native module stands, how to install it, how to test it.
  *
- * [ProtectedBackend.NATIVE] is the default and asks for nothing but a download: no administrator, no
- * restart, no virtual machine. [ProtectedBackend.WSL] runs the same daemon inside a small Linux
- * distribution, for the machines where the loader cannot run.
+ * There is one method and no choice to make: Chrome's Linux Widevine module is downloaded once and
+ * run by KittyTune itself â€” no administrator, no restart, no virtual machine. The Linux distribution
+ * that used to be the alternative is gone; [WslCleanup] sweeps up what an older version left, for
+ * the people who installed it.
  *
- * A method that is chosen but not answering is not an error the user caused: protected tracks are
- * simply not offered until it is set up, and the page says so next to the way to fix it.
+ * A module that is missing is not an error the user caused: protected tracks are simply not offered
+ * until it is installed, and the page says so next to the way to fix it.
  */
 @Composable
-internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUninstall: () -> Unit = {}) {
-    var backend by remember { mutableStateOf(ProtectedBackend.current) }
+internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
     var nativeReady by remember { mutableStateOf(false) }
-    var detection by remember { mutableStateOf<WslSidecarSetup.Detection?>(null) }
-    var wslConnected by remember { mutableStateOf(CdmSidecar.isInstalled) }
     var testing by remember { mutableStateOf(false) }
     var passed by remember { mutableStateOf<Boolean?>(null) }
     var report by remember { mutableStateOf<String?>(null) }
     var showLog by remember { mutableStateOf(false) }
+    var hasWslLeftovers by remember { mutableStateOf(false) }
+    var cleaningWsl by remember { mutableStateOf(false) }
+    var wslLog by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Where the chosen method stands. The native one is a probe away; WSL needs its distribution
-    // looked at first. Both run off the UI thread: the probe starts a process.
-    LaunchedEffect(backend) {
-        if (backend == ProtectedBackend.NATIVE) {
-            nativeReady = withContext(Dispatchers.IO) {
-                NativeCdmSetup.isInstalled() && CdmSidecar.verify()
-            }
-            if (!nativeReady && report == null) report = CdmSidecar.lastFailure
-            return@LaunchedEffect
+    // Where the module stands: a probe away. Off the UI thread, since it starts a process.
+    LaunchedEffect(Unit) {
+        nativeReady = withContext(Dispatchers.IO) {
+            NativeCdmSetup.isInstalled() && CdmSidecar.verify()
         }
-        detection = null
-        val found = WslSidecarSetup.detect()
-        detection = found
-        // Only a real setup (or the expert override) can be connected: anything else is "not set up",
-        // never a guess at some other distribution.
-        val overridden = !System.getenv("KITTYTUNE_CDM_SIDECAR").isNullOrBlank()
-        if (found.state == WslSidecarSetup.State.SET_UP || overridden) {
-            wslConnected = withContext(Dispatchers.IO) { CdmSidecar.verify() }
-            if (!wslConnected) report = CdmSidecar.lastFailure
-        } else {
-            CdmSidecar.reset()
-            wslConnected = false
-        }
+        if (!nativeReady) report = CdmSidecar.lastFailure
+        hasWslLeftovers = withContext(Dispatchers.IO) { WslCleanup.hasLeftoversNow() }
     }
-    val connected = if (backend == ProtectedBackend.NATIVE) nativeReady else wslConnected
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         DrmBanner(
@@ -197,50 +166,23 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
             items = listOf({ shape -> ProtectedTracksSwitch(shape) }),
         )
 
-        // The method: a choice, so a button group; under it, what the chosen one does and where it
-        // stands. Not rows: nothing in there is pressed except the group itself.
+        // What the module is and where it stands. Not rows: nothing in here is pressed.
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             SettingsGroupTitle(str("pref_drm_group_method"))
             Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ExpressiveConnectedButtonGroup(
-                        options = ProtectedBackend.entries,
-                        selectedOption = backend,
-                        onOptionSelected = { method ->
-                            if (method != backend) {
-                                ProtectedBackend.select(method)
-                                backend = method
-                                nativeReady = false
-                                wslConnected = CdmSidecar.isInstalled
-                                passed = null
-                            }
-                        },
-                        fillMaxWidth = true,
-                        uncheckedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        iconSpacing = 8.dp,
-                        labelProvider = { Text(methodName(it), fontWeight = FontWeight.Bold) },
-                        iconProvider = { Icon(methodIcon(it), contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    )
-                    AnimatedContent(
-                        targetState = backend,
-                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(150)) },
-                        label = "drm-method",
-                    ) { method ->
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                MethodBadge(method, size = 40)
-                                Text(
-                                    methodTagline(method),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                MethodInfoButton(method)
-                            }
-                            if (method == ProtectedBackend.NATIVE) NativeStatus(nativeReady) else WslStatus(detection, wslConnected)
-                            MethodPoints(method)
-                        }
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        MethodBadge(size = 40)
+                        Text(
+                            str("drm_method_native_tagline"),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        MethodInfoButton()
                     }
+                    NativeStatus(nativeReady)
+                    MethodPoints()
                 }
             }
         }
@@ -258,19 +200,15 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 },
                 icon = Icons.Rounded.PlayCircle,
                 titleColor = if (result == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                enabled = !testing && connected,
+                enabled = !testing && nativeReady,
                 trailingContent = if (testing) ({ DrmSpinner() }) else null,
                 onClick = {
-                    val title = when (backend) {
-                        ProtectedBackend.NATIVE -> str("drm_method_native")
-                        ProtectedBackend.WSL -> "WSL (${CdmSidecar.describe})"
-                    }
-                    report = title
+                    report = str("drm_method_native")
                     showLog = true
                     scope.launch {
                         testing = true
                         passed = null
-                        val log = StringBuilder(title)
+                        val log = StringBuilder(str("drm_method_native"))
                         try {
                             passed = DrmSelfTest.run { line ->
                                 log.append('\n').append(line)
@@ -283,7 +221,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 },
             )
         }
-        val nativeSetupRow: @Composable (Shape) -> Unit = { shape ->
+        val setupRow: @Composable (Shape) -> Unit = { shape ->
             SettingsItem(
                 shape = shape,
                 title = str(if (nativeReady) "pref_drm_native_redo_title" else "pref_drm_native_setup_title"),
@@ -292,7 +230,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 onClick = { onOpenWizard(DrmWizardStart.NATIVE) },
             )
         }
-        val nativeRemoveRow: @Composable (Shape) -> Unit = { shape ->
+        val removeRow: @Composable (Shape) -> Unit = { shape ->
             SettingsItem(
                 shape = shape,
                 title = str("pref_drm_native_remove_title"),
@@ -310,44 +248,46 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
                 },
             )
         }
-        val wslSetupRow: @Composable (Shape) -> Unit = { shape ->
+        // Only for people who installed the version that had a Linux distribution behind it.
+        val cleanupRow: @Composable (Shape) -> Unit = { shape ->
             SettingsItem(
                 shape = shape,
-                title = str(if (wslConnected) "pref_drm_wsl_redo_title" else "pref_drm_wsl_setup_title"),
-                subtitle = str(if (wslConnected) "pref_drm_wsl_redo_desc" else "pref_drm_wsl_setup_desc"),
-                icon = Icons.Rounded.Build,
-                onClick = { onOpenWizard(DrmWizardStart.WSL) },
-            )
-        }
-        // Offered whenever something of the WSL method may still be on the PC: that is exactly when
-        // someone wants it gone. Listing them starts nothing.
-        var hasWslLeftovers by remember(backend) { mutableStateOf(WslSidecarSetup.hasLeftovers()) }
-        LaunchedEffect(backend) {
-            if (!hasWslLeftovers) {
-                hasWslLeftovers = WslSidecarSetup.imported() || WslSidecarSetup.otherDistributionsRegistered()
-            }
-        }
-        val wslUninstallRow: @Composable (Shape) -> Unit = { shape ->
-            SettingsItem(
-                shape = shape,
-                title = str("pref_drm_wsl_uninstall_title"),
-                subtitle = str("pref_drm_wsl_uninstall_desc"),
+                title = str("pref_drm_wsl_cleanup_title"),
+                subtitle = if (cleaningWsl) str("pref_drm_wsl_cleanup_running") else str("pref_drm_wsl_cleanup_desc"),
                 icon = Icons.Rounded.DeleteSweep,
-                titleColor = MaterialTheme.colorScheme.error,
-                onClick = onOpenUninstall,
+                enabled = !cleaningWsl,
+                trailingContent = if (cleaningWsl) ({ DrmSpinner() }) else null,
+                onClick = {
+                    scope.launch {
+                        cleaningWsl = true
+                        val log = StringBuilder()
+                        val done = withContext(Dispatchers.IO) {
+                            WslCleanup.remove { line ->
+                                log.append(line).append('\n')
+                                wslLog = log.toString()
+                            }
+                        }
+                        cleaningWsl = false
+                        hasWslLeftovers = withContext(Dispatchers.IO) { WslCleanup.hasLeftoversNow() }
+                        wslLog = log.toString()
+                        com.alananasss.kittytune.core.Toaster.show(
+                            str(if (done) "pref_drm_wsl_cleanup_done" else "pref_drm_wsl_cleanup_partial")
+                        )
+                    }
+                },
             )
         }
-        val setupRow = if (backend == ProtectedBackend.NATIVE) nativeSetupRow else wslSetupRow
+
         SettingsGroup(
-            items = when {
-                connected -> listOf(testRow, setupRow)
-                else -> listOf(setupRow) + (if (backend == ProtectedBackend.NATIVE && NativeCdmSetup.isInstalled()) listOf(testRow) else emptyList())
-            } + (if (backend == ProtectedBackend.NATIVE && NativeCdmSetup.isInstalled()) listOf(nativeRemoveRow) else emptyList()) +
-                (if (hasWslLeftovers) listOf(wslUninstallRow) else emptyList()) +
-                drmLogRow(report) { showLog = true },
+            items = listOfNotNull(
+                if (nativeReady) testRow else null,
+                setupRow,
+                if (nativeReady) removeRow else null,
+                if (hasWslLeftovers) cleanupRow else null,
+            ) + drmLogRow(report) { showLog = true },
         )
 
-        DrmHelpGroup(onOpenWizard, experimental = backend == ProtectedBackend.WSL)
+        DrmHelpGroup(onOpenWizard)
     }
 
     val log = report
@@ -364,6 +304,20 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit, onOpenUni
             running = testing,
             failed = result != true,
             onDismiss = { showLog = false },
+        )
+    }
+    wslLog?.let { log ->
+        EscapableAlertDialog(
+            onDismissRequest = { wslLog = null },
+            title = { Text(str("pref_drm_wsl_cleanup_title"), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    Text(log, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
+                }
+            },
+            confirmButton = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { wslLog = null }) { Text(str("btn_close")) }
+            },
         )
     }
 }
@@ -386,43 +340,8 @@ private fun NativeStatus(ready: Boolean) {
     }
 }
 
-/** Where WSL stands. */
 @Composable
-internal fun WslStatus(detection: WslSidecarSetup.Detection?, connected: Boolean) {
-    val error = MaterialTheme.colorScheme.error
-    when {
-        connected -> DrmStatusLine(
-            // The distribution it really runs in, never an assumed name.
-            str("pref_drm_wsl_connected", CdmSidecar.connectedDistro ?: "WSL"),
-            Icons.Rounded.CheckCircle,
-            MaterialTheme.colorScheme.primary,
-        )
-        detection == null -> DrmStatusLine(str("drm_wiz_wsl_checking"), Icons.Rounded.Search, MaterialTheme.colorScheme.onSurfaceVariant)
-        else -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val text = when (detection.state) {
-                WslSidecarSetup.State.NO_WSL -> str("drm_wiz_wsl_missing")
-                // The component of the version installed before, else WSL1, the default.
-                WslSidecarSetup.State.FEATURE_OFF -> str("drm_wiz_wsl_needs_enable", detection.installedVersion ?: 1)
-                WslSidecarSetup.State.NOT_SET_UP -> str("pref_drm_wsl_not_set_up")
-                WslSidecarSetup.State.SET_UP -> str("pref_drm_wsl_not_answering")
-            }
-            DrmStatusLine(text, Icons.Rounded.ErrorOutline, error)
-            Text(
-                str("pref_drm_wsl_fallback"),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 28.dp),
-            )
-        }
-    }
-}
-
-/**
- * The way back into the whole assistant, for whoever clicked through it too fast or chose the wrong
- * method, then the experimental notice with the link to the code (on Windows, only with WSL).
- */
-@Composable
-private fun DrmHelpGroup(onOpenWizard: (DrmWizardStart) -> Unit, experimental: Boolean) {
+private fun DrmHelpGroup(onOpenWizard: (DrmWizardStart) -> Unit) {
     SettingsGroup(
         title = str("pref_drm_group_help"),
         items = listOf({ shape ->
@@ -435,12 +354,12 @@ private fun DrmHelpGroup(onOpenWizard: (DrmWizardStart) -> Unit, experimental: B
             )
         }),
     )
-    AnimatedVisibility(experimental, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-        DrmExperimentalCard(
-            windows = NativeCdmSetup.windows,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
+    // The card says this is still a beta: on Windows the module is fetched and run by the app, and
+    // the code is open for anyone with a better idea.
+    DrmExperimentalCard(
+        windows = NativeCdmSetup.windows,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 /**
@@ -648,7 +567,7 @@ private fun WidevineDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
             ) + drmLogRow(report) { showLog = true },
         )
 
-        DrmHelpGroup(onOpenWizard, experimental = true)
+        DrmHelpGroup(onOpenWizard)
     }
 
     val log = report
@@ -872,3 +791,4 @@ private fun searchOnce(deep: Boolean): String? {
     NativeWidevineCdm.applyCustomPath(found)
     return found
 }
+
