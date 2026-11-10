@@ -3279,8 +3279,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Nhạc được bảo vệ</string>
-    <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune có thể phát bản nhạc được bảo vệ của SoundCloud bằng cách tự chạy mô-đun Widevine Linux của Chrome. Mô-đun chỉ cài một lần, khoảng 60 MB, không cần quyền quản trị và không khởi động lại. Hãy bật bản nhạc được bảo vệ.</string>
+    <string name="protected_ann_body_windows">Bản nhạc được bảo vệ giờ đã chạy trong KittyTune, và lần này làm đúng cách: ứng dụng tự chạy mô-đun Widevine của Chrome trong tiến trình của chính nó và nhận âm thanh đã được giải mã sẵn. Không cửa sổ trình duyệt, không máy ảo, không quyền quản trị và không khởi động lại — khoảng 60 MB một lần. Bộ cân bằng, hiệu ứng, hình ảnh động và tải xuống hoạt động với những bản nhạc này như mọi bản khác.</string>
     <string name="protected_ann_body_desktop">KittyTune phát bản nhạc được bảo vệ của SoundCloud bằng mô-đun Widevine của trình duyệt. Tính năng này đã bật sẵn.</string>
     <string name="protected_ann_enable">Bật</string>
     <string name="protected_ann_learn">Tìm hiểu thêm</string>
@@ -3325,4 +3324,5 @@
     <string name="pref_drm_wsl_cleanup_partial">Xoá một phần: xem chi tiết</string>
     <string name="drm_method_pro_effects">Bộ cân bằng, hiệu ứng và hình ảnh động hoạt động với bản nhạc được bảo vệ</string>
     <string name="drm_method_pro_downloads">Có thể tải bản nhạc được bảo vệ và phát lại mà không cần mô-đun</string>
+    <string name="protected_ann_install">Cài mô-đun</string>
 </resources>

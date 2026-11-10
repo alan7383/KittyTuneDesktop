@@ -26,7 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,9 +65,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import com.alananasss.kittytune.data.drm.NativeCdmSetup
 
-/** Whether the "protected tracks are here" card is still owed to this user. */
+/**
+ * Whether the "protected tracks are here" card is still owed to this user.
+ *
+ * Versioned, and deliberately blind to the old choice: someone who turned protected tracks off, or
+ * dismissed the card during the 1.5.0 update, has to hear that the method changed — it no longer
+ * needs WSL, a browser or a restart.
+ */
 internal fun protectedTracksAnnouncementDue(prefs: PlayerPreferences = PlayerPreferences()): Boolean =
-    !prefs.getProtectedTracksAnnounced() && !prefs.hasProtectedTracksChoice() && !prefs.getDrmOnboardingDone()
+    prefs.getProtectedAnnouncementVersion() < ProtectedTracksNotice.CURRENT
 
 /**
  * Turns protected tracks on from a card or a notice. On Windows the module has to be downloaded once, so
@@ -75,7 +83,7 @@ private suspend fun enableProtectedTracks(): Boolean {
     if (NativeCdmSetup.windows && !withContext(Dispatchers.IO) { NativeCdmSetup.isInstalled() }) return false
     val prefs = PlayerPreferences()
     prefs.setProtectedTracksEnabled(true)
-    prefs.setProtectedTracksAnnounced(true)
+    prefs.setProtectedAnnouncementVersion(ProtectedTracksNotice.CURRENT)
     StreamResolver.forgetStreams()
     return true
 }
@@ -92,13 +100,18 @@ private suspend fun enableProtectedTracks(): Boolean {
 fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing: androidx.compose.ui.unit.Dp = 0.dp) {
     val windows = NativeCdmSetup.windows
     var visible by remember { mutableStateOf(protectedTracksAnnouncementDue()) }
-    var enabled by remember { mutableStateOf(false) }
+    var enabled by remember {
+        mutableStateOf(PlayerPreferences().getProtectedTracksEnabled() && (!windows || NativeCdmSetup.isInstalled()))
+    }
+    // On Windows the module has to be downloaded before the switch can mean anything: the card then
+    // offers to install it rather than to flip a switch that would do nothing.
+    var needsModule by remember { mutableStateOf(windows && !NativeCdmSetup.isInstalled()) }
     var busy by remember { mutableStateOf(false) }
     var openWizard by remember { mutableStateOf(false) }
     var enableRequest by remember { mutableStateOf(0) }
 
     fun done() {
-        PlayerPreferences().setProtectedTracksAnnounced(true)
+        PlayerPreferences().setProtectedAnnouncementVersion(ProtectedTracksNotice.CURRENT)
         visible = false
     }
 
@@ -144,10 +157,7 @@ fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing
                             spinning = !isEnabled,
                         )
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(str("protected_ann_title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                BetaPill()
-                            }
+                            Text(str("protected_ann_title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(
                                 text = str(
                                     when {
@@ -165,7 +175,13 @@ fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    if (windows) {
+                                    if (needsModule) {
+                                        Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { openWizard = true }) {
+                                            Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(str("protected_ann_install"), fontWeight = FontWeight.Bold)
+                                        }
+                                    } else if (windows) {
                                         Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { enableRequest++ }) {
                                             Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(8.dp))
@@ -259,10 +275,7 @@ fun ProtectedTracksNoticeHost(modifier: Modifier = Modifier) {
             ) {
                 ShapeBadge(icon = if (enabled) Icons.Rounded.CheckCircle else Icons.Rounded.Lock, size = 44, spinning = false)
                 Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(str("protected_hint_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        BetaPill()
-                    }
+                    Text(str("protected_hint_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
                         text = when {
                             enabled -> str("protected_ann_enabled")
@@ -297,20 +310,6 @@ fun ProtectedTracksNoticeHost(modifier: Modifier = Modifier) {
             openWizard = false
             ProtectedTracksNotice.dismiss()
         })
-    }
-}
-
-/** The "Beta" tag, in the tertiary role so it reads as a label and not as an action. */
-@Composable
-internal fun BetaPill() {
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
-        Text(
-            str("protected_beta").uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-        )
     }
 }
 

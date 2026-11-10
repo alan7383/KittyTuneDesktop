@@ -22,6 +22,15 @@ object ProtectedTracksNotice {
         UNAVAILABLE,
     }
 
+    /**
+     * The announcement this release owes, also a version.
+     *
+     * Bumping it shows the card and the floating offer again: the method behind protected tracks
+     * changed completely in this release, and a flag that can only turn true would leave everyone who
+     * dismissed the previous one without ever hearing about it.
+     */
+    const val CURRENT = 2
+
     /** [id] tells two notices of the same kind apart, so the host restarts its timer for a new one. */
     data class Notice(val kind: Kind, val id: Long = System.nanoTime())
 
@@ -45,13 +54,13 @@ object ProtectedTracksNotice {
     internal fun onProtectedTrackSkipped() {
         if (!NativeCdmSetup.windows) return
         val prefs = PlayerPreferences()
-        if (prefs.getProtectedTracksHintShown()) return
+        if (prefs.getProtectedHintVersion() >= CURRENT) return
         // Someone who turned the switch off made a choice, and a choice needs no notice. Someone who
         // turned it on but has no module any more needs one: their choice is stored, the track would
         // simply fall back for ever, and nothing else would tell them.
         val stranded = prefs.getProtectedTracksEnabled() && !NativeCdmSetup.isInstalled()
         if (prefs.hasProtectedTracksChoice() && !stranded) return
-        prefs.setProtectedTracksHintShown(true)
+        prefs.setProtectedHintVersion(CURRENT)
         _current.value = Notice(Kind.OFFER_ENABLE)
     }
 

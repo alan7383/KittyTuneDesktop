@@ -20,6 +20,7 @@ class ProtectedTracksNoticeTest {
 
     private val keys = listOf(
         "protected_tracks_enabled", "protected_tracks_announced", "protected_tracks_hint_shown", "drm_onboarding_done",
+        "protected_announced_version", "protected_hint_version",
     )
 
 
@@ -67,15 +68,23 @@ class ProtectedTracksNoticeTest {
     }
 
     @Test
-    fun `the announcement is owed to updaters who never dealt with protected tracks`() {
-        assertTrue(protectedTracksAnnouncementDue())
-        PlayerPreferences().setDrmOnboardingDone(true)
-        assertFalse("went through the assistant already", protectedTracksAnnouncementDue())
-        Prefs.remove("drm_onboarding_done")
-        PlayerPreferences().setProtectedTracksEnabled(true)
-        assertFalse("set the switch already", protectedTracksAnnouncementDue())
-        Prefs.remove("protected_tracks_enabled")
+    fun `a new announcement reaches everyone, including whoever dismissed the last one`() {
+        assertTrue("a fresh install is owed it", protectedTracksAnnouncementDue())
+
+        PlayerPreferences().setProtectedAnnouncementVersion(ProtectedTracksNotice.CURRENT)
+        assertFalse("already shown", protectedTracksAnnouncementDue())
+
+        PlayerPreferences().setProtectedAnnouncementVersion(ProtectedTracksNotice.CURRENT - 1)
+        assertTrue("an older announcement must not silence this one", protectedTracksAnnouncementDue())
+
+        // 1.5.0 stored a boolean. It counts as "saw version 1", so those users get this one too.
+        Prefs.remove("protected_announced_version")
         PlayerPreferences().setProtectedTracksAnnounced(true)
-        assertFalse(protectedTracksAnnouncementDue())
+        assertTrue("whoever put the 1.5.0 card off sees this one", protectedTracksAnnouncementDue())
+
+        // A choice made in the assistant no longer silences it either: the method behind it changed.
+        Prefs.remove("protected_tracks_announced")
+        PlayerPreferences().setDrmOnboardingDone(true)
+        assertTrue(protectedTracksAnnouncementDue())
     }
 }

@@ -3197,8 +3197,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Védett számok</string>
-    <string name="protected_beta">Béta</string>
-    <string name="protected_ann_body_windows">A KittyTune le tudja játszani a SoundCloud védett számait, mert maga futtatja a Chrome Linuxos Widevine-modulját. A modul egyszer települ, körülbelül 60 MB, rendszergazda és újraindítás nélkül. Kapcsold be a védett számokat.</string>
+    <string name="protected_ann_body_windows">A védett számok most már működnek a KittyTune-ban, és ezúttal rendesen: az alkalmazás maga futtatja a Chrome Widevine-modulját, a saját folyamatában, és már visszafejtett hangot kap. Nincs böngészőablak, nincs virtuális gép, nincs rendszergazda és nincs újraindítás — egyszeri körülbelül 60 MB. Az equalizer, az effektek, a vizualizáló és a letöltések ugyanúgy működnek ezeknél a számoknál, mint bármely másnál.</string>
     <string name="protected_ann_body_desktop">A KittyTune a böngésződ Widevine-moduljával játssza a SoundCloud védett számait. Ez már be van kapcsolva.</string>
     <string name="protected_ann_enable">Bekapcsolás</string>
     <string name="protected_ann_learn">Részletek</string>
@@ -3243,4 +3242,5 @@
     <string name="pref_drm_wsl_cleanup_partial">Részben törölve: nézd meg a részleteket</string>
     <string name="drm_method_pro_effects">Az equalizer, az effektek és a vizualizáló védett számoknál is működik</string>
     <string name="drm_method_pro_downloads">A védett számok letölthetők, és utána a modul nélkül is lejátszhatók</string>
+    <string name="protected_ann_install">Modul telepítése</string>
 </resources>

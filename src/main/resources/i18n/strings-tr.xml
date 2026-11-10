@@ -3199,8 +3199,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Korumalı parçalar</string>
-    <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune, Chrome'un Linux Widevine modülünü kendisi çalıştırarak SoundCloud'un korumalı parçalarını çalabilir. Modül bir kez kurulur, yaklaşık 60 MB, yönetici ve yeniden başlatma gerekmez. Korumalı parçaları aç.</string>
+    <string name="protected_ann_body_windows">Korumalı parçalar artık KittyTune'da çalışıyor ve bu kez düzgün yapıldı: uygulama Chrome'un Widevine modülünü kendi sürecinde kendisi çalıştırıyor ve sesi zaten çözülmüş olarak alıyor. Tarayıcı penceresi yok, sanal makine yok, yönetici ve yeniden başlatma yok — bir kez yaklaşık 60 MB. Ekolayzer, efektler, görselleştirici ve indirmeler bu parçalarda da diğerleri gibi çalışıyor.</string>
     <string name="protected_ann_body_desktop">KittyTune, SoundCloud'un korumalı parçalarını tarayıcının Widevine modülüyle çalar. Bu zaten açık.</string>
     <string name="protected_ann_enable">Aç</string>
     <string name="protected_ann_learn">Daha fazla bilgi</string>
@@ -3245,4 +3244,5 @@
     <string name="pref_drm_wsl_cleanup_partial">Kısmen kaldırıldı: ayrıntılara bak</string>
     <string name="drm_method_pro_effects">Ekolayzer, efektler ve görselleştirici korumalı parçalarda çalışır</string>
     <string name="drm_method_pro_downloads">Korumalı parçalar indirilebilir ve sonrasında modül olmadan çalar</string>
+    <string name="protected_ann_install">Modülü kur</string>
 </resources>

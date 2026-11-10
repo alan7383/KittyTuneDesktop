@@ -3198,8 +3198,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Protected tracks</string>
-    <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune can play SoundCloud's protected tracks, by running Chrome's Linux Widevine module itself. The module is installed once, about 60 MB, with no administrator and no restart. Turn protected tracks on to use it.</string>
+    <string name="protected_ann_body_windows">Protected tracks work in KittyTune now, and this time it is done properly: the app runs Chrome's Widevine module itself, in its own process, and receives the audio already decrypted. No browser window, no virtual machine, no administrator and no restart — about 60 MB once. The equalizer, the effects, the visualizer and downloads work on these tracks like on any other.</string>
     <string name="protected_ann_body_desktop">KittyTune plays SoundCloud's protected tracks with your browser's Widevine module. It is already on.</string>
     <string name="protected_ann_enable">Turn on</string>
     <string name="protected_ann_learn">Learn more</string>
@@ -3244,4 +3243,5 @@
     <string name="pref_drm_wsl_cleanup_partial">Partly removed: open the details to see why</string>
     <string name="drm_method_pro_effects">The equalizer, the effects and the visualizer work on protected tracks</string>
     <string name="drm_method_pro_downloads">Protected tracks can be downloaded, and play afterwards without the module</string>
+    <string name="protected_ann_install">Install the module</string>
 </resources>

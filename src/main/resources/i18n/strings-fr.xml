@@ -3199,8 +3199,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Titres protégés</string>
-    <string name="protected_beta">Bêta</string>
-    <string name="protected_ann_body_windows">KittyTune peut lire les titres protégés de SoundCloud en exécutant lui-même le module Widevine Linux de Chrome. Le module s'installe une fois, environ 60 Mo, sans administrateur ni redémarrage. Active les titres protégés pour l'utiliser.</string>
+    <string name="protected_ann_body_windows">Les titres protégés fonctionnent maintenant dans KittyTune, et cette fois c'est fait proprement : l'app exécute elle-même le module Widevine de Chrome, dans son propre processus, et reçoit l'audio déjà déchiffré. Pas de fenêtre de navigateur, pas de machine virtuelle, pas d'administrateur ni de redémarrage — environ 60 Mo une fois. L'égaliseur, les effets, le visualiseur et les téléchargements fonctionnent sur ces titres comme sur les autres.</string>
     <string name="protected_ann_body_desktop">KittyTune lit les titres protégés de SoundCloud avec le module Widevine de ton navigateur. C'est déjà activé.</string>
     <string name="protected_ann_enable">Activer</string>
     <string name="protected_ann_learn">En savoir plus</string>
@@ -3245,4 +3244,5 @@
     <string name="pref_drm_wsl_cleanup_partial">Suppression partielle : voir le détail</string>
     <string name="drm_method_pro_effects">L'égaliseur, les effets et le visualiseur fonctionnent sur les titres protégés</string>
     <string name="drm_method_pro_downloads">Les titres protégés se téléchargent, et se lisent ensuite sans le module</string>
+    <string name="protected_ann_install">Installer le module</string>
 </resources>
