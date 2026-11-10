@@ -3368,7 +3368,7 @@
     <string name="drm_wiz_how_cdm">Die Lizenz geht an ein CDM, das Entschlüsselungsmodul eines Browsers oder des Systems. Es behält den Schlüssel: KittyTune sieht ihn nie.</string>
     <string name="drm_wiz_how_fallback_title">Ein Plan B</string>
     <string name="drm_wiz_how_fallback">Kann ein geschützter Titel nicht abgespielt werden, wechselt KittyTune wie bisher zu deinen anderen Quellen.</string>
-    <string name="drm_wiz_how_windows">KittyTune führt Chromes Linux-Widevine-Modul in seinem eigenen Prozess aus, mit einem dafür geschriebenen Loader. Die Lizenz kommt zur App zurück, die dann jedes Fragment selbst entschlüsselt — Equalizer, Effekte und Visualizer funktionieren also auch bei geschützten Titeln.</string>
+    <string name="drm_wiz_how_windows">KittyTune führt Chromes Linux-Widevine-Modul in seinem eigenen Prozess aus, mit einem dafür geschriebenen Loader. Die Lizenz kommt zur App zurück, die dann jedes Fragment selbst entschlüsselt, also funktionieren Equalizer, Effekte und Visualizer auch bei geschützten Titeln.</string>
     <string name="drm_wiz_how_desktop">Hier nutzt KittyTune das Widevine-CDM deines Browsers (Chrome, Firefox, Brave…). Es findet es selbst.</string>
     <string name="drm_method_pro_light">Leicht: etwa 60 MB auf der Platte, keine virtuelle Maschine</string>
     <string name="drm_wiz_setup_title">Das Linux-Modul installieren</string>
@@ -3418,7 +3418,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Geschützte Titel</string>
-    <string name="protected_ann_body_windows">Geschützte Titel funktionieren jetzt in KittyTune, und diesmal richtig gemacht: Die App führt Chromes Widevine-Modul selbst aus, in ihrem eigenen Prozess, und bekommt das Audio bereits entschlüsselt. Kein Browserfenster, keine virtuelle Maschine, kein Administrator und kein Neustart — einmalig etwa 60 MB. Equalizer, Effekte, Visualizer und Downloads funktionieren bei diesen Titeln wie bei allen anderen.</string>
+    <string name="protected_ann_body_windows">Geschützte Titel funktionieren jetzt in KittyTune, und diesmal richtig gemacht: Die App führt Chromes Widevine-Modul selbst aus, in ihrem eigenen Prozess, und bekommt das Audio bereits entschlüsselt. Kein Browserfenster, keine virtuelle Maschine, kein Administrator und kein Neustart, nur einmalig etwa 60 MB. Equalizer, Effekte, Visualizer und Downloads funktionieren bei diesen Titeln wie bei allen anderen.</string>
     <string name="protected_ann_body_desktop">KittyTune spielt geschützte Titel von SoundCloud mit dem Widevine-Modul deines Browsers. Es ist bereits eingeschaltet.</string>
     <string name="protected_ann_enable">Einschalten</string>
     <string name="protected_ann_learn">Mehr erfahren</string>
@@ -3464,7 +3464,7 @@
     <string name="drm_method_pro_effects">Equalizer, Effekte und Visualizer funktionieren bei geschützten Titeln</string>
     <string name="drm_method_pro_downloads">Geschützte Titel lassen sich herunterladen und danach ohne das Modul abspielen</string>
     <string name="protected_ann_install">Modul installieren</string>
-    <string name="drm_method_native_claim">Von Chrome nutzt KittyTune nur das Widevine-Modul — Chrome selbst läuft nie: kein Fenster, kein Hintergrundprozess.</string>
+    <string name="drm_method_native_claim">Von Chrome nutzt KittyTune nur das Widevine-Modul. Chrome selbst läuft nie: kein Fenster, kein Hintergrundprozess.</string>
     <string name="drm_method_pro_chrome_module">Ein Modul aus Chrome, sonst nichts daraus</string>
     <string name="connect_relay_url_hint">https://relay.beispiel.de</string>
 </resources>

@@ -3147,7 +3147,7 @@
     <string name="drm_wiz_how_cdm">A licenc egy CDM-hez kerül, ami egy böngésző vagy a rendszer visszafejtő modulja. Ő őrzi a kulcsot: a KittyTune sosem látja.</string>
     <string name="drm_wiz_how_fallback_title">B terv</string>
     <string name="drm_wiz_how_fallback">Ha egy védett szám nem játszható le, a KittyTune a többi forrásodra vált, mint eddig.</string>
-    <string name="drm_wiz_how_windows">A KittyTune a Chrome Linuxos Widevine-modulját a saját folyamatában futtatja, egy erre írt betöltővel. A licenc visszakerül az alkalmazáshoz, amely maga fejti vissza a darabokat — így az equalizer, az effektek és a vizualizáló védett számoknál is működik.</string>
+    <string name="drm_wiz_how_windows">A KittyTune a Chrome Linuxos Widevine-modulját a saját folyamatában futtatja, egy erre írt betöltővel. A licenc visszakerül az alkalmazáshoz, amely maga fejti vissza a darabokat, így az equalizer, az effektek és a vizualizáló védett számoknál is működik.</string>
     <string name="drm_wiz_how_desktop">Itt a KittyTune a böngésződ Widevine CDM-jét használja (Chrome, Firefox, Brave…). Magától megtalálja.</string>
     <string name="drm_method_pro_light">Könnyű: körülbelül 60 MB a lemezen, nincs virtuális gép</string>
     <string name="drm_wiz_setup_title">A Linux-modul telepítése</string>
@@ -3197,7 +3197,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Védett számok</string>
-    <string name="protected_ann_body_windows">A védett számok most már működnek a KittyTune-ban, és ezúttal rendesen: az alkalmazás maga futtatja a Chrome Widevine-modulját, a saját folyamatában, és már visszafejtett hangot kap. Nincs böngészőablak, nincs virtuális gép, nincs rendszergazda és nincs újraindítás — egyszeri körülbelül 60 MB. Az equalizer, az effektek, a vizualizáló és a letöltések ugyanúgy működnek ezeknél a számoknál, mint bármely másnál.</string>
+    <string name="protected_ann_body_windows">A védett számok most már működnek a KittyTune-ban, és ezúttal rendesen: az alkalmazás maga futtatja a Chrome Widevine-modulját, a saját folyamatában, és már visszafejtett hangot kap. Nincs böngészőablak, nincs virtuális gép, nincs rendszergazda és nincs újraindítás, csak egyszeri körülbelül 60 MB. Az equalizer, az effektek, a vizualizáló és a letöltések ugyanúgy működnek ezeknél a számoknál, mint bármely másnál.</string>
     <string name="protected_ann_body_desktop">A KittyTune a böngésződ Widevine-moduljával játssza a SoundCloud védett számait. Ez már be van kapcsolva.</string>
     <string name="protected_ann_enable">Bekapcsolás</string>
     <string name="protected_ann_learn">Részletek</string>
@@ -3243,7 +3243,7 @@
     <string name="drm_method_pro_effects">Az equalizer, az effektek és a vizualizáló védett számoknál is működik</string>
     <string name="drm_method_pro_downloads">A védett számok letölthetők, és utána a modul nélkül is lejátszhatók</string>
     <string name="protected_ann_install">Modul telepítése</string>
-    <string name="drm_method_native_claim">A Chrome-nak csak a Widevine-modulját használja a KittyTune — maga a Chrome soha nem fut: nincs ablak, nincs háttérfolyamat.</string>
+    <string name="drm_method_native_claim">A Chrome-nak csak a Widevine-modulját használja a KittyTune. Maga a Chrome soha nem fut: nincs ablak, nincs háttérfolyamat.</string>
     <string name="drm_method_pro_chrome_module">Egyetlen modul a Chrome-ból, semmi más</string>
     <string name="connect_relay_url_hint">https://relay.pelda.hu</string>
 </resources>

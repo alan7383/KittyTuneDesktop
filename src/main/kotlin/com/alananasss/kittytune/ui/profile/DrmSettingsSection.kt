@@ -127,7 +127,7 @@ fun DrmSettingsSection() {
  * Windows: where the native module stands, how to install it, how to test it.
  *
  * There is one method and no choice to make: Chrome's Linux Widevine module is downloaded once and
- * run by KittyTune itself â€” no administrator, no restart, no virtual machine. The Linux distribution
+ * run by KittyTune itself: no administrator, no restart, no virtual machine. The Linux distribution
  * that used to be the alternative is gone; [WslCleanup] sweeps up what an older version left, for
  * the people who installed it.
  *

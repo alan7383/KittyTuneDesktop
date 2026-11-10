@@ -3148,7 +3148,7 @@
     <string name="drm_wiz_how_cdm">Лицензия передаётся CDM, модулю расшифровки браузера или системы. Ключ остаётся у него: KittyTune его никогда не видит.</string>
     <string name="drm_wiz_how_fallback_title">План Б</string>
     <string name="drm_wiz_how_fallback">Если защищённый трек не воспроизводится, KittyTune, как и раньше, переходит к другим источникам.</string>
-    <string name="drm_wiz_how_windows">KittyTune запускает Linux-модуль Widevine из Chrome в собственном процессе, с написанным для этого загрузчиком. Лицензия возвращается приложению, и оно само расшифровывает каждый фрагмент — поэтому эквалайзер, эффекты и визуализатор работают и на защищённых треках.</string>
+    <string name="drm_wiz_how_windows">KittyTune запускает Linux-модуль Widevine из Chrome в собственном процессе, с написанным для этого загрузчиком. Лицензия возвращается приложению, и оно само расшифровывает каждый фрагмент, поэтому эквалайзер, эффекты и визуализатор работают и на защищённых треках.</string>
     <string name="drm_wiz_how_desktop">Здесь KittyTune использует Widevine CDM вашего браузера (Chrome, Firefox, Brave…). Он находит его сам.</string>
     <string name="drm_method_pro_light">Легко: около 60 МБ на диске, без виртуальной машины</string>
     <string name="drm_wiz_setup_title">Установка модуля Linux</string>
@@ -3198,7 +3198,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Защищённые треки</string>
-    <string name="protected_ann_body_windows">Защищённые треки теперь работают в KittyTune, и на этот раз сделано как надо: приложение само запускает модуль Widevine из Chrome, в своём процессе, и получает уже расшифрованный звук. Без окна браузера, без виртуальной машины, без администратора и без перезагрузки — около 60 МБ один раз. Эквалайзер, эффекты, визуализатор и загрузки работают с этими треками так же, как с остальными.</string>
+    <string name="protected_ann_body_windows">Защищённые треки теперь работают в KittyTune, и на этот раз сделано как надо: приложение само запускает модуль Widevine из Chrome, в своём процессе, и получает уже расшифрованный звук. Без окна браузера, без виртуальной машины, без администратора и без перезагрузки, всего около 60 МБ один раз. Эквалайзер, эффекты, визуализатор и загрузки работают с этими треками так же, как с остальными.</string>
     <string name="protected_ann_body_desktop">KittyTune играет защищённые треки SoundCloud с помощью модуля Widevine из твоего браузера. Это уже включено.</string>
     <string name="protected_ann_enable">Включить</string>
     <string name="protected_ann_learn">Подробнее</string>
@@ -3244,7 +3244,7 @@
     <string name="drm_method_pro_effects">Эквалайзер, эффекты и визуализатор работают на защищённых треках</string>
     <string name="drm_method_pro_downloads">Защищённые треки можно скачать, и потом они играют без модуля</string>
     <string name="protected_ann_install">Установить модуль</string>
-    <string name="drm_method_native_claim">Из Chrome KittyTune использует только модуль Widevine — сам Chrome не запускается: ни окна, ни фонового процесса.</string>
+    <string name="drm_method_native_claim">Из Chrome KittyTune использует только модуль Widevine. Сам Chrome не запускается: ни окна, ни фонового процесса.</string>
     <string name="drm_method_pro_chrome_module">Один модуль из Chrome, больше ничего</string>
     <string name="connect_relay_url_hint">https://relay.example.ru</string>
 </resources>
