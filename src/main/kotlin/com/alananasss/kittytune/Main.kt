@@ -753,8 +753,12 @@ fun main(args: Array<String>) {
             )
         }
 
-        // The Kitty pet: the Android home-screen widget as a floating window, always on top.
-        if (com.alananasss.kittytune.ui.pet.PetWindowState.visible) {
+        // The Kitty pet: the Android home-screen widget as a floating window, always on top. When it
+        // is set to live inside the app instead, MainScreen draws it there and no window is created.
+        if (
+            com.alananasss.kittytune.ui.pet.PetWindowState.visible &&
+            com.alananasss.kittytune.ui.pet.PetWindowState.placement == com.alananasss.kittytune.ui.pet.PetPlacement.DESKTOP
+        ) {
             com.alananasss.kittytune.ui.pet.PetDesktopWindow(
                 isAppFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen,
                 onOpenMainWindow = { showMainWindow() },

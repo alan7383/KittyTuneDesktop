@@ -3102,6 +3102,15 @@
     <string name="pet_desk_show">L\'afficher sur le bureau</string>
     <string name="pet_desk_show_sub">Une petite fenêtre flottante, toujours au premier plan. Déplace-la où tu veux, clic droit pour les options</string>
     <string name="pet_desk_hide">Cacher le chat</string>
+    <string name="pet_desk_placement">Où vit le chat</string>
+    <string name="pet_desk_placement_dialog">Où doit vivre le chat ?</string>
+    <string name="pet_desk_float">Fenêtre flottante</string>
+    <string name="pet_desk_float_sub">Toujours au premier plan, par-dessus les autres apps. Déplace-la où tu veux sur ton bureau</string>
+    <string name="pet_desk_inside">Dans la fenêtre</string>
+    <string name="pet_desk_inside_sub">À l\'intérieur de la fenêtre de KittyTune, jamais par-dessus les autres apps. Il ne peut pas en sortir</string>
+    <string name="pet_desk_inside_show">Afficher le chat dans la fenêtre</string>
+    <string name="pet_desk_inside_show_sub">Déplace-le dans la fenêtre ; il est retenu aux bords et n\'en sort jamais</string>
+    <string name="pet_desk_move_inside">Garder dans la fenêtre</string>
     <string name="pet_desk_tray_show">Afficher le chat</string>
     <string name="pet_desk_window_section">Fenêtre du chat</string>
     <string name="pet_desk_how_boop">Clique dessus pour lui faire un boop. Clique sur la bulle pour lui donner de la musique</string>
@@ -3115,7 +3124,7 @@
     <string name="pet_desk_crop_hint">Fais glisser pour déplacer et utilise la molette pour zoomer, afin que sa tête remplisse le cercle</string>
     <string name="pet_desk_editor_hint">Clique ou fais glisser sur le chat pour peindre, pixel par pixel</string>
     <string name="pet_desk_rare_tip">Psst… des moments très rares peuvent apparaître dans la fenêtre du chat. Chacun que tu vois est ajouté ici !</string>
-    <string name="pet_desk_bar_button_desc">Affiche ou cache la fenêtre flottante du chat</string>
+    <string name="pet_desk_bar_button_desc">Affiche ou cache le chat</string>
     <string name="pet_desk_photo_filter">Images</string>
     <!-- /KITTY PET DESKTOP -->
 

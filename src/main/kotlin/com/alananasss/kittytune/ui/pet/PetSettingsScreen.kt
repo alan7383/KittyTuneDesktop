@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PictureInPicture
 import androidx.compose.material.icons.rounded.SetMeal
 import androidx.compose.material.icons.rounded.SportsBaseball
 import androidx.compose.material.icons.rounded.TravelExplore
@@ -75,6 +76,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -228,6 +230,7 @@ private fun PetSettingsContent(
 ) {
     var editingName by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
+    var showPlacementDialog by remember { mutableStateOf(false) }
     var boops by remember { mutableIntStateOf(PetConfig.boops()) }
     val recentBoops = remember { ArrayDeque<Long>() }
     val ivyUnlocked = remember(settings) { PetConfig.isIvyUnlocked() }
@@ -645,14 +648,26 @@ private fun PetSettingsContent(
             // ---------------- actions
             item { SectionTitle(str("pet_section_more")) }
             item {
+                val inWindow = PetWindowState.placement == PetPlacement.IN_APP
                 SettingsGroup(
                     items = listOf(
                         { shape ->
+                            // One row, one popup: the cat lives either in the floating window or
+                            // inside this one, never in both, and the choice is made in a dialog.
                             SettingsItem(
                                 shape = shape,
-                                title = str("pet_desk_show"),
-                                subtitle = str("pet_desk_show_sub"),
-                                icon = Icons.Rounded.DesktopWindows,
+                                title = str("pet_desk_placement"),
+                                subtitle = str(if (inWindow) "pet_desk_inside" else "pet_desk_float"),
+                                icon = if (inWindow) Icons.Rounded.PictureInPicture else Icons.Rounded.DesktopWindows,
+                                onClick = { showPlacementDialog = true }
+                            )
+                        },
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str(if (inWindow) "pet_desk_inside_show" else "pet_desk_show"),
+                                subtitle = str(if (inWindow) "pet_desk_inside_show_sub" else "pet_desk_show_sub"),
+                                icon = if (inWindow) Icons.Rounded.PictureInPicture else Icons.Rounded.DesktopWindows,
                                 hasSwitch = true,
                                 switchState = PetWindowState.visible,
                                 onSwitchChange = { PetWindowState.show(it) },
@@ -693,6 +708,28 @@ private fun PetSettingsContent(
             }
         )
     }
+    if (showPlacementDialog) {
+        // Two homes, one choice: the floating window (the widget's desktop counterpart) or the
+        // inside of this window. Picking one applies it at once, as the app's other choice dialogs do.
+        EscapableAlertDialog(
+            onDismissRequest = { showPlacementDialog = false },
+            title = { Text(str("pet_desk_placement_dialog")) },
+            text = {
+                PetPlacementChoices(
+                    selected = PetWindowState.placement,
+                    onSelect = {
+                        PetWindowState.moveTo(it)
+                        showPlacementDialog = false
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showPlacementDialog = false }, shapes = ButtonDefaults.shapes()) {
+                    Text(str("pet_cancel"))
+                }
+            }
+        )
+    }
     if (confirmReset) {
         EscapableAlertDialog(
             onDismissRequest = { confirmReset = false },
@@ -715,6 +752,59 @@ private fun PetSettingsContent(
 @Composable
 private fun SectionTitle(text: String) {
     Box(Modifier.padding(horizontal = 16.dp)) { SettingsGroupTitle(text) }
+}
+
+/**
+ * The two homes offered when the cat's placement is chosen: the floating window or this window.
+ * Shared with the render test so the popup's own rows are checked as drawn.
+ */
+@Composable
+internal fun PetPlacementChoices(selected: PetPlacement, onSelect: (PetPlacement) -> Unit) {
+    Column {
+        PlacementOption(
+            title = str("pet_desk_float"),
+            subtitle = str("pet_desk_float_sub"),
+            icon = Icons.Rounded.DesktopWindows,
+            selected = selected == PetPlacement.DESKTOP,
+        ) { onSelect(PetPlacement.DESKTOP) }
+        PlacementOption(
+            title = str("pet_desk_inside"),
+            subtitle = str("pet_desk_inside_sub"),
+            icon = Icons.Rounded.PictureInPicture,
+            selected = selected == PetPlacement.IN_APP,
+        ) { onSelect(PetPlacement.IN_APP) }
+    }
+}
+
+/** One home for the cat, in the placement dialog: a radio, what it means, and the pick itself. */
+@Composable
+private fun PlacementOption(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(10.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
@@ -1080,15 +1170,21 @@ private fun PetOnboarding(
                 PetSetupPage.HOW -> HowItWorksPage(settings)
 
                 PetSetupPage.WIDGET -> {
+                    // Same page, its own home: a replayed tutorial must not promise a floating
+                    // window to someone who chose to keep the cat inside the app.
+                    val inWindow = PetWindowState.placement == PetPlacement.IN_APP
                     SetupPage(
-                        title = str("pet_desk_window_title"),
-                        body = str("pet_desk_window_body"),
+                        title = str(if (inWindow) "pet_desk_inside" else "pet_desk_window_title"),
+                        body = str(if (inWindow) "pet_desk_inside_sub" else "pet_desk_window_body"),
                         sprite = { PetSprite(PetActivity.LOVE, settings, Modifier.fillMaxWidth(), label = draftName) }
                     ) {
                         Button(onClick = { PetWindowState.show(true) }, shapes = ButtonDefaults.shapes()) {
-                            Icon(Icons.Rounded.DesktopWindows, contentDescription = null)
+                            Icon(
+                                if (inWindow) Icons.Rounded.PictureInPicture else Icons.Rounded.DesktopWindows,
+                                contentDescription = null
+                            )
                             Spacer(Modifier.width(8.dp))
-                            Text(str("pet_desk_show"))
+                            Text(str(if (inWindow) "pet_desk_inside_show" else "pet_desk_show"))
                         }
                     }
                 }

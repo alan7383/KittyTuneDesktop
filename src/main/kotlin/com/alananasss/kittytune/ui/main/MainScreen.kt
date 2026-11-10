@@ -1388,6 +1388,14 @@ fun MainScreen(
     }
     }
 
+    // The Kitty pet, when it is set to live inside the app's own window: drawn over the panels but
+    // held by the window's edges, never floating over another app the way its desktop window does.
+    // It is drawn here, above the app and under every menu, the full player and the dialogs.
+    com.alananasss.kittytune.ui.pet.PetInAppOverlay(
+        onOpenSettings = { playerViewModel.navigateToPlaylistId = "pet_settings" },
+        onPlayPause = { playerViewModel.togglePlayPause() },
+    )
+
     TrackOptionsOverlays(playerViewModel)
     com.alananasss.kittytune.ui.library.LikeAllPromptHost()
 

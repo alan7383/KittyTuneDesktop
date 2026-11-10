@@ -3093,6 +3093,15 @@
     <string name="pet_desk_show">Masaüstünde göster</string>
     <string name="pet_desk_show_sub">Her zaman üstte duran küçük, yüzen bir pencere. İstediğin yere sürükle, seçenekler için sağ tıkla</string>
     <string name="pet_desk_hide">Kediyi gizle</string>
+    <string name="pet_desk_placement">Kedi nerede yaşar</string>
+    <string name="pet_desk_placement_dialog">Kedi nerede yaşasın?</string>
+    <string name="pet_desk_float">Yüzen pencere</string>
+    <string name="pet_desk_float_sub">Her zaman en üstte, diğer uygulamaların üzerinde. Masaüstünde istediğin yere sürükle</string>
+    <string name="pet_desk_inside">Pencerede</string>
+    <string name="pet_desk_inside_sub">KittyTune\'un penceresinde, asla diğer uygulamaların üzerinde değil. Pencereden çıkamaz</string>
+    <string name="pet_desk_inside_show">Kediyi pencerede göster</string>
+    <string name="pet_desk_inside_show_sub">Pencerenin içinde sürükle; kenarlarda durur ve asla dışarı çıkmaz</string>
+    <string name="pet_desk_move_inside">Pencerede tut</string>
     <string name="pet_desk_tray_show">Kediyi göster</string>
     <string name="pet_desk_window_section">Kedi penceresi</string>
     <string name="pet_desk_how_boop">Boop\'lamak için tıkla. Biraz müzikle beslemek için baloncuğa tıkla</string>
@@ -3106,7 +3115,7 @@
     <string name="pet_desk_crop_hint">Yüzü daireyi dolduracak şekilde sürükleyerek taşı, kaydırarak yakınlaştır</string>
     <string name="pet_desk_editor_hint">Piksel piksel boyamak için kediye tıkla veya sürükle</string>
     <string name="pet_desk_rare_tip">Psst… kedi penceresinde çok nadir anlar belirebilir. Gördüğün her biri buraya eklenir!</string>
-    <string name="pet_desk_bar_button_desc">Kedinin yüzen penceresini gösterir veya gizler</string>
+    <string name="pet_desk_bar_button_desc">Kediyi gösterir veya gizler</string>
     <string name="pet_desk_photo_filter">Görseller</string>
     <!-- /KITTY PET DESKTOP -->
 

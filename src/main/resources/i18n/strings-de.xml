@@ -3312,6 +3312,15 @@
     <string name="pet_desk_show">Auf dem Desktop zeigen</string>
     <string name="pet_desk_show_sub">Ein kleines schwebendes Fenster, immer im Vordergrund. Zieh es irgendwohin, Rechtsklick für Optionen</string>
     <string name="pet_desk_hide">Katze ausblenden</string>
+    <string name="pet_desk_placement">Wo die Katze wohnt</string>
+    <string name="pet_desk_placement_dialog">Wo soll die Katze wohnen?</string>
+    <string name="pet_desk_float">Schwebendes Fenster</string>
+    <string name="pet_desk_float_sub">Immer im Vordergrund, über anderen Apps. Zieh sie überallhin auf deinem Desktop</string>
+    <string name="pet_desk_inside">Im Fenster</string>
+    <string name="pet_desk_inside_sub">Im Fenster von KittyTune, nie über anderen Apps. Sie kann das Fenster nicht verlassen</string>
+    <string name="pet_desk_inside_show">Katze im Fenster zeigen</string>
+    <string name="pet_desk_inside_show_sub">Zieh sie im Fenster herum; an den Rändern wird sie festgehalten und kommt nie hinaus</string>
+    <string name="pet_desk_move_inside">Im Fenster behalten</string>
     <string name="pet_desk_tray_show">Kätzchen anzeigen</string>
     <string name="pet_desk_window_section">Katzenfenster</string>
     <string name="pet_desk_how_boop">Klick sie an für einen Boop. Klick auf die Blase, um sie mit Musik zu füttern</string>
@@ -3325,7 +3334,7 @@
     <string name="pet_desk_crop_hint">Ziehen zum Verschieben, scrollen zum Zoomen, bis das Gesicht den Kreis füllt</string>
     <string name="pet_desk_editor_hint">Klick oder zieh über die Katze, um Pixel für Pixel zu malen</string>
     <string name="pet_desk_rare_tip">Psst… im Katzenfenster können sehr seltene Momente auftauchen. Jeder, den du siehst, landet hier!</string>
-    <string name="pet_desk_bar_button_desc">Zeigt oder verbirgt das schwebende Fenster der Katze</string>
+    <string name="pet_desk_bar_button_desc">Zeigt oder verbirgt die Katze</string>
     <string name="pet_desk_photo_filter">Bilder</string>
     <!-- /KITTY PET DESKTOP -->
 

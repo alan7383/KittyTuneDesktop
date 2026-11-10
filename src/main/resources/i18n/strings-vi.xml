@@ -3173,6 +3173,15 @@
     <string name="pet_desk_show">Hiện trên màn hình</string>
     <string name="pet_desk_show_sub">Một cửa sổ nổi nhỏ, luôn ở trên cùng. Kéo đi bất cứ đâu, nhấp chuột phải để xem tùy chọn</string>
     <string name="pet_desk_hide">Ẩn chú mèo</string>
+    <string name="pet_desk_placement">Chú mèo sống ở đâu</string>
+    <string name="pet_desk_placement_dialog">Chú mèo nên sống ở đâu?</string>
+    <string name="pet_desk_float">Cửa sổ nổi</string>
+    <string name="pet_desk_float_sub">Luôn ở trên cùng, đè lên các ứng dụng khác. Kéo đi bất cứ đâu trên màn hình</string>
+    <string name="pet_desk_inside">Trong cửa sổ</string>
+    <string name="pet_desk_inside_sub">Bên trong cửa sổ KittyTune, không bao giờ đè lên ứng dụng khác. Nó không thể ra khỏi cửa sổ</string>
+    <string name="pet_desk_inside_show">Hiện chú mèo trong cửa sổ</string>
+    <string name="pet_desk_inside_show_sub">Kéo nó trong cửa sổ; nó dừng ở mép và không bao giờ ra ngoài</string>
+    <string name="pet_desk_move_inside">Giữ trong cửa sổ</string>
     <string name="pet_desk_tray_show">Hiện chú mèo</string>
     <string name="pet_desk_window_section">Cửa sổ thú cưng</string>
     <string name="pet_desk_how_boop">Nhấp vào để boop nó. Nhấp vào bong bóng để cho nó nghe nhạc</string>
@@ -3186,7 +3195,7 @@
     <string name="pet_desk_crop_hint">Kéo để di chuyển và cuộn để phóng to sao cho mặt mèo lấp đầy vòng tròn</string>
     <string name="pet_desk_editor_hint">Nhấp hoặc kéo trên chú mèo để tô, từng pixel một</string>
     <string name="pet_desk_rare_tip">Suỵt… những khoảnh khắc cực hiếm có thể xuất hiện trong cửa sổ thú cưng. Mỗi lần bạn thấy sẽ được thêm vào đây!</string>
-    <string name="pet_desk_bar_button_desc">Hiện hoặc ẩn cửa sổ nổi của chú mèo</string>
+    <string name="pet_desk_bar_button_desc">Hiện hoặc ẩn chú mèo</string>
     <string name="pet_desk_photo_filter">Hình ảnh</string>
     <!-- /KITTY PET DESKTOP -->
 

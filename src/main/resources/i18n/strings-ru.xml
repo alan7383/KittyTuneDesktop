@@ -3092,6 +3092,15 @@
     <string name="pet_desk_show">Показать на рабочем столе</string>
     <string name="pet_desk_show_sub">Маленькое плавающее окно поверх остальных. Перетащи куда угодно, правый клик — настройки</string>
     <string name="pet_desk_hide">Спрятать котика</string>
+    <string name="pet_desk_placement">Где живёт котик</string>
+    <string name="pet_desk_placement_dialog">Где должен жить котик?</string>
+    <string name="pet_desk_float">Плавающее окно</string>
+    <string name="pet_desk_float_sub">Поверх остальных окон. Перетаскивай куда угодно по рабочему столу</string>
+    <string name="pet_desk_inside">В окне</string>
+    <string name="pet_desk_inside_sub">Внутри окна KittyTune, никогда поверх других приложений. Он не может выйти из окна</string>
+    <string name="pet_desk_inside_show">Показать котика в окне</string>
+    <string name="pet_desk_inside_show_sub">Перетаскивай его по окну: у краёв он останавливается и никогда не выходит наружу</string>
+    <string name="pet_desk_move_inside">Держать в окне</string>
     <string name="pet_desk_tray_show">Показать котика</string>
     <string name="pet_desk_window_section">Окно котика</string>
     <string name="pet_desk_how_boop">Кликни по нему, чтобы бупнуть. Кликни по облачку, чтобы накормить его музыкой</string>
@@ -3105,7 +3114,7 @@
     <string name="pet_desk_crop_hint">Перетаскивай и крути колёсико, чтобы мордочка заполнила круг</string>
     <string name="pet_desk_editor_hint">Кликай или веди мышью по котику, чтобы рисовать пиксель за пикселем</string>
     <string name="pet_desk_rare_tip">Тсс… в окне котика могут случаться очень редкие моменты. Каждый увиденный попадает сюда!</string>
-    <string name="pet_desk_bar_button_desc">Показывает или прячет плавающее окно котика</string>
+    <string name="pet_desk_bar_button_desc">Показывает или прячет котика</string>
     <string name="pet_desk_photo_filter">Изображения</string>
     <!-- /KITTY PET DESKTOP -->
 
