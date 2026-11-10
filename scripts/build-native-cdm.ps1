@@ -23,6 +23,10 @@ $flags = @(
     '-Wall', '-Wextra', '-Wno-unused-parameter', '-Wno-missing-field-initializers',
     '-Wno-unused-function', '-Wno-cast-function-type', "-I$include"
 )
+# MinGW GCC 13-16 crashes in choose_baseaddr while emitting the prologue of a function that calls a
+# sysv_abi function (GCC PR target/97822), which is what cdm_bridge.c does. -O2 and an explicit frame
+# pointer are the workarounds the GCC developers give in that report; the file is not hot enough to care.
+$cdmBridgeFlags = @('-O2', '-fno-omit-frame-pointer')
 $sources = @('winelf.c', 'glibc_shim.c', 'shim_printf.c', 'sysv_support.S', 'probe_main.c', 'cdm_bridge.c')
 
 $objects = @()
@@ -30,7 +34,8 @@ $failed = $false
 foreach ($name in $sources) {
     Write-Host "== $name"
     $object = Join-Path $output "$name.o"
-    & g++ @flags -c (Join-Path $source $name) -o $object 2>&1 | Select-Object -First 30
+    $extra = if ($name -eq 'cdm_bridge.c') { $cdmBridgeFlags } else { @() }
+    & g++ @flags @extra -c (Join-Path $source $name) -o $object 2>&1 | Select-Object -First 30
     if ($LASTEXITCODE -ne 0) { $failed = $true } else { $objects += $object }
 }
 if ($failed) { Write-Host 'COMPILE FAILED'; exit 1 }
