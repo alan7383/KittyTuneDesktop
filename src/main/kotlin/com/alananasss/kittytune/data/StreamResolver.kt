@@ -409,6 +409,10 @@ object StreamResolver {
         if (result != null && !forDownload) {
             streamCache[track.id] = CachedStream(result)
         }
+        // Anything that reads this URL later — a karaoke split, the AI detector, the beat analyser —
+        // needs the licence token that came with it. Remembering it by URL is what lets those
+        // features work on a protected track without every caller having to carry the token around.
+        result?.licenseAuthToken?.let { SoundCloudDrm.rememberLicence(result.url, it) }
         return result
     }
 

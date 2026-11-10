@@ -765,10 +765,32 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
             // An answer queued here can still fail: close() interrupts this thread, and a blocked
             // put then throws. That is the shutdown path, not a fault worth a stack trace.
             putQuietly(closedMessage())
+            dumpStderr()
         } catch (e: IOException) {
             putQuietly("the CDM sidecar pipe failed: ${e.message}")
+            dumpStderr()
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
+        }
+    }
+
+    /**
+     * Keeps what the daemon said when it stopped, in full, next to its configuration.
+     *
+     * The message in the exception carries three lines, which is right for a toast and useless for a
+     * crash: the native host prints its faulting address, registers and backtrace on stderr before it
+     * dies. This is the copy a bug report can attach.
+     */
+    private fun dumpStderr() {
+        if (closed) return // an orderly shutdown is not a fault
+        val text = stderr()
+        if (text.isEmpty()) return
+        runCatching {
+            val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
+            val file = java.io.File(base, "KittyTune/cdm-last-failure.log")
+            file.parentFile?.mkdirs()
+            file.writeText(text + "\n")
+            Logger.w("CdmSidecar", "the daemon stopped; its log is in ${file.absolutePath}")
         }
     }
 

@@ -458,6 +458,54 @@ static DWORD protection_from_posix(int protection) {
     return PAGE_NOACCESS;
 }
 
+// Address-pool reservations, so a later `munmap` of one slice can never release the pool itself.
+//
+// The CDM's allocator reserves a huge PROT_NONE range and then hands out slices of it. Freeing a
+// slice is `munmap(slice, page)`, and Windows' MEM_RELEASE frees the *whole* VirtualAlloc allocation
+// â€” the 32 GiB reservation with everything still committed inside it. That is a silent, delayed
+// crash: the next write anywhere in the pool hits unmapped memory (measured: 0xC0000005 at the pool
+// base, an address 1.2 GiB below the image the allocator had just copied into).
+#define MAX_RESERVATIONS 128
+typedef struct { uint8_t* base; size_t size; } Reservation;
+static Reservation g_reservations[MAX_RESERVATIONS];
+static int g_reservation_count;
+static SRWLOCK g_reservation_lock = SRWLOCK_INIT;
+
+static void remember_reservation(void* base, size_t size) {
+    if (!base || !size) return;
+    AcquireSRWLockExclusive(&g_reservation_lock);
+    for (int i = 0; i < g_reservation_count; i++) {
+        if (g_reservations[i].base == (uint8_t*)base) {
+            g_reservations[i].size = size;
+            ReleaseSRWLockExclusive(&g_reservation_lock);
+            return;
+        }
+    }
+    if (g_reservation_count < MAX_RESERVATIONS) {
+        g_reservations[g_reservation_count].base = (uint8_t*)base;
+        g_reservations[g_reservation_count].size = size;
+        g_reservation_count++;
+    }
+    ReleaseSRWLockExclusive(&g_reservation_lock);
+}
+
+/** True when [address] lies inside a pool we reserved, filling [base] and [size]. */
+static int inside_reservation(const void* address, uint8_t** base, size_t* size) {
+    int found = 0;
+    AcquireSRWLockShared(&g_reservation_lock);
+    for (int i = 0; i < g_reservation_count; i++) {
+        uint8_t* start = g_reservations[i].base;
+        if ((uint8_t*)address >= start && (uint8_t*)address < start + g_reservations[i].size) {
+            if (base) *base = start;
+            if (size) *size = g_reservations[i].size;
+            found = 1;
+            break;
+        }
+    }
+    ReleaseSRWLockShared(&g_reservation_lock);
+    return found;
+}
+
 SYSV void* sysv_mmap(void* address, size_t length, int protection, int flags, int fd, int64_t offset) {
     T2("mmap", length, (uint64_t)address);
     if (g_trace_verbose)
@@ -512,6 +560,7 @@ SYSV void* sysv_mmap(void* address, size_t length, int protection, int flags, in
             g_errno = ENOMEM;
             return (void*)-1;
         }
+        remember_reservation(block, length);
         return block;
     }
     void* block = VirtualAlloc(hint, length, MEM_RESERVE | MEM_COMMIT,
@@ -530,6 +579,17 @@ SYSV int sysv_munmap(void* address, size_t length) {
     T2("munmap", address, length);
     if (!address) return 0;
     length = (length + 0xFFF) & ~(size_t)0xFFF;
+    // A slice of an address pool is decommitted, never released: MEM_RELEASE frees the reservation
+    // the allocator is still handing blocks out of.
+    uint8_t* pool_base = NULL;
+    size_t pool_size = 0;
+    if (inside_reservation(address, &pool_base, &pool_size)) {
+        if (VirtualFree(address, length, MEM_DECOMMIT)) {
+            DWORD previous = 0;
+            VirtualProtect(address, length, PAGE_NOACCESS, &previous);
+        }
+        return 0;
+    }
     // Unmapping a whole reservation releases it; unmapping a slice of a pool only gives the pages
     // back, because the reservation has to stay for the allocator to reuse.
     MEMORY_BASIC_INFORMATION region;

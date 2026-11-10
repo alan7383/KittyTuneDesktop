@@ -247,7 +247,8 @@ class HlsStreamAdapter(
             if (!info.isSampleAes) {
                 throw IOException("Unsupported HLS encryption METHOD=${info.method} on this stream")
             }
-            val token = licenseToken
+            val token = licenseToken?.takeIf { it.isNotBlank() }
+                ?: SoundCloudDrm.licenceFor(playlistUrl)
             if (token.isNullOrBlank()) {
                 throw IOException("This stream is DRM-protected but no license token was resolved for it")
             }

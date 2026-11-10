@@ -439,10 +439,18 @@ void winelf_run_initializers(const WinElfImage* image) {
 #define TP_OFFSET  0x8000u
 
 typedef struct { DWORD tid; uint8_t* tcb; } TlsSlot;
-#define MAX_THREADS 256
+#define MAX_THREADS 1024
 static TlsSlot g_tls_slots[MAX_THREADS];
-static volatile LONG g_tls_rotate;
+// Slots in use, and the next one to overwrite when the table is full. `volatile LONG` read without
+// the lock on the fault path would be a data race; the fault path takes the shared lock.
+static LONG g_tls_used;
+static LONG g_tls_victim;
 static volatile LONG64 g_tls_count;
+static volatile LONG64 g_tls_evictions;
+
+// An SRW lock, not a critical section: it is statically initialisable, so it can be used from a
+// vectored exception handler without allocating or calling into anything that might be busy.
+static SRWLOCK g_tls_lock = SRWLOCK_INIT;
 
 static uint8_t* g_tls_image_data;   // pointer into the image
 static uint64_t g_tls_image_filesz;
@@ -485,24 +493,47 @@ static uint8_t* build_tcb(void) {
 }
 
 static uint8_t* tls_slot_find(DWORD tid) {
-    LONG count = g_tls_rotate;
-    if (count > MAX_THREADS) count = MAX_THREADS;
+    uint8_t* found = NULL;
+    AcquireSRWLockShared(&g_tls_lock);
+    const LONG count = g_tls_used;
     for (LONG i = 0; i < count; i++) {
-        if (g_tls_slots[i].tid == tid) return g_tls_slots[i].tcb;
+        if (g_tls_slots[i].tid == tid) { found = g_tls_slots[i].tcb; break; }
     }
-    return NULL;
+    ReleaseSRWLockShared(&g_tls_lock);
+    return found;
 }
 
 static int tls_slot_add(DWORD tid, uint8_t* tcb) {
-    LONG count = InterlockedCompareExchange(&g_tls_rotate, 0, 0);
-    for (LONG i = 0; i < count && i < MAX_THREADS; i++)
-        if (g_tls_slots[i].tid == tid) { g_tls_slots[i].tcb = tcb; return 1; }
-    if (count >= MAX_THREADS) return 0;
-    // Publish the TCB before the id, so a lock-free reader never sees a half-filled slot.
-    g_tls_slots[count].tcb = tcb;
-    InterlockedExchange(&g_tls_slots[count].tid, (LONG)tid);
-    InterlockedIncrement(&g_tls_rotate);
+    AcquireSRWLockExclusive(&g_tls_lock);
+    for (LONG i = 0; i < g_tls_used; i++) {
+        if (g_tls_slots[i].tid == tid) {
+            g_tls_slots[i].tcb = tcb;
+            ReleaseSRWLockExclusive(&g_tls_lock);
+            return 1;
+        }
+    }
+    if (g_tls_used < MAX_THREADS) {
+        g_tls_slots[g_tls_used].tcb = tcb;
+        g_tls_slots[g_tls_used].tid = tid;
+        g_tls_used++;
+        ReleaseSRWLockExclusive(&g_tls_lock);
+        InterlockedIncrement64(&g_tls_count);
+        return 1;
+    }
+    // Full. The CDM creates a thread per operation and none of them ever tells us it ended, so the
+    // table fills on a long session; a thread that is not in it runs with `fs` = 0 and dies on the
+    // first stack canary read (`mov rax, fs:[0x28]`, fault at 0x28 — measured). Overwriting the
+    // oldest entry keeps new threads working; the thread it displaces re-registers itself through
+    // the fault handler below if it ever runs CDM code again.
+    const LONG victim = g_tls_victim++ % MAX_THREADS;
+    g_tls_slots[victim].tcb = tcb;
+    g_tls_slots[victim].tid = tid;
+    ReleaseSRWLockExclusive(&g_tls_lock);
     InterlockedIncrement64(&g_tls_count);
+    if (InterlockedIncrement64(&g_tls_evictions) % 64 == 1) {
+        fprintf(stderr, "[winelf] thread table full, reusing slot %ld\n", (long)victim);
+        fflush(stderr);
+    }
     return 1;
 }
 
@@ -589,11 +620,30 @@ static int readable_range(const void* address, size_t size) {
 static LONG CALLBACK fs_exception_handler(PEXCEPTION_POINTERS info) {
     EXCEPTION_RECORD* record = info->ExceptionRecord;
 
-    uint8_t* tp = tls_slot_find(GetCurrentThreadId());
-    if (!tp) return EXCEPTION_CONTINUE_SEARCH;
-
     const uint64_t fault = record->NumberParameters >= 2 ? (uint64_t)record->ExceptionInformation[1] : 0;
     const uint8_t* rip = (const uint8_t*)info->ContextRecord->Rip;
+    uint8_t* tp = tls_slot_find(GetCurrentThreadId());
+
+    // A thread we have never seen — a pool thread the CDM was called back on, or one whose slot was
+    // reused — runs with `fs` = 0, so its very first stack canary read faults. Register it here, on
+    // the spot, and retry the instruction: an unknown thread is a setup that has not happened yet,
+    // not a reason to take the process down.
+    if (!tp) {
+        if (!(readable_range(rip, 1) && rip[0] == 0x64)) {
+            InterlockedIncrement64(&g_fs_passthrough);
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+        winelf_tls_install_for_current_thread();
+        tp = tls_slot_find(GetCurrentThreadId());
+        if (!tp) {
+            InterlockedIncrement64(&g_fs_passthrough);
+            return EXCEPTION_CONTINUE_SEARCH;
+        }
+        _writefsbase_u64((uint64_t)tp);
+        InterlockedIncrement64(&g_fs_restores);
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+
     const uint64_t base = _readfsbase_u64();
 
     // A reset base points every `fs:` access at linear 0 + offset: small for the canary, huge and

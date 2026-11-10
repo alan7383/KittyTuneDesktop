@@ -86,6 +86,26 @@ dans un objet Itanium désigne la **première fonction virtuelle** ; l'offset-to
 *avant*. Mettre deux mots de préfixe décale tous les slots de deux — `Initialize` devient
 `SetServerCertificate`, et le CDM rejette une promesse au lieu de s'initialiser.
 
+## Deux pièges corrigés après la mise en service
+
+**`munmap` d'une tranche libérait tout le pool.** L'allocateur du CDM réserve une plage `PROT_NONE`
+de plusieurs gigaoctets puis en distribue des tranches ; « libérer » une tranche, c'est
+`munmap(tranche, page)`. `MEM_RELEASE` de Windows libère l'allocation `VirtualAlloc` **entière** —
+donc le pool, avec tout ce qui y était encore commité. Résultat : un `0xC0000005` différé, à
+l'adresse de base du pool, 1,2 Gio sous l'image que l'allocateur venait d'écrire. Le shim note
+désormais ses réservations et ne fait plus que décommiter à l'intérieur.
+
+**Un thread inconnu mourait sur la canari.** Le tableau des TCB était plafonné à 256 entrées sans
+jamais en libérer : au bout d'une longue session, un nouveau thread ne pouvait plus s'enregistrer et
+tournait avec `fs = 0`, donc `mov rax, fs:[0x28]` fautait à l'adresse 0x28. Le tableau est protégé par
+un SRW lock, réutilise ses entrées quand il est plein, et surtout le gestionnaire d'exceptions
+**enregistre lui-même un thread inconnu** puis rejoue l'instruction : un thread non vu est un
+amorçage qui n'a pas eu lieu, pas une raison de tuer le processus.
+
+Quand le démon meurt pour de bon, `CdmSidecar` écrit son stderr complet dans
+`%LOCALAPPDATA%\KittyTune\cdm-last-failure.log` (adresse fautive, registres, backtrace, derniers
+appels du shim) : c'est le fichier à joindre à un rapport de bug.
+
 ## Construire et essayer
 
 Le démon est construit et livré par le build normal de l'app :

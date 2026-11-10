@@ -134,7 +134,16 @@ object TrackLoudnessRepository {
     }
 
     private suspend fun measureUpcoming(track: Track): Boolean {
-        val url = StreamResolver.resolveStream(track) ?: return false
+        val resolved = StreamResolver.resolveStreamWithDrm(track) ?: return false
+        // A protected stream is ciphertext: FFmpeg would decode noise and store a wrong level, and the
+        // gain would be wrong for the whole track. Such a track is measured on air instead — the
+        // engine reports its integrated loudness from the decrypted PCM when it ends, and that value
+        // overwrites whatever was cached.
+        if (resolved.isDrmProtected) {
+            println("[TrackLoudness] ${track.title} is protected: measured on air, not up front")
+            return false
+        }
+        val url = resolved.url
         val headers = mutableMapOf("User-Agent" to "SoundCloud/2025.12.10-release (Android 10; Android)")
         if (track.source != "youtube" && track.source != "youtube_music") {
             headers["Origin"] = "https://soundcloud.com"

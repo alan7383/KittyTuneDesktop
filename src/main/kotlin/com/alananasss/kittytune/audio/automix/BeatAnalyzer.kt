@@ -86,6 +86,17 @@ object BeatAnalyzer {
         knownDurationMs: Long = 0L,
         shouldCancel: () -> Boolean = { false },
     ): Result? {
+        // A protected stream is ciphertext to FFmpeg. This runs on the automix thread and must not
+        // block on a download, so it uses a clear copy only when one is already on disk (a download,
+        // the audio cache, or the karaoke split leaves one). Without it, there is simply no beat
+        // grid for that track, which automix already handles.
+        if (source.contains(".m3u8")) {
+            val clear = com.alananasss.kittytune.audio.ClearStreamCache.cached(source)
+            if (clear != null) {
+                Logger.d(TAG, "beat analysis reads a clear copy of the protected stream")
+                return analyzeFile(clear.absolutePath, shouldCancel)
+            }
+        }
         if (source.contains(".m3u8")) {
             val adapter = try {
                 com.alananasss.kittytune.audio.HlsStreamAdapter(source, headers)

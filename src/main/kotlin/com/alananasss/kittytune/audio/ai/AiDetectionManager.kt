@@ -829,14 +829,22 @@ object AiDetectionManager {
                 }
                 if (!isModelLoaded() || !isActive || epoch != currentAnalysisEpoch) return@launch
 
-                val isLocalFile = File(urlOrPath).exists() || urlOrPath.startsWith("file:")
-                val isHls = urlOrPath.contains(".m3u8") || hlsAdapter != null
-                val isHttp = urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")
+                // A protected stream is ciphertext to FFmpeg: use a clear copy when one can be made.
+                // Playback's own path decrypts as it reads; this one opens the URL itself, so it
+                // needs a file on disk.
+                val clear = if (urlOrPath.contains(".m3u8")) {
+                    com.alananasss.kittytune.audio.ClearStreamCache.ensure(urlOrPath)
+                } else null
+                val source = clear?.absolutePath ?: urlOrPath
+
+                val isLocalFile = File(source).exists() || source.startsWith("file:")
+                val isHls = source.contains(".m3u8") || hlsAdapter != null
+                val isHttp = source.startsWith("http://") || source.startsWith("https://")
 
                 val chunkScores = mutableListOf<Float>()
 
                 if (isLocalFile) {
-                    val filePath = if (urlOrPath.startsWith("file://")) urlOrPath.removePrefix("file://") else urlOrPath
+                    val filePath = if (source.startsWith("file://")) source.removePrefix("file://") else source
                     val file = File(filePath)
                     if (!file.exists()) return@launch
 
@@ -869,7 +877,7 @@ object AiDetectionManager {
                     }
                 } else if (isHls) {
                     val adapter = hlsAdapter ?: try {
-                        HlsStreamAdapter(urlOrPath, headers)
+                        HlsStreamAdapter(source, headers)
                     } catch (_: Exception) {
                         null
                     }
