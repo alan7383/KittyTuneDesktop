@@ -970,7 +970,7 @@ tasks.register<Test>("headlessTest") {
     filter {
         listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
-            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest",
+            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
             "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
