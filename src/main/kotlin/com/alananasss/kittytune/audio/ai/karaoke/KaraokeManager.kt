@@ -1171,6 +1171,14 @@ object KaraokeManager {
                     ?: (if (audioSourceUrl.startsWith("file:") || File(audioSourceUrl).exists()) {
                         File(audioSourceUrl.removePrefix("file://"))
                     } else null)
+                    // A protected stream cannot be decoded by FFmpeg as-is: take a clear copy of it
+                    // (licence paid once, kept in the audio cache) rather than reading ciphertext.
+                    ?: run {
+                        if (audioSourceUrl.contains(".m3u8")) {
+                            updateProgress(0.01f, "Préparation du flux protégé...")
+                            com.alananasss.kittytune.audio.ClearStreamCache.ensure(audioSourceUrl)
+                        } else null
+                    }
 
                 if (localFile != null && localFile.exists()) {
                     Logger.i(TAG, "Decoding from local cached file: ${localFile.absolutePath}")

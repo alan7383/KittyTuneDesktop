@@ -127,6 +127,26 @@ C'est la chaîne du lecteur : `NativeCdmSetup` → `CdmSidecar` → `SoundCloudD
 FFmpeg. Le démon est le **même** que celui de WSL : `cdmsidecar/CdmSidecar.cpp` est compilé tel quel,
 seul le backend du CDM change (`cdm_bridge.c` remplace `WidevineBridge.cpp`).
 
+### Ce qui marche sur un titre protégé, et comment
+
+Le démon rend des échantillons **clairs** à l'app, donc tout ce qui travaille sur le PCM fonctionne
+comme sur un titre ordinaire :
+
+| Fonction | Chemin | Vérifié |
+|---|---|---|
+| Lecture, égaliseur, effets, visualiseur, crossfade | `HlsStreamAdapter` déchiffre chaque fragment avant le DSP | oui (it-girl) |
+| Téléchargement d'un titre (et dans une playlist) | `DrmStreamDownloader` : licence une fois, fichier clair sur le disque | oui : 2,8 Mo (it-girl), 3,8 Mo (Sugar), décodés par FFmpeg |
+| Normalisation du volume | mesure « à l'antenne » sur le PCM déchiffré, ou analyse FFmpeg du fichier téléchargé | oui : -9,5 et -9,4 LUFS |
+| Séparation de voix / karaoké | `ClearStreamCache` : une copie claire du flux, licence comprise | oui, mécanisme testé |
+| Détection IA, analyse de tempo | la même copie claire quand elle existe | oui |
+
+Deux détails qui ont compté :
+
+- un flux protégé est du chiffré pour FFmpeg : les analyseurs qui ouvrent l'URL eux-mêmes (karaoké,
+  IA, tempo) demandent maintenant une **copie claire** au lieu de lire le ciphertext ;
+- l'instance de CDM des téléchargements est **sérialisée** (un titre protégé à la fois) : une playlist
+  lance jusqu'à quatre téléchargements en parallèle, et le CDM ne tient qu'une session par instance.
+
 ### La méthode WSL reste
 
 Elle n'est plus proposée en premier : elle garde son assistant, et sert aux machines où le chargeur ne

@@ -79,6 +79,29 @@ object SoundCloudDrm {
     val cdmPath: String? get() = if (CdmSidecar.isInstalled) CdmSidecar.describe else NativeWidevineCdm.currentCdmPath
 
     /**
+     * The licence token that came back with a stream URL, for everything that reads that URL.
+     *
+     * The token is a property of the resolved stream, not of the player: a karaoke split, the AI
+     * detector or the beat analyser all open the same `ctr-encrypted-hls` playlist through
+     * [com.alananasss.kittytune.audio.HlsStreamAdapter], and without the token those features would
+     * decode ciphertext on a protected track. Keyed by URL, bounded, and only ever filled by a
+     * resolution that actually carried a token.
+     */
+    private val licences = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(32, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 64
+        }
+    )
+
+    /** Remembers [token] for [url]; a blank one is ignored, never remembered as an absence. */
+    fun rememberLicence(url: String, token: String?) {
+        if (url.isBlank() || token.isNullOrBlank()) return
+        licences[url] = token
+    }
+
+    fun licenceFor(url: String): String? = licences[url]
+
+    /**
      * Returns a licensed session for [encryption], opening one when needed.
      *
      * @param licenseToken the `licenseAuthToken` from the stream resolution.
