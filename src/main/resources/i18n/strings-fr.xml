@@ -3345,4 +3345,9 @@
     <string name="drm_wiz_native_step_probe">Vérification de la réponse du module</string>
     <string name="drm_wiz_native_step_connect">Activation des titres protégés</string>
     <string name="drm_wiz_done_native">Les titres protégés passent maintenant par le module natif. Lance un test pour vérifier sur un vrai titre.</string>
+    <string name="pref_drm_wsl_cleanup_title">Supprimer l'ancienne installation WSL</string>
+    <string name="pref_drm_wsl_cleanup_desc">Efface la distribution Linux installée par une version précédente ; les titres protégés passent maintenant par le module natif</string>
+    <string name="pref_drm_wsl_cleanup_running">Suppression en cours…</string>
+    <string name="pref_drm_wsl_cleanup_done">Ancienne installation WSL supprimée</string>
+    <string name="pref_drm_wsl_cleanup_partial">Suppression partielle : voir le détail</string>
 </resources>

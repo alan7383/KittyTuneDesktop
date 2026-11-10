@@ -13,8 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.Strings
-import com.alananasss.kittytune.data.drm.ProtectedBackend
-import com.alananasss.kittytune.data.drm.WslSidecarSetup
+import com.alananasss.kittytune.data.drm.NativeCdmSetup
 import com.alananasss.kittytune.data.local.AppThemeMode
 import com.alananasss.kittytune.ui.theme.SoundTuneTheme
 import com.alananasss.kittytune.ui.theme.getDynamicTypography
@@ -25,42 +24,39 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Renders the WSL steps of the protected-tracks assistant offscreen, to build/previews, with a made-up
- * machine: nothing is detected, enabled or installed on the machine running the test.
+ * Renders the steps of the protected-tracks assistant offscreen, to build/previews, with a made-up
+ * state: nothing is downloaded, installed or probed on the machine running the test.
  */
 class DrmWizardRenderTest {
 
     @Test
-    fun methodChoiceWithTheAdvancedWslChoiceOpen() = render("drm-choose-fr", "fr") {
-        // Version 2 opens the advanced options, so both versions show.
-        ChooseStep(choice = ProtectedBackend.WSL, onChoose = {}, version = 2, onVersion = {}, onSkip = {})
+    fun howStepInFrench() = render("drm-how-fr", "fr") {
+        HowStep(windows = true)
     }
 
     @Test
-    fun methodChoiceInEnglish() = render("drm-choose-en", "en") {
-        ChooseStep(choice = ProtectedBackend.WSL, onChoose = {}, version = 1, onVersion = {}, onSkip = {})
-    }
-
-    @Test
-    fun enableStepWhenTheWsl1ComponentIsOff() = render("drm-enable-fr", "fr") {
-        WslCheckStep(
-            WslWizardState().apply {
-                detection = WslSidecarSetup.Detection(
-                    WslSidecarSetup.State.FEATURE_OFF, wsl1Available = false, wsl2Available = true,
-                )
-            },
-            showVersionChoice = true,
-        )
+    fun howStepInEnglish() = render("drm-how-en", "en") {
+        HowStep(windows = true)
     }
 
     @Test
     fun setupStepWhileItRuns() = render("drm-setup-fr", "fr") {
-        WslSetupStep(
-            WslWizardState().apply {
+        NativeSetupStep(
+            NativeWizardState().apply {
                 running = true
-                states[WslSidecarSetup.Step.DOWNLOAD.ordinal] = StepState.DONE
-                states[WslSidecarSetup.Step.IMPORT.ordinal] = StepState.DONE
-                states[WslSidecarSetup.Step.CDM.ordinal] = StepState.RUNNING
+                states[NativeCdmSetup.Step.HOST.ordinal] = StepState.DONE
+                states[NativeCdmSetup.Step.DOWNLOAD.ordinal] = StepState.DONE
+                states[NativeCdmSetup.Step.EXTRACT.ordinal] = StepState.RUNNING
+            },
+        )
+    }
+
+    @Test
+    fun setupStepWhenTheModuleIsAlreadyThere() = render("drm-setup-done-fr", "fr") {
+        NativeSetupStep(
+            NativeWizardState().apply {
+                succeeded = true
+                for (i in states.indices) states[i] = StepState.DONE
             },
         )
     }

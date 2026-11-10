@@ -228,19 +228,6 @@ fun MainScreen(
         com.alananasss.kittytune.data.DownloadManager.refreshFollowings()
     }
 
-    // Coming back after the reboot the WSL feature needed: once the feature is actually on, nudge the
-    // user to Settings, where the protected-tracks assistant resumes by itself.
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        if (com.alananasss.kittytune.data.drm.WslSidecarSetup.windows &&
-            com.alananasss.kittytune.data.drm.WslSidecarSetup.pendingVersion() != null
-        ) {
-            val ready = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                com.alananasss.kittytune.data.drm.WslSidecarSetup.pendingReady()
-            }
-            if (ready) com.alananasss.kittytune.core.Toaster.show(com.alananasss.kittytune.core.str("drm_resume_toast"))
-        }
-    }
-
     androidx.compose.runtime.LaunchedEffect(Unit) {
 
         var gPressedTime = 0L

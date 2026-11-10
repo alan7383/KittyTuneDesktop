@@ -17,10 +17,9 @@ import java.util.concurrent.TimeUnit
  *
  * On Windows the licence server refuses every CDM that is not hosted by a browser it recognises when
  * that CDM is a Windows build (`docs/SOUNDCLOUD_DRM_WINDOWS.md`, section 3). Chrome's **Linux**
- * module is accepted, so KittyTune runs that one — natively, in its own process ([NativeCdmSetup]),
- * or inside a tiny Linux distribution as the fallback ([WslSidecarSetup]). Either way the app
- * decodes the audio itself: FFmpeg decode, DSP chain, WASAPI output, because it receives plaintext
- * samples.
+ * module is accepted, so KittyTune runs that one, natively, in its own process ([NativeCdmSetup]).
+ * The app decodes the audio itself: FFmpeg decode, DSP chain, WASAPI output, because it receives
+ * plaintext samples.
  *
  * ## Where it runs
  *
@@ -34,7 +33,11 @@ import java.util.concurrent.TimeUnit
  *  1. `KITTYTUNE_CDM_SIDECAR` — a quoted command line, e.g.
  *     `C:\...\ktcdm.exe C:\...\libwidevinecdm.so`
  *  2. `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` — `{"command": ["ktcdm.exe", "libwidevinecdm.so"]}`,
- *     written by the in-app setup ([NativeCdmSetup] or [WslSidecarSetup]) and deleted by its uninstall.
+ *     written by the in-app setup ([NativeCdmSetup]) and deleted by its uninstall.
+ *
+ * A configuration that goes through `wsl.exe` is ignored: WSL is no longer a supported backend, and
+ * using it would silently play through a path the app no longer maintains. [WslCleanup] removes what
+ * an older version left behind.
  *
  * ## Protocol
  *
@@ -60,13 +63,9 @@ internal object CdmSidecar {
     private var failureReason: String? = null
 
     init {
-        // wsl.exe is a child process the JVM does not reap: without this, quitting the app would leave
-        // the daemon, and with it the whole WSL VM, running.
         Runtime.getRuntime().addShutdownHook(Thread({
             runCatching { installed?.release() }
             runCatching { secondary?.release() }
-            // The usual delayed shutdown would never run in a JVM that is exiting.
-            runCatching { WslVmLifecycle.settleNow() }
         }, "KittyTune-cdm-sidecar-shutdown"))
     }
 
@@ -79,10 +78,6 @@ internal object CdmSidecar {
 
     /** Why the configured backend is not in use, or null when nothing is configured. */
     val lastFailure: String? get() = failureReason
-
-    /** The WSL distribution the registered sidecar really runs in, or null (not over WSL, or none). */
-    val connectedDistro: String?
-        get() = installedCommand?.let { WslVmLifecycle.distroOf(it) }
 
     /** What is registered, for diagnostics: `sidecar over WSL (kittytune-cdm)`. */
     val describe: String get() = installed?.name ?: (failureReason ?: "not configured")
@@ -107,22 +102,9 @@ internal object CdmSidecar {
             val now = System.currentTimeMillis()
             if (attempted && now - lastAttemptAt < RETRY_AFTER_MS) return false
             val command = explicitCommand() ?: return false
-            if (wslMissingFor(command)) return false
             register(command)
             return true
         }
-    }
-
-    /**
-     * A command that goes through WSL while WSL is not installed (removed since the config was written):
-     * starting it would only wake Windows' installer stub, which opens a terminal offering to install WSL.
-     */
-    private fun wslMissingFor(command: List<String>): Boolean {
-        if (WslVmLifecycle.distroOf(command) == null || WslSidecarSetup.wslInstalled) return false
-        failureReason = "${commandLabel(command)}: WSL is not installed"
-        attempted = true
-        lastAttemptAt = System.currentTimeMillis()
-        return true
     }
 
     /**
@@ -139,7 +121,6 @@ internal object CdmSidecar {
                 failureReason = null
                 return false
             }
-            if (wslMissingFor(command)) return false
             val label = commandLabel(command)
             val error = probe(command)
             attempted = true
@@ -268,13 +249,17 @@ internal object CdmSidecar {
      * There used to be a third source, auto-detection: the first WSL distribution, with a daemon in its
      * home. It served the old setup script, and it picked whichever distribution came first — on a
      * machine where KittyTune's own `kittytune-cdm` had just been removed, it silently fell back to a
-     * leftover daemon in the user's Ubuntu (a WSL2 VM, the heavy path) while the page said "connected".
-     * Only what the setup or the user configured counts now.
+     * leftover daemon in the user's Ubuntu while the page said "connected". Only what the setup or the
+     * user configured counts now.
+     *
+     * A command that goes through `wsl.exe` is refused: the Linux distribution was a backend of its
+     * own, removed in favour of the native one, and a configuration an older version wrote must not
+     * quietly keep playing through it. [WslCleanup] deletes what was left behind.
      */
     private fun explicitCommand(): List<String>? {
         val fromEnvironment = System.getenv("KITTYTUNE_CDM_SIDECAR")?.trim().orEmpty()
         if (fromEnvironment.isNotEmpty()) {
-            return splitCommand(fromEnvironment).takeIf { it.isNotEmpty() }
+            return splitCommand(fromEnvironment).takeIf { it.isNotEmpty() && !goesThroughWsl(it) }
         }
         val local = System.getenv("LOCALAPPDATA") ?: return null
         val file = File(local, "KittyTune/$CONFIG_NAME")
@@ -282,9 +267,15 @@ internal object CdmSidecar {
             return runCatching {
                 val array = JSONObject(file.readText()).getJSONArray("command")
                 (0 until array.length()).map { array.getString(it) }
-            }.getOrNull()?.takeIf { it.isNotEmpty() }
+            }.getOrNull()?.takeIf { it.isNotEmpty() && !goesThroughWsl(it) }
         }
         return null
+    }
+
+    /** True when [command] drives the daemon through wsl.exe, the backend this version dropped. */
+    private fun goesThroughWsl(command: List<String>): Boolean {
+        val head = command.firstOrNull()?.substringAfterLast('\\')?.substringAfterLast('/').orEmpty()
+        return head.equals("wsl.exe", true) || head.equals("wsl", true)
     }
 
 
@@ -314,10 +305,6 @@ internal object CdmSidecar {
     private fun commandLabel(command: List<String>): String {
         val head = command.firstOrNull()?.substringAfterLast('\\')?.substringAfterLast('/').orEmpty()
         return when {
-            head.equals("wsl.exe", true) || head.equals("wsl", true) -> {
-                val distro = command.indexOf("-d").takeIf { it >= 0 }?.let { command.getOrNull(it + 1) }
-                "sidecar over WSL" + (distro?.let { " ($it)" } ?: "")
-            }
             head.equals("ssh", true) -> "sidecar over SSH"
             else -> "sidecar ($head)"
         }
@@ -327,13 +314,12 @@ internal object CdmSidecar {
 /**
  * A [WidevineCdm] whose daemon runs only while it is needed.
  *
- * A running daemon is only cheap under WSL1; under WSL2 it keeps the Linux VM up, which costs hundreds
- * of megabytes. Either way it should not outlive the tracks that need it. So:
+ * A running daemon holds the module's ~80 MiB image, so it should not outlive the tracks that need
+ * it. So:
  *  - the process starts when a protected track opens a session, never before;
  *  - it stops [GRACE_MS] after the last session is closed. A track closes its session as soon as all
  *    its fragments are decrypted, or when the player drops it;
  *  - with a session still open but unused (a long pause), it stops after [IDLE_MS];
- *  - once no daemon of ours runs, [WslVmLifecycle] shuts down what KittyTune itself started.
  *
  * A session whose daemon stopped reports itself [ExpiringSession.expired], and the player opens a
  * fresh one (one more licence) if it still needs one.
@@ -538,142 +524,8 @@ internal class SidecarWidevineSession(
     }
 }
 
-/**
- * Shuts WSL down again when KittyTune was the one that started it.
- *
- * Stopping our daemon is not enough: WSL keeps the distribution, and the VM behind it (`VmmemWSL`,
- * often more than a gigabyte), running for a while afterwards. So the first daemon notes what was
- * running before it, and when the last one stops:
- *  - the distribution is terminated if it was not running before and nobody has a terminal open in
- *    it;
- *  - the whole VM is shut down if WSL ran nothing at all before and runs nothing now.
- *
- * Anything the user was already running in WSL is never touched.
- */
-internal object WslVmLifecycle {
-
-    private const val TAG = "WslVmLifecycle"
-    private const val SETTLE_MS = 1_500L
-
-    private val lock = Any()
-    private var active = 0
-    private var generation = 0L
-    private var distro: String? = null
-    private var distroWasRunning = true
-    private var wslWasRunning = true
-
-    private val wslExe: File
-        get() = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32\\wsl.exe")
-
-    /** The distribution a sidecar command runs in, or null when it does not go through WSL. */
-    fun distroOf(command: List<String>): String? {
-        val head = command.firstOrNull()?.substringAfterLast('\\')?.substringAfterLast('/') ?: return null
-        if (!head.equals("wsl.exe", true) && !head.equals("wsl", true)) return null
-        val at = command.indexOf("-d").takeIf { it >= 0 } ?: command.indexOf("--distribution").takeIf { it >= 0 }
-        return at?.let { command.getOrNull(it + 1) }
-    }
-
-    /** Called before something of ours starts in [distro]. */
-    fun acquire(distro: String) {
-        synchronized(lock) {
-            if (active == 0) {
-                val running = runningDistros()
-                // Unknown means "assume it was running": never shut down what might be someone else's.
-                distroWasRunning = running?.contains(distro) ?: true
-                wslWasRunning = running?.isNotEmpty() ?: true
-                this.distro = distro
-                Logger.d(TAG, "starting in $distro (it was ${if (distroWasRunning) "" else "not "}running)")
-            }
-            active++
-            generation++
-        }
-    }
-
-    /** Called when that thing stopped. The last one shuts down what we started, shortly after. */
-    fun release() {
-        val token = synchronized(lock) {
-            active = (active - 1).coerceAtLeast(0)
-            if (active > 0) return
-            ++generation
-        }
-        SidecarWidevineCdm.TIMER.schedule({ settle(token) }, SETTLE_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
-    }
-
-    /** Settles at once, for the app exiting. */
-    fun settleNow() {
-        settle(synchronized(lock) { generation })
-    }
-
-    private fun settle(token: Long) {
-        val (target, terminate, shutdown) = synchronized(lock) {
-            // Something of ours started again meanwhile: it owns the decision now.
-            if (active > 0 || generation != token) return
-            val decision = Triple(distro, !distroWasRunning, !wslWasRunning)
-            // Settled once: a second pass (the app exiting) must not act, nor even look, again.
-            distroWasRunning = true
-            wslWasRunning = true
-            decision
-        }
-        if (target == null || (!terminate && !shutdown)) return
-        if (someoneElseUsesWsl()) {
-            Logger.d(TAG, "another program uses WSL, leaving it running")
-            return
-        }
-        if (terminate && runningDistros()?.contains(target) == true) {
-            Logger.d(TAG, "terminating $target, which KittyTune started")
-            run(listOf("--terminate", target))
-        }
-        if (shutdown && runningDistros()?.isEmpty() == true) {
-            Logger.d(TAG, "nothing runs in WSL any more, shutting its VM down")
-            run(listOf("--shutdown"))
-        }
-    }
-
-    /**
-     * True when a `wsl.exe` that is not ours runs: a terminal tab, VS Code, a script. Looking from the
-     * Windows side matters twice: it does not start the distribution to find out, and WSL itself keeps a
-     * `login` shell on a pseudo-terminal inside every distribution, so a terminal there proves nothing.
-     */
-    private fun someoneElseUsesWsl(): Boolean {
-        val ours = ProcessHandle.current().descendants().map { it.pid() }.toList().toSet()
-        return ProcessHandle.allProcesses().anyMatch { handle ->
-            handle.pid() !in ours && handle.isAlive &&
-                handle.info().command().orElse("").substringAfterLast('\\').equals("wsl.exe", ignoreCase = true)
-        }
-    }
-
-    private fun runningDistros(): List<String>? =
-        run(listOf("--list", "--running", "--quiet"))?.let(WslSidecarSetup::parseDistros)
-
-    /** Runs `wsl.exe` and returns its output, or null when it failed or WSL is not there. */
-    private fun run(args: List<String>): String? = runCatching {
-        // Never the installer stub that System32\wsl.exe is on a PC without WSL (see WslSidecarSetup.wslInstalled).
-        if (!WslSidecarSetup.wslInstalled) return null
-        val builder = ProcessBuilder(listOf(wslExe.absolutePath) + args).redirectErrorStream(true)
-        builder.environment()["WSL_UTF8"] = "1"
-        val process = builder.start()
-        process.outputStream.close()
-        val output = process.inputStream.bufferedReader(Charsets.UTF_8).readText()
-        if (!process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)) {
-            process.destroyForcibly()
-            return null
-        }
-        // `--list --running` exits non-zero when nothing runs; its output is still the answer.
-        if (process.exitValue() != 0 && args.firstOrNull() != "--list") return null
-        output
-    }.getOrNull()
-}
-
-/**
- * The pipe to one `ktcdm` process.
- *
- * Answers arrive on a reader thread and are handed to the waiting caller through a queue, because a
- * `Process` pipe has no read timeout and a wedged daemon must not wedge the player thread forever.
- */
 internal class SidecarTransport(command: List<String>) : AutoCloseable {
 
-    /** The WSL distribution this daemon runs in, accounted for in [WslVmLifecycle]. */
-    private val wslDistro: String? = WslVmLifecycle.distroOf(command)?.also { WslVmLifecycle.acquire(it) }
     private val released = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val process: Process = try {
@@ -681,7 +533,6 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
             .redirectError(ProcessBuilder.Redirect.PIPE)
             .start()
     } catch (e: Exception) {
-        if (wslDistro != null) WslVmLifecycle.release()
         throw e
     }
     private val output: OutputStream = process.outputStream
@@ -836,7 +687,6 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
         if (process.isAlive) process.destroyForcibly()
         reader.interrupt()
         errorReader.interrupt()
-        if (wslDistro != null && released.compareAndSet(false, true)) WslVmLifecycle.release()
     }
 
     companion object {

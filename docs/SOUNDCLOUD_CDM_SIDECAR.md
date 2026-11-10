@@ -147,10 +147,20 @@ Deux détails qui ont compté :
 - l'instance de CDM des téléchargements est **sérialisée** (un titre protégé à la fois) : une playlist
   lance jusqu'à quatre téléchargements en parallèle, et le CDM ne tient qu'une session par instance.
 
-### La méthode WSL reste
+### La méthode WSL a été retirée
 
-Elle n'est plus proposée en premier : elle garde son assistant, et sert aux machines où le chargeur ne
-peut pas tourner. Le même protocole, la même configuration, le même démon.
+Elle n'est plus une option : le module natif fait le même travail dans un seul processus, sans
+composant Windows, sans administrateur et sans redémarrage. L'assistant ne propose donc plus de
+choix, et une configuration qui pilotait le démon via `wsl.exe` est **ignorée** : laisser un ancien
+fichier décider ferait jouer les titres protégés par un chemin que l'application ne maintient plus.
+
+Pour ceux qui ont installé la version précédente, Réglages › Titres protégés affiche une ligne
+**« Supprimer l'ancienne installation WSL »** dès qu'il reste quelque chose. Elle désenregistre la
+distribution que l'app avait importée (`kittytune-cdm`, `ktw1`, `ktw2`), supprime
+`%LOCALAPPDATA%\KittyTune\wsl` et efface la configuration devenue inutile. Elle ne touche ni les
+composants Windows de WSL ni les autres distributions : d'autres logiciels peuvent s'en servir, et
+désactiver un composant du système dans le dos de l'utilisateur n'est pas le travail de cette
+application.
 
 ## Ce que le protocole transporte, et ce qu'il ne transporte pas
 

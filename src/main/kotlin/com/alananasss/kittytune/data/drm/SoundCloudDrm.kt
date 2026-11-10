@@ -131,17 +131,14 @@ object SoundCloudDrm {
     }
 
     /**
-     * The CDM to use, after making sure the configured one is actually registered.
+     * The CDM playback uses: whatever is registered.
      *
-     * [WidevineCdmRegistry] only holds a CDM once something installed it, and installing the sidecar
-     * happens lazily. A caller that asks for a session before any track was resolved — the settings'
-     * own test, exactly — used to get the in-process CDM instead, the one SoundCloud refuses with a
-     * `403`. Asking here costs nothing when it is already registered and fixes the order.
+     * Playback never installs anything here. The sidecar is registered when a protected stream is
+     * *resolved* (`isAvailable` asks for it), so by the time a track reaches this point it exists; and
+     * installing it here would replace a CDM that was registered on purpose — the platform's own on
+     * Linux, or a test's fake.
      */
-    private fun requireCdm(): WidevineCdm {
-        CdmSidecar.installIfConfigured()
-        return WidevineCdmRegistry.require()
-    }
+    private fun requireCdm(): WidevineCdm = WidevineCdmRegistry.require()
 
     /**
      * Opens a session for a download, on the download side's own CDM instance.

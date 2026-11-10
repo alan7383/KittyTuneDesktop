@@ -58,7 +58,6 @@ class CdmSidecarTest {
         CdmSidecar.reset()
         assertFalse(CdmSidecar.verify())
         assertFalse(CdmSidecar.isInstalled)
-        assertNull(CdmSidecar.connectedDistro)
     }
 
     @Test
