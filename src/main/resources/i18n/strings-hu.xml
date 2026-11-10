@@ -3091,6 +3091,15 @@
     <string name="pet_desk_show">Megjelenítés az asztalon</string>
     <string name="pet_desk_show_sub">Egy kis lebegő ablak, mindig legfelül. Húzd bárhová, jobb klikk a beállításokhoz</string>
     <string name="pet_desk_hide">Cica elrejtése</string>
+    <string name="pet_desk_placement">Hol lakik a cica</string>
+    <string name="pet_desk_placement_dialog">Hol lakjon a cica?</string>
+    <string name="pet_desk_float">Lebegő ablak</string>
+    <string name="pet_desk_float_sub">Mindig legfelül, más appok fölött. Húzd bárhová az asztalodon</string>
+    <string name="pet_desk_inside">Az ablakban</string>
+    <string name="pet_desk_inside_sub">A KittyTune ablakában, soha nem más appok fölött. Nem hagyhatja el az ablakot</string>
+    <string name="pet_desk_inside_show">Cica megjelenítése az ablakban</string>
+    <string name="pet_desk_inside_show_sub">Húzd az ablakon belül; a széleinél megáll, és soha nem jut ki</string>
+    <string name="pet_desk_move_inside">Tartsd az ablakban</string>
     <string name="pet_desk_tray_show">Cica megjelenítése</string>
     <string name="pet_desk_window_section">Cica ablak</string>
     <string name="pet_desk_how_boop">Kattints rá egy pöckölésért. Kattints a buborékra, hogy zenét adj neki</string>
@@ -3104,7 +3113,7 @@
     <string name="pet_desk_crop_hint">Húzással mozgasd, görgetéssel nagyíts, hogy a feje kitöltse a kört</string>
     <string name="pet_desk_editor_hint">Kattints vagy húzd az egeret a cicán a festéshez, pixelről pixelre</string>
     <string name="pet_desk_rare_tip">Pszt… nagyon ritka pillanatok is felbukkanhatnak a cica ablakában. Mindegyik, amit látsz, ide kerül!</string>
-    <string name="pet_desk_bar_button_desc">Megjeleníti vagy elrejti a cica lebegő ablakát</string>
+    <string name="pet_desk_bar_button_desc">Megjeleníti vagy elrejti a cicát</string>
     <string name="pet_desk_photo_filter">Képek</string>
     <!-- /KITTY PET DESKTOP -->
 

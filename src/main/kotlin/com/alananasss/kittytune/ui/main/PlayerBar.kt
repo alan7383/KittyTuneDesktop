@@ -551,7 +551,8 @@ fun PlayerBar(
                         }
                     }
                 }
-                // The Kitty pet's floating window, on and off in one click (lit while it is shown).
+                // The Kitty pet on and off in one click (lit while it is shown), in whichever home
+                // it was given: the floating window or the app's own window.
                 AnimatedVisibility(
                     visible = !isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_PET in visibleButtons,
                     enter = barButtonEnter,

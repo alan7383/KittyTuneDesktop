@@ -3101,6 +3101,15 @@
     <string name="pet_desk_show">Show it on the desktop</string>
     <string name="pet_desk_show_sub">A little floating window, always on top. Drag it anywhere, right-click for options</string>
     <string name="pet_desk_hide">Hide the cat</string>
+    <string name="pet_desk_placement">Where the cat lives</string>
+    <string name="pet_desk_placement_dialog">Where should the cat live?</string>
+    <string name="pet_desk_float">Floating window</string>
+    <string name="pet_desk_float_sub">Always on top, over other apps. Drag it anywhere on your desktop</string>
+    <string name="pet_desk_inside">In the window</string>
+    <string name="pet_desk_inside_sub">Inside KittyTune\'s window, never over other apps. It cannot leave the window</string>
+    <string name="pet_desk_inside_show">Show the cat in the window</string>
+    <string name="pet_desk_inside_show_sub">Drag it around the window; it is held at the edges and never goes outside</string>
+    <string name="pet_desk_move_inside">Keep it in the window</string>
     <string name="pet_desk_tray_show">Show the kitty pet</string>
     <string name="pet_desk_window_section">Pet window</string>
     <string name="pet_desk_how_boop">Click it to boop it. Click the bubble to feed it some music</string>
@@ -3114,7 +3123,7 @@
     <string name="pet_desk_crop_hint">Drag to move and scroll to zoom so its face fills the circle</string>
     <string name="pet_desk_editor_hint">Click or drag on the cat to paint, pixel by pixel</string>
     <string name="pet_desk_rare_tip">Psst… very rare moments can show up in the pet window. Each one you see is added here!</string>
-    <string name="pet_desk_bar_button_desc">Shows or hides the cat's floating window</string>
+    <string name="pet_desk_bar_button_desc">Shows or hides the cat</string>
     <string name="pet_desk_photo_filter">Images</string>
     <!-- /KITTY PET DESKTOP -->
 

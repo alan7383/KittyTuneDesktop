@@ -377,10 +377,16 @@ object PetConfig {
 
     internal const val KEY_WINDOW_VISIBLE = "desk_window_visible"
     internal const val KEY_WINDOW_PINNED = "desk_window_pinned"
-    private val DESKTOP_KEYS = listOf("desk_window_x", "desk_window_y", "desk_window_w", "desk_window_h")
+    internal const val KEY_PLACEMENT = "desk_placement"
+    internal const val KEY_INAPP_X = "desk_inapp_x"
+    internal const val KEY_INAPP_Y = "desk_inapp_y"
+    private val DESKTOP_KEYS = listOf(
+        "desk_window_x", "desk_window_y", "desk_window_w", "desk_window_h",
+        KEY_PLACEMENT, KEY_INAPP_X, KEY_INAPP_Y,
+    )
 
     fun windowBounds(): IntArray? {
-        val v = DESKTOP_KEYS.map { prefs.getString(it, null)?.toIntOrNull() }
+        val v = DESKTOP_KEYS.take(4).map { prefs.getString(it, null)?.toIntOrNull() }
         return if (v.any { it == null }) null else v.map { it!! }.toIntArray()
     }
 
@@ -390,6 +396,39 @@ object PetConfig {
 
     fun isWindowPinned() = prefs.getBoolean(KEY_WINDOW_PINNED, true)
     fun setWindowPinned(value: Boolean) = prefs.putBoolean(KEY_WINDOW_PINNED, value)
+
+    /**
+     * Where the cat lives. Desktop keeps the floating always-on-top window it has always had;
+     * "in the app" draws it inside KittyTune's own window, held by the window's edges.
+     */
+    fun placement(): PetPlacement =
+        if (prefs.getString(KEY_PLACEMENT, null) == PLACEMENT_IN_APP) PetPlacement.IN_APP else PetPlacement.DESKTOP
+
+    fun setPlacement(value: PetPlacement) {
+        prefs.putString(KEY_PLACEMENT, if (value == PetPlacement.IN_APP) PLACEMENT_IN_APP else PLACEMENT_DESKTOP)
+        changed()
+    }
+
+    /**
+     * Where the cat sits inside the window, as fractions of the room it has left to move in, so a
+     * window that is resized (or a different screen size) keeps it in the same corner.
+     */
+    fun inAppPosition(): Pair<Float, Float> {
+        val x = prefs.getString(KEY_INAPP_X, null)?.toFloatOrNull() ?: 1f
+        val y = prefs.getString(KEY_INAPP_Y, null)?.toFloatOrNull() ?: IN_APP_DEFAULT_Y
+        return x.coerceIn(0f, 1f) to y.coerceIn(0f, 1f)
+    }
+
+    fun saveInAppPosition(x: Float, y: Float) {
+        prefs.putString(KEY_INAPP_X, x.coerceIn(0f, 1f).toString())
+        prefs.putString(KEY_INAPP_Y, y.coerceIn(0f, 1f).toString())
+    }
+
+    private const val PLACEMENT_DESKTOP = "desktop"
+    private const val PLACEMENT_IN_APP = "in_app"
+
+    /** Just above the player bar, in the bottom-right corner of the window, on a first run. */
+    private const val IN_APP_DEFAULT_Y = 0.82f
 }
 
 /** Decides what the cat is up to. */

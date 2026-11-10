@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Pets
+import androidx.compose.material.icons.rounded.PictureInPicture
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -79,9 +80,19 @@ import com.alananasss.kittytune.ui.theme.withUiScale
 import java.awt.Cursor
 import kotlin.math.roundToInt
 
-/** Whether the floating pet window is shown (remembered across launches). */
+/**
+ * Where the cat lives: [DESKTOP] is the floating always-on-top window, the counterpart of the
+ * Android home-screen widget; [IN_APP] is inside KittyTune's own window, where it is held by the
+ * window's edges and can never sit over another app.
+ */
+enum class PetPlacement { DESKTOP, IN_APP }
+
+/** Whether the pet is shown (remembered across launches) and where it lives. */
 object PetWindowState {
     var visible by mutableStateOf(PetConfig.prefs.getBoolean(PetConfig.KEY_WINDOW_VISIBLE, false))
+        private set
+
+    var placement by mutableStateOf(PetConfig.placement())
         private set
 
     fun show(value: Boolean = true) {
@@ -91,6 +102,17 @@ object PetWindowState {
     }
 
     fun toggle() = show(!visible)
+
+    /**
+     * Moves the cat between the desktop and the app's own window. The chosen home shows it: a cat
+     * that was hidden and asked to live in the window would otherwise look like nothing happened.
+     */
+    fun moveTo(value: PetPlacement) {
+        if (placement == value) return
+        placement = value
+        PetConfig.setPlacement(value)
+        if (!visible) show(true) else PetState.refresh(force = true, reroll = false)
+    }
 }
 
 private const val MIN_W = 120
@@ -258,7 +280,7 @@ fun PetDesktopWindow(
                         FloatingMenuWindow(
                             anchorXDp = window.x + menuOffset.x.value,
                             anchorYDp = window.y + menuOffset.y.value,
-                            contentHeight = FLOATING_MENU_PADDING + FLOATING_MENU_DIVIDER + FLOATING_MENU_ITEM_HEIGHT * 4,
+                            contentHeight = FLOATING_MENU_PADDING + FLOATING_MENU_DIVIDER + FLOATING_MENU_ITEM_HEIGHT * 5,
                             contentWidth = 240.dp,
                             onDismiss = { menuVisible = false },
                         ) {
@@ -280,6 +302,11 @@ fun PetDesktopWindow(
                                 icon = Icons.Rounded.Pets,
                                 text = str("pet_settings_title"),
                                 onClick = { menuVisible = false; onOpenSettings() },
+                            )
+                            FloatingMenuItem(
+                                icon = Icons.Rounded.PictureInPicture,
+                                text = str("pet_desk_move_inside"),
+                                onClick = { menuVisible = false; PetWindowState.moveTo(PetPlacement.IN_APP) },
                             )
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
