@@ -961,7 +961,9 @@ internal fun NativeSetupStep(state: NativeWizardState) {
                     },
                 )
                 if (ok) {
-                    current?.let { state.states[it.ordinal] = StepState.DONE }
+                    // Everything that is drawn is done: a step the installer had no reason to run
+                    // (a module already on disk) must not leave an empty circle and a short bar.
+                    for (i in state.states.indices) state.states[i] = StepState.DONE
                     state.succeeded = true
                     // Setting the module up is asking for protected tracks.
                     PlayerPreferences().setProtectedTracksEnabled(true)

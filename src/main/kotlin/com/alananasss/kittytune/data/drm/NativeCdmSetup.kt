@@ -128,7 +128,10 @@ internal object NativeCdmSetup {
             onStep(Step.DOWNLOAD)
             val module = moduleFile
             if (isUsableModule(module)) {
-                report("  module: already present (${module.length() / (1024 * 1024)} MiB)")
+                report("  module: already present (${module.length() / (1024 * 1024)} MiB), nothing to extract")
+                // Reported even though it does nothing: the assistant draws every step, and a step
+                // that is skipped without saying so leaves its tick empty and the bar short.
+                onStep(Step.EXTRACT)
             } else {
                 val packageFile = downloadChrome(report) ?: run {
                     report("  result: FAILED (could not download the Widevine module)")
