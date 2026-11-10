@@ -178,6 +178,16 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
                         )
                         MethodInfoButton()
                     }
+                    // The one thing worth reading before the list: which piece of Chrome is used, and
+                    // that Chrome itself never runs.
+                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text(
+                            str("drm_method_native_claim"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
                     NativeStatus(nativeReady)
                     MethodPoints()
                 }

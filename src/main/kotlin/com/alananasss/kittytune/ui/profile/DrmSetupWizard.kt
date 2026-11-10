@@ -380,28 +380,36 @@ private fun InfoSection(icon: ImageVector, title: String, body: String) {
     }
 }
 
-/** What the module can do, in one list: there is a single method now, so no comparison to draw. */
+/**
+ * What this method gives, in one list.
+ *
+ * It opens with the thing that matters most and is easiest to misread: the only piece of Chrome used
+ * is its Widevine module, and Chrome itself never runs — no window, no background process.
+ */
 @Composable
 internal fun MethodPoints() {
-    val abilities = listOf(
+    val points = listOf(
+        "drm_method_pro_chrome_module",
+        "drm_method_pro_light",
+        "drm_method_pro_noreboot",
         "drm_method_pro_effects",
         "drm_method_pro_downloads",
-        "drm_method_pro_no_browser",
-    )
-    val points = abilities.map { it to true } + listOf(
-        "drm_method_pro_light" to true,
-        "drm_method_pro_noreboot" to true,
     )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        points.forEach { (key, ok) ->
+        points.forEach { key ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+                    Icons.Rounded.CheckCircle,
                     contentDescription = null,
-                    tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp),
                 )
-                Text(str(key), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    str(key),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
             }
         }
     }

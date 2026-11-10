@@ -3163,7 +3163,7 @@
     <string name="drm_wiz_done_desktop">KittyTune tarayıcının CDM’ini kullanacak. Gerçek bir parçayla doğrulamak için bir test başlat.</string>
     <string name="drm_wiz_test">Şimdi test et</string>
     <string name="drm_wiz_test_failed">Test başarısız oldu. Aşağıdaki ayrıntılar nedenini açıklıyor.</string>
-    <string name="pref_drm_windows_intro">Windows'ta KittyTune, Chrome'un Linux Widevine modülünü kendisi çalıştırarak korumalı parçaları çalar. Modülün bir kez kurulması yeterli; gerisi otomatik.</string>
+    <string name="pref_drm_windows_intro">Windows'ta KittyTune, korumalı parçaları Chrome'un tek bir parçasıyla çalar: kendi çalıştırdığı Widevine modülüyle. Chrome hiç açılmaz ve arka planda hiçbir şey çalışmaz. Modül bir kez kurulur; gerisi otomatik.</string>
     <string name="pref_drm_group_method">Yöntem</string>
     <string name="pref_drm_group_help">Yardım</string>
     <string name="pref_drm_tour_title">Yardımcıyı yeniden başlat</string>
@@ -3209,7 +3209,7 @@
     <string name="protected_hint_title">Korumalı parça</string>
     <string name="protected_hint_offer">Bu parça SoundCloud tarafından korunuyor, bu yüzden başka bir kaynaktan çalındı. Orijinali duymak için korumalı parçaları aç.</string>
     <string name="drm_method_native">Yerel</string>
-    <string name="drm_method_native_tagline">Varsayılan: VM yok, yeniden başlatma yok</string>
+    <string name="drm_method_native_tagline">Chrome'un Widevine modülü, KittyTune çalıştırır</string>
     <string name="drm_method_pro_noreboot">Yönetici yok, yeniden başlatma yok</string>
     <string name="drm_info_native_title">Yerel modül ayrıntılı olarak</string>
     <string name="drm_info_native_how">KittyTune, Chrome'un Linux Widevine modülünü bunun için yazılmış bir yükleyiciyle kendi Windows sürecine yükler. Lisans uygulamaya döner ve uygulama her parçayı kendisi çözer: ekolayzer, efektler, görselleştirici ve indirmeler korumalı parçalarda da çalışır.</string>
@@ -3245,4 +3245,7 @@
     <string name="drm_method_pro_effects">Ekolayzer, efektler ve görselleştirici korumalı parçalarda çalışır</string>
     <string name="drm_method_pro_downloads">Korumalı parçalar indirilebilir ve sonrasında modül olmadan çalar</string>
     <string name="protected_ann_install">Modülü kur</string>
+    <string name="drm_method_native_claim">KittyTune, Chrome'un yalnızca Widevine modülünü kullanır — Chrome'un kendisi hiç çalışmaz: pencere yok, arka plan süreci yok.</string>
+    <string name="drm_method_pro_chrome_module">Chrome'dan yalnızca bir modül, başka bir şey değil</string>
+    <string name="connect_relay_url_hint">https://relay.ornek.com</string>
 </resources>
