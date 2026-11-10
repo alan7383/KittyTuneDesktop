@@ -62,7 +62,9 @@ object ClearStreamCache {
     private fun fileFor(url: String): File {
         val hash = MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
             .joinToString("") { "%02x".format(it) }.take(16)
-        val dir = AppDirs.audioCacheDir.apply { mkdirs() }
+        // Inside the audio cache, so its size budget and trim cover these files too: they are
+        // regenerable, and a few megabytes each should not live outside the cache.
+        val dir = com.alananasss.kittytune.data.cache.AudioCache.dir.apply { mkdirs() }
         return File(dir, "clear_$hash.m4a")
     }
 }
