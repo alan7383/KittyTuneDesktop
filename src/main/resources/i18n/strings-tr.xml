@@ -3149,7 +3149,7 @@
     <string name="drm_wiz_how_cdm">Lisans, bir tarayıcının ya da sistemin şifre çözme modülü olan CDM’e verilir. Anahtarı o saklar: KittyTune onu asla görmez.</string>
     <string name="drm_wiz_how_fallback_title">B planı</string>
     <string name="drm_wiz_how_fallback">Korumalı bir parça çalınamazsa KittyTune, eskisi gibi diğer kaynaklarına geçer.</string>
-    <string name="drm_wiz_how_windows">KittyTune, Chrome'un Linux Widevine modülünü bunun için yazılmış bir yükleyiciyle kendi sürecinde çalıştırır. Lisans uygulamaya döner ve uygulama her parçayı kendisi çözer — böylece ekolayzer, efektler ve görselleştirici korumalı parçalarda da çalışır.</string>
+    <string name="drm_wiz_how_windows">KittyTune, Chrome'un Linux Widevine modülünü bunun için yazılmış bir yükleyiciyle kendi sürecinde çalıştırır. Lisans uygulamaya döner ve uygulama her parçayı kendisi çözer, böylece ekolayzer, efektler ve görselleştirici korumalı parçalarda da çalışır.</string>
     <string name="drm_wiz_how_desktop">Burada KittyTune tarayıcının Widevine CDM’ini kullanır (Chrome, Firefox, Brave…). Onu kendisi bulur.</string>
     <string name="drm_method_pro_light">Hafif: diskte yaklaşık 60 MB, sanal makine yok</string>
     <string name="drm_wiz_setup_title">Linux modülünü kur</string>
@@ -3199,7 +3199,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Korumalı parçalar</string>
-    <string name="protected_ann_body_windows">Korumalı parçalar artık KittyTune'da çalışıyor ve bu kez düzgün yapıldı: uygulama Chrome'un Widevine modülünü kendi sürecinde kendisi çalıştırıyor ve sesi zaten çözülmüş olarak alıyor. Tarayıcı penceresi yok, sanal makine yok, yönetici ve yeniden başlatma yok — bir kez yaklaşık 60 MB. Ekolayzer, efektler, görselleştirici ve indirmeler bu parçalarda da diğerleri gibi çalışıyor.</string>
+    <string name="protected_ann_body_windows">Korumalı parçalar artık KittyTune'da çalışıyor ve bu kez düzgün yapıldı: uygulama Chrome'un Widevine modülünü kendi sürecinde kendisi çalıştırıyor ve sesi zaten çözülmüş olarak alıyor. Tarayıcı penceresi yok, sanal makine yok, yönetici ve yeniden başlatma yok, yalnızca bir kez yaklaşık 60 MB. Ekolayzer, efektler, görselleştirici ve indirmeler bu parçalarda da diğerleri gibi çalışıyor.</string>
     <string name="protected_ann_body_desktop">KittyTune, SoundCloud'un korumalı parçalarını tarayıcının Widevine modülüyle çalar. Bu zaten açık.</string>
     <string name="protected_ann_enable">Aç</string>
     <string name="protected_ann_learn">Daha fazla bilgi</string>
@@ -3245,7 +3245,7 @@
     <string name="drm_method_pro_effects">Ekolayzer, efektler ve görselleştirici korumalı parçalarda çalışır</string>
     <string name="drm_method_pro_downloads">Korumalı parçalar indirilebilir ve sonrasında modül olmadan çalar</string>
     <string name="protected_ann_install">Modülü kur</string>
-    <string name="drm_method_native_claim">KittyTune, Chrome'un yalnızca Widevine modülünü kullanır — Chrome'un kendisi hiç çalışmaz: pencere yok, arka plan süreci yok.</string>
+    <string name="drm_method_native_claim">KittyTune, Chrome'un yalnızca Widevine modülünü kullanır. Chrome'un kendisi hiç çalışmaz: pencere yok, arka plan süreci yok.</string>
     <string name="drm_method_pro_chrome_module">Chrome'dan yalnızca bir modül, başka bir şey değil</string>
     <string name="connect_relay_url_hint">https://relay.ornek.com</string>
 </resources>

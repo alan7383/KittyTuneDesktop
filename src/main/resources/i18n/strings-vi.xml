@@ -3229,7 +3229,7 @@
     <string name="drm_wiz_how_cdm">Giấy phép được giao cho CDM, mô-đun giải mã của trình duyệt hoặc của hệ thống. Nó giữ khóa: KittyTune không bao giờ thấy khóa.</string>
     <string name="drm_wiz_how_fallback_title">Phương án dự phòng</string>
     <string name="drm_wiz_how_fallback">Nếu một bài được bảo vệ không phát được, KittyTune chuyển sang các nguồn khác của bạn như trước.</string>
-    <string name="drm_wiz_how_windows">KittyTune chạy mô-đun Widevine Linux của Chrome trong tiến trình của chính nó, với bộ nạp viết riêng. Giấy phép quay về ứng dụng và ứng dụng tự giải mã từng đoạn — nhờ vậy bộ cân bằng, hiệu ứng và hình ảnh động cũng hoạt động với bản nhạc được bảo vệ.</string>
+    <string name="drm_wiz_how_windows">KittyTune chạy mô-đun Widevine Linux của Chrome trong tiến trình của chính nó, với bộ nạp viết riêng. Giấy phép quay về ứng dụng và ứng dụng tự giải mã từng đoạn, nhờ vậy bộ cân bằng, hiệu ứng và hình ảnh động cũng hoạt động với bản nhạc được bảo vệ.</string>
     <string name="drm_wiz_how_desktop">Ở đây, KittyTune dùng Widevine CDM của trình duyệt (Chrome, Firefox, Brave…). Nó tự tìm.</string>
     <string name="drm_method_pro_light">Nhẹ: khoảng 60 MB trên đĩa, không máy ảo</string>
     <string name="drm_wiz_setup_title">Cài mô-đun Linux</string>
@@ -3279,7 +3279,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Nhạc được bảo vệ</string>
-    <string name="protected_ann_body_windows">Bản nhạc được bảo vệ giờ đã chạy trong KittyTune, và lần này làm đúng cách: ứng dụng tự chạy mô-đun Widevine của Chrome trong tiến trình của chính nó và nhận âm thanh đã được giải mã sẵn. Không cửa sổ trình duyệt, không máy ảo, không quyền quản trị và không khởi động lại — khoảng 60 MB một lần. Bộ cân bằng, hiệu ứng, hình ảnh động và tải xuống hoạt động với những bản nhạc này như mọi bản khác.</string>
+    <string name="protected_ann_body_windows">Bản nhạc được bảo vệ giờ đã chạy trong KittyTune, và lần này làm đúng cách: ứng dụng tự chạy mô-đun Widevine của Chrome trong tiến trình của chính nó và nhận âm thanh đã được giải mã sẵn. Không cửa sổ trình duyệt, không máy ảo, không quyền quản trị và không khởi động lại, chỉ khoảng 60 MB một lần. Bộ cân bằng, hiệu ứng, hình ảnh động và tải xuống hoạt động với những bản nhạc này như mọi bản khác.</string>
     <string name="protected_ann_body_desktop">KittyTune phát bản nhạc được bảo vệ của SoundCloud bằng mô-đun Widevine của trình duyệt. Tính năng này đã bật sẵn.</string>
     <string name="protected_ann_enable">Bật</string>
     <string name="protected_ann_learn">Tìm hiểu thêm</string>
@@ -3325,7 +3325,7 @@
     <string name="drm_method_pro_effects">Bộ cân bằng, hiệu ứng và hình ảnh động hoạt động với bản nhạc được bảo vệ</string>
     <string name="drm_method_pro_downloads">Có thể tải bản nhạc được bảo vệ và phát lại mà không cần mô-đun</string>
     <string name="protected_ann_install">Cài mô-đun</string>
-    <string name="drm_method_native_claim">KittyTune chỉ dùng mô-đun Widevine của Chrome — bản thân Chrome không bao giờ chạy: không cửa sổ, không tiến trình nền.</string>
+    <string name="drm_method_native_claim">KittyTune chỉ dùng mô-đun Widevine của Chrome. Bản thân Chrome không bao giờ chạy: không cửa sổ, không tiến trình nền.</string>
     <string name="drm_method_pro_chrome_module">Chỉ một mô-đun lấy từ Chrome, không gì khác</string>
     <string name="connect_relay_url_hint">https://relay.vidu.com</string>
 </resources>

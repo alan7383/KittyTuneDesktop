@@ -4170,7 +4170,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             }
             val cleanTitle = when {
                 context.displayText.contains("•") -> context.displayText.substringAfter("•").trim()
-                context.displayText.contains("â€¢") -> context.displayText.substringAfter("â€¢").trim()
+                context.displayText.contains("•") -> context.displayText.substringAfter("•").trim()
                 else -> context.displayText.trim()
             }
 

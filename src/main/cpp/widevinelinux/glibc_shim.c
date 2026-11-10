@@ -160,7 +160,7 @@ SYSV size_t shim_malloc_usable_size(void* pointer) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// mem*/str* â€” thin System V trampolines around the C runtime
+// mem*/str*: thin System V trampolines around the C runtime
 // ---------------------------------------------------------------------------------------------
 
 SYSV void* sysv_memcpy(void* d, const void* s, size_t n) { return memcpy(d, s, n); }
@@ -462,7 +462,7 @@ static DWORD protection_from_posix(int protection) {
 //
 // The CDM's allocator reserves a huge PROT_NONE range and then hands out slices of it. Freeing a
 // slice is `munmap(slice, page)`, and Windows' MEM_RELEASE frees the *whole* VirtualAlloc allocation
-// â€” the 32 GiB reservation with everything still committed inside it. That is a silent, delayed
+// and the 32 GiB reservation goes with everything still committed inside it. That is a silent, delayed
 // crash: the next write anywhere in the pool hits unmapped memory (measured: 0xC0000005 at the pool
 // base, an address 1.2 GiB below the image the allocator had just copied into).
 #define MAX_RESERVATIONS 128
@@ -1543,7 +1543,7 @@ SYSV size_t sysv_openssl_memory_get_size(void* pointer) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// qsort with a System V comparator â€” the CDM's comparison function is Linux code and cannot be
+// qsort with a System V comparator: the CDM's comparison function is Linux code and cannot be
 // called with the Windows convention, so the sort has to live here as well.
 // ---------------------------------------------------------------------------------------------
 
