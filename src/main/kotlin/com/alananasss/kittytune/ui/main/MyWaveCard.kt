@@ -43,9 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -244,24 +241,13 @@ private fun waveModeVisual(mode: WaveMode): Pair<ImageVector, String> = when (mo
  */
 @Composable
 private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifier = Modifier) {
-    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
-    val phase = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(isSeen, ambientClock) {
-        // When the window is hidden, hold a static phase instead of drawing for nobody. The wave is decorative — a
-        // static wave looks the same as a frozen one (audit Phase 3 CPU gain).
-        if (!isSeen) {
-            phase.floatValue = 0f
-            return@LaunchedEffect
-        }
-        val start = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
-        while (true) {
-            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { now ->
-                val turns = ((now - start) / 1_000_000.0 / WAVE_PERIOD_MS) % 1.0
-                phase.floatValue = (turns * 2 * PI).toFloat()
-            }
-        }
-    }
+    // The shared ambient pulse, and nothing at all while the window is hidden. The wave is decorative — a static
+    // wave looks the same as a frozen one (audit Phase 3 CPU gain).
+    val phase = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = WAVE_PERIOD_MS,
+        from = 0f,
+        to = (2 * PI).toFloat(),
+    )
     Spacer(
         modifier.drawWithCache {
             val w = size.width
@@ -288,7 +274,7 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
                 radius = h * 0.8f,
             )
             onDrawBehind {
-                val effectivePhase = phase.floatValue
+                val effectivePhase = phase.value
                 colors.forEachIndexed { i, color ->
                     val baseline = h * (0.62f + i * 0.1f)
                     val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)

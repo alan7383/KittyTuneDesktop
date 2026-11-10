@@ -81,7 +81,17 @@ fun SearchingBarsIcon(
     val dY2 = remember { Animatable(0f) } // bar2
     val dY3 = remember { Animatable(0f) } // bar3
 
-    LaunchedEffect(Unit) {
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+
+    LaunchedEffect(isSeen) {
+        // Three bounces at the display's rate for as long as the screen is open. A hidden window keeps the
+        // animations parked instead, and they pick up from the top when it is back (see WindowVisibility).
+        if (!isSeen) {
+            dY1.snapTo(0f)
+            dY2.snapTo(0f)
+            dY3.snapTo(0f)
+            return@LaunchedEffect
+        }
         // bar1 & circle: intro 367ms up, then 750ms full cycles
         launch {
             dY1.animateTo(-BOUNCE_AMPLITUDE, tween(367, easing = EaseInterp))

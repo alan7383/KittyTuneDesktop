@@ -143,12 +143,16 @@ internal fun AnimatedVisibilityScope.SleepScreen(
     }
 
     val drift = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        var step = 0
+    var driftStep by remember { mutableStateOf(0) }
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    LaunchedEffect(isSeen) {
+        // The slow Lissajous glide asks for a frame every frame while it runs; a minimised sleep screen can
+        // draw none of it, so it is parked and resumed where the last step left it (see WindowVisibility).
+        if (!isSeen) return@LaunchedEffect
         while (true) {
             kotlinx.coroutines.delay(DRIFT_STEP_MS)
-            step++
-            drift.animateTo(step.toFloat(), tween(DRIFT_GLIDE_MS, easing = FastOutSlowInEasing))
+            driftStep++
+            drift.animateTo(driftStep.toFloat(), tween(DRIFT_GLIDE_MS, easing = FastOutSlowInEasing))
         }
     }
 

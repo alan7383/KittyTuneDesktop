@@ -626,12 +626,12 @@ private fun PassportCopySplitButton(image: BufferedImage?, passport: MusicPasspo
 @Composable
 private fun IdentityDossierCard(passport: MusicPassport) {
     val scheme = MaterialTheme.colorScheme
-    val spin = rememberInfiniteTransition(label = "sealSpin")
-    val angle by spin.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(48_000, easing = LinearEasing)),
-        label = "sealAngle",
+    // On the shared ambient pulse (see AmbientClock): a forty-eight second turn needs none of the display's
+    // frames, and none at all while the window is hidden.
+    val angle = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = 48_000,
+        from = 0f,
+        to = 360f,
     )
     val issuedDate = remember(passport.issuedAtMs) {
         DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
@@ -670,7 +670,7 @@ private fun IdentityDossierCard(passport: MusicPassport) {
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
                     .size(110.dp)
-                    .graphicsLayer { rotationZ = angle }
+                    .graphicsLayer { rotationZ = angle.value }
                     .clip(MaterialShapes.Cookie12Sided.toShape())
                     .background(scheme.primary.copy(alpha = 0.07f)),
             )

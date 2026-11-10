@@ -5,15 +5,9 @@ import kotlin.math.cos
 import kotlin.math.PI
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.foundation.Canvas
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.BorderStroke
@@ -46,7 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -100,69 +96,94 @@ internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, mod
             value = false
         }
     }
-    val intensity by animateFloatAsState(
+    val intensity = animateFloatAsState(
         targetValue = if (lit) 1f else 0f,
         animationSpec = tween(if (lit) 1600 else 2400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "likesAura",
     )
     // Nothing drawn, and nothing running, once it has faded out.
-    if (intensity <= 0.01f) return
+    if (intensity.value <= 0.01f) return
 
-    val transition = rememberInfiniteTransition(label = "likesAuraDrift")
     // A whole turn, started over: the blobs go round by whole turns of it (see below), so the loop has no seam.
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(AURA_PERIOD_MS, easing = LinearEasing), RepeatMode.Restart),
-        label = "likesAuraPhase",
+    // On the shared slow pulse, and held still while the window is hidden (see AmbientClock).
+    val drift = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = AURA_PERIOD_MS,
+        from = 0f,
+        to = (2 * PI).toFloat(),
+        slow = true,
     )
     AuraCanvas(palette, intensity, drift, modifier)
 }
 
-/** The aura itself: [drift] is a phase from 0 to a full turn, [intensity] how much of it is shown. */
+/**
+ * The aura itself: [drift] is a phase from 0 to a full turn, [intensity] how much of it is shown.
+ *
+ * Both are read while drawing, never in composition: a step of either repaints this layer instead of
+ * recomposing the page, and the fade is one layer alpha rather than a rebuild of every gradient.
+ */
 @Composable
-internal fun AuraCanvas(palette: AuraPalette, intensity: Float, drift: Float, modifier: Modifier = Modifier) {
-    Canvas(
+internal fun AuraCanvas(
+    palette: AuraPalette,
+    intensity: androidx.compose.runtime.State<Float>,
+    drift: androidx.compose.runtime.State<Float>,
+    modifier: Modifier = Modifier,
+) {
+    Spacer(
         modifier
             .fillMaxWidth()
             .height(AURA_HEIGHT)
             // Drawn in its own layer so the bottom can be faded out to nothing whatever the page behind is
-            // made of, instead of painting a colour that has to match it.
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    ) {
-        val w = size.width
-        val h = size.height
-        // The mix, as a quiet wash from the very top.
-        drawRect(Brush.verticalGradient(listOf(palette.mix.copy(alpha = 0.20f * intensity), Color.Transparent)))
-        palette.colors.forEachIndexed { i, color ->
-            val turns = AURA_TURNS[i % AURA_TURNS.size]
-            val angle = drift * turns + i * 2.1f
-            val centre = Offset(
-                x = w * (0.16f + 0.34f * i) + cos(angle) * w * 0.14f,
-                y = h * 0.20f + sin(angle) * h * 0.12f,
-            )
-            // A slow swell on each, so the colour breathes as well as moves.
-            val swell = 0.88f + 0.12f * sin(drift * 2f + i)
-            val radius = w * 0.75f
-            val a = 0.30f * swell * intensity
-            // A bell-shaped falloff (many stops, each the Gaussian's value), so there is no rim anywhere to tell the blob
-            // from the page: with the three stops it had, each colour read as a circle laid on the screen.
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colorStops = AURA_FALLOFF.map { (t, weight) -> t to color.copy(alpha = a * weight) }.toTypedArray(),
-                    center = centre,
-                    radius = radius,
-                ),
-                radius = radius,
-                center = centre,
-            )
-        }
-        // Gone by the bottom.
-        drawRect(
-            brush = Brush.verticalGradient(0f to Color.White, 0.45f to Color.White, 1f to Color.Transparent),
-            blendMode = BlendMode.DstIn,
-        )
-    }
+            // made of, instead of painting a colour that has to match it. The same layer carries the fade-in.
+            .graphicsLayer {
+                alpha = intensity.value
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithCache {
+                val radius = size.width * AURA_RADIUS_SHARE
+                // The shaders are made here, once per palette and size, rather than once per blob and frame:
+                // the drifting centre is a canvas translation now, which costs a matrix instead of a fresh
+                // Skia gradient and its Java wrapper thirty times a second.
+                //
+                // A bell-shaped falloff (all stops, each the Gaussian's value), so there is no rim anywhere to
+                // tell the blob from the page: with the three stops it had, each colour read as a circle laid
+                // on the screen.
+                val blobs = palette.colors.map { color ->
+                    Brush.radialGradient(
+                        colorStops = AURA_FALLOFF
+                            .map { (t, weight) -> t to color.copy(alpha = AURA_PEAK * weight) }
+                            .toTypedArray(),
+                        center = Offset.Zero,
+                        radius = radius,
+                    )
+                }
+                // The mix, as a quiet wash from the very top.
+                val wash = Brush.verticalGradient(listOf(palette.mix.copy(alpha = 0.20f), Color.Transparent))
+                val mask = Brush.verticalGradient(0f to Color.White, 0.45f to Color.White, 1f to Color.Transparent)
+                onDrawBehind {
+                    val w = size.width
+                    val h = size.height
+                    val phase = drift.value
+                    drawRect(wash)
+                    palette.colors.forEachIndexed { i, _ ->
+                        val turns = AURA_TURNS[i % AURA_TURNS.size]
+                        val angle = phase * turns + i * 2.1f
+                        val centre = Offset(
+                            x = w * (0.16f + 0.34f * i) + cos(angle) * w * 0.14f,
+                            y = h * 0.20f + sin(angle) * h * 0.12f,
+                        )
+                        // A slow swell on each, so the colour breathes as well as moves.
+                        val swell = 0.88f + 0.12f * sin(phase * 2f + i)
+                        translate(centre.x, centre.y) {
+                            scale(swell, swell, pivot = Offset.Zero) {
+                                drawCircle(brush = blobs[i], radius = radius, center = Offset.Zero)
+                            }
+                        }
+                    }
+                    // Gone by the bottom.
+                    drawRect(brush = mask, blendMode = BlendMode.DstIn)
+                }
+            }
+    )
 }
 
 /** The colours the aura is drawn in. Pure, so that what it makes of the covers and the theme can be tested. */
@@ -194,13 +215,24 @@ internal class AuraPalette(val colors: List<Color>, val mix: Color) {
 private val AURA_HEIGHT = 460.dp
 private const val AURA_PERIOD_MS = 40_000
 
+/** The strongest a blob gets, before the fade-in multiplier. */
+private const val AURA_PEAK = 0.30f
+
+/** How wide each blob is, as a share of the page. */
+private const val AURA_RADIUS_SHARE = 0.75f
+
 /** How long the aura stays lit after the likes stop playing, so a change of song does not make it flicker. */
 private const val AURA_HOLD_MS = 2_500L
 
-/** Distance from the centre (0..1) and the share of the colour left there: a Gaussian, ending at nothing. */
-private val AURA_FALLOFF: List<Pair<Float, Float>> = (0..10).map { step ->
-    val t = step / 10f
-    t to (if (step == 10) 0f else kotlin.math.exp(-4.0 * t * t).toFloat())
+/**
+ * Distance from the centre (0..1) and the share of the colour left there: a Gaussian, ending at nothing.
+ *
+ * Seven stops rather than the eleven this had: the falloff is smooth long before that, and each stop is one more
+ * colour the shader interpolates on every pixel of a blob the size of the page.
+ */
+private val AURA_FALLOFF: List<Pair<Float, Float>> = (0..6).map { step ->
+    val t = step / 6f
+    t to (if (step == 6) 0f else kotlin.math.exp(-4.0 * t * t).toFloat())
 }
 
 /** Whole turns of the drift for each blob, one backwards: the loop is seamless and they go their own ways. */

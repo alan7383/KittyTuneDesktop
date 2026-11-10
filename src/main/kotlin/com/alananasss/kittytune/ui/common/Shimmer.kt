@@ -1,10 +1,5 @@
-﻿    package com.alananasss.kittytune.ui.common
+    package com.alananasss.kittytune.ui.common
     
-    import androidx.compose.animation.core.animateFloat
-    import androidx.compose.animation.core.infiniteRepeatable
-    import androidx.compose.animation.core.rememberInfiniteTransition
-    import androidx.compose.animation.core.tween
-    import androidx.compose.foundation.background
     import androidx.compose.foundation.layout.*
     import androidx.compose.foundation.shape.CircleShape
     import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,42 +9,43 @@
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.composed
     import androidx.compose.ui.draw.clip
+    import androidx.compose.ui.draw.drawBehind
     import androidx.compose.ui.geometry.Offset
     import androidx.compose.ui.graphics.Brush
-    import androidx.compose.ui.graphics.Color
+    import androidx.compose.ui.graphics.Shape
     import androidx.compose.ui.unit.dp
     
-    // the magic gradient that moves across the screen
-    @Composable
-    private fun ShimmerBrush(targetValue: Float = 1000f): Brush {
+    /**
+     * The magic gradient that moves across a placeholder.
+     *
+     * On the shared ambient pulse and at half its rate (see AmbientClock): a one-second sheen is indistinguishable
+     * at fifteen steps, and, unlike the `rememberInfiniteTransition` this was, it stops while the window is hidden
+     * instead of keeping every skeleton on screen redrawing for nobody.
+     *
+     * The value is read while drawing, so a step repaints one shape rather than recomposing every placeholder.
+     */
+    fun Modifier.shimmerBackground(shape: Shape): Modifier = composed {
         val shimmerColors = listOf(
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         )
-    
-        val transition = rememberInfiniteTransition(label = "shimmer")
-        val translateAnimation = transition.animateFloat(
-            initialValue = 0f,
-            targetValue = targetValue,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1000)
-            ), label = "shimmer_translate"
+        val travel = rememberAmbientLoop(
+            periodMs = SHIMMER_PERIOD_MS,
+            from = 0f,
+            to = SHIMMER_TRAVEL,
+            slow = true,
         )
-    
-        return Brush.linearGradient(
-            colors = shimmerColors,
-            start = Offset.Zero,
-            end = Offset(x = translateAnimation.value, y = translateAnimation.value)
-        )
-    }
-    
-    // easy extension to slap the shimmer on any composable
-    fun Modifier.shimmerBackground(shape: androidx.compose.ui.graphics.Shape): Modifier = composed {
         this
-            .background(ShimmerBrush(), shape)
             .clip(shape)
+            .drawBehind {
+                val x = travel.value
+                drawRect(Brush.linearGradient(colors = shimmerColors, start = Offset.Zero, end = Offset(x, x)))
+            }
     }
+
+    private const val SHIMMER_PERIOD_MS = 1000
+    private const val SHIMMER_TRAVEL = 1000f
     
     // --- basic building blocks ---
     

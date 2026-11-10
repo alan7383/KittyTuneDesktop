@@ -140,16 +140,21 @@ fun FloatingMenuWindow(
             }
         }
 
-        KittyTuneTheme {
-            Box(Modifier.fillMaxSize().padding(SHADOW_PAD)) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                    shadowElevation = 8.dp,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    Column(Modifier.fillMaxSize().padding(6.dp), content = content)
+        val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.alananasss.kittytune.core.LocalWindowSeen provides windowSeen,
+        ) {
+            KittyTuneTheme {
+                Box(Modifier.fillMaxSize().padding(SHADOW_PAD)) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Column(Modifier.fillMaxSize().padding(6.dp), content = content)
+                    }
                 }
             }
         }

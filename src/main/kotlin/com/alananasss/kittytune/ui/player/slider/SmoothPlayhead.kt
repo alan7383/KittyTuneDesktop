@@ -57,7 +57,15 @@ fun rememberSmoothPlayhead(
     val key by rememberUpdatedState(trackKey)
 
     val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
-    LaunchedEffect(clock, ambientClock) {
+    // A hidden window draws no playhead, so the clock must not keep asking for frames for one: it sat there
+    // awaiting the ambient pulse for as long as music played, even minimised (see WindowVisibility).
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    LaunchedEffect(clock, ambientClock, isSeen) {
+        if (!isSeen) {
+            shown.longValue = reported
+            clock.snapTo(reported, System.nanoTime())
+            return@LaunchedEffect
+        }
         while (isActive) {
             val animate = running || clock.isGliding
             if (!animate) {
@@ -141,7 +149,7 @@ internal class PlayheadClock {
         return drawn.toLong().coerceAtLeast(0L)
     }
 
-    private fun snapTo(reported: Long, now: Long) {
+    internal fun snapTo(reported: Long, now: Long) {
         drawn = reported.toDouble()
         lastReport = reported
         lastReportNanos = now

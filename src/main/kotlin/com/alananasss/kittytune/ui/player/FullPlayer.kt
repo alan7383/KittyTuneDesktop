@@ -836,13 +836,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMesh(
     // Where each light starts, how fast it goes round, and where in its circuit it begins. The rates are
     // deliberately not multiples of each other: shared or harmonic rates make four lights read as one shape
     // pulsing, which is the thing that gives a mesh away as an animation rather than as weather.
-    val lights = listOf(
-        Blob(baseX = 0.78f, baseY = 0.12f, rate = 1.00f, phase = 0.00f),
-        Blob(baseX = 0.20f, baseY = 0.74f, rate = 0.71f, phase = 0.31f),
-        Blob(baseX = 0.92f, baseY = 0.66f, rate = 1.29f, phase = 0.63f),
-        Blob(baseX = 0.10f, baseY = 0.22f, rate = 0.53f, phase = 0.86f),
-    )
-    lights.forEachIndexed { index, blob ->
+    MESH_LIGHTS.forEachIndexed { index, blob ->
         val angle = ((drift * blob.rate + blob.phase) * 2f * Math.PI).toFloat()
         // Different multipliers on the two axes, so a light travels an ellipse rather than a circle and the
         // whole field never returns to a shape you recognise from a moment ago.
@@ -860,6 +854,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMesh(
 
 /** One light in the mesh: where it lives, how fast it circles, and where in that circle it starts. */
 private data class Blob(val baseX: Float, val baseY: Float, val rate: Float, val phase: Float)
+
+/** The four lights, built once rather than once per frame: [drawMesh] runs on every frame of the player. */
+private val MESH_LIGHTS = listOf(
+    Blob(baseX = 0.78f, baseY = 0.12f, rate = 1.00f, phase = 0.00f),
+    Blob(baseX = 0.20f, baseY = 0.74f, rate = 0.71f, phase = 0.31f),
+    Blob(baseX = 0.92f, baseY = 0.66f, rate = 1.29f, phase = 0.63f),
+    Blob(baseX = 0.10f, baseY = 0.22f, rate = 0.53f, phase = 0.86f),
+)
 
 /**
  * How far a light strays from where it started, as a fraction of the screen.
