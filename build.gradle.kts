@@ -972,15 +972,15 @@ tasks.register<Test>("headlessTest") {
     filter {
         listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
-            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest",
+            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
-            "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest",
+            "WindowsNativeDspTest", "AudioLineCloserTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
-            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*"
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "KittyTuneProcessesTest"
         ).forEach(::includeTestsMatching)
     }
 }

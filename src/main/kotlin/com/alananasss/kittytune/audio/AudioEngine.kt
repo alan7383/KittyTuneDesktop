@@ -523,6 +523,7 @@ class AudioEngine {
         if (released) return
         released = true
         stop()
+        lineCloser.close()
         // Without this the CDM daemon (in WSL) would stay up until it noticed it was idle.
         hlsAdapter?.releaseDrm()
         aiDetection.resetForNewTrack()
@@ -1297,18 +1298,11 @@ class AudioEngine {
             localLine.stop()
         } catch (_: Exception) {
         }
-        lineCloser.execute {
-            try {
-                localLine.close()
-            } catch (_: Exception) {
-            }
-        }
+        lineCloser.closeLater(localLine)
     }
 
     /** One thread, so lines close one after another rather than piling up threads on a burst of taps. */
-    private val lineCloser = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(r, "audio-line-closer").apply { isDaemon = true }
-    }
+    private val lineCloser = AudioLineCloser()
 
     @Synchronized
     private fun stopInternal() {
