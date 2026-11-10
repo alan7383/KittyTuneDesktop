@@ -43,20 +43,18 @@ object SoundCloudDrm {
      * Loading the CDM is attempted here, once and lazily: a build (or a machine) without one keeps
      * the previous behaviour instead of failing at the first protected track.
      *
-     * The optional CDM sidecar is tried first, because it is the only path that gives the app PCM
-     * samples — and therefore the only one where the equalizer, the filters and the pitch shifter
-     * work on a protected track. It is off unless the user configured it; when it is absent this
-     * falls straight through to the in-process CDM and then to PlayReady.
+     * The CDM sidecar is tried first, because it gives the app clear PCM samples — and therefore
+     * allows the equalizer, the filters and the pitch shifter to work on protected tracks.
      */
     val isAvailable: Boolean
         get() = CdmSidecar.installIfConfigured() ||
             (NativeWidevineCdm.installIfAvailable() && WidevineCdmRegistry.isAvailable)
 
     /**
-     * True when protected playback is decoded by the sidecar rather than by the PlayReady renderer.
+     * True when protected playback is decoded by the CDM sidecar.
      *
-     * [com.alananasss.kittytune.audio.AudioEngine] reads this to decide whether a protected URL goes
-     * to the OS renderer or through the ordinary FFmpeg + DSP chain. Cheap on purpose: it must not
+     * [com.alananasss.kittytune.audio.AudioEngine] reads this to verify whether a protected URL
+     * can go through the ordinary FFmpeg + DSP chain. Cheap on purpose: it must not
      * trigger a probe while a track is being prepared.
      */
     val usesSidecar: Boolean get() = CdmSidecar.isInstalled

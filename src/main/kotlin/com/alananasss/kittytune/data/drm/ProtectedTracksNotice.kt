@@ -47,9 +47,8 @@ object ProtectedTracksNotice {
      * a choice needs no notice.
      *
      * One exception, and it is the common case after this version: someone who *had* protected tracks
-     * on now has none, because the module has to be installed once now instead of PlayReady playing
-     * them. Nothing would tell them otherwise: their choice is already stored, and the track would
-     * simply fall back for ever.
+     * on now has none, because the native module has to be installed once. Nothing would tell them
+     * otherwise: their choice is already stored, and the track would simply fall back for ever.
      */
     internal fun onProtectedTrackSkipped() {
         if (!NativeCdmSetup.windows) return

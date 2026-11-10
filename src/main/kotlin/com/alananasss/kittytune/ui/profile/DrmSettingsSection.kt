@@ -89,13 +89,12 @@ internal val drmSettingsTitleKey: String
     get() = if (NativeCdmSetup.windows) "pref_drm_title_windows" else "pref_drm_title"
 
 /**
- * Settings → protected SoundCloud tracks, whose page depends on who does the decrypting.
+ * Settings -> protected SoundCloud tracks, whose page depends on who does the decrypting.
  *
- * Windows offers two methods ([WindowsDrmSection]): the OS PlayReady renderer, or Chrome's Linux
- * Widevine CDM in WSL, which the app sets up itself. Linux and macOS load the browser's Widevine CDM
- * ([WidevineDrmSection]).
+ * Windows runs Chrome's Linux Widevine CDM natively ([WindowsDrmSection]), which the app sets up itself.
+ * Linux and macOS load the browser's Widevine CDM ([WidevineDrmSection]).
  *
- * The first visit opens [DrmSetupWizard], which explains all of this and asks for the method.
+ * The first visit opens [DrmSetupWizard], which explains all of this and guides the user through setup.
  */
 @Composable
 fun DrmSettingsSection() {

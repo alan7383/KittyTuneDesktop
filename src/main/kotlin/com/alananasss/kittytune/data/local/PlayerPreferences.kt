@@ -795,10 +795,8 @@ class PlayerPreferences {
     /**
      * Off, SoundCloud's protected streams are never tried and a track goes to its other sources.
      *
-     * Off by default on Windows, on by default elsewhere. It is a beta on every platform, but on Windows the
-     * PlayReady renderer also turns off effects, the equaliser, the visualizer and downloads on those tracks,
-     * which reads as a bug to anyone who did not ask for it; so there it is offered ([getProtectedTracksAnnounced])
-     * rather than switched on. Linux and macOS load the browser's own module and lose nothing.
+     * Off by default on Windows until the native Widevine module is set up, on by default elsewhere.
+     * Linux and macOS load the browser's own module and lose nothing.
      */
     fun getProtectedTracksEnabled(): Boolean = Prefs.getBoolean(KEY_PROTECTED_TRACKS, !isWindowsHost)
     fun setProtectedTracksEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PROTECTED_TRACKS, enabled)
@@ -840,7 +838,6 @@ class PlayerPreferences {
     fun getProtectedTracksHintShown(): Boolean = Prefs.getBoolean(KEY_PROTECTED_HINT_SHOWN, false)
     fun setProtectedTracksHintShown(shown: Boolean) = Prefs.putBoolean(KEY_PROTECTED_HINT_SHOWN, shown)
 
-    /** Windows only: "playready" (the OS renderer) or "wsl" (the Widevine sidecar in WSL). */
     /**
      * Whether the WSL setup is waiting for the restart that enabling the Windows feature needs, so the
      * assistant resumes by itself when the user comes back. [getWslSetupVersion] is 1 (WSL1) or 2 (WSL2).
