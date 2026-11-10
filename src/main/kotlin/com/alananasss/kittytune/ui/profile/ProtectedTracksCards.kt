@@ -219,7 +219,10 @@ fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing
     if (openWizard) {
         DrmSetupWizard(start = DrmWizardStart.INTRO, onClose = {
             openWizard = false
-            // The assistant marks the announcement as dealt with; the switch is whatever it was left at.
+            // The assistant may have just installed the module and turned the switch on: read the
+            // state again, or the card keeps offering to install something that is already there.
+            needsModule = windows && !NativeCdmSetup.isInstalled()
+            enabled = PlayerPreferences().getProtectedTracksEnabled() && !needsModule
             visible = protectedTracksAnnouncementDue()
         })
     }
