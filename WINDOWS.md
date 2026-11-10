@@ -4,7 +4,7 @@ Extract `KittyTune-<version>-Windows-Portable-x64.zip` into a writable folder an
 open `KittyTune/KittyTune.exe`. Keep `app` and `runtime` beside the executable.
 The Java runtime is included; no installer or system Java is required.
 
-SoundCloud protected playback uses a native in-process Widevine CDM loader.
+SoundCloud protected playback (`ctr-encrypted-hls` streams) uses a native in-process Widevine CDM loader.
 It loads Chrome's Linux Widevine CDM module directly on Windows without WSL,
 virtual machines, or administrator privileges. Decrypted audio samples flow
 directly into the audio engine as clear PCM, so equalizers, DSP effects,

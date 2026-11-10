@@ -23,7 +23,7 @@ KittyTune Desktop is a native desktop music player built with Kotlin and Compose
 
 Connect your real SoundCloud account with OAuth PKCE for full two-way synchronization: your likes, playlists, reposts, followed artists, listening history, and in-app direct messages stay in lockstep. You can stream your entire collection with instant full-library shuffle and zero advertisements.
 
-Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matches it via ISRC and swaps in lossless audio on the fly. For SoundCloud Go+ protected tracks, KittyTune uses native Widevine CDM decryption (on Linux directly, and on Windows through a native in-process ELF loader with no VM or WSL needed), routing raw PCM straight into the audio engine so equalizers, DSP effects, and offline caching work on protected music.
+Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matches it via ISRC and swaps in lossless audio on the fly. For encrypted tracks (`ctr-encrypted-hls` streams, including Go+ releases), KittyTune uses native Widevine CDM decryption (on Linux directly, and on Windows via a native in-process ELF loader with no VM or WSL needed), routing raw PCM straight into the audio engine so equalizers, DSP effects, and offline caching work on protected music.
 
 <br>
 
@@ -32,7 +32,7 @@ Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matc
 | Feature | What it does | Details |
 | :--- | :--- | :--- |
 | Real SoundCloud sync | Connects to your actual SoundCloud account | OAuth PKCE syncs likes, playlists, reposts, stream feed, and in-app DMs |
-| Lossless and Go+ DRM | Upgrades streams and unlocks protected tracks | ISRC matching pulls studio masters (Qobuz, TIDAL, Deezer); native Widevine CDM on Linux and Windows |
+| Lossless and protected HLS | Upgrades streams and decrypts protected audio | ISRC matching pulls studio masters (Qobuz, TIDAL, Deezer); native Widevine CDM on Linux and Windows |
 | Audio FX and Nightcore | Real-time audio transformations on any track | Independent pitch and tempo shift for nightcore or daycore, plus 34 DSP effects |
 | Studio EQ and AutoEQ | 16-band graphic EQ paired with headphone tuning | 8,850+ measured AutoEQ profiles, peak limiting, spatial 8D audio, and lo-fi filters |
 | Real-time lyrics | Syllable-level synchronized karaoke text | 14 providers, duet split, spring animations, and script translation |
@@ -87,7 +87,7 @@ Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matc
 | Account login and sync | Basic web session | Real OAuth PKCE sync: likes, playlists, reposts, and DMs |
 | Playlist shuffle | Limited by lazy loading | Instant full-library shuffle without pagination |
 | Audio quality upgrades | Standard 128 kbps MP3 or 256 kbps AAC | Lossless matching via Qobuz, TIDAL, Deezer |
-| Protected Go+ playback | Web player only | Native Widevine CDM on Linux and Windows with raw PCM routing |
+| Protected stream playback (`ctr-encrypted-hls`) | Web player only | Native Widevine CDM on Linux and Windows with raw PCM routing |
 | Audio FX and Nightcore | None | Speed and pitch shift (nightcore/daycore), 16-band EQ, 34 DSP effects |
 | Advertisements | Audio and banner ads | Zero ads |
 | Synchronized lyrics | None | Syllable-level tracking, duet split, variable fonts |
