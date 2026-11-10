@@ -38,7 +38,7 @@ class NativeCdmSetupLiveTest {
         assertTrue("the install failed:\n$log", installed)
         assertTrue("the module is missing", NativeCdmSetup.moduleFile.isFile)
         assertTrue("the module is too small", NativeCdmSetup.moduleFile.length() > 8L * 1024 * 1024)
-        assertTrue("the daemon is missing", NativeCdmSetup.hostFile.isFile)
+        assertTrue("the configuration names a daemon that is not there", NativeCdmSetup.state() == NativeCdmSetup.State.INSTALLED)
         assertTrue("the configuration is missing", NativeCdmSetup.configFile.isFile)
 
         CdmSidecar.reset()

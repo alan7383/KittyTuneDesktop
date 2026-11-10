@@ -45,9 +45,12 @@ object ProtectedTracksNotice {
     internal fun onProtectedTrackSkipped() {
         if (!NativeCdmSetup.windows) return
         val prefs = PlayerPreferences()
-        val moduleMissing = !NativeCdmSetup.isInstalled()
         if (prefs.getProtectedTracksHintShown()) return
-        if (prefs.hasProtectedTracksChoice() && !moduleMissing) return
+        // Someone who turned the switch off made a choice, and a choice needs no notice. Someone who
+        // turned it on but has no module any more needs one: their choice is stored, the track would
+        // simply fall back for ever, and nothing else would tell them.
+        val stranded = prefs.getProtectedTracksEnabled() && !NativeCdmSetup.isInstalled()
+        if (prefs.hasProtectedTracksChoice() && !stranded) return
         prefs.setProtectedTracksHintShown(true)
         _current.value = Notice(Kind.OFFER_ENABLE)
     }
