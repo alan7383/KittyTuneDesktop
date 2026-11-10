@@ -255,7 +255,13 @@ fun PetDesktopWindow(
             }
         }
 
-        CompositionLocalProvider(LocalDensity provides customDensity) {
+        // Its own window, so its own "can anyone see this": a pet covered by the app (or minimised) should sit
+        // still, not keep animating for a screen nobody is looking at (see LocalWindowSeen).
+        val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+        CompositionLocalProvider(
+            LocalDensity provides customDensity,
+            com.alananasss.kittytune.core.LocalWindowSeen provides windowSeen,
+        ) {
             KittyTuneTheme {
                 var menuVisible by remember { mutableStateOf(false) }
                 var menuOffset by remember { mutableStateOf(DpOffset.Zero) }

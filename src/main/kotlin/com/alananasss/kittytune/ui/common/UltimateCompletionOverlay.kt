@@ -1,4 +1,4 @@
-﻿    package com.alananasss.kittytune.ui.common
+    package com.alananasss.kittytune.ui.common
 import com.alananasss.kittytune.core.str
     
     import androidx.compose.animation.AnimatedVisibility
@@ -49,33 +49,24 @@ import com.alananasss.kittytune.core.str
             canDismiss = true // Unlocks output
         }
     
-        // --- Infinite animations for the background ---
-        val infiniteTransition = rememberInfiniteTransition(label = "infinite")
-    
+        // --- Endless decorations, on the shared ambient pulse (see AmbientClock): pulsing only while the
+        // window can be seen, and at thirty frames a second rather than the display's rate. ---
         // Rays rotation
-        val raysRotation by infiniteTransition.animateFloat(
-            initialValue = 0f, targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
-            label = "rotation"
+        val raysRotation = rememberAmbientLoop(
+            periodMs = 20_000, from = 0f, to = 360f, slow = true,
         )
-    
+
         // Disk pulsation (Breathing)
-        val pulseScale by infiniteTransition.animateFloat(
-            initialValue = 1f, targetValue = 1.1f,
-            animationSpec = infiniteRepeatable(
-                tween(1500, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulse"
+        val pulseScale = rememberAmbientLoop(
+            periodMs = 1_500, from = 1f, to = 1.1f,
+            repeatMode = RepeatMode.Reverse, easing = FastOutSlowInEasing,
         )
-    
+
         // Particles (One-time random generation)
         val particles = remember { List(30) { ParticleData.random() } }
         // Animation to move particles
-        val particleAnim by infiniteTransition.animateFloat(
-            initialValue = 0f, targetValue = 2f * Math.PI.toFloat(),
-            animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
-            label = "particles"
+        val particleAnim = rememberAmbientLoop(
+            periodMs = 5_000, from = 0f, to = 2f * Math.PI.toFloat(), slow = true,
         )
     
         Box(
@@ -104,7 +95,7 @@ import com.alananasss.kittytune.core.str
                 // Fix here: Removed unnecessary with(drawContext.canvas.nativeCanvas)
                 val count = 12
                 for (i in 0 until count) {
-                    val angle = raysRotation + (i * (360f / count))
+                    val angle = raysRotation.value + (i * (360f / count))
                     val rad = Math.toRadians(angle.toDouble())
                     val endX = center.x + (size.width * 1.5f * cos(rad)).toFloat()
                     val endY = center.y + (size.height * 1.5f * sin(rad)).toFloat()
@@ -121,15 +112,16 @@ import com.alananasss.kittytune.core.str
                 // 2. Floating gold particles (Stardust)
                 particles.forEach { p ->
                     // Slight orbital movement
-                    val offsetX = cos(particleAnim + p.offsetSeed) * 20.dp.toPx()
-                    val offsetY = sin(particleAnim + p.offsetSeed) * 20.dp.toPx()
+                    val phase = particleAnim.value
+                    val offsetX = cos(phase + p.offsetSeed) * 20.dp.toPx()
+                    val offsetY = sin(phase + p.offsetSeed) * 20.dp.toPx()
     
                     drawCircle(
                         color = Color(0xFFFFD700),
                         radius = p.radius.dp.toPx(),
                         center = Offset(
                             x = (size.width * p.relX) + offsetX,
-                            y = (size.height * p.relY) - (particleAnim * 50) // Rises slowly
+                            y = (size.height * p.relY) - (phase * 50) // Rises slowly
                         ),
                         alpha = p.alpha
                     )
@@ -149,7 +141,12 @@ import com.alananasss.kittytune.core.str
                     // The Gold Record / Medallion
                     Box(contentAlignment = Alignment.Center) {
                         // External halo (Glow)
-                        Canvas(modifier = Modifier.size(240.dp).scale(pulseScale)) {
+                        Canvas(
+                            modifier = Modifier.size(240.dp).graphicsLayer {
+                                scaleX = pulseScale.value
+                                scaleY = pulseScale.value
+                            }
+                        ) {
                             drawCircle(
                                 brush = Brush.radialGradient(
                                     colors = listOf(Color(0xFFFFD700).copy(alpha = 0.3f), Color.Transparent)
@@ -197,8 +194,8 @@ import com.alananasss.kittytune.core.str
                         ),
                         modifier = Modifier.graphicsLayer {
                             shadowElevation = 20f
-                            scaleX = pulseScale // The text also breathes slightly
-                            scaleY = pulseScale
+                            scaleX = pulseScale.value // The text also breathes slightly
+                            scaleY = pulseScale.value
                         }
                     )
     

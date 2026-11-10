@@ -171,15 +171,14 @@ fun AiDetectionBadge(
                 .padding(horizontal = 7.dp, vertical = 2.dp),
         ) {
             if (isAnalyzing) {
-                val infiniteTransition = rememberInfiniteTransition(label = "AiBadgePulse")
-                val pulseAlpha by infiniteTransition.animateFloat(
-                    initialValue = 0.4f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(750, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                    label = "AiBadgePulseAlpha",
+                // On the shared ambient pulse rather than an infinite transition: this badge sits in track rows
+                // that stay composed while the window is hidden, where an endless animation used to keep the whole
+                // window drawing for nobody (see AmbientClock).
+                val pulseAlpha by com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+                    periodMs = 750,
+                    from = 0.4f,
+                    to = 1f,
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
                 )
                 Icon(
                     imageVector = Icons.Rounded.AutoAwesome,

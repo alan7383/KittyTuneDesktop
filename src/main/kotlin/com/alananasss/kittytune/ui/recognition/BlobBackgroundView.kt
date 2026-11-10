@@ -81,7 +81,13 @@ fun BlobBackgroundView(
     val painter = rememberLottiePainter(
         composition = composition,
         dynamicProperties = dynamicProperties,
-        iterations = Compottie.IterateForever
+        iterations = Compottie.IterateForever,
+        // This loop runs for as long as the recognition screen is composed, which is a full vector redraw every
+        // frame. A minimised or covered window cannot see it, so the loop is parked instead of drawn for nobody.
+        isPlaying = com.alananasss.kittytune.core.LocalWindowSeen.current,
+        // The file has its own frame rate, well under a 144 or 240 Hz display's: sampling it at every display
+        // frame only asks the window to redraw frames the animation does not have.
+        useCompositionFrameRate = true,
     )
 
     Image(

@@ -39,12 +39,12 @@ internal fun LyricsSearchingIndicator(
     modifier: Modifier = Modifier,
     large: Boolean = true,
 ) {
-    val breathing = rememberInfiniteTransition(label = "lyricsSearching")
-    val labelAlpha by breathing.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing), RepeatMode.Reverse),
-        label = "lyricsSearchingAlpha",
+    // On the shared ambient pulse: a hidden window draws no lyrics, so nothing should keep pulsing for it.
+    val labelAlpha = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = 1100,
+        from = 0.45f,
+        to = 0.9f,
+        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
     )
     Column(
         modifier = modifier.padding(24.dp),
@@ -59,7 +59,7 @@ internal fun LyricsSearchingIndicator(
                 .copy(fontFamily = fontFamily, fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
-            modifier = Modifier.graphicsLayer { alpha = labelAlpha },
+            modifier = Modifier.graphicsLayer { alpha = labelAlpha.value },
         )
     }
 }

@@ -230,14 +230,16 @@ private fun Starfield() {
         val r = Random(7)
         List(70) { Triple(Offset(r.nextFloat(), r.nextFloat()), r.nextFloat() * 2.2f + 0.8f, r.nextFloat() * 6.28f) }
     }
-    val t by rememberInfiniteTransition(label = "stars").animateFloat(
-        initialValue = 0f, targetValue = 6.28f,
-        animationSpec = infiniteRepeatable(tween(4_000, easing = LinearEasing), RepeatMode.Restart),
-        label = "twinkle"
+    // On the shared ambient pulse: nothing is drawn for a window nobody can see (see AmbientClock).
+    val t = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = 4_000,
+        from = 0f,
+        to = 6.28f,
     )
     Canvas(Modifier.fillMaxSize()) {
-        stars.forEach { (pos, radius, phase) ->
-            val a = 0.35f + 0.65f * ((sin(t + phase) + 1f) / 2f)
+        val phase = t.value
+        stars.forEach { (pos, radius, offset) ->
+            val a = 0.35f + 0.65f * ((sin(phase + offset) + 1f) / 2f)
             drawCircle(Color.White.copy(alpha = a), radius = radius, center = Offset(pos.x * size.width, pos.y * size.height))
         }
     }

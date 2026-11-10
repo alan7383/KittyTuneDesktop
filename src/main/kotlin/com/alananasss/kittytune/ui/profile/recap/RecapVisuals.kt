@@ -176,16 +176,16 @@ internal fun SpinningShape(
     periodMs: Int = 24_000,
     clockwise: Boolean = true,
 ) {
-    val transition = rememberInfiniteTransition(label = "spin")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (clockwise) 360f else -360f,
-        animationSpec = infiniteRepeatable(tween(periodMs, easing = LinearEasing), RepeatMode.Restart),
-        label = "angle",
+    // On the shared ambient pulse (see AmbientClock): a slow turn needs none of the display's frames, and no
+    // frame at all while the window is hidden.
+    val angle = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = periodMs,
+        from = 0f,
+        to = if (clockwise) 360f else -360f,
     )
     Box(
         modifier
-            .graphicsLayer { rotationZ = angle }
+            .graphicsLayer { rotationZ = angle.value }
             .clip(polygon.toShape())
             .background(color)
     )

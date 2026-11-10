@@ -113,6 +113,7 @@ fun NowPlayingListenButton(
     val morphProgress = remember { Animatable(if (active) 1f else 0f) }
     val breathingOffset = remember { Animatable(0f) }
     var isFirstComposition by remember { mutableStateOf(true) }
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
 
     LaunchedEffect(active) {
         if (!active) {
@@ -150,7 +151,17 @@ fun NowPlayingListenButton(
             delay(BLOOM_DELAY_MS)
             buttonScale.animateTo(BLOOM_SCALE, tween(BLOOM_MS, easing = StandardAccelerate))
         }
+    }
 
+    // The breathing pulse has its own effect so that parking it for a hidden window does not replay the button's
+    // entry. Nobody can see it while the window is hidden, and the loop asks for a frame for as long as it runs.
+    LaunchedEffect(active, isSeen) {
+        // Not active: the exit below owns the offset, easing it back, so this effect leaves it alone.
+        if (!active) return@LaunchedEffect
+        if (!isSeen) {
+            breathingOffset.snapTo(0f)
+            return@LaunchedEffect
+        }
         // Official Now Playing breathing pulse (fid.smali / hac.java lines 18803-18870):
         // 1000ms delay after listening begins (0x3e8 in fid.smali)
         delay(1000L)
@@ -175,31 +186,14 @@ fun NowPlayingListenButton(
     // Heartbeat / breathing aura animation from hac.java bv() lines 18803-18870:
     // Scale radiates continuously outward from 0.70f (220dp, tucked behind button)
     // to 1.0f (314dp, expanding past the 236dp button) with RepeatMode.Restart (always expanding outward, never reversing)
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
-    val pulseScaleRaw by infiniteTransition.animateFloat(
-        initialValue = 0.70f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = CubicBezierEasing(0.0f, 0.0f, 0.2f, 1.0f)),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulse_scale"
-    )
-
-    // Alpha peaks at 0.25f at mid-cycle (750ms) and fades to 0f at 0 and 1500ms (ggp.java case 12)
-    val pulseAlphaRaw by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 1500
-                0.0f at 0 using CubicBezierEasing(0.4f, 0.0f, 1.0f, 1.0f)
-                0.25f at 750 using CubicBezierEasing(0.0f, 0.0f, 0.2f, 1.0f)
-                0.0f at 1500
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulse_alpha"
+    //
+    // On the shared ambient pulse, and stopped while the window is hidden: an infinite transition held the
+    // window's own frame clock here, so this screen kept being redrawn at the display's rate for as long as it was
+    // composed, whether listening or not. The two curves below are the tween and keyframes it drew.
+    val pulsePhase = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = PULSE_PERIOD_MS,
+        from = 0f,
+        to = 1f,
     )
 
     val haloFade by animateFloatAsState(
@@ -207,18 +201,26 @@ fun NowPlayingListenButton(
         animationSpec = tween(300),
         label = "halo_fade"
     )
-    val haloAlpha = pulseAlphaRaw * haloFade
 
     val haloPath = remember { Path().also { ButtonMorph.toComposePath(1f, it) } }
     val buttonScratch = remember { Path() }
 
     Box(
         modifier = modifier.drawBehind {
+            // Alpha peaks at 0.25f at mid-cycle (750ms) and fades to 0f at 0 and 1500ms (ggp.java case 12)
+            val phase = pulsePhase.value
+            val alphaRaw = if (phase < 0.5f) {
+                PULSE_RISE_EASING.transform(phase * 2f) * PULSE_PEAK
+            } else {
+                (1f - PULSE_FALL_EASING.transform((phase - 0.5f) * 2f)) * PULSE_PEAK
+            }
+            val haloAlpha = alphaRaw * haloFade
             if (haloAlpha <= 0f) return@drawBehind
             // Official Now Playing halo viewport: 314dp (hac.java:18839 / amn.m598g(..., 314.0f))
             // At scale 0.70x: 220dp (tucked behind the 236dp bloomed button).
             // At scale 1.00x: 314dp (emerging generously 39dp past each edge of the 236dp bloomed button).
-            val radius = (314.dp.toPx() / 2f) * pulseScaleRaw
+            val pulseScale = PULSE_MIN_SCALE + (1f - PULSE_MIN_SCALE) * PULSE_SCALE_EASING.transform(phase)
+            val radius = (314.dp.toPx() / 2f) * pulseScale
             translate(left = size.center.x, top = size.center.y) {
                 scale(scaleX = radius, scaleY = radius, pivot = Offset.Zero) {
                     rotate(degrees = -90f, pivot = Offset.Zero) {
@@ -307,6 +309,14 @@ private fun DrawScope.drawFitted(
 
 private val ACTIVE_BLOB_VIEWPORT = Size(236f, 236f)
 private val PULSE_HALO_VIEWPORT = Size(176f, 182f)
+
+/** One breath of the halo, and the curves its tween and keyframes used before it moved to the ambient pulse. */
+private const val PULSE_PERIOD_MS = 1_500
+private const val PULSE_MIN_SCALE = 0.70f
+private const val PULSE_PEAK = 0.25f
+private val PULSE_SCALE_EASING = CubicBezierEasing(0.0f, 0.0f, 0.2f, 1.0f)
+private val PULSE_RISE_EASING = CubicBezierEasing(0.4f, 0.0f, 1.0f, 1.0f)
+private val PULSE_FALL_EASING: Easing = androidx.compose.animation.core.LinearEasing
 
 /** `music_recognition_active_background_new`, the shape the button wears while listening. */
 private const val ACTIVE_BLOB_PATH_DATA =

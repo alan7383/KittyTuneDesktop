@@ -218,8 +218,9 @@ fun rememberMixTransition(): MixTransition {
     // player was open, mixing or not, which is the steady cost the heavy full-screen player did not need.
     val beatPulse = remember { mutableFloatStateOf(1f) }
     val counting = beatsLeft != null
-    LaunchedEffect(counting, beatMs) {
-        if (!counting) {
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    LaunchedEffect(counting, beatMs, isSeen) {
+        if (!counting || !isSeen) {
             beatPulse.floatValue = 1f
             return@LaunchedEffect
         }
@@ -237,11 +238,11 @@ fun rememberMixTransition(): MixTransition {
     // The player reports its position four times a second and the fade publishes its progress as it goes,
     // but neither keeps time while the bar catches up after a mix: those steps
     // were drawn as jumps. Frames are asked for only while such a glide runs.
-    LaunchedEffect(mix) {
+    LaunchedEffect(mix, isSeen) {
         var last = 0L
         while (isActive) {
             val target = published.value
-            if (mix.isActive || target > 0f) {
+            if ((mix.isActive || target > 0f) && isSeen) {
                 withFrameNanos { now ->
                     val dt = if (last == 0L) 0f else ((now - last) / 1_000_000_000f).coerceAtMost(0.1f)
                     last = now

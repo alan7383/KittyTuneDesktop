@@ -273,18 +273,18 @@ internal fun StepDots(count: Int, current: Int, modifier: Modifier = Modifier) {
 /** The big shape at the top of a step, slowly turning behind a still icon. */
 @Composable
 internal fun Hero(shape: androidx.graphics.shapes.RoundedPolygon, icon: ImageVector) {
-    val turn = rememberInfiniteTransition(label = "hero")
-    val rotation by turn.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart),
-        label = "hero-rotation",
+    // On the shared ambient pulse: a twenty-four second turn gains nothing from the display's own rate, and
+    // nothing at all is asked for while the window is hidden (see AmbientClock).
+    val rotation = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = 24_000,
+        from = 0f,
+        to = 360f,
     )
     Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
         Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
             Box(
                 Modifier.fillMaxSize()
-                    .graphicsLayer { rotationZ = rotation }
+                    .graphicsLayer { rotationZ = rotation.value }
                     .background(MaterialTheme.colorScheme.primaryContainer, shape.toShape())
             )
             Icon(

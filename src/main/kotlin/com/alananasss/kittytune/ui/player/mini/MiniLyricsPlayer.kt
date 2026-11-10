@@ -553,7 +553,13 @@ fun MiniLyricsPlayerWindow(
             }
         }
 
-        CompositionLocalProvider(LocalDensity provides customDensity) {
+        // Its own window, so its own "can anyone see this": a mini player left behind a full-screen app, or
+        // hidden while the full player shows, must not keep animating for nobody (see LocalWindowSeen).
+        val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+        CompositionLocalProvider(
+            LocalDensity provides customDensity,
+            com.alananasss.kittytune.core.LocalWindowSeen provides windowSeen,
+        ) {
             KittyTuneTheme {
                 val prefsSnapshot by Prefs.flow.collectAsState()
                 val showCover = remember(prefsSnapshot) { prefs.getMiniPlayerShowCover() }

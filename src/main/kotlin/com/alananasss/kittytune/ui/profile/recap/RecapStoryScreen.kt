@@ -400,12 +400,12 @@ private fun MorphingBackdrop(target: RoundedPolygon, color: Color) {
         morphProgress.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
     }
     val morph = remember(from, to) { Morph(from, to) }
-    val spin = rememberInfiniteTransition(label = "backdropSpin")
-    val angle by spin.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(40_000, easing = LinearEasing)),
-        label = "backdropAngle",
+    // On the shared ambient pulse (see AmbientClock): a forty second turn needs none of the display's frames,
+    // and no frame at all while the window is hidden.
+    val angle = com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = 40_000,
+        from = 0f,
+        to = 360f,
     )
     val path = remember { Path() }
     Canvas(Modifier.fillMaxSize()) {
@@ -426,7 +426,7 @@ private fun MorphingBackdrop(target: RoundedPolygon, color: Color) {
         }
         path.close()
         translate(left, top) {
-            rotate(angle, pivot = Offset(side / 2f, side / 2f)) {
+            rotate(angle.value, pivot = Offset(side / 2f, side / 2f)) {
                 scale(side, side, pivot = Offset.Zero) {
                     drawPath(path, color)
                 }
