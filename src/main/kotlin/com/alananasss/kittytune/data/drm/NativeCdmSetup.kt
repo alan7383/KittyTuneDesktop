@@ -54,6 +54,8 @@ internal object NativeCdmSetup {
         }
 
     val moduleFile: File get() = File(installDirectory, MODULE_NAME)
+
+    /** The daemon under its default name; the real one is content-addressed, see [extractDaemon]. */
     val hostFile: File get() = File(installDirectory, HOST_NAME)
 
     /** The configuration file [CdmSidecar] already reads. Written here, never hand-edited. */
@@ -73,11 +75,23 @@ internal object NativeCdmSetup {
         INSTALLED,
     }
 
-    fun state(): State = when {
-        !hostFile.isFile -> State.MISSING
-        !moduleFile.isFile -> State.MISSING
-        !configFile.isFile -> State.MISSING
-        else -> State.INSTALLED
+    /**
+     * The command the configuration file names, or null when there is none.
+     *
+     * This is the truth about what is installed: the daemon's file name carries its hash (see
+     * [extractDaemon]), so it cannot be guessed — it has to be read back.
+     */
+    fun configuredCommand(): List<String>? = runCatching {
+        if (!configFile.isFile) return@runCatching null
+        val array = JSONObject(configFile.readText()).getJSONArray("command")
+        (0 until array.length()).map { array.getString(it) }
+    }.getOrNull()?.takeIf { it.size >= 2 }
+
+    fun state(): State {
+        val command = configuredCommand() ?: return State.MISSING
+        val host = File(command[0])
+        val module = File(command[1])
+        return if (host.isFile && module.isFile) State.INSTALLED else State.MISSING
     }
 
     fun isInstalled(): Boolean = state() == State.INSTALLED
@@ -160,19 +174,31 @@ internal object NativeCdmSetup {
         }
     }
 
-    /** Removes the module, the daemon copy and the configuration. Keeps nothing else. */
+    /** Removes the module, every daemon copy and the configuration. Keeps nothing else. */
     fun uninstall() {
+        // Stop ours first: Windows will not delete a running executable, and a leftover copy would
+        // make the next install look broken.
+        runCatching { CdmSidecar.reset() }
+        Thread.sleep(150)
         runCatching { moduleFile.delete() }
         runCatching { hostFile.delete() }
         runCatching { configFile.delete() }
-        runCatching { installDirectory.listFiles()?.forEach { if (it.name.startsWith("data.tar")) it.delete() } }
-        CdmSidecar.reset()
+        runCatching {
+            installDirectory.listFiles()
+                ?.filter { it.name.startsWith("ktcdm") || it.name.startsWith("data.tar") || it.name.endsWith(".deb") }
+                ?.forEach { it.delete() }
+        }
         com.alananasss.kittytune.data.StreamResolver.forgetStreams()
     }
 
     /**
-     * Copies the daemon out of the packaged resources. The copy is keyed by the executable's own
-     * hash so an app update replaces it without ever running a stale one.
+     * Copies the daemon out of the packaged resources, under a name that carries its hash.
+     *
+     * The name matters: Windows refuses to overwrite a running executable, so an app update that
+     * rebuilt `ktcdm.exe` while a protected track was playing would fail to install it (measured: the
+     * file is locked by the daemon still inside its 4 s grace window, and the setup reported the
+     * daemon as "missing from this build"). A content-addressed name can always be written beside the
+     * running one, and the configuration is then repointed at it.
      */
     private fun extractDaemon(): File? = runCatching {
         val bytes = javaClass.getResourceAsStream("/native/widevinelinux/$HOST_NAME")?.use { it.readBytes() }
@@ -184,16 +210,17 @@ internal object NativeCdmSetup {
             ?: return@runCatching null
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it) }.take(16)
-        val target = hostFile
-        val existingHash = target.takeIf { it.isFile }?.let { file ->
-            MessageDigest.getInstance("SHA-256").digest(file.readBytes())
-                .joinToString("") { "%02x".format(it) }.take(16)
-        }
-        if (existingHash != hash) {
-            installDirectory.mkdirs()
+        installDirectory.mkdirs()
+        val target = File(installDirectory, "ktcdm-$hash.exe")
+        if (!target.isFile || target.length() != bytes.size.toLong()) {
             target.outputStream().use { output -> output.write(bytes) }
         }
         target.setExecutable(true)
+        // Older builds left copies behind (the default name too): never reused, and each one a
+        // megabyte. A running one cannot be deleted; best effort is enough.
+        installDirectory.listFiles()
+            ?.filter { it.name.startsWith("ktcdm") && it.name != target.name }
+            ?.forEach { stale -> runCatching { stale.delete() } }
         target
     }.getOrNull()
 

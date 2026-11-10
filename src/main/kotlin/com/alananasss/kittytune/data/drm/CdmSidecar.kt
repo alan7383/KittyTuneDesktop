@@ -161,7 +161,18 @@ internal object CdmSidecar {
      */
     internal fun markFailed(cdm: SidecarWidevineCdm, reason: String) {
         synchronized(lock) {
-            if (cdm !== installed && cdm !== secondary) return
+            // The download's daemon failing says nothing about playback's: only the second instance
+            // and the download session go. Dropping the registered one here would stop the music for
+            // a failed download.
+            if (cdm === secondary) {
+                failureReason = "${cdm.name}: $reason"
+                Logger.w(TAG, "secondary sidecar failed — $failureReason")
+                runCatching { secondary?.release() }
+                secondary = null
+                SoundCloudDrm.releaseDownloadSession()
+                return
+            }
+            if (cdm !== installed) return
             failureReason = "${cdm.name}: $reason"
             Logger.w(TAG, "sidecar failed — $failureReason")
             attempted = true
@@ -347,27 +358,51 @@ internal class SidecarWidevineCdm(
             runCatching { transport?.close() }
             transport = null
         }
-        val link = existing ?: runCatching { SidecarTransport(command) }
-            .getOrElse {
-                CdmSidecar.markFailed(this, "could not start: ${it.message}")
-                throw DrmUnavailableException("could not start the CDM sidecar ($name): ${it.message}", it)
-            }
-            .also { transport = it }
         // The bridge holds one session at a time on one CDM instance, exactly like the browser does.
-        // On a daemon just started this is also the proof that it answers at all.
-        try {
-            link.call(SidecarTransport.RESET_SESSION, ByteArray(0), if (existing == null) 30_000 else 15_000)
-        } catch (e: DrmLicenseException) {
-            if (existing == null) {
-                runCatching { link.close() }
-                transport = null
-                CdmSidecar.markFailed(this, e.message ?: "no answer")
-                throw DrmUnavailableException("the CDM sidecar ($name) does not answer: ${e.message}", e)
-            }
+        // On a daemon already running this is best effort; on a fresh one it is the proof that it
+        // answers at all, and [startDaemon] retries before giving up.
+        val link = existing ?: startDaemon()
+        if (existing != null) {
+            runCatching { existing.call(SidecarTransport.RESET_SESSION, ByteArray(0), 15_000) }
         }
         openSessions++
         scheduleCheck(IDLE_MS)
-        SidecarWidevineSession(link, lock, pssh, onUse = ::touch, onClose = ::sessionClosed)
+        SidecarWidevineSession(link, lock, pssh, onUse = ::touch, onClose = ::sessionClosed, restart = ::startDaemon)
+    }
+
+    /**
+     * Starts the daemon and proves it answers, retrying once.
+     *
+     * The retry is not superstition: the executable is written by the installer moments before its
+     * first run, and Windows' antivirus can hold a freshly written binary long enough for the process
+     * to die before it reads a frame (observed once, as "the pipe closed" between the setup's probe
+     * and the first licence). A second start, 250 ms later, costs nothing and does not depend on why
+     * the first one was refused.
+     */
+    private fun startDaemon(): SidecarTransport {
+        var lastError: String? = null
+        repeat(START_ATTEMPTS) { attempt ->
+            val link = try {
+                SidecarTransport(command)
+            } catch (e: Exception) {
+                CdmSidecar.markFailed(this, "could not start: ${e.message}")
+                throw DrmUnavailableException("could not start the CDM sidecar ($name): ${e.message}", e)
+            }
+            try {
+                link.call(SidecarTransport.RESET_SESSION, ByteArray(0), 30_000)
+                transport = link
+                return link
+            } catch (e: DrmLicenseException) {
+                lastError = e.message
+                runCatching { link.close() }
+                if (attempt + 1 < START_ATTEMPTS) {
+                    Logger.w("CdmSidecar", "$name did not answer, starting it again (${e.message})")
+                    runCatching { Thread.sleep(250) }
+                }
+            }
+        }
+        CdmSidecar.markFailed(this, lastError ?: "no answer")
+        throw DrmUnavailableException("the CDM sidecar ($name) does not answer: $lastError")
     }
 
     private fun touch() {
@@ -408,6 +443,9 @@ internal class SidecarWidevineCdm(
     }
 
     companion object {
+        /** One retry after a start that did not answer; see [startDaemon]. */
+        private const val START_ATTEMPTS = 2
+
         /** A minute without a call while a session is open: a playing track decrypts far more often. */
         const val IDLE_MS = 60_000L
 
@@ -422,7 +460,7 @@ internal class SidecarWidevineCdm(
 
 /** One licence exchange on the sidecar CDM. */
 internal class SidecarWidevineSession(
-    private val link: SidecarTransport,
+    link: SidecarTransport,
     private val lock: Any,
     /**
      * The PSSH this session was opened for.
@@ -433,7 +471,15 @@ internal class SidecarWidevineSession(
     private val pssh: ByteArray,
     private val onUse: () -> Unit = {},
     private val onClose: () -> Unit = {},
+    /**
+     * Starts a replacement daemon when the one behind this session died before a key existed. Null
+     * when the CDM cannot be restarted that way (the in-process one), in which case failures
+     * propagate as before.
+     */
+    private val restart: (() -> SidecarTransport)? = null,
 ) : WidevineLicenseSession, KeyIdScopedSession, ExpiringSession {
+
+    private var link: SidecarTransport = link
 
     private val closed = java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -443,9 +489,26 @@ internal class SidecarWidevineSession(
     @Volatile
     private var keyId: ByteArray = ByteArray(0)
 
+    /**
+     * Asks the CDM for a licence request, on a fresh daemon if this one died first.
+     *
+     * Before a key exists the exchange holds no state worth keeping: a process that stopped between
+     * the session being opened and this call costs one restart, and nothing else. A failure from a
+     * *live* CDM (a PSSH it refuses) is a real answer and is thrown as before — retrying it would
+     * only hide it.
+     */
     override fun licenseRequest(): ByteArray = synchronized(lock) {
         onUse()
-        link.call(SidecarTransport.LICENSE_REQUEST, pssh, 60_000)
+        val first = runCatching { link.call(SidecarTransport.LICENSE_REQUEST, pssh, 60_000) }
+        first.getOrNull()?.let { return@synchronized it }
+        val failure = first.exceptionOrNull()
+        val dead = !link.alive
+        if (dead) runCatching { link.close() } // release the handle of a process that is already gone
+        val replacement = if (dead) restart?.invoke() else null
+        if (replacement == null) throw failure ?: DrmLicenseException("the CDM sidecar did not answer")
+        Logger.w("CdmSidecar", "the daemon stopped before the licence request; restarted it")
+        link = replacement
+        replacement.call(SidecarTransport.LICENSE_REQUEST, pssh, 60_000)
     }
 
     override fun provideLicense(license: ByteArray): List<ContentKey> = synchronized(lock) {
@@ -699,24 +762,33 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
                 answers.put(if (status == 0) body else String(body, Charsets.UTF_8))
             }
         } catch (_: EOFException) {
-            answers.put(closedMessage())
+            // An answer queued here can still fail: close() interrupts this thread, and a blocked
+            // put then throws. That is the shutdown path, not a fault worth a stack trace.
+            putQuietly(closedMessage())
         } catch (e: IOException) {
-            answers.put("the CDM sidecar pipe failed: ${e.message}")
+            putQuietly("the CDM sidecar pipe failed: ${e.message}")
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
         }
     }
 
+    private fun putQuietly(message: String) {
+        runCatching { answers.put(message) }
+    }
+
     /**
-     * Why the daemon stopped answering, as far as it said. The native host explains its failures on
-     * stderr — a CPU without sgsbase, a module it cannot load — and an ending that only says "the
-     * pipe closed" hides exactly the line a bug report needs.
+     * Why the daemon stopped answering: its exit code and the tail of its stderr.
+     *
+     * The native host explains its failures there — a CPU without FSGSBASE, a module it cannot load —
+     * and an ending that only says "the pipe closed" hides exactly the line a bug report needs.
      */
     private fun closedMessage(): String {
+        val exit = runCatching { process.exitValue() }.getOrNull()
         val tail = synchronized(errors) { errors.toString() }.trim()
-        if (tail.isEmpty()) return "the CDM sidecar closed the pipe"
         val last = tail.lineSequence().filter { it.isNotBlank() }.toList().takeLast(3)
-        return "the CDM sidecar closed the pipe: " + last.joinToString(" | ")
+        return "the CDM sidecar closed the pipe" +
+            (exit?.let { " (exit $it)" } ?: "") +
+            (if (last.isEmpty()) "" else ": " + last.joinToString(" | "))
     }
 
     private fun readFully(input: InputStream, target: ByteArray) {
@@ -729,6 +801,10 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
     }
 
     override fun close() {
+        if (TRACE) {
+            val who = Throwable().stackTrace.drop(2).take(3).joinToString(" < ")
+            Logger.d("CdmSidecar", "closing transport pid=${process.pid()} alive=$alive from $who")
+        }
         closed = true
         runCatching { output.write(byteArrayOf(QUIT.toByte()) + length(0)); output.flush() }
         runCatching { process.waitFor(2, TimeUnit.SECONDS) }
@@ -739,6 +815,9 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
     }
 
     companion object {
+        /** Set KITTYTUNE_CDM_TRACE=1 to log every transport start and close, with who closed it. */
+        val TRACE: Boolean = !System.getenv("KITTYTUNE_CDM_TRACE").isNullOrBlank()
+
         const val QUIT = 0
         const val LICENSE_REQUEST = 1
         const val PROVIDE_LICENSE = 2
