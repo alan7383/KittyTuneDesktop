@@ -775,21 +775,24 @@ internal class SidecarTransport(command: List<String>) : AutoCloseable {
     }
 
     /**
-     * Keeps what the daemon said when it stopped, in full, next to its configuration.
+     * Keeps what the daemon said when it died, in full, next to its configuration.
      *
      * The message in the exception carries three lines, which is right for a toast and useless for a
      * crash: the native host prints its faulting address, registers and backtrace on stderr before it
-     * dies. This is the copy a bug report can attach.
+     * dies. This is the copy a bug report can attach. An orderly exit writes nothing: a daemon that
+     * sees its stdin close because the app is quitting ends with code 0, and that is not a fault.
      */
     private fun dumpStderr() {
         if (closed) return // an orderly shutdown is not a fault
+        val exit = runCatching { process.exitValue() }.getOrNull()
+        if (exit == 0 || exit == null) return
         val text = stderr()
         if (text.isEmpty()) return
         runCatching {
             val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
             val file = java.io.File(base, "KittyTune/cdm-last-failure.log")
             file.parentFile?.mkdirs()
-            file.writeText(text + "\n")
+            file.writeText("exit $exit\n" + text + "\n")
             Logger.w("CdmSidecar", "the daemon stopped; its log is in ${file.absolutePath}")
         }
     }

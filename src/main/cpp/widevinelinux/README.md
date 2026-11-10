@@ -106,6 +106,23 @@ Quand le démon meurt pour de bon, `CdmSidecar` écrit son stderr complet dans
 `%LOCALAPPDATA%\KittyTune\cdm-last-failure.log` (adresse fautive, registres, backtrace, derniers
 appels du shim) : c'est le fichier à joindre à un rapport de bug.
 
+## Trois pièges de plus, tous mesurés
+
+**`munmap` est un no-op.** Chaque tentative d'honorer l'appel a cassé l'allocateur du CDM :
+`MEM_RELEASE` libère l'allocation Windows entière (0xC0000005 à la base du pool), et décommiter la
+tranche demandée laisse le CDM écrire dans des pages qu'il croit engagées (même faute). Le démon vit
+quelques secondes et ne rend qu'un morceau de piste en mémoire : garder réservé est borné, et `mmap`
+sur une adresse encore réservée la réengage.
+
+**Le tampon déchiffré n'est plus libéré par nous.** Le CDM l'a obtenu par `Host::Allocate` et appelle
+`Destroy()` dessus ; le libérer aussi était un double free (0xC0000374, corruption du tas). Si un CDM
+oublie son `Destroy`, le tampon est perdu — quelques centaines de kilo-octets par fragment, dans un
+processus qui s'arrête juste après.
+
+**`ktwv_destroy` n'est plus appelé à la sortie.** Les destructeurs du CDM finissaient sur un appel à
+une adresse nulle ; le démon quitte par `_Exit(0)`, sans démontage : il n'a rien à rendre, et le
+système récupère l'espace.
+
 ## Le CDM n'est pas réentrant
 
 Widevine n'est pas thread-safe, et deux threads l'atteignent : celui du démon (création de session,

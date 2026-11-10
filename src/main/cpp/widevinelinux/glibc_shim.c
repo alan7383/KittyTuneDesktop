@@ -579,29 +579,18 @@ SYSV int sysv_munmap(void* address, size_t length) {
     T2("munmap", address, length);
     if (!address) return 0;
     length = (length + 0xFFF) & ~(size_t)0xFFF;
-    // A slice of an address pool is decommitted, never released: MEM_RELEASE frees the reservation
-    // the allocator is still handing blocks out of.
-    uint8_t* pool_base = NULL;
-    size_t pool_size = 0;
-    if (inside_reservation(address, &pool_base, &pool_size)) {
-        if (VirtualFree(address, length, MEM_DECOMMIT)) {
-            DWORD previous = 0;
-            VirtualProtect(address, length, PAGE_NOACCESS, &previous);
-        }
-        return 0;
-    }
-    // Unmapping a whole reservation releases it; unmapping a slice of a pool only gives the pages
-    // back, because the reservation has to stay for the allocator to reuse.
-    MEMORY_BASIC_INFORMATION region;
-    if (VirtualQuery(address, &region, sizeof(region)) &&
-        region.BaseAddress == address && region.RegionSize <= length) {
-        if (VirtualFree(address, 0, MEM_RELEASE)) return 0;
-    }
-    if (length && VirtualFree(address, length, MEM_DECOMMIT)) {
-        DWORD previous = 0;
-        VirtualProtect(address, length, PAGE_NOACCESS, &previous);
-        return 0;
-    }
+    // A no-op, on purpose.
+    //
+    // Every attempt to honour it has broken the CDM's allocator: Windows' MEM_RELEASE frees the
+    // whole VirtualAlloc allocation rather than the range asked for (measured: 0xC0000005 at the pool
+    // base, twice), and decommitting the slice it names still leaves the CDM writing to pages it
+    // believes are committed (measured: the same fault at 0x22900000000, and 0xC0000374 heap
+    // corruption). The daemon is short-lived and hands back only a track's worth of buffers, so
+    // keeping the memory reserved is bounded and the OS reclaims it at exit. `mmap` at an address
+    // that is still reserved re-commits it through the "already ours" path above, so nothing that
+    // asks for memory again can notice.
+    (void)address;
+    (void)length;
     return 0;
 }
 
