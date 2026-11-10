@@ -106,6 +106,18 @@ Quand le démon meurt pour de bon, `CdmSidecar` écrit son stderr complet dans
 `%LOCALAPPDATA%\KittyTune\cdm-last-failure.log` (adresse fautive, registres, backtrace, derniers
 appels du shim) : c'est le fichier à joindre à un rapport de bug.
 
+## L'adresse du pool est une indication, pas une exigence
+
+`mmap(0x7000000000, 32 Gio, PROT_NONE)` : le CDM réserve son pool à une adresse qu'il préfère. Notre
+shim la traitait comme une exigence, et Windows la refuse (`ERROR_INVALID_ADDRESS`, 487) dès qu'une
+autre allocation vit à proximité — environ un processus sur trois. Le CDM s'arrêtait alors sur un
+`CHECK` pendant `InitializeCdmModule`, donc **avant** la première requête ; côté app, le démon était
+déjà mort quand la licence partait (« the CDM sidecar stopped listening »).
+
+Sur Linux, cette adresse n'est qu'une indication sauf `MAP_FIXED`. Le shim fait pareil : si la
+réservation échoue, il en demande une autre, n'importe où. Mesuré : le test intégré à froid, qui
+échouait une fois sur trois, passe huit fois sur huit sans un seul message du démon.
+
 ## Trois pièges de plus, tous mesurés
 
 **`munmap` est un no-op.** Chaque tentative d'honorer l'appel a cassé l'allocateur du CDM :

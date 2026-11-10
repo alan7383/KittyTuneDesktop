@@ -553,6 +553,17 @@ SYSV void* sysv_mmap(void* address, size_t length, int protection, int flags, in
     }
     if (protection == 0) {
         void* block = VirtualAlloc(hint, length, MEM_RESERVE, PAGE_NOACCESS);
+        if (!block && !(flags & MAP_FIXED)) {
+            // The address is a *hint* unless MAP_FIXED says otherwise, and Windows is stricter than
+            // Linux about it: a 32 GiB reservation at the address the CDM's allocator prefers fails
+            // with ERROR_INVALID_ADDRESS (487) whenever anything else lives nearby, and the CDM then
+            // aborts on a CHECK trap while initialising (measured: exit 0x80000003 in
+            // InitializeCdmModule, about one process in three). Asking for any free range instead is
+            // what Linux would do, and the allocator takes whatever base it is given.
+            block = VirtualAlloc(NULL, length, MEM_RESERVE, PAGE_NOACCESS);
+            if (block && g_trace_verbose)
+                fprintf(stderr, "[shim] mmap: pool moved from %p to %p\n", hint, block);
+        }
         if (!block) {
             fprintf(stderr, "[shim] mmap reserve FAILED hint=%p length=0x%llx error=%lu\n", hint,
                     (unsigned long long)length, (unsigned long)GetLastError());
@@ -634,7 +645,10 @@ SYSV void* sysv_mremap(void* old_address, size_t old_size, size_t new_size, int 
     void* block = VirtualAlloc(NULL, new_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     if (!block) { g_errno = ENOMEM; return (void*)-1; }
     memcpy(block, old_address, old_size);
-    VirtualFree(old_address, 0, MEM_RELEASE);
+    // The old block is left alone, as `munmap` is: `MEM_RELEASE` frees the whole VirtualAlloc
+    // allocation, and a block that sits at the base of the 32 GiB pool takes the pool with it
+    // (measured: 0xC0000005 at the pool base, once per longer run). The copy above is already made,
+    // and the daemon outlives neither of them by long.
     return block;
 }
 

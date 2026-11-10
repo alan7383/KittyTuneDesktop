@@ -540,6 +540,7 @@ void* g_host_vtable_probe[] = {
 };
 
 SYSV HostBuffer* host_allocate(HostObject* self, uint32_t capacity) {
+    winelf_note_host_call("Allocate", (uint64_t)(capacity));
     host_callsite("Allocate", self, __builtin_return_address(0));
     if (host_debug()) fprintf(stderr, "[host] Allocate(%u)\n", capacity);
     (void)self;
@@ -547,6 +548,7 @@ SYSV HostBuffer* host_allocate(HostObject* self, uint32_t capacity) {
 }
 
 SYSV void host_set_timer(HostObject* self, int64_t delay_ms, void* context) {
+    winelf_note_host_call("SetTimer", (uint64_t)(delay_ms));
     host_callsite("SetTimer", self, __builtin_return_address(0));
     if (host_debug()) fprintf(stderr, "[host] SetTimer(%lld, %p)\n", (long long)delay_ms, context);
     Bridge* bridge = self->bridge;
@@ -567,6 +569,7 @@ SYSV double host_wall_time(HostObject* self) {
 }
 
 SYSV void host_on_initialized(HostObject* self, int success) {
+    winelf_note_host_call("OnInitialized", (uint64_t)(success));
     host_callsite("OnInitialized", self, __builtin_return_address(0));
     if (host_debug()) fprintf(stderr, "[host] OnInitialized(%d)\n", success);
     Bridge* bridge = self->bridge;
@@ -621,6 +624,7 @@ SYSV void host_on_reject_promise(HostObject* self, uint32_t promise_id, int exce
 
 SYSV void host_on_session_message(HostObject* self, const char* id, uint32_t id_size, int type,
                                   const char* message, uint32_t message_size) {
+    winelf_note_host_call("OnSessionMessage", (uint64_t)(type));
     host_callsite("OnSessionMessage", self, __builtin_return_address(0));
     if (host_debug()) fprintf(stderr, "[host] OnSessionMessage(type=%d, size=%u)\n", type, message_size);
     (void)id;

@@ -602,6 +602,31 @@ int winelf_trace_enabled(void) { return g_trace_enabled; }
 // ---------------------------------------------------------------------------------------------
 
 static volatile LONG64 g_fs_restores;
+
+static char g_last_host_call[48];
+static volatile LONG64 g_last_host_argument;
+static volatile LONG g_last_host_stamp;
+
+void winelf_note_host_call(const char* name, uint64_t argument) {
+    if (name) {
+        int i = 0;
+        for (; name[i] && i < (int)sizeof(g_last_host_call) - 1; i++) g_last_host_call[i] = name[i];
+        g_last_host_call[i] = 0;
+    }
+    g_last_host_argument = (LONG64)argument;
+    InterlockedIncrement(&g_last_host_stamp);
+}
+
+void winelf_describe_last_host_call(char* out, size_t out_len) {
+    if (!out || !out_len) return;
+    out[0] = 0;
+    if (!g_last_host_stamp) {
+        snprintf(out, out_len, "(none)");
+        return;
+    }
+    snprintf(out, out_len, "%s(0x%llx)", g_last_host_call,
+             (unsigned long long)(uint64_t)g_last_host_argument);
+}
 static volatile LONG64 g_fs_passthrough;
 
 static int readable_range(const void* address, size_t size) {
@@ -781,6 +806,11 @@ static LONG CALLBACK diagnostic_exception_handler(PEXCEPTION_POINTERS info) {
         rbp = next;
     }
     winelf_dump_trace();
+    {
+        char host_call[64];
+        winelf_describe_last_host_call(host_call, sizeof(host_call));
+        fprintf(stderr, "[winelf] last host call: %s\n", host_call);
+    }
     fprintf(stderr, "[winelf] fs restores=%lld passthrough=%lld\n",
             (long long)g_fs_restores, (long long)g_fs_passthrough);
     fflush(stderr);

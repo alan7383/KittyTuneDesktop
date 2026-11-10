@@ -236,9 +236,11 @@ object SoundCloudDrm {
     /**
      * Asks [cdm] for a license request, posts it to SoundCloud, and hands the answer back.
      *
-     * One retry when the CDM process dies on the way: before a key exists there is nothing to keep,
-     * and a fresh session starts a fresh daemon. Any other failure — a refusal, a live CDM rejecting
-     * the PSSH — is a real answer and propagates as before.
+     * Up to three attempts when the CDM process dies on the way: before a key exists there is nothing
+     * to keep, and a fresh session starts a fresh daemon. Measured on this machine, a daemon dies
+     * inside the module's own licence generation about one run in three — a fault inside Google's
+     * binary that no amount of retrying explains away, but that a new process survives. Any other
+     * failure — a refusal, a live CDM rejecting the PSSH — is a real answer and propagates at once.
      */
     private fun openLicensedSession(
         cdm: WidevineCdm,
@@ -257,12 +259,16 @@ object SoundCloudDrm {
                 return session
             } catch (e: Throwable) {
                 runCatching { session.close() }
-                if (attempt > 0 || !looksLikeDeadCdm(e)) throw e
                 attempt++
-                Logger.w(TAG, "the CDM stopped before the licence, asking a fresh one (${e.message})")
+                if (attempt >= LICENCE_ATTEMPTS || !looksLikeDeadCdm(e)) throw e
+                Logger.w(TAG, "the CDM stopped before the licence (attempt $attempt), asking a fresh one: ${e.message}")
+                runCatching { Thread.sleep(150) }
             }
         }
     }
+
+    /** How many daemons a licence may cost. Three is already generous for one exchange. */
+    private const val LICENCE_ATTEMPTS = 3
 
     /** The CDM process went away, as opposed to it refusing the request. */
     private fun looksLikeDeadCdm(e: Throwable): Boolean {

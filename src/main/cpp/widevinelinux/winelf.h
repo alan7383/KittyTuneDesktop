@@ -95,6 +95,14 @@ void winelf_dump_trace(void);
 // exported name when it is.
 void winelf_describe_address(const void* address, char* out, size_t out_len);
 
+// The last host callback the CDM made, for the fault report.
+//
+// A crash inside the CDM almost always happens just after one of *our* callbacks answered it, and
+// which one it was is the whole diagnosis: an Allocate that returned null reads very differently
+// from a message the CDM then mis-parses. Kept in a fixed buffer, so it is safe from a fault path.
+void winelf_note_host_call(const char* name, uint64_t argument);
+void winelf_describe_last_host_call(char* out, size_t out_len);
+
 // The libc shim next to this loader. Declared here so both translation units agree on C linkage.
 void* shim_lookup(const char* name);
 int shim_count(void);
