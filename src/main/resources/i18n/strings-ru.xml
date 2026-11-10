@@ -3247,4 +3247,5 @@
     <string name="drm_method_native_claim">Из Chrome KittyTune использует только модуль Widevine. Сам Chrome не запускается: ни окна, ни фонового процесса.</string>
     <string name="drm_method_pro_chrome_module">Один модуль из Chrome, больше ничего</string>
     <string name="connect_relay_url_hint">https://relay.example.ru</string>
+    <string name="pref_drm_attempt_needs_module">Сначала установи модуль, строка ниже это делает</string>
 </resources>
