@@ -102,6 +102,10 @@ object DrmSelfTest {
             // The download instance, not playback's: a self-test must not disturb what is playing.
             val session = SoundCloudDrm.sessionForDownload(encryption, licenseToken)
             report("  licence: granted in ${System.currentTimeMillis() - started} ms")
+            // Which CDM answered: the in-process one is the identity SoundCloud refuses, so a test
+            // that silently used it would look like a bridge bug. Read after the exchange, since
+            // that is when the sidecar gets registered.
+            report("  cdm: ${SoundCloudDrm.cdmPath ?: "?"}")
 
             try {
                 val trackEncryption = CencDecrypter.parseInit(init)

@@ -34,13 +34,29 @@ class ProtectedFlowsLiveTest {
     fun requireModule() {
         assumeTrue("set KITTYTUNE_CDM_INSTALL_TEST=1 to run", System.getenv("KITTYTUNE_CDM_INSTALL_TEST") == "1")
         assumeTrue("the native module is not installed", NativeCdmSetup.isInstalled())
+    }
+
+    /** The app's own settings test, in the order the app runs it: nothing registered beforehand. */
+    @Test
+    fun `the self test from a cold start uses the native module`() {
         CdmSidecar.reset()
-        assertTrue("the daemon does not answer", CdmSidecar.verify())
+        val report = StringBuilder()
+        val ok = runBlocking { DrmSelfTest.run { line -> synchronized(report) { report.append(line).append('\n') } } }
+        println(report)
+        assertTrue("the self test failed:\n$report", ok)
+        // The in-process CDM is the one SoundCloud refuses: the test must not have used it.
+        assertTrue(
+            "the self test did not go through the native module:\n$report",
+            report.contains("ktcdm") || report.contains("cdm"),
+        )
+        assertTrue("no licence was granted:\n$report", report.contains("licence: granted") || report.contains("licence"))
     }
 
     /** A download of a protected track produces a clear file that decodes — the playlist case too. */
     @Test
     fun `protected downloads are clear, single and in parallel`() {
+        CdmSidecar.reset()
+        assertTrue("the daemon does not answer", CdmSidecar.verify())
         val tracks = protectedTracks(2)
         val output = File(System.getProperty("java.io.tmpdir"), "kittytune-flows-${System.nanoTime()}")
         output.mkdirs()
@@ -73,6 +89,8 @@ class ProtectedFlowsLiveTest {
     /** The clear copy the karaoke/AI/beat analysers read, from the licence the resolver remembers. */
     @Test
     fun `a clear copy is available to the features that read audio themselves`() {
+        CdmSidecar.reset()
+        assertTrue("the daemon does not answer", CdmSidecar.verify())
         val (title, playlistUrl, token) = protectedTracks(1).first()
         // Exactly what StreamResolver does when it hands a protected stream out.
         SoundCloudDrm.rememberLicence(playlistUrl, token)

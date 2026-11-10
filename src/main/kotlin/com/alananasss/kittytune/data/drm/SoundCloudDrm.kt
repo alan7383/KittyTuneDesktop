@@ -122,12 +122,25 @@ object SoundCloudDrm {
         currentSession = null
         currentKey = null
 
-        val cdm = WidevineCdmRegistry.require()
+        val cdm = requireCdm()
         val session = openLicensedSession(cdm, pssh, licenseToken, encryption.keyIdHex)
         currentSession = session
         currentKey = key
         Logger.d(TAG, "session ready for kid=${encryption.keyIdHex}")
         return session
+    }
+
+    /**
+     * The CDM to use, after making sure the configured one is actually registered.
+     *
+     * [WidevineCdmRegistry] only holds a CDM once something installed it, and installing the sidecar
+     * happens lazily. A caller that asks for a session before any track was resolved — the settings'
+     * own test, exactly — used to get the in-process CDM instead, the one SoundCloud refuses with a
+     * `403`. Asking here costs nothing when it is already registered and fixes the order.
+     */
+    private fun requireCdm(): WidevineCdm {
+        CdmSidecar.installIfConfigured()
+        return WidevineCdmRegistry.require()
     }
 
     /**
@@ -147,8 +160,10 @@ object SoundCloudDrm {
         downloadSession = null
         downloadKey = null
 
-        // With the WSL sidecar, the second instance is a second daemon: the in-process CDM is the one
-        // SoundCloud refuses on Windows.
+        // With the sidecar, the second instance is a second daemon: the in-process CDM is the one
+        // SoundCloud refuses on Windows. The sidecar has to be registered before that choice is made,
+        // which is exactly what a caller that never resolved a track would otherwise skip.
+        CdmSidecar.installIfConfigured()
         val cdm = downloadCdm
             ?: (if (CdmSidecar.isInstalled) CdmSidecar.secondaryCdm() else NativeWidevineCdm.secondaryCdm())?.also {
                 downloadCdm = it
@@ -218,6 +233,13 @@ object SoundCloudDrm {
     }
 
     /** Asks [cdm] for a license request, posts it to SoundCloud, and hands the answer back. */
+    /**
+     * Asks [cdm] for a license request, posts it to SoundCloud, and hands the answer back.
+     *
+     * One retry when the CDM process dies on the way: before a key exists there is nothing to keep,
+     * and a fresh session starts a fresh daemon. Any other failure — a refusal, a live CDM rejecting
+     * the PSSH — is a real answer and propagates as before.
+     */
     private fun openLicensedSession(
         cdm: WidevineCdm,
         pssh: ByteArray,
@@ -225,16 +247,30 @@ object SoundCloudDrm {
         keyIdHex: String?,
     ): WidevineLicenseSession {
         Logger.d(TAG, "opening a license session with ${cdm.name} (kid=$keyIdHex)")
-        val session = cdm.openSession(pssh)
-        try {
-            val request = session.licenseRequest()
-            val license = SoundCloudWidevineLicense.request(request, licenseToken)
-            session.provideLicense(license)
-        } catch (e: Throwable) {
-            runCatching { session.close() }
-            throw e
+        var attempt = 0
+        while (true) {
+            val session = cdm.openSession(pssh)
+            try {
+                val request = session.licenseRequest()
+                val license = SoundCloudWidevineLicense.request(request, licenseToken)
+                session.provideLicense(license)
+                return session
+            } catch (e: Throwable) {
+                runCatching { session.close() }
+                if (attempt > 0 || !looksLikeDeadCdm(e)) throw e
+                attempt++
+                Logger.w(TAG, "the CDM stopped before the licence, asking a fresh one (${e.message})")
+            }
         }
-        return session
+    }
+
+    /** The CDM process went away, as opposed to it refusing the request. */
+    private fun looksLikeDeadCdm(e: Throwable): Boolean {
+        val message = e.message ?: return false
+        return message.contains("closed the pipe") ||
+            message.contains("is not running") ||
+            message.contains("does not answer") ||
+            message.contains("stopped listening")
     }
 
     /**

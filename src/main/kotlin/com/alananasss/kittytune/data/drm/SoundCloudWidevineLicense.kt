@@ -118,20 +118,20 @@ object SoundCloudWidevineLicense {
     }
 
     /**
-     * Why a `403` under Windows is not a bug in the bridge, spelled out once.
+     * Why a `403` is worth spelling out.
      *
-     * The server judges the client identity carried in the request body. A CDM driven outside a
-     * browser presents an identity Windows is refused for, while the same CDM on Linux gets a
-     * licence — measured, and documented in `docs/SOUNDCLOUD_DRM_WINDOWS.md`. Saying so in the
-     * exception turns a bare `HTTP 403` in a log into something a user can act on.
+     * The server judges the client identity carried in the request body. The Windows in-process CDM
+     * is refused, while the Linux module loaded by the native host is accepted — measured. So a `403`
+     * with the module installed does not mean "impossible on Windows": it means something other than
+     * the module answered, or the request went through a proxy SoundCloud refuses.
      */
     private fun refusalHint(code: Int): String {
         if (code != 403) return ""
         val os = System.getProperty("os.name").orEmpty()
         if (!os.startsWith("Windows", ignoreCase = true)) return ""
-        return " — SoundCloud refuses the client identity presented by a CDM driven outside a " +
-            "browser on Windows, so protected tracks cannot be decrypted here; see " +
-            "docs/SOUNDCLOUD_DRM_WINDOWS.md"
+        return " — the licence server refused that request. With the native module installed this " +
+            "means the CDM that answered was not it (the in-process one is refused), or the request " +
+            "went through a proxy SoundCloud refuses; see docs/SOUNDCLOUD_CDM_SIDECAR.md"
     }
 
     private const val TAG = "SoundCloudWidevineLicense"
