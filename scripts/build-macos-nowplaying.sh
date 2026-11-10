@@ -85,7 +85,27 @@ if [[ $BUILD_DMG -eq 1 ]]; then
   VERSION="$(grep -m 1 '^version = ' "$ROOT/build.gradle.kts" | cut -d '"' -f 2)"
   DMG_PATH="$ROOT/dist-mac/KittyTune-${VERSION}.dmg"
   echo "Packaging DMG at: $DMG_PATH"
-  hdiutil create -volname "KittyTune" -srcfolder "$APP" -ov -format UDZO "$DMG_PATH"
+  # Stop gradle daemon and flush disk buffers to prevent "Resource busy" lock race conditions
+  ./gradlew --stop 2>/dev/null || true
+  sync
+  hdiutil detach "/Volumes/KittyTune" 2>/dev/null || true
+
+  created=0
+  for attempt in 1 2 3 4 5; do
+    echo "hdiutil create attempt $attempt/5..."
+    if hdiutil create -volname "KittyTune" -srcfolder "$APP" -ov -format UDZO "$DMG_PATH"; then
+      created=1
+      break
+    fi
+    echo "hdiutil create failed with resource busy or lock, retrying in 3s..."
+    sync
+    sleep 3
+  done
+
+  if [[ $created -ne 1 ]]; then
+    echo "Failed to create DMG after 5 attempts." >&2
+    exit 1
+  fi
   echo "Created DMG: $DMG_PATH"
 else
   echo "Launch with: open '$APP'"
