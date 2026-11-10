@@ -286,7 +286,7 @@ int main(int argc, char** argv) {
 
   for (;;) {
     uint8_t header[5];
-    if (!read_exact(0, header, sizeof(header))) return 0;  // caller closed the pipe: normal exit
+    if (!read_exact(0, header, sizeof(header))) { std::_Exit(0); }  // caller closed the pipe: normal exit
     const uint8_t opcode = header[0];
     const uint32_t length = static_cast<uint32_t>(header[1]) |
                             (static_cast<uint32_t>(header[2]) << 8) |
@@ -297,10 +297,19 @@ int main(int argc, char** argv) {
       return 70;
     }
     std::vector<uint8_t> payload(length);
-    if (length > 0 && !read_exact(0, payload.data(), length)) return 0;
+    if (length > 0 && !read_exact(0, payload.data(), length)) { std::_Exit(0); }
     if (opcode == kQuit) {
       send_ok(nullptr, 0);
-      return 0;
+      std::fflush(stdout);
+      std::fflush(stderr);
+      // Leave without tearing the CDM down.
+      //
+      // `ktwv_destroy` runs the CDM's own destructors, and they die on a call through a null
+      // function pointer (measured: exit 0xC0000005, rip=0, right after a clean session). A daemon
+      // whose only job was to serve this pipe has nothing to hand back: the OS reclaims the address
+      // space, the module was never asked for persistent state, and the client already has its
+      // answer. Skipping the teardown also removes a whole class of "crashed at exit" reports.
+      std::_Exit(0);
     }
     if (!handle(daemon, opcode, payload)) return 0;  // the far end went away mid-answer
   }

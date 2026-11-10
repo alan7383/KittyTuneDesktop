@@ -865,7 +865,14 @@ void ktwv_destroy(KtwvCdm handle) {
         bridge->cdm = nullptr;
     }
     free(bridge->host);
-    delete bridge;
+    bridge->host = nullptr;
+    // The Bridge itself is deliberately left allocated.
+    //
+    // `Host::SetTimer` hands a detached thread the Bridge pointer, and a licence expiry timer can
+    // sleep for hours: freeing the Bridge here would leave that thread with a dangling pointer, and
+    // it corrupts the heap the moment it wakes (measured: 0xC0000374, every field poisoned with
+    // 0xaa). The flag above and the null CDM make a late wake-up harmless, and the daemon exits right
+    // after this call — a few hundred bytes are cheaper than racing a thread we cannot join.
 }
 
 void ktwv_reset_session(KtwvCdm handle) {
@@ -1191,7 +1198,13 @@ int ktwv_decrypt(KtwvCdm handle, const uint8_t* data, int data_length, const uin
     }
     if (size) memcpy(*out, plain->memory, size);
     *out_length = (int)size;
-    buffer_destroy(plain);
+    // The output buffer is not freed here.
+    //
+    // The CDM allocated it through Host::Allocate and calls Destroy() on it when it is done, which
+    // is a free through `buffer_destroy`. Freeing it here as well is a double free: measured as
+    // 0xC0000374 (heap corruption, every register 0xaa) once every few runs. If a CDM ever skips
+    // that Destroy, the buffer is leaked — a few hundred kilobytes per fragment in a daemon that
+    // lives for seconds, which is the cheaper of the two mistakes.
     return 1;
 }
 
