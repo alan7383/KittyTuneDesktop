@@ -3418,8 +3418,7 @@
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
     <string name="protected_ann_title">Geschützte Titel</string>
-    <string name="protected_beta">Beta</string>
-    <string name="protected_ann_body_windows">KittyTune kann geschützte Titel von SoundCloud abspielen, indem es Chromes Linux-Widevine-Modul selbst ausführt. Das Modul wird einmal installiert, etwa 60 MB, ohne Administrator und ohne Neustart. Schalte geschützte Titel ein, um es zu nutzen.</string>
+    <string name="protected_ann_body_windows">Geschützte Titel funktionieren jetzt in KittyTune, und diesmal richtig gemacht: Die App führt Chromes Widevine-Modul selbst aus, in ihrem eigenen Prozess, und bekommt das Audio bereits entschlüsselt. Kein Browserfenster, keine virtuelle Maschine, kein Administrator und kein Neustart — einmalig etwa 60 MB. Equalizer, Effekte, Visualizer und Downloads funktionieren bei diesen Titeln wie bei allen anderen.</string>
     <string name="protected_ann_body_desktop">KittyTune spielt geschützte Titel von SoundCloud mit dem Widevine-Modul deines Browsers. Es ist bereits eingeschaltet.</string>
     <string name="protected_ann_enable">Einschalten</string>
     <string name="protected_ann_learn">Mehr erfahren</string>
@@ -3464,4 +3463,5 @@
     <string name="pref_drm_wsl_cleanup_partial">Teilweise entfernt: Details ansehen</string>
     <string name="drm_method_pro_effects">Equalizer, Effekte und Visualizer funktionieren bei geschützten Titeln</string>
     <string name="drm_method_pro_downloads">Geschützte Titel lassen sich herunterladen und danach ohne das Modul abspielen</string>
+    <string name="protected_ann_install">Modul installieren</string>
 </resources>

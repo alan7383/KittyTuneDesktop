@@ -69,7 +69,6 @@ object R {
         const val pref_drm_tour_title = "pref_drm_tour_title"
         const val pref_drm_tour_desc = "pref_drm_tour_desc"
         const val protected_ann_title = "protected_ann_title"
-        const val protected_beta = "protected_beta"
         const val protected_ann_body_windows = "protected_ann_body_windows"
         const val protected_ann_body_desktop = "protected_ann_body_desktop"
         const val protected_ann_enable = "protected_ann_enable"

@@ -484,6 +484,8 @@ class PlayerPreferences {
         private const val KEY_PROTECTED_TRACKS = "protected_tracks_enabled"
         private const val KEY_PROTECTED_ANNOUNCED = "protected_tracks_announced"
         private const val KEY_PROTECTED_HINT_SHOWN = "protected_tracks_hint_shown"
+        private const val KEY_PROTECTED_ANNOUNCED_VERSION = "protected_announced_version"
+        private const val KEY_PROTECTED_HINT_VERSION = "protected_hint_version"
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
         private const val KEY_WSL_SETUP_PENDING = "wsl_setup_pending_reboot"
         private const val KEY_WSL_SETUP_VERSION = "wsl_setup_version"
@@ -805,6 +807,32 @@ class PlayerPreferences {
     /** Whether the "protected tracks are here" card was shown and dealt with (or never applied: a new install). */
     fun getProtectedTracksAnnounced(): Boolean = Prefs.getBoolean(KEY_PROTECTED_ANNOUNCED, false)
     fun setProtectedTracksAnnounced(done: Boolean) = Prefs.putBoolean(KEY_PROTECTED_ANNOUNCED, done)
+
+    /**
+     * Which announcement this user has already been shown, 0 when never.
+     *
+     * A boolean was enough while there was one thing to say. Now there is a new one — the module runs
+     * without WSL, without a browser and without a restart — and it has to reach the people who put
+     * the last one off, which a flag that only ever goes true cannot do. The old flag still counts as
+     * "saw version 1", so anyone who dismissed the 1.5.0 card sees this one.
+     */
+    fun getProtectedAnnouncementVersion(): Int {
+        val stored = Prefs.getInt(KEY_PROTECTED_ANNOUNCED_VERSION, -1)
+        if (stored >= 0) return stored
+        return if (getProtectedTracksAnnounced()) 1 else 0
+    }
+
+    fun setProtectedAnnouncementVersion(version: Int) =
+        Prefs.putInt(KEY_PROTECTED_ANNOUNCED_VERSION, version)
+
+    /** Same, for the floating notice that offers to turn protected tracks on. */
+    fun getProtectedHintVersion(): Int {
+        val stored = Prefs.getInt(KEY_PROTECTED_HINT_VERSION, -1)
+        if (stored >= 0) return stored
+        return if (Prefs.getBoolean(KEY_PROTECTED_HINT_SHOWN, false)) 1 else 0
+    }
+
+    fun setProtectedHintVersion(version: Int) = Prefs.putInt(KEY_PROTECTED_HINT_VERSION, version)
 
     /** Whether the one-time "this track is protected" hint was shown. */
     fun getProtectedTracksHintShown(): Boolean = Prefs.getBoolean(KEY_PROTECTED_HINT_SHOWN, false)
