@@ -106,6 +106,19 @@ Quand le démon meurt pour de bon, `CdmSidecar` écrit son stderr complet dans
 `%LOCALAPPDATA%\KittyTune\cdm-last-failure.log` (adresse fautive, registres, backtrace, derniers
 appels du shim) : c'est le fichier à joindre à un rapport de bug.
 
+## Le CDM n'est pas réentrant
+
+Widevine n'est pas thread-safe, et deux threads l'atteignent : celui du démon (création de session,
+requête de licence, déchiffrement) et celui de la minuterie, qui livre `TimerExpired` après le délai
+demandé par `Host::SetTimer`. Une minuterie qui se déclenchait pendant
+`CreateSessionAndGenerateRequest` corrompait l'état interne du CDM : `call [0+8]`, un appel virtuel
+sur un objet zéro, une fois toutes les quelques exécutions — et le démon mourait en `0xC0000005`.
+
+Chaque point d'entrée du CDM est maintenant sérialisé par un `std::recursive_mutex`
+(`Bridge::cdm_lock`), y compris `TimerExpired` ; un drapeau `destroyed` empêche une minuterie en
+attente d'appeler un CDM déjà détruit. Les rappels de l'hôte (`Host_11`) ne prennent pas ce verrou :
+ils sont appelés *depuis* un appel en cours.
+
 ## Construire et essayer
 
 Le démon est construit et livré par le build normal de l'app :

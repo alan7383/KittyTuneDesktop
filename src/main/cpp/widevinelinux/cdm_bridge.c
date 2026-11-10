@@ -162,6 +162,13 @@ struct Bridge {
     HostObject* host = nullptr;
 
     std::mutex mutex;
+
+    // The CDM is not thread-safe, and two threads reach it: the daemon's, and the timer thread that
+    // delivers TimerExpired. Overlapping calls corrupt its internals — measured as `call [0+8]`, a
+    // null virtual call on a zeroed object, inside CreateSessionAndGenerateRequest, once every few
+    // runs. Every entry point takes this lock; the host callbacks do not (they run inside a call).
+    std::recursive_mutex cdm_lock;
+    bool destroyed = false;
     std::condition_variable condition;
 
     bool initialized = false;
@@ -547,6 +554,8 @@ SYSV void host_set_timer(HostObject* self, int64_t delay_ms, void* context) {
     // The CDM calls this while holding its own lock, so TimerExpired has to come from elsewhere.
     std::thread([bridge, delay_ms, context] {
         std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms > 0 ? delay_ms : 0));
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed || !bridge->cdm) return;
         cdm_timer_expired(bridge)(bridge->cdm, context);
     }).detach();
 }
@@ -701,9 +710,13 @@ SYSV void host_request_storage_id(HostObject* self, uint32_t version) {
     const char* mode = getenv("KITTYTUNE_WIDEVINE_STORAGE_ID");
     static const uint8_t kId[32] = {0x4b, 0x54, 0x2d, 0x6c, 0x69, 0x6e, 0x75, 0x78};
     if (mode && std::string(mode) == "empty") {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed || !bridge->cdm) return;
         cdm_on_storage_id(bridge)(bridge->cdm, version, nullptr, 0);
         return;
     }
+    std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+    if (bridge->destroyed || !bridge->cdm) return;
     cdm_on_storage_id(bridge)(bridge->cdm, version, kId, (uint32_t)sizeof(kId));
 }
 
@@ -822,7 +835,10 @@ KtwvCdm ktwv_create(const char* cdm_path, char* error, int error_length) {
     bridge->cdm = instance;
     bridge->cdm_vtable = *(void***)instance;
 
-    cdm_initialize(bridge)(bridge->cdm, 0, 0, 0);
+    {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        cdm_initialize(bridge)(bridge->cdm, 0, 0, 0);
+    }
     {
         std::unique_lock<std::mutex> lock(bridge->mutex);
         if (!bridge->condition.wait_for(lock, std::chrono::seconds(30),
@@ -842,7 +858,12 @@ KtwvCdm ktwv_create(const char* cdm_path, char* error, int error_length) {
 void ktwv_destroy(KtwvCdm handle) {
     Bridge* bridge = (Bridge*)handle;
     if (!bridge) return;
-    if (bridge->cdm && bridge->cdm_vtable) cdm_destroy(bridge)(bridge->cdm);
+    if (bridge->cdm && bridge->cdm_vtable) {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        bridge->destroyed = true;  // a pending timer must not call into it any more
+        cdm_destroy(bridge)(bridge->cdm);
+        bridge->cdm = nullptr;
+    }
     free(bridge->host);
     delete bridge;
 }
@@ -862,9 +883,12 @@ void ktwv_reset_session(KtwvCdm handle) {
         bridge->license_request.clear();
         bridge->key_id.clear();
     }
-    if (!session_id.empty() && bridge->cdm)
-        cdm_close_session(bridge)(bridge->cdm, 3, session_id.c_str(),
-                                  (uint32_t)session_id.size());
+    if (!session_id.empty() && bridge->cdm) {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (!bridge->destroyed)
+            cdm_close_session(bridge)(bridge->cdm, 3, session_id.c_str(),
+                                      (uint32_t)session_id.size());
+    }
 }
 
 int ktwv_set_server_certificate(KtwvCdm handle, const uint8_t* certificate, int certificate_length,
@@ -879,7 +903,11 @@ int ktwv_set_server_certificate(KtwvCdm handle, const uint8_t* certificate, int 
         bridge->promise_settled = false;
         bridge->promise_ok = false;
     }
-    cdm_set_certificate(bridge)(bridge->cdm, 1000, certificate, (uint32_t)certificate_length);
+    {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed) return 0;
+        cdm_set_certificate(bridge)(bridge->cdm, 1000, certificate, (uint32_t)certificate_length);
+    }
     std::unique_lock<std::mutex> lock(bridge->mutex);
     if (!bridge->condition.wait_for(lock, std::chrono::seconds(10),
                                     [bridge] { return bridge->promise_settled; })) {
@@ -992,8 +1020,15 @@ int ktwv_license_request(KtwvCdm handle, const uint8_t* pssh, int pssh_length, u
     // This header's enums are the old ones: kTemporary is 0 here and 1 in current Chromium. The CDM
     // we load is 4.10, so it speaks the old numbering (measured: kTemporary=1 is rejected with
     // kExceptionTypeError, system code 45).
-    cdm_generate_request(bridge)(bridge->cdm, 1, 0 /* kTemporary */, 0 /* kCenc */, init_data,
-                                 init_size);
+    {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed) {
+            set_error(error, error_length, "the CDM was destroyed");
+            return 0;
+        }
+        cdm_generate_request(bridge)(bridge->cdm, 1, 0 /* kTemporary */, 0 /* kCenc */, init_data,
+                                     init_size);
+    }
     if (host_debug()) fprintf(stderr, "[ktwv-linux] CreateSessionAndGenerateRequest returned\n");
     std::unique_lock<std::mutex> lock(bridge->mutex);
     if (!bridge->condition.wait_for(lock, std::chrono::seconds(30), [bridge] {
@@ -1023,9 +1058,16 @@ int ktwv_provide_license(KtwvCdm handle, const uint8_t* license, int license_len
         set_error(error, error_length, "bad arguments");
         return 0;
     }
-    cdm_update_session(bridge)(bridge->cdm, 2, bridge->session_id.c_str(),
-                               (uint32_t)bridge->session_id.size(), license,
-                               (uint32_t)license_length);
+    {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed) {
+            set_error(error, error_length, "the CDM was destroyed");
+            return 0;
+        }
+        cdm_update_session(bridge)(bridge->cdm, 2, bridge->session_id.c_str(),
+                                   (uint32_t)bridge->session_id.size(), license,
+                                   (uint32_t)license_length);
+    }
     std::unique_lock<std::mutex> lock(bridge->mutex);
     if (!bridge->condition.wait_for(lock, std::chrono::seconds(30), [bridge] {
             return bridge->keys_changed || bridge->rejected;
@@ -1060,9 +1102,16 @@ int ktwv_update(KtwvCdm handle, const uint8_t* message, int message_length, uint
         bridge->rejected = false;
         bridge->license_request.clear();
     }
-    cdm_update_session(bridge)(bridge->cdm, 2, bridge->session_id.c_str(),
-                               (uint32_t)bridge->session_id.size(), message,
-                               (uint32_t)message_length);
+    {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed) {
+            set_error(error, error_length, "the CDM was destroyed");
+            return 0;
+        }
+        cdm_update_session(bridge)(bridge->cdm, 2, bridge->session_id.c_str(),
+                                   (uint32_t)bridge->session_id.size(), message,
+                                   (uint32_t)message_length);
+    }
     std::unique_lock<std::mutex> lock(bridge->mutex);
     if (!bridge->condition.wait_for(lock, std::chrono::seconds(15), [bridge] {
             return bridge->license_requested || bridge->keys_changed || bridge->rejected;
@@ -1114,7 +1163,15 @@ int ktwv_decrypt(KtwvCdm handle, const uint8_t* data, int data_length, const uin
 
     HostDecryptedBlock block = {};
     block.vtable = g_block_vtable;
-    int status = cdm_decrypt(bridge)(bridge->cdm, &input, &block);
+    int status;
+    {
+        std::lock_guard<std::recursive_mutex> guard(bridge->cdm_lock);
+        if (bridge->destroyed) {
+            set_error(error, error_length, "the CDM was destroyed");
+            return 0;
+        }
+        status = cdm_decrypt(bridge)(bridge->cdm, &input, &block);
+    }
     if (status != 0 /* kSuccess */) {
         char message[64];
         snprintf(message, sizeof(message), "Decrypt returned status %d", status);
