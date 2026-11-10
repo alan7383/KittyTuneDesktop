@@ -3161,7 +3161,7 @@
     <string name="drm_wiz_done_desktop">A KittyTune a böngésződ CDM-jét használja. Indíts egy tesztet, hogy egy valódi számon ellenőrizd.</string>
     <string name="drm_wiz_test">Tesztelés most</string>
     <string name="drm_wiz_test_failed">A teszt sikertelen. Az alábbi részletek elmagyarázzák, miért.</string>
-    <string name="pref_drm_windows_intro">Windowson a KittyTune úgy játssza le a védett számokat, hogy maga futtatja a Chrome Linuxos Widevine-modulját. A modult egyszer telepíteni kell; a többi automatikus.</string>
+    <string name="pref_drm_windows_intro">Windowson a KittyTune a Chrome egyetlen részével játssza le a védett számokat: a Widevine-moduljával, amelyet maga futtat. A Chrome soha nem indul el, és semmi nem fut a háttérben. A modult egyszer kell telepíteni; a többi automatikus.</string>
     <string name="pref_drm_group_method">Módszer</string>
     <string name="pref_drm_group_help">Súgó</string>
     <string name="pref_drm_tour_title">A varázsló újraindítása</string>
@@ -3207,7 +3207,7 @@
     <string name="protected_hint_title">Védett szám</string>
     <string name="protected_hint_offer">Ezt a számot a SoundCloud védi, ezért más forrásból szólt. Kapcsold be a védett számokat az eredetihez.</string>
     <string name="drm_method_native">Natív</string>
-    <string name="drm_method_native_tagline">Az alapértelmezett: VM és újraindítás nélkül</string>
+    <string name="drm_method_native_tagline">A Chrome Widevine-modulja, a KittyTune futtatja</string>
     <string name="drm_method_pro_noreboot">Nincs rendszergazda, nincs újraindítás</string>
     <string name="drm_info_native_title">A natív modul részletesen</string>
     <string name="drm_info_native_how">A KittyTune a Chrome Linuxos Widevine-modulját a saját Windows-folyamatában tölti be, egy erre írt betöltővel. A licenc visszakerül az alkalmazáshoz, amely maga fejti vissza a darabokat: az equalizer, a effektek, a vizualizáló és a letöltések is működnek védett számoknál.</string>
@@ -3243,4 +3243,7 @@
     <string name="drm_method_pro_effects">Az equalizer, az effektek és a vizualizáló védett számoknál is működik</string>
     <string name="drm_method_pro_downloads">A védett számok letölthetők, és utána a modul nélkül is lejátszhatók</string>
     <string name="protected_ann_install">Modul telepítése</string>
+    <string name="drm_method_native_claim">A Chrome-nak csak a Widevine-modulját használja a KittyTune — maga a Chrome soha nem fut: nincs ablak, nincs háttérfolyamat.</string>
+    <string name="drm_method_pro_chrome_module">Egyetlen modul a Chrome-ból, semmi más</string>
+    <string name="connect_relay_url_hint">https://relay.pelda.hu</string>
 </resources>
