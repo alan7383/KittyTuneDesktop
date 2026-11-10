@@ -48,11 +48,8 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.Science
-import com.alananasss.kittytune.core.openUrl
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Celebration
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -360,9 +357,8 @@ internal fun HowStep(windows: Boolean) {
     ExplainRow(
         Icons.Rounded.Memory,
         str("drm_wiz_how_nobrowser_title"),
-        str("drm_wiz_how_nobrowser") + if (windows) " " + str("drm_wiz_how_nobrowser_wsl") else "",
+        str("drm_wiz_how_nobrowser"),
     )
-    if (!windows) DrmExperimentalCard(windows = false)
     Text(
         text = str(if (windows) "drm_wiz_how_windows" else "drm_wiz_how_desktop"),
         style = MaterialTheme.typography.bodyLarge,
@@ -371,60 +367,6 @@ internal fun HowStep(windows: Boolean) {
         modifier = Modifier.fillMaxWidth(),
     )
 }
-
-@Composable
-internal fun DrmExperimentalCard(windows: Boolean, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(32.dp).background(MaterialTheme.colorScheme.tertiaryContainer, MaterialShapes.Cookie7Sided.toShape()),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Rounded.Science,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Text(str("drm_exp_title"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            }
-            Text(
-                str(if (windows) "drm_exp_windows" else "drm_exp_desktop"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Rounded.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Text(
-                        str("drm_exp_open"),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f).padding(vertical = 6.dp),
-                    )
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { openUrl(KITTYTUNE_REPO_URL) }) {
-                        Text(str("drm_exp_github"), fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** One method as a big selectable card: what it is, then what it can and cannot do. */
-/** Where the code lives, for anyone with a better way to play these tracks. */
-internal const val KITTYTUNE_REPO_URL = "https://github.com/alan7383/KittyTuneDesktop"
 
 /** A titled point with a small icon, for the explanation dialog. */
 @Composable
