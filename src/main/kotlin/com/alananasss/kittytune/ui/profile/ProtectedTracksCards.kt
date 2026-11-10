@@ -108,6 +108,7 @@ fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing
     var needsModule by remember { mutableStateOf(windows && !NativeCdmSetup.isInstalled()) }
     var busy by remember { mutableStateOf(false) }
     var openWizard by remember { mutableStateOf(false) }
+    var wizardStart by remember { mutableStateOf(DrmWizardStart.INTRO) }
     var enableRequest by remember { mutableStateOf(0) }
 
     fun done() {
@@ -176,7 +177,11 @@ fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     if (needsModule) {
-                                        Button(shapes = ButtonDefaults.shapes(), enabled = !busy, onClick = { openWizard = true }) {
+                                        Button(
+                                            shapes = ButtonDefaults.shapes(),
+                                            enabled = !busy,
+                                            onClick = { wizardStart = DrmWizardStart.NATIVE; openWizard = true },
+                                        ) {
                                             Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(8.dp))
                                             Text(str("protected_ann_install"), fontWeight = FontWeight.Bold)
@@ -217,8 +222,9 @@ fun ProtectedTracksAnnouncementCard(modifier: Modifier = Modifier, bottomSpacing
     }
 
     if (openWizard) {
-        DrmSetupWizard(start = DrmWizardStart.INTRO, onClose = {
+        DrmSetupWizard(start = wizardStart, onClose = {
             openWizard = false
+            wizardStart = DrmWizardStart.INTRO
             // The assistant may have just installed the module and turned the switch on: read the
             // state again, or the card keeps offering to install something that is already there.
             needsModule = windows && !NativeCdmSetup.isInstalled()
