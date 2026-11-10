@@ -170,7 +170,7 @@ object DownloadManager {
 
     lateinit var downloadedIds: StateFlow<Set<Long>>
 
-    private val activeJobs = ConcurrentHashMap<Long, Job>()
+    private val activeJobs = DownloadJobs(scope)
     private val activePlaylistJobs = ConcurrentHashMap<Long, Job>()
     private val batchTrackIds = ConcurrentHashMap<Long, Set<Long>>()
 
@@ -912,7 +912,7 @@ object DownloadManager {
     }
 
     fun downloadTrack(track: Track) {
-        if (activeJobs.containsKey(track.id)) return
+        if (activeJobs.contains(track.id)) return
         scope.launch {
             val existing = dao.getTrack(track.id)
             if (existing != null && existing.localAudioPath.isNotEmpty()) return@launch
@@ -921,7 +921,7 @@ object DownloadManager {
     }
 
     private fun startDownloadJob(track: Track, subFolderName: String? = null): Job {
-        val job = scope.launch {
+        val job = activeJobs.launch(track.id) {
             if (!hasEnoughFreeStorage()) {
                 Logger.e("DownloadManager", "Not enough storage space to download track: ${track.title}")
                 withContext(Dispatchers.Main) {
@@ -1082,11 +1082,9 @@ object DownloadManager {
                     taggedAudioFile?.let { if (it.exists()) it.delete() }
                 } catch (e: Exception) {}
                 _downloadProgress.update { it - track.id }
-                activeJobs.remove(track.id)
             }
         }
     }
-        activeJobs[track.id] = job
         return job
     }
 
@@ -1219,8 +1217,7 @@ object DownloadManager {
     }
 
     fun cancelDownload(trackId: Long) {
-        activeJobs[trackId]?.cancel()
-        activeJobs.remove(trackId)
+        activeJobs.cancel(trackId)
         _downloadProgress.update { it - trackId }
         // Both extensions: YouTube/HLS tracks download as temp_<id>.m4a, everything else as .mp3 —
         // the hardcoded .mp3 below is why cancelled m4a downloads left their temp file behind.
@@ -1234,7 +1231,7 @@ object DownloadManager {
     }
 
     fun isPlaylistDownloading(playlistId: Long): Boolean = activePlaylistJobs.containsKey(playlistId)
-    fun isTrackDownloading(trackId: Long): Boolean = activeJobs.containsKey(trackId)
+    fun isTrackDownloading(trackId: Long): Boolean = activeJobs.contains(trackId)
     suspend fun getLocalTrack(id: Long): LocalTrack? = dao.getTrack(id)
 
     fun addTracksToPlaylistBulk(playlistId: Long, tracks: List<Track>) {
