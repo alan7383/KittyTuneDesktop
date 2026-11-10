@@ -121,29 +121,18 @@ object UpdateManager {
 
     fun getOtherKittyTuneProcesses(): List<ProcessHandle> {
         return try {
-            val currentPid = ProcessHandle.current().pid()
-            ProcessHandle.allProcesses().filter { handle ->
-                if (handle.pid() == currentPid) return@filter false
-
-                val info = handle.info()
-                val cmd = info.command().orElse("").lowercase()
-                val cmdLine = info.commandLine().orElse("").lowercase()
-
-                // Ignore Gradle Daemons, Gradle Workers, and IDE processes
-                if (cmdLine.contains("gradledaemon") || cmdLine.contains("gradleworkermain") || cmdLine.contains("gradlewrappermain")) {
-                    return@filter false
+            ProcessHandle.allProcesses().use { stream ->
+                val handles = stream.toList()
+                val snapshots = handles.map { handle ->
+                    val info = handle.info()
+                    AppProcessInfo(
+                        handle.pid(), handle.parent().map { it.pid() }.orElse(null),
+                        info.command().orElse(""), info.commandLine().orElse(""),
+                    )
                 }
-
-                // Check native binary executable name
-                val exeName = cmd.substringAfterLast('/', "").substringAfterLast('\\', "")
-                val isNativeKittyTune = (exeName == "kittytune.exe" || exeName == "kittytune" || exeName == "kitty-tune")
-
-                // Check java process running another KittyTune MainKt instance
-                val isJavaKittyTune = (exeName == "java.exe" || exeName == "javaw.exe" || exeName == "java") &&
-                        cmdLine.contains("com.alananasss.kittytune.mainkt")
-
-                isNativeKittyTune || isJavaKittyTune
-            }.toList()
+                val ids = otherKittyTuneProcessIds(ProcessHandle.current().pid(), snapshots)
+                handles.filter { it.pid() in ids }
+            }
         } catch (_: Exception) {
             emptyList()
         }
@@ -151,24 +140,12 @@ object UpdateManager {
 
     fun killOtherKittyTuneProcesses() {
         try {
-            val currentPid = ProcessHandle.current().pid()
-            getOtherKittyTuneProcesses().forEach { handle ->
+            val others = getOtherKittyTuneProcesses()
+            others.forEach { handle ->
                 runCatching { handle.destroyForcibly() }
             }
-            val osName = System.getProperty("os.name", "").lowercase()
-            when {
-                osName.contains("win") -> {
-                    val currentExeName = "KittyTune.exe"
-                    runCatching { ProcessBuilder("taskkill", "/F", "/FI", "PID ne $currentPid", "/IM", currentExeName).start().waitFor() }
-                }
-                osName.contains("nux") || osName.contains("nix") -> {
-                    runCatching { ProcessBuilder("pkill", "-9", "-f", "kittytune").start().waitFor() }
-                    runCatching { ProcessBuilder("pkill", "-9", "-f", "kitty-tune").start().waitFor() }
-                    runCatching { ProcessBuilder("killall", "-9", "kittytune").start().waitFor() }
-                }
-                osName.contains("mac") -> {
-                    runCatching { ProcessBuilder("pkill", "-9", "-f", "KittyTune").start().waitFor() }
-                }
+            others.forEach { handle ->
+                runCatching { handle.onExit().get(5, java.util.concurrent.TimeUnit.SECONDS) }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -176,10 +153,10 @@ object UpdateManager {
     }
 
     fun killInstancesAndContinue() {
-        killOtherKittyTuneProcesses()
         downloadedInstallerFile?.let { file ->
             _status.value = UpdateStatus.INSTALLING
             installScope.launch {
+                killOtherKittyTuneProcesses()
                 performBackgroundInstall(file)
             }
         }
@@ -503,38 +480,20 @@ object UpdateManager {
                     .start()
                 currentInstallProcess = process
 
-                if (needsAuth) {
-                    var authDetected = false
-                    val reader = Thread {
-                        try {
-                            process.inputStream.bufferedReader().useLines { lines ->
-                                for (line in lines) {
-                                    if (!authDetected) {
-                                        authDetected = true
-                                        if (_status.value == UpdateStatus.WAITING_FOR_AUTH) {
-                                            _status.value = UpdateStatus.INSTALLING
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (_: Exception) {}
+                try {
+                    val result = awaitInstallerResult(process, needsAuth) {
+                        if (_status.value == UpdateStatus.WAITING_FOR_AUTH || !needsAuth) {
+                            _status.value = UpdateStatus.INSTALLING
+                        }
                     }
-                    reader.isDaemon = true
-                    reader.start()
-
-                    val exitCode = process.waitFor()
-                    reader.join(2000)
-
-                    if (exitCode != 0 && !authDetected) {
+                    if (result == UpdateStatus.AUTH_FAILED) {
                         authFailedFile = file
-                        _status.value = UpdateStatus.AUTH_FAILED
-                        return
                     }
-                } else {
-                    _status.value = UpdateStatus.INSTALLING
-                    process.waitFor()
+                    _status.value = result
+                } finally {
+                    currentInstallProcess = null
                 }
-                currentInstallProcess = null
+                return
             }
             _status.value = UpdateStatus.READY_TO_INSTALL
         } catch (e: Exception) {
