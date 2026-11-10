@@ -160,7 +160,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
 
         SettingsGroup(
             title = str("pref_drm_group_playback"),
-            items = listOf({ shape -> ProtectedTracksSwitch(shape) }),
+            items = listOf({ shape -> ProtectedTracksSwitch(shape, ready = nativeReady) }),
         )
 
         // What the module is and where it stands. Not rows: nothing in here is pressed.
@@ -585,16 +585,19 @@ private fun WidevineDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
 
 /** Whether protected streams are tried at all, or a track goes straight to its other sources. */
 @Composable
-private fun ProtectedTracksSwitch(shape: Shape) {
+private fun ProtectedTracksSwitch(shape: Shape, ready: Boolean = true) {
     val prefs = remember { PlayerPreferences() }
     var enabled by remember { mutableStateOf(prefs.getProtectedTracksEnabled()) }
     SettingsItem(
         shape = shape,
         title = str("pref_drm_attempt_title"),
-        subtitle = str("pref_drm_attempt_desc"),
+        // Greyed out until the module is installed: turning it on would promise something the app
+        // cannot do yet, and the row above already says what is missing.
+        subtitle = str(if (ready) "pref_drm_attempt_desc" else "pref_drm_attempt_needs_module"),
         icon = Icons.Rounded.Lock,
+        enabled = ready,
         hasSwitch = true,
-        switchState = enabled,
+        switchState = ready && enabled,
         onSwitchChange = { on ->
             enabled = on
             prefs.setProtectedTracksEnabled(on)

@@ -3246,4 +3246,5 @@
     <string name="drm_method_native_claim">A Chrome-nak csak a Widevine-modulját használja a KittyTune. Maga a Chrome soha nem fut: nincs ablak, nincs háttérfolyamat.</string>
     <string name="drm_method_pro_chrome_module">Egyetlen modul a Chrome-ból, semmi más</string>
     <string name="connect_relay_url_hint">https://relay.pelda.hu</string>
+    <string name="pref_drm_attempt_needs_module">Előbb telepítsd a modult, az alatta lévő sor megteszi</string>
 </resources>

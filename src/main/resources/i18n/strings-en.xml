@@ -3247,4 +3247,5 @@
     <string name="drm_method_native_claim">The only part of Chrome KittyTune uses is its Widevine module. Chrome itself never runs: no window, no background process.</string>
     <string name="drm_method_pro_chrome_module">One module taken from Chrome, nothing else from it</string>
     <string name="connect_relay_url_hint">https://relay.example.com</string>
+    <string name="pref_drm_attempt_needs_module">Install the module first; the row below does it</string>
 </resources>

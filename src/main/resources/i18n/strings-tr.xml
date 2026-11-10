@@ -3248,4 +3248,5 @@
     <string name="drm_method_native_claim">KittyTune, Chrome'un yalnızca Widevine modülünü kullanır. Chrome'un kendisi hiç çalışmaz: pencere yok, arka plan süreci yok.</string>
     <string name="drm_method_pro_chrome_module">Chrome'dan yalnızca bir modül, başka bir şey değil</string>
     <string name="connect_relay_url_hint">https://relay.ornek.com</string>
+    <string name="pref_drm_attempt_needs_module">Önce modülü kur, alttaki satır bunu yapar</string>
 </resources>

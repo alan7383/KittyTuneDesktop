@@ -3248,4 +3248,5 @@
     <string name="drm_method_native_claim">La seule partie de Chrome que KittyTune utilise, c'est son module Widevine. Chrome lui-même ne tourne jamais : aucune fenêtre, aucun processus en arrière-plan.</string>
     <string name="drm_method_pro_chrome_module">Un seul module pris dans Chrome, rien d'autre</string>
     <string name="connect_relay_url_hint">https://relais.exemple.com</string>
+    <string name="pref_drm_attempt_needs_module">Installe d'abord le module, la ligne en dessous s'en occupe</string>
 </resources>
