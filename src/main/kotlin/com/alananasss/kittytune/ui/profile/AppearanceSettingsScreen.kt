@@ -377,16 +377,48 @@ internal fun CoversSettingsGroup() {
     )
 }
 
-/** Home screen cards: Your mix and Listening statistics, matching KittyTune Android. */
+/** Home screen cards: My Wave, the charts, Your mix and Listening statistics, matching KittyTune Android. */
 @Composable
 internal fun HomeScreenCardsSettingsGroup() {
     val prefs = remember { PlayerPreferences() }
     var showHomeListeningStats by remember { mutableStateOf(prefs.getShowHomeListeningStats()) }
     var showHomeYourMix by remember { mutableStateOf(prefs.getShowHomeYourMix()) }
+    var showHomeMyWave by remember { mutableStateOf(prefs.getShowHomeMyWave()) }
+    var showHomeCharts by remember { mutableStateOf(prefs.getShowHomeCharts()) }
 
     SettingsGroup(
         title = str("pref_home_cards_group_title"),
         items = listOf(
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("wave_title"),
+                    subtitle = str("pref_home_my_wave_desc"),
+                    icon = Icons.Rounded.Waves,
+                    hasSwitch = true,
+                    switchState = showHomeMyWave,
+                    onSwitchChange = {
+                        showHomeMyWave = it
+                        prefs.setShowHomeMyWave(it)
+                    },
+                    highlightKey = "pref_home_my_wave",
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_home_charts"),
+                    subtitle = str("pref_home_charts_desc"),
+                    icon = Icons.Rounded.Leaderboard,
+                    hasSwitch = true,
+                    switchState = showHomeCharts,
+                    onSwitchChange = {
+                        showHomeCharts = it
+                        prefs.setShowHomeCharts(it)
+                    },
+                    highlightKey = "pref_home_charts",
+                )
+            },
             { shape ->
                 SettingsItem(
                     shape = shape,

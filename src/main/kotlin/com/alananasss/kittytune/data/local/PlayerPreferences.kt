@@ -379,6 +379,8 @@ class PlayerPreferences {
 
         const val KEY_SHOW_HOME_LISTENING_STATS = "show_home_listening_stats"
         const val KEY_SHOW_HOME_YOUR_MIX = "show_home_your_mix"
+        const val KEY_SHOW_HOME_MY_WAVE = "show_home_my_wave"
+        const val KEY_SHOW_HOME_CHARTS = "show_home_charts"
 
         private const val KEY_LIBRARY_TILES_HIDDEN = "library_tiles_hidden"
 
@@ -1079,6 +1081,17 @@ class PlayerPreferences {
     fun setShowHomeYourMix(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_YOUR_MIX, enabled)
     fun showHomeYourMixFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_YOUR_MIX, false)
     fun getShowHomeYourMixFlow(): Flow<Boolean> = showHomeYourMixFlow()
+
+    // On by default: both lead the home page and were always there before they could be switched off.
+    fun getShowHomeMyWave(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_MY_WAVE, true)
+    fun setShowHomeMyWave(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_MY_WAVE, enabled)
+    fun showHomeMyWaveFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_MY_WAVE, true)
+    fun getShowHomeMyWaveFlow(): Flow<Boolean> = showHomeMyWaveFlow()
+
+    fun getShowHomeCharts(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_CHARTS, true)
+    fun setShowHomeCharts(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_CHARTS, enabled)
+    fun showHomeChartsFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_CHARTS, true)
+    fun getShowHomeChartsFlow(): Flow<Boolean> = showHomeChartsFlow()
     fun getAudioQuality(): String = Prefs.getString(KEY_AUDIO_QUALITY, "HIGH") ?: "HIGH"
     fun setAudioQuality(quality: String) = Prefs.putString(KEY_AUDIO_QUALITY, quality)
     fun getPersistentQueueEnabled(): Boolean = Prefs.getBoolean(KEY_PERSISTENT_QUEUE, true)

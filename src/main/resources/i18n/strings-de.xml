@@ -1232,6 +1232,9 @@
     <string name="pref_home_cards_group_title">Karten auf dem Startbildschirm</string>
     <string name="pref_home_listening_stats_desc">Hörstatistik-Karte auf dem Startbildschirm anzeigen</string>
     <string name="pref_home_your_mix_desc">Karte für personalisierten Mix auf dem Startbildschirm anzeigen</string>
+    <string name="pref_home_my_wave_desc">Die Karte Meine Welle auf dem Startbildschirm anzeigen</string>
+    <string name="pref_home_charts">Charts</string>
+    <string name="pref_home_charts_desc">Die Chartliste auf dem Startbildschirm anzeigen</string>
 
     <string name="listening_stats_period_week">Diese Woche</string>
     <string name="listening_stats_period_all">Gesamt</string>

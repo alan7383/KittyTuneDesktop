@@ -837,6 +837,9 @@
     <string name="pref_home_cards_group_title">Kezdőképernyő kártyák</string>
     <string name="pref_home_listening_stats_desc">Hallgatási statisztika kártya megjelenítése a kezdőképernyőn</string>
     <string name="pref_home_your_mix_desc">Személyre szabott mix kártya megjelenítése a kezdőképernyőn</string>
+    <string name="pref_home_my_wave_desc">A Hullámom kártya megjelenítése a kezdőképernyőn</string>
+    <string name="pref_home_charts">Toplisták</string>
+    <string name="pref_home_charts_desc">A toplisták megjelenítése a kezdőképernyőn</string>
     <string name="mix_title">A te mixed</string>
     <string name="mix_start">Mixelés indítása</string>
     <string name="mix_building">Mix készítése…</string>

@@ -837,6 +837,9 @@
     <string name="pref_home_cards_group_title">Cartes de l\'écran d\'accueil</string>
     <string name="pref_home_listening_stats_desc">Afficher la carte des statistiques d\'écoute sur l\'accueil</string>
     <string name="pref_home_your_mix_desc">Afficher la carte du mix personnalisé sur l\'accueil</string>
+    <string name="pref_home_my_wave_desc">Afficher la carte Ma vague sur l\'accueil</string>
+    <string name="pref_home_charts">Classements</string>
+    <string name="pref_home_charts_desc">Afficher la section des classements sur l\'accueil</string>
     <string name="mix_title">Ton mix</string>
     <string name="mix_start">Lancer le mix</string>
     <string name="mix_building">Construction du mix…</string>

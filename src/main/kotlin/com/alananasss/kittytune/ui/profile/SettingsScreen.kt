@@ -484,6 +484,8 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var followsCover by remember { mutableStateOf(prefs.getTrackDynamicTheme()) }
     var showHomeListeningStats by remember { mutableStateOf(prefs.getShowHomeListeningStats()) }
     var showHomeYourMix by remember { mutableStateOf(prefs.getShowHomeYourMix()) }
+    var showHomeMyWave by remember { mutableStateOf(prefs.getShowHomeMyWave()) }
+    var showHomeCharts by remember { mutableStateOf(prefs.getShowHomeCharts()) }
     var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
     var verticalVolume by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
     var showRemainingTime by remember { mutableStateOf(prefs.getShowRemainingTime()) }
@@ -597,6 +599,36 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 prefs.setDynamicTheme(it)
             },
             highlightKey = "pref_dynamic_theme",
+        ),
+        SettingsSearchItem(
+            title = str("wave_title"),
+            subtitle = str("pref_home_my_wave_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.Waves,
+            keywords = listOf("my wave", "wave", "mywave", "home", "cards", "vague", "accueil", "cartes", "волна", "главный экран"),
+            hasSwitch = true,
+            switchState = showHomeMyWave,
+            onSwitchChange = {
+                showHomeMyWave = it
+                prefs.setShowHomeMyWave(it)
+            },
+            highlightKey = "pref_home_my_wave",
+        ),
+        SettingsSearchItem(
+            title = str("pref_home_charts"),
+            subtitle = str("pref_home_charts_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.Leaderboard,
+            keywords = listOf("charts", "chart", "top", "home", "cards", "classements", "accueil", "cartes", "чарты", "главный экран"),
+            hasSwitch = true,
+            switchState = showHomeCharts,
+            onSwitchChange = {
+                showHomeCharts = it
+                prefs.setShowHomeCharts(it)
+            },
+            highlightKey = "pref_home_charts",
         ),
         SettingsSearchItem(
             title = str("listening_stats_title"),
