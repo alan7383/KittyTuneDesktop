@@ -8,7 +8,9 @@ import com.alananasss.kittytune.data.drm.isExpired
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
 import okhttp3.Request
+import okhttp3.Response
 import java.io.ByteArrayInputStream
+import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.URL
@@ -192,13 +194,11 @@ class HlsStreamAdapter(
         val requestBuilder = Request.Builder().url(url)
         headers.forEach { (k, v) -> requestBuilder.header(k, v) }
 
-        val response = client.newCall(requestBuilder.build()).execute()
-        if (!response.isSuccessful) {
-            response.close()
-            throw IOException("Failed to load playlist: ${response.code}")
+        val body = client.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("Failed to load playlist: ${response.code}")
+            // `string()` closes the body, and the use block closes the response with it.
+            response.body?.string() ?: throw IOException("Empty playlist")
         }
-
-        val body = response.body?.string() ?: throw IOException("Empty playlist")
 
         var initUrl: String? = null
         val parsed = mutableListOf<Segment>()
@@ -443,6 +443,18 @@ class HlsStreamAdapter(
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
             if (isClosed) return -1
+            return try {
+                readInternal(b, off, len)
+            } catch (e: Throwable) {
+                // A segment that fails half-way keeps its connection until someone closes it, and a
+                // player that gives up on the stream never does.
+                runCatching { currentStream?.close() }
+                currentStream = null
+                throw e
+            }
+        }
+
+        private fun readInternal(b: ByteArray, off: Int, len: Int): Int {
 
             while (true) {
                 if (currentStream == null) {
@@ -522,7 +534,11 @@ class HlsStreamAdapter(
                 throw IOException("HTTP ${response.code} for segment")
             }
             if (!isEncrypted) {
-                return response.body?.byteStream() ?: throw IOException("Empty segment body")
+                val body = response.body ?: run {
+                    response.close()
+                    throw IOException("Empty segment body")
+                }
+                return ClosingStream(body.byteStream(), response)
             }
             // A protected fragment has to be held whole: its samples are decrypted per `senc` entry
             // and the encryption boxes are stripped, so the demuxer never sees the original bytes.
@@ -534,8 +550,25 @@ class HlsStreamAdapter(
 
         override fun close() {
             isClosed = true
-            currentStream?.close()
+            runCatching { currentStream?.close() }
             currentStream = null
+        }
+    }
+}
+
+/**
+ * A clear fragment's stream, tied to the response it came from.
+ *
+ * Closing the body returns the connection to the pool, but only if someone closes it: a seek, a
+ * grabber replaced mid-track or a read that threw all leave it behind, and OkHttp then reports
+ * "A connection … was leaked". Closing the response with the stream makes one close enough.
+ */
+private class ClosingStream(inner: InputStream, private val response: Response) : FilterInputStream(inner) {
+    override fun close() {
+        try {
+            super.close()
+        } finally {
+            response.close()
         }
     }
 }
