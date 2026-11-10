@@ -30,6 +30,9 @@ internal object NativeCdmSetup {
     private const val TAG = "NativeCdmSetup"
 
     /** Chrome's own package, the canonical source the WSL route uses too. */
+    /** Below this a downloaded package is a fragment, not Chrome: the real one is ~140 MB. */
+    private const val MINIMUM_PACKAGE_BYTES = 64L * 1024 * 1024
+
     private const val CHROME_DEB =
         "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
 
@@ -139,6 +142,7 @@ internal object NativeCdmSetup {
                 }
                 onStep(Step.EXTRACT)
                 if (!extractModule(packageFile, module, report)) {
+                    runCatching { packageFile.delete() }
                     report("  result: FAILED (could not extract libwidevinecdm.so)")
                     return@withContext false
                 }
@@ -229,37 +233,70 @@ internal object NativeCdmSetup {
         target
     }.getOrNull()
 
-    /** Downloads Chrome's package, streaming so a 140 MB file never sits in the heap. */
+    /**
+     * Downloads Chrome's package, streaming so a 140 MB file never sits in the heap.
+     *
+     * Written to a `.part` first and only renamed once it is whole: closing the app mid-download used
+     * to leave a truncated `chrome.deb` behind (measured: 2 MB of 140), and the next attempt then
+     * failed at extraction with a package that looked present.
+     */
     private fun downloadChrome(report: (String) -> Unit): File? = runCatching {
+        installDirectory.mkdirs()
         val target = File(installDirectory, "chrome.deb")
+        val partial = File(installDirectory, "chrome.deb.part")
+        // Whatever an earlier attempt left is not trustworthy: a package is all or nothing.
+        runCatching { target.delete() }
+        runCatching { partial.delete() }
+
         val request = Request.Builder().url(CHROME_DEB).build()
+        var expected = -1L
+        var copied = 0L
         ProxyManager.getOkHttpClient().newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 report("  download: HTTP ${response.code}")
                 return@runCatching null
             }
-            val total = response.body?.contentLength() ?: -1L
-            var copied = 0L
+            expected = response.body?.contentLength() ?: -1L
             var lastReport = 0L
             response.body?.byteStream()?.use { input ->
-                target.outputStream().use { output ->
+                partial.outputStream().use { output ->
                     val buffer = ByteArray(256 * 1024)
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
                         output.write(buffer, 0, read)
                         copied += read
-                        if (total > 0 && copied - lastReport > total / 20) {
+                        if (expected > 0 && copied - lastReport > expected / 20) {
                             lastReport = copied
-                            report("  download: ${copied / (1024 * 1024)} of ${total / (1024 * 1024)} MiB")
+                            report("  download: ${copied / (1024 * 1024)} of ${expected / (1024 * 1024)} MiB")
                         }
                     }
                 }
             }
-            report("  download: ${target.length() / (1024 * 1024)} MiB")
         }
+
+        if (expected > 0 && copied != expected) {
+            report("  download: interrupted after $copied of $expected bytes")
+            runCatching { partial.delete() }
+            return@runCatching null
+        }
+        if (copied < MINIMUM_PACKAGE_BYTES) {
+            report("  download: only $copied bytes, that is not Chrome's package")
+            runCatching { partial.delete() }
+            return@runCatching null
+        }
+        runCatching { com.alananasss.kittytune.core.AtomicFiles.replace(partial, target) }
+        if (!target.isFile) {
+            report("  download: could not put the package in place")
+            runCatching { partial.delete() }
+            return@runCatching null
+        }
+        report("  download: ${target.length() / (1024 * 1024)} MiB")
         target
-    }.getOrNull()
+    }.getOrElse {
+        report("  download: ${it.message ?: it::class.simpleName}")
+        null
+    }
 
     /**
      * Pulls the module out of the package with Windows' own `tar.exe` (bsdtar). A `.deb` is an `ar`
