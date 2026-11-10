@@ -978,7 +978,7 @@ tasks.register<Test>("headlessTest") {
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
-            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*"
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "KittyTuneProcessesTest"
         ).forEach(::includeTestsMatching)
     }
 }
