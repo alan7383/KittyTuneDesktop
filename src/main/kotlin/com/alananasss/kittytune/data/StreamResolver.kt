@@ -812,11 +812,9 @@ object StreamResolver {
         // that exists nowhere else can be saved and then played back without any CDM at all.
         //
         // [canLicense] drops out of the first `403` from the licence server: a CDM that is installed
-        // but refused (any CDM driven outside a browser on Windows) would otherwise send every
-        // protected track into a licence exchange that cannot succeed. Returning no candidate here is
-        // what lets the caller fall through to its providers and its 30 s preview.
-        // Windows playback uses its own PlayReady/PMP renderer. Download/analysis must still
-        // require a CDM that can supply samples to our decoder.
+        // but refused would otherwise send every protected track into a licence exchange that cannot
+        // succeed. Returning no candidate here is what lets the caller fall through to its providers
+        // and its 30 s preview.
         // The user's switch comes first: turned off, not even the CDM is loaded, and the caller moves
         // straight on to its other sources.
         val preferences = PlayerPreferences()

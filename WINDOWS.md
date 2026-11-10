@@ -4,11 +4,12 @@ Extract `KittyTune-<version>-Windows-Portable-x64.zip` into a writable folder an
 open `KittyTune/KittyTune.exe`. Keep `app` and `runtime` beside the executable.
 The Java runtime is included; no installer or system Java is required.
 
-SoundCloud protected playback uses an unpackaged native Windows PlayReady renderer.
-It requires no Developer Mode, MSIX registration, Store publication or certificate import.
-The x64 renderer targets Windows 10 version 2004 or newer and Windows 11.
-Encrypted fragments are cached before playback starts; startup depends on the network.
-See [the implementation and verified limits](docs/SOUNDCLOUD_PLAYREADY_WINDOWS.md).
+SoundCloud protected playback uses a native in-process Widevine CDM loader.
+It loads Chrome's Linux Widevine CDM module directly on Windows without WSL,
+virtual machines, or administrator privileges. Decrypted audio samples flow
+directly into the audio engine as clear PCM, so equalizers, DSP effects,
+and offline caching work seamlessly on protected tracks.
+See [the native CDM sidecar guide](docs/SOUNDCLOUD_CDM_SIDECAR.md).
 
 The portable package uses the normal KittyTune profile in `%APPDATA%\KittyTune`
 and cache in `%LOCALAPPDATA%\KittyTuneCache`. It does not relocate settings into
