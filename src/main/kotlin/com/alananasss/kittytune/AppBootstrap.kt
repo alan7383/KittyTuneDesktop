@@ -115,7 +115,9 @@ object AppBootstrap {
 
         // 1. Core config + persistence.
         Config.init()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: Config.init")
         AppDatabase.init()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: AppDatabase.init")
 
         // 1c. Cache sweep: drop leftover partial/temp files from a previous run, prune stale
         //     lyrics JSON, and pull the audio cache back under its byte bound. Each step is
@@ -172,12 +174,15 @@ object AppBootstrap {
 
         // 3. Repositories (all global singletons, like the Android objects).
         LikeRepository.init()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: LikeRepository.init")
         HistoryRepository.init()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: HistoryRepository.init")
         ListeningStatsRepository.init()
         RepostRepository.init()
         RecognitionHistoryRepository.init()
         DownloadManager.init()
         AlbumResolver.init()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: remaining repositories")
 
         // The Kitty pet follows playback from the start (it gets hungry, sad, sleepy on its own),
         // whether or not its window is shown.
@@ -203,7 +208,9 @@ object AppBootstrap {
 
         // 4. Player + session keep-alive.
         MusicManager.init()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: MusicManager.init")
         SessionManager.start()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: SessionManager.start")
 
         // 4b. Anonymous client_id: validate/scrape in background (replaces the ghost
         // WebView interception on Android). Guest mode depends on this.
@@ -230,5 +237,6 @@ object AppBootstrap {
                 com.alananasss.kittytune.utils.NativeMemoryManager.trim()
             }
         }
+        com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: done")
     }
 }
