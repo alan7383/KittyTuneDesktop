@@ -1879,10 +1879,11 @@ fun PlaylistDetailScreen(
                                     }
                                     if (shareUrl.isNotEmpty()) {
                                         DropdownMenuItem(
-                                            text = { Text(str("btn_share")) },
+                                            text = { Text(str("cover_copy_link")) },
                                             leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
                                             onClick = {
                                                 Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(shareUrl), null)
+                                                com.alananasss.kittytune.core.Toaster.confirm(str("artist_link_copied"))
                                                 showOptionsMenu = false
                                             }
                                         )

@@ -109,7 +109,7 @@ internal fun ArtistShareDialog(card: ArtistShareCard, onDismiss: () -> Unit) {
                 FilledTonalButton(
                     onClick = {
                         StringSelection(card.link).let { Toolkit.getDefaultToolkit().systemClipboard.setContents(it, it) }
-                        Toaster.show(str("artist_link_copied"))
+                        Toaster.confirm(str("artist_link_copied"))
                     },
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.fillMaxWidth().height(48.dp),

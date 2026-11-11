@@ -1,5 +1,6 @@
 import com.alananasss.kittytune.core.AppIconRuntime
 import com.alananasss.kittytune.core.AppIconVariants
+import com.alananasss.kittytune.core.IconEncoders
 import java.awt.Color
 import java.awt.Image
 import java.awt.Taskbar
@@ -29,8 +30,9 @@ class MacDockIconTest {
                     dispose()
                 }
                 taskbar.iconImage = placeholder
-                AppIconRuntime.apply(AppIconVariants.DEFAULT_KEY)
-                val expected = ImageIO.read(javaClass.getResource("/icons/kittytune.png"))
+                AppIconRuntime.applyMacDockIcon(AppIconVariants.DEFAULT_KEY)
+                val artwork = ImageIO.read(javaClass.getResource("/icons/kittytune.png"))
+                val expected = IconEncoders.macOsIcon(artwork, maxOf(artwork.width, artwork.height).coerceAtMost(512))
                 val actual = thumbnail(taskbar.iconImage)
                 val source = thumbnail(expected)
                 // Inspect the interior to allow the OS to decorate the icon's outer edge.

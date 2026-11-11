@@ -64,13 +64,15 @@ import com.alananasss.kittytune.ui.player.slider.mixGlow
 import com.alananasss.kittytune.ui.player.lyrics.SearchLyricsDialog
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pause
-import com.alananasss.kittytune.ui.main.seekWheel
+import com.alananasss.kittytune.ui.main.PlaybackSeekBar
+import com.alananasss.kittytune.ui.main.rememberShowRemainingTime
 import com.alananasss.kittytune.ui.main.volumeWheel
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.ui.draw.blur
 import com.alananasss.kittytune.data.local.FullPlayerBgStyle
 import androidx.compose.runtime.Composable
@@ -108,8 +110,10 @@ import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import com.alananasss.kittytune.ui.player.cover.CanvasVideo
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.FullPlayerLayout
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.main.PanelLyrics
 import com.alananasss.kittytune.ui.utils.fadingEdge
+import com.alananasss.kittytune.utils.makeTimeString
 
 /**
  * The player at the size of the window, built from the reference he sent (issue #33).
@@ -1495,108 +1499,36 @@ private fun QuietButton(
     }
 }
 
-/**
- * A hairline bar with the elapsed time at one end and the time left at the other.
- *
- * Drawn rather than assembled from [androidx.compose.material3.Slider], which on this screen would be
- * wrong in three ways at once: its track is several times too thick, its thumb is a filled pill in the
- * primary colour, and it insists on a 48 dp touch height that would push the transport away from the
- * cover. What the reference has is 4 dp of rounded track and a dot, so that is what this draws.
- *
- * The scrub position is local while a drag is in progress, because the playhead reports four times a
- * second and a bar bound straight to it fights the finger.
- */
 @Composable
 private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPalette) {
-    // A trailer's song is shown as its window; see PlaybackProgressRow in the player bar.
-    val clip = viewModel.uiClipWindow
-    val shownOf = { songMs: Long -> clip?.toShown(songMs) ?: songMs }
-    val songOf = { shownMs: Long -> clip?.toSong(shownMs) ?: shownMs }
-    val duration = (clip?.lengthMs ?: viewModel.uiDuration).coerceAtLeast(1L)
-    val sliderStyle = com.alananasss.kittytune.ui.main.rememberPlayerSliderStyle()
-    val seekWheelSeconds = com.alananasss.kittytune.ui.main.rememberSeekWheelSeconds()
-    var scrubbing by remember { mutableStateOf(false) }
-    var scrubPosition by remember { mutableFloatStateOf(0f) }
-    var drawnMs by remember { mutableLongStateOf(0L) }
-    // What the smoothed playhead says, so the wheel hands the bar back only once the playhead itself has arrived.
-    var playheadMs by remember { mutableLongStateOf(0L) }
-    val wheel = com.alananasss.kittytune.ui.main.rememberWheelSeek(
-        drawnMs = { drawnMs },
-        reportedMs = { playheadMs },
-        durationMs = { clip?.lengthMs ?: viewModel.uiDuration },
-        stepSeconds = { seekWheelSeconds },
-        commit = { target -> viewModel.seekTo(songOf(target)) },
-    )
-    val wheelMs = wheel.shownMs
-    val isScrubbingNow = scrubbing || viewModel.isScrubbing || wheel.isActive
+    PlaybackSeekBar(
+        viewModel = viewModel,
+        colors = SliderDefaults.colors(
+            thumbColor = palette.bright,
+            activeTrackColor = palette.bright,
+            inactiveTrackColor = palette.dim.copy(alpha = 0.25f),
+        ),
+    ) { position, duration, slider ->
+        Column(Modifier.fillMaxWidth()) {
+            slider(Modifier.fillMaxWidth())
 
-    val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
-        reportedMs = shownOf(viewModel.uiCurrentPosition),
-        isRunning = viewModel.uiIsPlaying && !viewModel.uiIsLoading,
-        followsInput = isScrubbingNow,
-        trackKey = viewModel.uiCurrentTrack?.id,
-    )
-    playheadMs = playhead
-    val position = when {
-        wheelMs != null -> wheelMs
-        isScrubbingNow -> scrubPosition.toLong()
-        else -> playhead
-    }
-    drawnMs = position
-    val played = position.coerceIn(0L, duration)
-    // A mix shows on the bar itself, as in the player bar; see MixTransition.
-    val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
-    val shownFraction = if (isScrubbingNow) (played.toFloat() / duration).also { mix.noteShown(it) }
-    else mix.shownFraction(played.toFloat() / duration, viewModel.uiCurrentTrack?.id)
-
-    Column(Modifier.fillMaxWidth()) {
-        com.alananasss.kittytune.ui.player.slider.PlayerSlider(
-            value = shownFraction * duration,
-            onValueChange = {
-                wheel.cancel()
-                scrubbing = true
-                scrubPosition = it
-                viewModel.updateScrubPosition(songOf(it.toLong()))
-            },
-            onValueChangeFinished = {
-                viewModel.seekTo(songOf(scrubPosition.toLong()))
-                scrubbing = false
-            },
-            sliderStyle = sliderStyle,
-            isPlaying = viewModel.uiIsPlaying,
-            valueRange = 0f..duration.toFloat(),
-            mix = mix,
-            mixColor = palette.bright,
-            colors = androidx.compose.material3.SliderDefaults.colors(
-                thumbColor = palette.bright,
-                activeTrackColor = palette.bright,
-                inactiveTrackColor = palette.dim.copy(alpha = 0.25f),
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .seekWheel(wheel)
-        )
-
-        val showRemaining = rememberFullPlayerShowRemaining()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TimeLabel(com.alananasss.kittytune.utils.makeTimeString(played), palette)
-            // Counting down or total duration, switchable by clicking and synced with settings.
-            TimeLabel(
-                text = if (showRemaining) "-" + com.alananasss.kittytune.utils.makeTimeString((duration - played).coerceAtLeast(0L)) else com.alananasss.kittytune.utils.makeTimeString(duration),
-                palette = palette,
-                modifier = Modifier
-                    // Fixed width for the longest time, so the bar keeps its length when the label flips.
-                    .widthIn(min = 56.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable {
-                        com.alananasss.kittytune.data.local.PlayerPreferences().setShowRemainingTime(!showRemaining)
-                    }
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-            )
+            val showRemaining = rememberShowRemainingTime()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TimeLabel(makeTimeString(position), palette)
+                TimeLabel(
+                    text = if (showRemaining) "-" + makeTimeString(duration - position) else makeTimeString(duration),
+                    palette = palette,
+                    modifier = Modifier
+                        .widthIn(min = 56.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { PlayerPreferences().setShowRemainingTime(!showRemaining) }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            }
         }
     }
 }
@@ -1609,15 +1541,4 @@ private fun TimeLabel(text: String, palette: FullPlayerPalette, modifier: Modifi
         color = palette.dim,
         modifier = modifier,
     )
-}
-
-/**
- * Reactive read of the "show remaining time" setting; recomposes when the pref changes.
- */
-@Composable
-private fun rememberFullPlayerShowRemaining(): Boolean {
-    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
-    return remember(prefsSnapshot) {
-        com.alananasss.kittytune.data.local.PlayerPreferences().getShowRemainingTime()
-    }
 }

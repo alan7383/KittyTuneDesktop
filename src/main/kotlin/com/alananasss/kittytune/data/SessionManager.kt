@@ -87,6 +87,11 @@ object SessionManager {
     private val _sessionReadyEvent = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
     val sessionReadyEvent = _sessionReadyEvent.asSharedFlow()
 
+    /** Login already issued fresh tokens. Reload consumers even when no refresh token was issued. */
+    fun onLoginCompleted() {
+        _sessionReadyEvent.tryEmit(Unit)
+    }
+
     fun start() {
         startKeepAliveCycle()
         scope.launch { singleFlight { migrateLegacySession() } }

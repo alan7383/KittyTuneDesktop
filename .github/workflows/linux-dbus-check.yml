@@ -29,7 +29,9 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
       - name: Install desktop test dependencies
-        run: sudo apt-get update && sudo apt-get install -y fakeroot python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1 libegl1
+        run: |
+          sudo apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
+          sudo apt-get -o Acquire::Retries=3 install -y fakeroot python3-dbus python3-gi dbus-x11 xvfb xauth playerctl libasound2t64 libgl1 libegl1
       - name: Test D-Bus services and build release package
         run: |
           dbus-run-session -- bash gradlew :test --tests '*MprisServiceTest*' --tests '*LinuxStatusNotifierServiceTest*' -PdesktopOnly=true --console=plain

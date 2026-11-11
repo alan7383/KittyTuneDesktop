@@ -30,6 +30,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,10 +60,13 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 fun DiscordLoginScreen(
     onBackClick: () -> Unit,
     onLoginSuccess: () -> Unit,
-    playerViewModel: PlayerViewModel? = null
+    playerViewModel: PlayerViewModel? = null,
+    embedded: Boolean = false,
+    onAccountConnected: (String?, String?) -> Unit = { _, _ -> }
 ) {
     val prefs = remember { PlayerPreferences() }
     val state by DiscordRemoteAuth.state.collectAsState()
+    var preview by remember { mutableStateOf<DiscordRemoteAuth.State.AwaitingConfirmation?>(null) }
 
     DisposableEffect(Unit) {
         DiscordRemoteAuth.start()
@@ -70,63 +75,75 @@ fun DiscordLoginScreen(
 
     LaunchedEffect(state) {
         val current = state
+        if (current is DiscordRemoteAuth.State.AwaitingConfirmation) preview = current
         if (current is DiscordRemoteAuth.State.Success) {
             prefs.setDiscordToken(current.token)
             prefs.setDiscordRpcEnabled(true)
             playerViewModel?.updateDiscordPresence()
+            onAccountConnected(preview?.username, preview?.avatarUrl)
             onLoginSuccess()
         }
     }
 
-    SettingsScaffold(title = str("discord_login_title"), onBackClick = onBackClick) { innerPadding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                modifier = Modifier.widthIn(max = 420.dp)
-            ) {
-                when (val current = state) {
-                    is DiscordRemoteAuth.State.AwaitingScan -> {
-                        QrPanel(content = current.qrContent)
-                        Text(
-                            text = str("discord_qr_instructions"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+    val content: @Composable () -> Unit = {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        modifier = Modifier.widthIn(max = 420.dp)
+    ) {
+        when (val current = state) {
+            is DiscordRemoteAuth.State.AwaitingScan -> {
+                QrPanel(content = current.qrContent)
+                Text(
+                    text = str("discord_qr_instructions"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
 
-                    is DiscordRemoteAuth.State.AwaitingConfirmation -> {
-                        AccountPreview(
-                            username = current.username,
-                            discriminator = current.discriminator,
-                            avatarUrl = current.avatarUrl
-                        )
-                        Text(
-                            text = str("discord_qr_confirm_on_phone"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+            is DiscordRemoteAuth.State.AwaitingConfirmation -> {
+                AccountPreview(
+                    username = current.username,
+                    discriminator = current.discriminator,
+                    avatarUrl = current.avatarUrl
+                )
+                Text(
+                    text = str("discord_qr_confirm_on_phone"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
 
-                    is DiscordRemoteAuth.State.Expired -> RetryPanel(str("discord_qr_expired"))
+            is DiscordRemoteAuth.State.Expired -> RetryPanel(str("discord_qr_expired"))
 
-                    is DiscordRemoteAuth.State.Failed -> RetryPanel(str("discord_qr_failed"))
+            is DiscordRemoteAuth.State.Failed -> RetryPanel(str("discord_qr_failed"))
 
-                    else -> {
-                        CircularWavyProgressIndicator()
-                        Text(
-                            text = str("discord_qr_connecting"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            else -> {
+                CircularWavyProgressIndicator()
+                Text(
+                    text = str("discord_qr_connecting"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+    }
+    if (embedded) {
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                content()
+                androidx.compose.material3.TextButton(onClick = onBackClick, shapes = ButtonDefaults.shapes()) {
+                    Text(str("btn_cancel"))
                 }
             }
+        }
+    } else {
+        SettingsScaffold(title = str("discord_login_title"), onBackClick = onBackClick) { innerPadding ->
+            Box(Modifier.fillMaxSize().padding(innerPadding).padding(24.dp), contentAlignment = Alignment.Center) { content() }
         }
     }
 }

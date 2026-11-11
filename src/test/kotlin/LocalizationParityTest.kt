@@ -25,6 +25,7 @@ class LocalizationParityTest {
             val el = nodes.item(i) as Element
             val name = el.getAttribute("name")
             val text = el.textContent
+            assertFalse("Duplicate localization key in $lang: $name", result.containsKey(name))
             result[name] = text
         }
         return result
@@ -43,6 +44,43 @@ class LocalizationParityTest {
                 "Language '$lang' is missing ${missing.size} keys from strings-en.xml: ${missing.take(10)}",
                 missing.isEmpty()
             )
+        }
+    }
+
+    @Test
+    fun testTranslationFormatArgumentsMatchEnglish() {
+        val pattern = Regex("""(?<![0-9])%(?:(\d+)\$)?([-#+0,(<]*)(\d+)?(?:\.\d+)?([tT][a-zA-Z]|[a-zA-Z%])""")
+        fun arguments(value: String): List<String> {
+            var implicit = 0
+            var previous = 0
+            return pattern.findAll(value).mapNotNull { match ->
+                val kind = match.groupValues[4].lowercase()
+                if (kind == "%" || kind == "n") return@mapNotNull null
+                val slot = match.groupValues[1].toIntOrNull()
+                    ?: if ("<" in match.groupValues[2]) previous else ++implicit
+                previous = slot
+                "$slot:$kind"
+            }.sorted().toList()
+        }
+        val english = loadKeys("en")
+        for (lang in languages - "en") {
+            val translated = loadKeys(lang)
+            for ((key, value) in english) {
+                assertEquals("Format arguments differ: $lang/$key", arguments(value), arguments(translated.getValue(key)))
+            }
+        }
+    }
+
+    @Test
+    fun testEveryOnboardingStringIsTranslated() {
+        val english = loadKeys("en").filterKeys { it.startsWith("onboard_") }
+        assertTrue(english.isNotEmpty())
+        for (lang in languages - "en") {
+            val translated = loadKeys(lang)
+            for ((key, text) in english) {
+                assertFalse("Empty onboarding translation: $lang/$key", translated[key].isNullOrBlank())
+                if (key != "onboard_discord_label") assertNotEquals("Untranslated onboarding text: $lang/$key", text, translated[key])
+            }
         }
     }
 
