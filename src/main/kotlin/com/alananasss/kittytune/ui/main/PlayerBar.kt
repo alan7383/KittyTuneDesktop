@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.AnimatedVisibility
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
-import com.alananasss.kittytune.ui.player.slider.PlayerSlider
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,8 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -667,92 +664,29 @@ private fun lerpByWidth(width: Dp, from: Pair<Dp, Dp>, to: Pair<Dp, Dp>): Dp {
  */
 @Composable
 private fun PlaybackProgressRow(vm: PlayerViewModel) {
-    val seekWheelSeconds = rememberSeekWheelSeconds()
-    val sliderStyle = rememberPlayerSliderStyle()
-    var scrubbing by remember { mutableStateOf(false) }
-    var scrubPosition by remember { mutableFloatStateOf(0f) }
-    var drawnMs by remember { mutableLongStateOf(0L) }
-    // What the smoothed playhead says, so the wheel hands the bar back only once the playhead itself has arrived.
-    var playheadMs by remember { mutableLongStateOf(0L) }
-    // A trailer's song is shown as its window: 0:00 to its length. Everything below is in that time, and what is
-    // asked of the player is turned back into the song's.
-    val clip = vm.uiClipWindow
-    val shownOf = { songMs: Long -> clip?.toShown(songMs) ?: songMs }
-    val songOf = { shownMs: Long -> clip?.toSong(shownMs) ?: shownMs }
-    val wheel = rememberWheelSeek(
-        drawnMs = { drawnMs },
-        reportedMs = { playheadMs },
-        durationMs = { clip?.lengthMs ?: vm.uiDuration },
-        stepSeconds = { seekWheelSeconds },
-        commit = { target -> vm.seekTo(songOf(target)) },
-    )
-    val wheelMs = wheel.shownMs
-    val isScrubbingNow = scrubbing || vm.isScrubbing || wheel.isActive
-    val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
-        reportedMs = shownOf(vm.uiCurrentPosition),
-        isRunning = vm.uiIsPlaying && !vm.uiIsLoading,
-        followsInput = isScrubbingNow,
-        trackKey = vm.uiCurrentTrack?.id,
-    )
-    playheadMs = playhead
-    val duration = (clip?.lengthMs ?: vm.uiDuration).coerceAtLeast(1L)
-    val rawPosition = when {
-        wheelMs != null -> wheelMs
-        isScrubbingNow -> scrubPosition.toLong()
-        else -> playhead
-    }
-    val position = rawPosition.coerceIn(0L, duration)
-    drawnMs = position
-    val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
-    val shownFraction = if (isScrubbingNow) (position.toFloat() / duration).also { mix.noteShown(it) }
-    else mix.shownFraction(position.toFloat() / duration, vm.uiCurrentTrack?.id)
-    val glowColor = MaterialTheme.colorScheme.primary
+    PlaybackSeekBar(vm) { position, duration, slider ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = makeTimeString(position),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            slider(Modifier.weight(1f).padding(horizontal = 8.dp))
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = makeTimeString(position),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        PlayerSlider(
-            value = (shownFraction * duration).coerceIn(0f, duration.toFloat()),
-            onValueChange = {
-                wheel.cancel()
-                scrubbing = true
-                scrubPosition = it
-                vm.updateScrubPosition(songOf(it.toLong()))
-            },
-            onValueChangeFinished = {
-                vm.seekTo(songOf(scrubPosition.toLong()))
-                scrubbing = false
-            },
-            sliderStyle = sliderStyle,
-            isPlaying = vm.uiIsPlaying,
-            valueRange = 0f..duration.toFloat(),
-            mix = mix,
-            mixColor = glowColor,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp)
-                .seekWheel(wheel),
-        )
-        // Click to switch between the track's length and the time left, which counts down with a minus, as in
-        // the full player. Remembered and synced with settings.
-        val showRemaining = rememberShowRemainingTime()
-        Text(
-            text = if (showRemaining) "-" + makeTimeString((duration - position).coerceAtLeast(0L)) else makeTimeString(duration),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-            // Wide enough for the longest time, so flipping between the length and the countdown never moves the bar.
-            modifier = Modifier
-                .widthIn(min = 52.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .clickable {
-                    com.alananasss.kittytune.data.local.PlayerPreferences().setShowRemainingTime(!showRemaining)
-                }
-                .padding(horizontal = 4.dp, vertical = 2.dp),
-        )
+            val showRemaining = rememberShowRemainingTime()
+            Text(
+                text = if (showRemaining) "-" + makeTimeString(duration - position) else makeTimeString(duration),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                // Reserve room for either time label so toggling it keeps the slider in place.
+                modifier = Modifier
+                    .widthIn(min = 52.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { PlayerPreferences().setShowRemainingTime(!showRemaining) }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
     }
 }
 
@@ -841,13 +775,6 @@ private fun rememberPlayerBarButtons(): Set<String> {
     return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarButtons() }
 }
 
-/** Reactive read of how far a wheel notch over the progress bar moves the playhead. */
-@Composable
-internal fun rememberSeekWheelSeconds(): Float {
-    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
-    return remember(prefsSnapshot) { PlayerPreferences().getSeekWheelSeconds() }
-}
-
 /** Reactive read of the lyrics button's own switch, which lives in the lyrics settings. */
 @Composable
 private fun rememberShowLyricsButton(): Boolean {
@@ -871,27 +798,4 @@ private fun rememberVerticalVolumeSlider(): Boolean {
         com.alananasss.kittytune.data.local.PlayerPreferences().getVerticalVolumeSlider()
     }
 }
-
-/**
- * Reactive read of the "slider style" setting; recomposes when the pref changes.
- */
-@Composable
-internal fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.PlayerSliderStyle {
-    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
-    return remember(prefsSnapshot) {
-        com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle()
-    }
-}
-
-/**
- * Reactive read of the "show remaining time" setting; recomposes when the pref changes.
- */
-@Composable
-private fun rememberShowRemainingTime(): Boolean {
-    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
-    return remember(prefsSnapshot) {
-        com.alananasss.kittytune.data.local.PlayerPreferences().getShowRemainingTime()
-    }
-}
-
 

@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,6 +36,7 @@ fun ToastNoticeHost(modifier: Modifier = Modifier) {
             message = null
         }
     }
+    ConfirmationHost()
     AnimatedVisibility(visible = message != null, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -49,6 +51,47 @@ fun ToastNoticeHost(modifier: Modifier = Modifier) {
                     Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                 }
             }
+        }
+    }
+}
+
+/**
+ * [Toaster.confirm] notices, drawn as the pill the "AI track skipped" notice uses, minus its Undo button.
+ *
+ * The bar closes itself when its countdown runs out; the counter is its key, so confirming the same thing twice
+ * in a row starts the countdown again instead of being ignored.
+ */
+@Composable
+private fun ConfirmationHost() {
+    var shown by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf("") }
+    var count by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        Toaster.confirmations.collect { next ->
+            if (next.isBlank()) return@collect
+            text = next
+            count++
+            shown = true
+        }
+    }
+    AnimatedVisibility(
+        visible = shown,
+        enter = androidx.compose.animation.slideInVertically(
+            androidx.compose.animation.core.tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it } +
+            fadeIn(androidx.compose.animation.core.tween(300)),
+        exit = androidx.compose.animation.slideOutVertically(
+            androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it } +
+            fadeOut(androidx.compose.animation.core.tween(250)),
+    ) {
+        key(count) {
+            com.alananasss.kittytune.ui.player.pixel.DismissUndoBar(
+                text = text,
+                leadingIcon = Icons.Rounded.CheckCircle,
+                onUndo = null,
+                onClose = { shown = false },
+                durationMillis = 2500L,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.widthIn(min = 260.dp, max = 640.dp),
+            )
         }
     }
 }

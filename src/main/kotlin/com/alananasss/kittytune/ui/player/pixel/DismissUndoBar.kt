@@ -50,7 +50,7 @@ import com.alananasss.kittytune.core.str
  * Displays a pill-shaped snackbar with:
  * - Leading icon and message text
  * - Animated background progress bar ticking down to zero
- * - Inset shaped "Undo" button (surfaceContainerLow, primary text)
+ * - Inset shaped "Undo" button (surfaceContainerLow, primary text), left out when there is nothing to undo
  * - Inset shaped close icon button (surfaceContainerLow, onSurface icon)
  */
 @Composable
@@ -58,7 +58,7 @@ fun DismissUndoBar(
     modifier: Modifier = Modifier,
     text: String = str("player_dismissed_message"),
     leadingIcon: ImageVector? = null,
-    onUndo: () -> Unit,
+    onUndo: (() -> Unit)?,
     onClose: () -> Unit,
     durationMillis: Long = 5000L,
 ) {
@@ -142,7 +142,7 @@ fun DismissUndoBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Button(
+                    if (onUndo != null) Button(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             contentColor = MaterialTheme.colorScheme.onSurface,

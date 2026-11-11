@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -37,6 +36,7 @@ fun PlayerSlider(
     /** A mix to show on the bar, with the colour of its glow; the wavy bar draws it from its own thumb, the others behind themselves. */
     mix: MixTransition? = null,
     mixColor: Color = colors.activeTrackColor,
+    onValueChangeCancelled: (() -> Unit)? = null,
 ) {
     val clampedValue = if (valueRange.endInclusive > valueRange.start) {
         value.coerceIn(valueRange.start, valueRange.endInclusive)
@@ -67,10 +67,10 @@ fun PlayerSlider(
                 valueRange = valueRange,
                 onValueChange = onValueChange,
                 onValueChangeFinished = onValueChangeFinished,
+                onValueChangeCancelled = onValueChangeCancelled,
                 colors = colors,
                 isPlaying = isPlaying,
                 enabled = enabled,
-                bufferedValue = bufferedValue,
                 mix = mix,
                 mixColor = mixColor,
                 modifier = modifier
@@ -91,14 +91,9 @@ fun PlayerSlider(
                 label = "trackHeight"
             )
 
-            val sliderState = androidx.compose.material3.rememberSliderState(
+            Slider(
                 value = clampedValue,
-                trackRange = valueRange
-            )
-            sliderState.value = clampedValue
-
-            androidx.compose.material3.Slider(
-                state = sliderState,
+                valueRange = valueRange,
                 onValueChange = onValueChange,
                 onValueChangeFinished = onValueChangeFinished,
                 interactionSource = trackInteractionSource,
@@ -122,10 +117,10 @@ fun PlayerSlider(
                 valueRange = valueRange,
                 onValueChange = onValueChange,
                 onValueChangeFinished = onValueChangeFinished,
+                onValueChangeCancelled = onValueChangeCancelled,
                 colors = colors,
                 isPlaying = isPlaying,
                 enabled = enabled,
-                bufferedValue = bufferedValue,
                 modifier = behindGlow
             )
         }

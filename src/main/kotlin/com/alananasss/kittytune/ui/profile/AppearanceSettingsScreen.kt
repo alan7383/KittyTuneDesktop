@@ -539,7 +539,7 @@ private fun ThemePresetCard(
     onClick: () -> Unit,
 ) {
     val scheme = rememberDynamicColorScheme(
-        seedColor = if (seed == 0) Color(0xFFFF7A1A) else Color(seed),
+        seedColor = if (seed == 0) com.alananasss.kittytune.ui.theme.KittyTuneDefaultSeedColor else Color(seed),
         isDark = isDark,
         isAmoled = pureBlack,
         style = style,

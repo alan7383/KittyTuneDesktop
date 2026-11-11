@@ -12,4 +12,11 @@ object Toaster {
     fun show(message: String) {
         messages.tryEmit(message)
     }
+
+    /** Short "it worked" notices such as "Link copied", shown as the same pill as the app's undo bars. */
+    val confirmations = MutableSharedFlow<String>(extraBufferCapacity = 8)
+
+    fun confirm(message: String) {
+        confirmations.tryEmit(message)
+    }
 }
