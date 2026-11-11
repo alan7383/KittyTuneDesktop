@@ -3334,4 +3334,10 @@
     <string name="onboard_desktop_zoom_body">Metinler ve kontroller için rahat bir boyut seç. Değişiklik hemen uygulanır.</string>
     <string name="account_return_title">Tekrar hoş geldin.</string>
     <string name="account_return_body">Beğenilerine ve çalma listelerine erişmek için SoundCloud’u bağla veya misafir olarak dinle. Ayarların yerinde duruyor.</string>
+
+    <!-- macOS menus and updates -->
+    <string name="menu_go">Git</string>
+    <string name="menu_window">Pencere</string>
+    <string name="update_mac_manual">Güncellemeyi tamamlamak için disk görüntüsünü aç ve KittyTune’u Uygulamalar klasörüne kopyala.</string>
+    <string name="update_mac_failed">KittyTune güncellemeyi yükleyemedi. Ayrıntılar için güncelleme günlüğünü aç.</string>
 </resources>
