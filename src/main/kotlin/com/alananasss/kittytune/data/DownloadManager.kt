@@ -275,13 +275,6 @@ object DownloadManager {
         return dir
     }
 
-    private fun getOutputStreamForFile(fileName: String, subDir: String?): Pair<OutputStream, String> {
-        val dir = outputDirFor(subDir)
-        val file = File(dir, fileName)
-        if (file.exists()) file.delete()
-        return Pair(FileOutputStream(file), file.absolutePath)
-    }
-
     private fun deleteFileByPath(path: String) {
         if (path.isEmpty()) return
         try {
@@ -1042,14 +1035,9 @@ object DownloadManager {
                     tempAudioFile.copyTo(taggedAudioFile, overwrite = true)
                 }
 
-                val cleanArtist = sanitizeFilename(track.displayArtist.ifBlank { track.user?.username ?: str("generic_artist") })
-                val cleanTitle = sanitizeFilename(track.title ?: str("generic_title"))
-                val finalFileName = "$cleanArtist - $cleanTitle.$ext"
-
-                val (audioStream, audioPath) = getOutputStreamForFile(finalFileName, subFolderName)
-                FileInputStream(taggedAudioFile).use { input ->
-                    audioStream.use { output -> input.copyTo(output) }
-                }
+                val audioPath = DownloadFiles.store(taggedAudioFile, outputDirFor(subFolderName), track.id,
+                    track.displayArtist.ifBlank { track.user?.username ?: str("generic_artist") },
+                    track.title ?: str("generic_title"), ext).absolutePath
 
                 val existingTrack = dao.getTrack(track.id)
                 val creationTimestamp = existingTrack?.downloadedAt ?: System.currentTimeMillis()

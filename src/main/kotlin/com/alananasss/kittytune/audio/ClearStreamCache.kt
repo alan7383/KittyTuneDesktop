@@ -1,11 +1,8 @@
 package com.alananasss.kittytune.audio
 
-import com.alananasss.kittytune.core.AppDirs
-import com.alananasss.kittytune.core.AtomicFiles
 import com.alananasss.kittytune.data.drm.SoundCloudDrm
 import com.alananasss.kittytune.utils.Logger
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * A clear copy of a protected stream, for the features that read audio with FFmpeg.
@@ -23,11 +20,10 @@ object ClearStreamCache {
 
     private const val TAG = "ClearStreamCache"
 
-    /** Below this a file is a failure, not a track. */
-    private const val MIN_BYTES = 64L * 1024L
+    private val files = ClearStreamFiles { com.alananasss.kittytune.data.cache.AudioCache.dir }
 
     /** The clear copy if one is already on disk, without touching the network. Never suspends. */
-    fun cached(url: String): File? = fileFor(url).takeIf { it.isFile && it.length() > MIN_BYTES }
+    fun cached(url: String): File? = files.cached(url)
 
     /**
      * The clear copy of [url], written on first use.
@@ -41,30 +37,13 @@ object ClearStreamCache {
         if (!url.contains(".m3u8")) return null
         val token = SoundCloudDrm.licenceFor(url) ?: return null
         if (!SoundCloudDrm.isAvailable) return null
-        val target = fileFor(url)
-        val partial = File(target.parentFile, "${target.name}.part")
         return try {
-            DrmStreamDownloader.download(url, token, partial)
-            AtomicFiles.replace(partial, target)
-            Logger.d(TAG, "clear copy of ${url.takeLast(48)} is ${target.length()} B")
-            target.takeIf { it.isFile && it.length() > MIN_BYTES }
+            files.ensure(url) { partial -> DrmStreamDownloader.download(url, token, partial) }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             Logger.w(TAG, "could not read a clear copy of ${url.takeLast(48)}: ${e.message}")
             null
-        } finally {
-            runCatching { partial.delete() }
         }
-    }
-
-    /** Keyed by URL: the same stream always lands on the same file, whatever track it belongs to. */
-    private fun fileFor(url: String): File {
-        val hash = MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
-            .joinToString("") { "%02x".format(it) }.take(16)
-        // Inside the audio cache, so its size budget and trim cover these files too: they are
-        // regenerable, and a few megabytes each should not live outside the cache.
-        val dir = com.alananasss.kittytune.data.cache.AudioCache.dir.apply { mkdirs() }
-        return File(dir, "clear_$hash.m4a")
     }
 }

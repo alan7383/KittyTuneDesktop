@@ -3414,4 +3414,10 @@
     <string name="onboard_desktop_zoom_body">Chọn kích thước chữ và nút điều khiển dễ sử dụng. Thay đổi được áp dụng ngay.</string>
     <string name="account_return_title">Chào mừng trở lại.</string>
     <string name="account_return_body">Kết nối SoundCloud để truy cập bài đã thích và danh sách phát, hoặc nghe với tư cách khách. Cài đặt của bạn vẫn được giữ nguyên.</string>
+
+    <!-- macOS menus and updates -->
+    <string name="menu_go">Đi</string>
+    <string name="menu_window">Cửa sổ</string>
+    <string name="update_mac_manual">Mở ảnh đĩa và sao chép KittyTune vào thư mục Ứng dụng để hoàn tất cập nhật.</string>
+    <string name="update_mac_failed">KittyTune không thể cài đặt bản cập nhật. Mở nhật ký cập nhật để xem chi tiết.</string>
 </resources>
