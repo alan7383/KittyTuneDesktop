@@ -31,7 +31,7 @@ object HlsHeadCache {
         }
         scope.launch {
             val adapter = runCatching {
-                HlsStreamAdapter(playlistUrl, headers).also { it.prefetchOpening() }
+                HlsStreamAdapter(playlistUrl, headers).also { if (!it.isEncrypted) it.prefetchOpening() }
             }.onFailure { Logger.w("HlsHeadCache", "Could not open ahead: ${it.message}") }.getOrNull()
             synchronized(this@HlsHeadCache) {
                 warming.remove(playlistUrl)

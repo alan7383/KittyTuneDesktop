@@ -1,6 +1,8 @@
 package com.alananasss.kittytune.core
 
 import java.io.File
+import java.nio.file.Files
+import java.util.concurrent.Executors
 
 /** `SHChangeNotify` is not in JNA's bundled Shell32 mapping, so declare the one call we need. */
 private interface WindowsShellNotifier : com.sun.jna.win32.StdCallLibrary {
@@ -20,26 +22,19 @@ private const val SHCNF_IDLIST = 0x0000
  *    Menu, on the Desktop and in the taskbar pins, pointing them at a generated multi-size
  *    .ico under %APPDATA%\KittyTune. The icon embedded in the exe itself cannot change
  *    without repackaging, but every shortcut the user actually clicks does switch.
- *  - **macOS**: replaces the .icns inside the running .app bundle and re-registers it with
- *    LaunchServices, which is what Finder, Launchpad and the Dock read.
+ *  - **macOS**: sets the Finder custom icon on the running .app through NSWorkspace.
  *
  * The running window's own icon switches on every OS (Main.kt), and the Dock image plus the
  * multi-size window icons are handled by [AppIconRuntime].
  */
 object AppIconInstaller {
 
-    /**
-     * Installs the variant for launchers, off the calling thread.
-     *
-     * Every platform's path ends in shell commands that have to be waited on — kbuildsycoca,
-     * update-desktop-database, lsregister, ie4uinit — and together they take long enough to
-     * stutter the UI if run from a click handler, which is where this is called from.
-     */
+    private val installer = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "kittytune-icon-install").apply { isDaemon = true }
+    }
+
     fun apply(variantKey: String) {
-        Thread({ install(variantKey) }, "kittytune-icon-install").apply {
-            isDaemon = true
-            start()
-        }
+        installer.execute { install(variantKey) }
     }
 
     private fun install(variantKey: String) {
@@ -389,63 +384,33 @@ object AppIconInstaller {
 
     // ------------------------------------------------------------------ macos
 
-    /**
-     * Replaces the .icns inside the running .app bundle. Finder, Launchpad, the Dock's
-     * not-running tile and the Cmd-Tab switcher all read the bundle, not the window, so this
-     * is the persistent half; [AppIconRuntime] handles the Dock while the app is running.
-     */
     private fun applyMacOs(variantKey: String) {
-        try {
-            val bundle = locateMacAppBundle() ?: run {
-                // Running from Gradle or a bare JAR: there is no bundle to rewrite, and the
-                // live Dock icon is already handled elsewhere.
-                println("[AppIconInstaller] Not running from an .app bundle; skipping bundle icon")
-                return
+        val bundle = locateMacAppBundle() ?: return
+        val source = variantPng(variantKey)?.let(IconEncoders::decode) ?: return
+        runCatching {
+            val icon = Files.createTempFile("kittytune-icon-", ".icns")
+            try {
+                Files.write(icon, IconEncoders.icns(source))
+                val process = ProcessBuilder(
+                    "/usr/bin/osascript", "-l", "JavaScript", "-e", """
+                        ObjC.import("AppKit");
+                        function run(argv) {
+                            const image = $.NSImage.alloc.initWithContentsOfFile(argv[0]);
+                            if (!$.NSWorkspace.sharedWorkspace.setIconForFileOptions(image, argv[1], 0)) {
+                                throw Error("Unable to set the Finder icon");
+                            }
+                        }
+                    """.trimIndent(), icon.toString(), bundle.absolutePath
+                ).redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().use { it.readText() }
+                check(process.waitFor() == 0) { output.trim() }
+            } finally {
+                Files.deleteIfExists(icon)
             }
-            val pngBytes = variantPng(variantKey) ?: return
-            val source = IconEncoders.decode(pngBytes) ?: return
-
-            val resources = File(bundle, "Contents/Resources")
-            if (!resources.isDirectory && !resources.mkdirs()) return
-            val plist = File(bundle, "Contents/Info.plist")
-
-            val icnsName = bundleIconName(plist, resources)
-            val target = File(resources, icnsName)
-            if (!target.canWrite() && target.exists() && !target.setWritable(true)) {
-                println("[AppIconInstaller] $icnsName is not writable; skipping bundle icon")
-                return
-            }
-            val iconBytes = IconEncoders.icns(source)
-            if (target.isFile && target.readBytes().contentEquals(iconBytes)) return
-            target.writeBytes(iconBytes)
-
-            if (plist.isFile && !plist.readText().contains("CFBundleIconFile")) {
-                addPlistIconKey(plist, icnsName)
-            }
-
-            // Finder decides whether to re-read a bundle from its modification date, and
-            // LaunchServices keeps its own copy keyed on the bundle path.
-            val now = System.currentTimeMillis()
-            listOf(resources, File(bundle, "Contents"), bundle).forEach {
-                runCatching { it.setLastModified(now) }
-            }
-            listOf(
-                // AppIconRuntime updates the live Dock through Taskbar. Restarting the Dock
-                // here disrupts Spaces and third-party notch widgets, even on a normal launch.
-                listOf(LSREGISTER, "-f", bundle.absolutePath)
-            ).forEach { cmd ->
-                runCatching {
-                    ProcessBuilder(cmd).redirectErrorStream(true).start().waitFor()
-                }
-            }
-        } catch (e: Throwable) {
-            println("[AppIconInstaller] Failed to update macOS bundle icon: ${e.message}")
+        }.onFailure {
+            println("[AppIconInstaller] Failed to update Finder icon: ${it.message}")
         }
     }
-
-    private const val LSREGISTER =
-        "/System/Library/Frameworks/CoreServices.framework/Frameworks/" +
-            "LaunchServices.framework/Support/lsregister"
 
     /**
      * Finds the .app we are executing from. jpackage passes the launcher path in
@@ -465,33 +430,4 @@ object AppIconInstaller {
         }
         return null
     }
-
-    /** CFBundleIconFile if the plist names one, else any existing .icns, else the bundle name. */
-    private fun bundleIconName(plist: File, resources: File): String {
-        val declared = runCatching {
-            Regex(
-                "<key>CFBundleIconFile</key>\\s*<string>([^<]+)</string>",
-                RegexOption.IGNORE_CASE
-            ).find(plist.readText())?.groupValues?.get(1)?.trim()
-        }.getOrNull()
-
-        val name = declared?.takeIf { it.isNotEmpty() }
-            ?: resources.listFiles { f -> f.isFile && f.extension.equals("icns", true) }
-                ?.firstOrNull()?.name
-            ?: "KittyTune"
-
-        return if (name.endsWith(".icns", ignoreCase = true)) name else "$name.icns"
-    }
-
-    private fun addPlistIconKey(plist: File, icnsName: String) {
-        runCatching {
-            val text = plist.readText()
-            val marker = "<dict>"
-            val at = text.indexOf(marker)
-            if (at < 0) return
-            val insertion = "\n  <key>CFBundleIconFile</key>\n  <string>$icnsName</string>"
-            plist.writeText(text.substring(0, at + marker.length) + insertion + text.substring(at + marker.length))
-        }
-    }
 }
-

@@ -144,6 +144,9 @@ object SoundCloudDrm {
      */
     private fun requireCdm(): WidevineCdm = WidevineCdmRegistry.require()
 
+    internal fun openPlaybackSession(cdm: WidevineCdm, encryption: HlsEncryptionInfo, token: String): WidevineLicenseSession =
+        openLicensedSession(cdm, requireWidevinePssh(encryption, token), token, encryption.keyIdHex)
+
     /**
      * Opens a session for a download, on the download side's own CDM instance.
      *

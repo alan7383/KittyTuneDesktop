@@ -39,7 +39,7 @@ internal object MenuTiles {
         Tile("go_artist", "menu_go_artist"),
         Tile("edit_track", "menu_edit_track"),
         Tile("track_radio", "menu_track_radio"),
-        Tile("share", "btn_share"),
+        Tile("share", "cover_copy_link"),
         Tile("block_track", "menu_block_track"),
         Tile("block_artist", "menu_block_artist"),
         Tile("remove_from_playlist", "menu_remove"),
@@ -56,7 +56,7 @@ internal object MenuTiles {
         Tile("add_playlist", "menu_add_playlist"),
         Tile("details", "menu_playlist_details"),
         Tile("go_artist", "menu_go_artist"),
-        Tile("share", "btn_share"),
+        Tile("share", "cover_copy_link"),
         Tile("download", "btn_download"),
     )
 

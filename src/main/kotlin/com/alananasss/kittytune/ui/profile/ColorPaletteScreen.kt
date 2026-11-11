@@ -49,7 +49,6 @@ import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.theme.MaterialKolorColorSpecOptions
 import com.alananasss.kittytune.ui.theme.ThemeState
 import com.alananasss.kittytune.ui.theme.normalizedMaterialKolorColorSpecName
-import com.alananasss.kittytune.ui.theme.parseMaterialKolorPaletteStyle
 import com.materialkolor.PaletteStyle
 import kotlin.math.roundToInt
 
@@ -106,7 +105,7 @@ fun ColorPaletteContent() {
     val clipboardManager = LocalClipboardManager.current
 
     var currentKeyColor by remember { mutableIntStateOf(prefs.getKeyColor()) }
-    var colorStyle by remember { mutableStateOf(parseMaterialKolorPaletteStyle(prefs.getColorStyle()).name) }
+    var colorStyle by remember { mutableStateOf(prefs.getColorStyle()) }
     var colorSpec by remember { mutableStateOf(normalizedMaterialKolorColorSpecName(prefs.getColorSpec())) }
     var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
 
@@ -859,7 +858,7 @@ private fun RiffTrackSlider(
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ColorEngineCard(
+internal fun ColorEngineCard(
     colorStyle: String,
     colorSpec: String,
     onStyleSelected: (String) -> Unit,
@@ -901,41 +900,28 @@ private fun ColorEngineCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(styles) { styleName ->
-                        val isSelected = styleName.equals(colorStyle, ignoreCase = true)
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { onStyleSelected(styleName) },
-                            label = { Text(styleName, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                            shape = CircleShape,
-                            leadingIcon = if (isSelected) {
-                                {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // Keep every style visible: wrap connected groups instead of hiding choices off-screen.
+                    val columns = when {
+                        maxWidth >= 560.dp -> 3
+                        maxWidth >= 360.dp -> 2
+                        else -> 1
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        styles.chunked(columns).forEach { row ->
+                            ExpressiveConnectedButtonGroup(
+                                options = row,
+                                selectedOption = row.firstOrNull { it.equals(colorStyle, ignoreCase = true) },
+                                onOptionSelected = onStyleSelected,
+                                fillMaxWidth = true,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                                labelProvider = { styleName ->
+                                    Text(if (styleName == "System") str("theme_system") else styleName,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                 }
-                            } else null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isSelected,
-                                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                             )
-                        )
+                        }
                     }
                 }
             }

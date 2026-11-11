@@ -104,77 +104,81 @@ object BeatAnalyzer {
                 Logger.w(TAG, "Failed creating HlsStreamAdapter for beat analysis: ${e.message}")
                 return null
             }
-            val totalDurationMs = if (knownDurationMs > 0) knownDurationMs else adapter.totalDurationMs
+            try {
+                val totalDurationMs = if (knownDurationMs > 0) knownDurationMs else adapter.totalDurationMs
 
-            val windowStartMs = if (totalDurationMs > 36_000L) max(0L, totalDurationMs / 2 - 9_000L) else 0L
-            if (shouldCancel()) return null
-            val midPcm = try {
-                decodeHlsWindow(adapter, windowStartMs, WINDOW_US, shouldCancel)
-            } catch (e: Exception) {
-                Logger.w(TAG, "Failed decoding HLS middle window: ${e.message}")
-                null
+                val windowStartMs = if (totalDurationMs > 36_000L) max(0L, totalDurationMs / 2 - 9_000L) else 0L
+                if (shouldCancel()) return null
+                val midPcm = try {
+                    decodeHlsWindow(adapter, windowStartMs, WINDOW_US, shouldCancel)
+                } catch (e: Exception) {
+                    Logger.w(TAG, "Failed decoding HLS middle window: ${e.message}")
+                    null
+                }
+
+                if (midPcm == null || midPcm.samples.size < FFT_SIZE * 8) {
+                    Logger.d(TAG, "Insufficient PCM frames from HLS for beat analysis (${midPcm?.samples?.size ?: 0})")
+                    return null
+                }
+
+                if (shouldCancel()) return null
+                val key = estimateKey(midPcm.samples, midPcm.sampleRate)
+
+                if (shouldCancel()) return null
+                val flux = spectralFlux(midPcm.samples)
+                val frameRate = midPcm.sampleRate.toFloat() / HOP_SIZE
+
+                val (periodFrames, confidence) = estimateTempoPeriod(flux, frameRate) ?: return null
+                val phaseFrames = estimateBeatPhase(flux, periodFrames)
+
+                var periodMs = periodFrames / frameRate * 1000f
+                var bpm = 60_000f / periodMs
+                while (bpm < MIN_CANONICAL_BPM) {
+                    bpm *= 2f
+                    periodMs /= 2f
+                }
+                while (bpm >= MAX_CANONICAL_BPM) {
+                    bpm /= 2f
+                    periodMs *= 2f
+                }
+
+                val windowStartAnchorMs = midPcm.actualStartUs / 1000L
+                val anchorMs = windowStartAnchorMs + (phaseFrames / frameRate * 1000f).roundToLong()
+                val firstBeatOffsetMs = (anchorMs % periodMs.roundToLong() + periodMs.roundToLong()) % periodMs.roundToLong()
+
+                var mixInPointMs: Long? = null
+                if (totalDurationMs > 16_000L && !shouldCancel()) {
+                    try {
+                        val headPcm = decodeHlsWindow(adapter, 0L, HEAD_WINDOW_US, shouldCancel)
+                        if (headPcm != null) {
+                            mixInPointMs = detectMixIn(
+                                energyEnvelope(headPcm.samples, headPcm.sampleRate),
+                                firstBeatOffsetMs,
+                                periodMs
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                var mixOutPointMs: Long? = null
+                if (totalDurationMs > 45_000L && !shouldCancel()) {
+                    val tailStartMs = max(0L, totalDurationMs - 24_000L)
+                    try {
+                        val tailPcm = decodeHlsWindow(adapter, tailStartMs, TAIL_WINDOW_US, shouldCancel)
+                        if (tailPcm != null) {
+                            mixOutPointMs = detectMixOut(
+                                energyEnvelope(tailPcm.samples, tailPcm.sampleRate),
+                                tailStartMs,
+                                totalDurationMs
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                return Result(bpm, firstBeatOffsetMs, confidence, mixInPointMs, mixOutPointMs, key?.first, key?.second, bodyEnergy(midPcm.samples, bpm))
+            } finally {
+                adapter.releaseDrm()
             }
-
-            if (midPcm == null || midPcm.samples.size < FFT_SIZE * 8) {
-                Logger.d(TAG, "Insufficient PCM frames from HLS for beat analysis (${midPcm?.samples?.size ?: 0})")
-                return null
-            }
-
-            if (shouldCancel()) return null
-            val key = estimateKey(midPcm.samples, midPcm.sampleRate)
-
-            if (shouldCancel()) return null
-            val flux = spectralFlux(midPcm.samples)
-            val frameRate = midPcm.sampleRate.toFloat() / HOP_SIZE
-
-            val (periodFrames, confidence) = estimateTempoPeriod(flux, frameRate) ?: return null
-            val phaseFrames = estimateBeatPhase(flux, periodFrames)
-
-            var periodMs = periodFrames / frameRate * 1000f
-            var bpm = 60_000f / periodMs
-            while (bpm < MIN_CANONICAL_BPM) {
-                bpm *= 2f
-                periodMs /= 2f
-            }
-            while (bpm >= MAX_CANONICAL_BPM) {
-                bpm /= 2f
-                periodMs *= 2f
-            }
-
-            val windowStartAnchorMs = midPcm.actualStartUs / 1000L
-            val anchorMs = windowStartAnchorMs + (phaseFrames / frameRate * 1000f).roundToLong()
-            val firstBeatOffsetMs = (anchorMs % periodMs.roundToLong() + periodMs.roundToLong()) % periodMs.roundToLong()
-
-            var mixInPointMs: Long? = null
-            if (totalDurationMs > 16_000L && !shouldCancel()) {
-                try {
-                    val headPcm = decodeHlsWindow(adapter, 0L, HEAD_WINDOW_US, shouldCancel)
-                    if (headPcm != null) {
-                        mixInPointMs = detectMixIn(
-                            energyEnvelope(headPcm.samples, headPcm.sampleRate),
-                            firstBeatOffsetMs,
-                            periodMs
-                        )
-                    }
-                } catch (_: Exception) {}
-            }
-
-            var mixOutPointMs: Long? = null
-            if (totalDurationMs > 45_000L && !shouldCancel()) {
-                val tailStartMs = max(0L, totalDurationMs - 24_000L)
-                try {
-                    val tailPcm = decodeHlsWindow(adapter, tailStartMs, TAIL_WINDOW_US, shouldCancel)
-                    if (tailPcm != null) {
-                        mixOutPointMs = detectMixOut(
-                            energyEnvelope(tailPcm.samples, tailPcm.sampleRate),
-                            tailStartMs,
-                            totalDurationMs
-                        )
-                    }
-                } catch (_: Exception) {}
-            }
-
-            return Result(bpm, firstBeatOffsetMs, confidence, mixInPointMs, mixOutPointMs, key?.first, key?.second, bodyEnergy(midPcm.samples, bpm))
         }
 
         var grabber: FFmpegFrameGrabber? = null

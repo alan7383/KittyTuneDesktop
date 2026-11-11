@@ -20,7 +20,7 @@ package com.alananasss.kittytune.data.drm
  * installed, DRM tracks fail with [DrmUnavailableException] and a message naming the missing piece,
  * instead of a decrypt error hundreds of lines into the player.
  */
-interface WidevineCdm {
+interface WidevineCdm : AutoCloseable {
 
     /** For logs and error messages, e.g. `"Android MediaDrm"`. */
     val name: String
@@ -32,6 +32,10 @@ interface WidevineCdm {
      *   the EME stack would pass to `generateRequest`.
      */
     fun openSession(pssh: ByteArray): WidevineLicenseSession
+
+    fun fork(): WidevineCdm? = null
+
+    override fun close() {}
 }
 
 /** One license exchange. Closing it releases whatever key material the CDM is holding. */

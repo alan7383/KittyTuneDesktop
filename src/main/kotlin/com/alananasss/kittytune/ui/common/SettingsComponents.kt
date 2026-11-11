@@ -76,12 +76,13 @@ fun SettingsGroupTitle(title: String) {
 @Composable
 fun SettingsGroup(
     title: String? = null,
-    items: List<@Composable (Shape) -> Unit>
+    items: List<@Composable (Shape) -> Unit>,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 16.dp
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = horizontalPadding, vertical = 8.dp)
     ) {
         if (title != null) {
             SettingsGroupTitle(title)

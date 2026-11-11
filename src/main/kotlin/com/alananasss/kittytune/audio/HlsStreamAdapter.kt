@@ -54,7 +54,8 @@ class HlsStreamAdapter(
      * Playback uses the shared one; a download sets [SoundCloudDrm.sessionForDownload] so it works on
      * its own CDM instance and cannot reset the session of the track currently playing.
      */
-    internal var sessionProvider: (HlsEncryptionInfo, String) -> WidevineLicenseSession = SoundCloudDrm::session
+    private val playbackSession = com.alananasss.kittytune.data.drm.PlaybackDrmSession()
+    internal var sessionProvider: (HlsEncryptionInfo, String) -> WidevineLicenseSession = playbackSession::session
 
     /**
      * Reports `(fragments read, fragments total)` as the stream is consumed.
@@ -101,7 +102,7 @@ class HlsStreamAdapter(
      * sidecar) stop. A session that is not playback's current one is left alone: a download releases
      * its own when it is done.
      */
-    internal var sessionRelease: (WidevineLicenseSession) -> Unit = SoundCloudDrm::releaseSession
+    internal var sessionRelease: (WidevineLicenseSession) -> Unit = playbackSession::release
 
     /**
      * Fragments of a protected stream, already decrypted, by index.

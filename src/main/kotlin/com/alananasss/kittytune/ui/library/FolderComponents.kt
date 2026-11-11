@@ -775,7 +775,7 @@ fun LibraryPlaylistOptionsDialog(
                 })
             }
             if (permalink.isNotEmpty()) {
-                add(LibraryPlaylistActionItem(Icons.Outlined.Share, str("btn_share")) {
+                add(LibraryPlaylistActionItem(Icons.Rounded.Link, str("cover_copy_link")) {
                     playerViewModel.sharePlaylist(playlist)
                     onDismiss()
                 })
