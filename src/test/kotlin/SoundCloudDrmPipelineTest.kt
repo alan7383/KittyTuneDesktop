@@ -83,6 +83,10 @@ class SoundCloudDrmPipelineTest {
     fun startServer() {
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/playlist.m3u8") { exchange -> respond(exchange, playlist(), "application/vnd.apple.mpegurl") }
+        server.createContext("/long.m3u8") { exchange ->
+            val body = String(playlist()).replace("#EXT-X-ENDLIST", "#EXTINF:2.000,\ndata000.m4s\n#EXT-X-ENDLIST")
+            respond(exchange, body.toByteArray(), "application/vnd.apple.mpegurl")
+        }
         server.createContext("/init.mp4") { exchange -> respond(exchange, initBytes, "video/mp4") }
         server.createContext("/data000.m4s") { exchange -> respond(exchange, segmentBytes, "video/iso.segment") }
         server.createContext("/playback/widevine") { exchange ->
@@ -134,6 +138,7 @@ class SoundCloudDrmPipelineTest {
     /** Returns a fixed key, and records what the app asked the license server for. */
     private inner class FakeCdm : WidevineCdm {
         override val name = "test CDM"
+        override fun fork(): WidevineCdm = FakeCdm()
 
         var psshSeen: ByteArray? = null
         var closed = false
@@ -184,6 +189,46 @@ class SoundCloudDrmPipelineTest {
     }
 
     // --- tests ------------------------------------------------------------------------------------
+
+    @Test
+    fun overlappingAdaptersDoNotCloseThePlayingSession() {
+        val cdm = FakeCdm()
+        WidevineCdmRegistry.install(cdm)
+        val first = HlsStreamAdapter("$base/long.m3u8", emptyMap()).apply { licenseToken = "first" }
+        val second = HlsStreamAdapter("$base/long.m3u8?next", emptyMap()).apply { licenseToken = "second" }
+        try {
+            first.getInputStream(0).use { a ->
+                val buffer = ByteArray(64 * 1024)
+                a.read(buffer)
+                a.read(buffer)
+                second.getInputStream(0).use { b ->
+                    b.read(buffer)
+                    b.read(buffer)
+                    assertFalse("the incoming adapter closed the playing session", cdm.closed)
+                    assertTrue(a.read(buffer) > 0)
+                }
+            }
+        } finally { first.releaseDrm(); second.releaseDrm() }
+    }
+
+    @Test
+    fun protectedHeadPrefetchDoesNotOpenALicense() {
+        val cdm = FakeCdm()
+        WidevineCdmRegistry.install(cdm)
+        val url = "$base/long.m3u8?warm"
+        SoundCloudDrm.rememberLicence(url, "warm-token")
+        com.alananasss.kittytune.audio.HlsHeadCache.warm(url, emptyMap())
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3)
+        var ready: HlsStreamAdapter? = null
+        while (ready == null && System.nanoTime() < deadline) {
+            ready = com.alananasss.kittytune.audio.HlsHeadCache.take(url) { null }
+            if (ready == null) Thread.sleep(5)
+        }
+        try {
+            assertTrue("head prefetch did not complete", ready?.isEncrypted == true)
+            assertEquals(0, licensePosts.get())
+        } finally { ready?.releaseDrm() }
+    }
 
     @Test
     fun aProtectedPlaylistIsLicensedDecryptedAndFedAsClearAudio() {
