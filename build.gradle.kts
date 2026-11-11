@@ -974,7 +974,7 @@ tasks.register<Test>("headlessTest") {
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
             "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
-            "WindowsNativeDspTest", "AudioLineCloserTest", "DesktopRenderTest", "DesktopDensityTest",
+            "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
