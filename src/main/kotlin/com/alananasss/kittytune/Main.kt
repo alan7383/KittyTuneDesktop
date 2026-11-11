@@ -24,14 +24,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Tray
 import coil3.compose.setSingletonImageLoaderFactory
 import com.alananasss.kittytune.core.DesktopBackDispatcher
+import com.alananasss.kittytune.core.MAC_STATUS_MENU_ANCHOR
+import com.alananasss.kittytune.core.MacStatusMenu
+import com.alananasss.kittytune.core.MacStatusMenuItem
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.ui.ImageLoaderFactory
-import com.alananasss.kittytune.ui.login.LoginScreen
-import com.alananasss.kittytune.ui.login.WelcomeScreen
 import com.alananasss.kittytune.ui.main.MainScreen
 import com.alananasss.kittytune.ui.setup.SetupScreen
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
@@ -44,10 +46,17 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 
-enum class AppState { WELCOME, LOGIN, SETUP, MAIN }
+enum class AppState { ACCOUNT, SETUP, MAIN }
+
+internal fun initialAppState(hasCompletedSetup: Boolean, hasSession: Boolean): AppState = when {
+    !hasCompletedSetup -> AppState.SETUP
+    hasSession -> AppState.MAIN
+    else -> AppState.ACCOUNT
+}
 
 @Composable
 fun AppRouter(playerViewModel: PlayerViewModel? = null) {
+    com.alananasss.kittytune.utils.StartupTimeline.mark("router: first composition")
     val tokenManager = remember { TokenManager }
     val isLoggedIn = !tokenManager.getAccessToken().isNullOrEmpty()
     val isGuestMode = tokenManager.isGuestMode()
@@ -56,37 +65,50 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
     val setupCompletedAtLaunch = remember { PlayerPreferences().getHasCompletedSetup() && (isLoggedIn || isGuestMode) }
     var appState by remember {
         val hasCompletedSetup = PlayerPreferences().getHasCompletedSetup()
-        val initialState = if (isLoggedIn || isGuestMode) {
-            if (hasCompletedSetup) AppState.MAIN else AppState.SETUP
-        } else {
-            AppState.WELCOME
-        }
+        val initialState = initialAppState(hasCompletedSetup, isLoggedIn || isGuestMode)
         mutableStateOf(initialState)
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         TokenManager.logoutFlow.collect {
-            appState = AppState.WELCOME
+            playerViewModel?.resetAccountProfile()
+            com.alananasss.kittytune.ui.setup.SetupLauncher.requested = false
+            com.alananasss.kittytune.ui.setup.AccountLauncher.requested = false
+            appState = initialAppState(PlayerPreferences().getHasCompletedSetup(), false)
         }
     }
 
+    // Whoever is signed in may have changed on the way out of the account screen, so the profile is read again.
+    val accountChosen = {
+        playerViewModel?.resetAccountProfile()
+        com.alananasss.kittytune.ui.setup.AccountLauncher.requested = false
+        appState = AppState.MAIN
+    }
+    // "Switch account" from inside the app: the same screen, but it can be closed and nobody is signed out.
+    if (com.alananasss.kittytune.ui.setup.AccountLauncher.requested && appState == AppState.MAIN) {
+        com.alananasss.kittytune.ui.setup.AccountScreen(
+            onDone = accountChosen,
+            onCancel = { com.alananasss.kittytune.ui.setup.AccountLauncher.requested = false }
+        )
+        return
+    }
+
+    if (com.alananasss.kittytune.ui.setup.SetupLauncher.requested) {
+        SetupScreen(
+            onSetupComplete = { com.alananasss.kittytune.ui.setup.SetupLauncher.requested = false },
+            onCancel = { com.alananasss.kittytune.ui.setup.SetupLauncher.requested = false }
+        )
+        return
+    }
+
     when (appState) {
-        AppState.WELCOME -> WelcomeScreen(
-            onLoginClick = { appState = AppState.LOGIN },
-            onGuestClick = { 
-                tokenManager.setGuestMode(true)
-                appState = AppState.SETUP 
-            },
-            isGuestLoading = false
-        )
-        AppState.LOGIN -> LoginScreen(
-            onLoginSuccess = { appState = AppState.SETUP },
-            onBackClick = { appState = AppState.WELCOME }
-        )
+        // Setup is shown once. Signing out, or a guest asking to sign in, only asks for the account again.
+        AppState.ACCOUNT -> com.alananasss.kittytune.ui.setup.AccountScreen(onDone = accountChosen)
         AppState.SETUP -> SetupScreen(
             onSetupComplete = { appState = AppState.MAIN }
         )
         AppState.MAIN -> {
+            com.alananasss.kittytune.utils.StartupTimeline.mark("router: composing main screen")
             if (playerViewModel != null) MainScreen(playerViewModel = playerViewModel) else MainScreen()
             // One-time "new: kitty pet" announcement for people who updated (not fresh installs).
             com.alananasss.kittytune.ui.pet.PetAnnouncementHost(setupCompletedAtLaunch = setupCompletedAtLaunch, playerViewModel = playerViewModel)
@@ -99,9 +121,21 @@ private const val DROP_HIDDEN_WINDOW_AFTER_MS = 20_000L
 
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main(args: Array<String>) {
+    com.alananasss.kittytune.utils.StartupTimeline.mark("main() entered")
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
+    // Two costs that do not have to be on the path to the first frame, because neither is on the AWT
+    // thread: Skiko's native library (13 MB to map and relocate, needed by the first window and by
+    // nothing before it) and the Swing look and feel (Swing's own dialogs, which only exist once
+    // somebody opens one). Both are started here and finish long before either is first used.
+    Thread({
+        runCatching { org.jetbrains.skiko.Library.load() }
+        com.alananasss.kittytune.utils.StartupTimeline.mark("skiko native library loaded")
+        runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
+        com.alananasss.kittytune.utils.StartupTimeline.mark("swing look and feel applied")
+    }, "startup-preload").apply { isDaemon = true; start() }
+    com.alananasss.kittytune.utils.StartupTimeline.mark("single instance (lock + listener)")
     com.alananasss.kittytune.audio.LinuxAudioIntegration.initialize()
     com.alananasss.kittytune.audio.ai.OnnxHelper.disableNativeTelemetry()
     com.alananasss.kittytune.core.MacWindowIntegration.configureApplication()
@@ -111,24 +145,27 @@ fun main(args: Array<String>) {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }
     com.alananasss.kittytune.data.MacSoundCloudOAuth.installUriHandler()
+    com.alananasss.kittytune.utils.StartupTimeline.mark("platform init")
     AppBootstrap.init()
+    com.alananasss.kittytune.utils.StartupTimeline.mark("AppBootstrap.init")
     ProtectedTracksDemo.prepare()
+    com.alananasss.kittytune.utils.StartupTimeline.mark("ProtectedTracksDemo.prepare")
     // Transparent windows (pet, mini player, menus) in software on Windows: Direct3D hung on their first frame
     // on some GPU drivers and froze the whole app.
     com.alananasss.kittytune.core.TransparentWindowRendering.install()
     // Opaque floating windows when RTSS is running or a floating window froze the app last time.
     com.alananasss.kittytune.core.FloatingWindowCompat.init()
-    // Swing's own dialogs (folder pickers, the avatar chooser) in the system's look rather than Java's Metal,
-    // which is what made them look cut down next to Windows' own. Compose is unaffected.
-    runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
+    com.alananasss.kittytune.utils.StartupTimeline.mark("transparent window compat")
 
     // ThemeState's snapshot states must exist before the first composition. Otherwise PlayerViewModel can
     // create them from a background thread after the window's snapshot was taken, and that composition
     // fails with "Reading a state that was created after the snapshot was taken".
     com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor
+    com.alananasss.kittytune.utils.StartupTimeline.mark("entering application{}")
 
     application {
         val playerViewModel = remember { PlayerViewModel(AppInstance.application) }
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("PlayerViewModel created")
         val prefsForTray = remember { PlayerPreferences() }
         val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())
 
@@ -136,13 +173,7 @@ fun main(args: Array<String>) {
         // window/taskbar icon and the tray icon, live.
         val appIconVariant by prefsForTray.appIconVariantFlow().collectAsState(initial = prefsForTray.getAppIconVariant())
         val appIcon = androidx.compose.runtime.remember(appIconVariant) {
-            runCatching {
-                Thread.currentThread().contextClassLoader?.getResourceAsStream(
-                    com.alananasss.kittytune.core.AppIconVariants.resourcePath(appIconVariant)
-                )?.use { stream ->
-                    androidx.compose.ui.graphics.painter.BitmapPainter(androidx.compose.ui.res.loadImageBitmap(stream))
-                }
-            }.getOrNull()
+            com.alananasss.kittytune.core.AppIconRuntime.loadAppPainter(appIconVariant)
         }
         val trayIcon = androidx.compose.runtime.remember(appIconVariant) {
             com.alananasss.kittytune.core.AppIconRuntime.loadTrayPainter(appIconVariant) ?: appIcon
@@ -175,7 +206,7 @@ fun main(args: Array<String>) {
             isWindowVisible = true
             isWindowComposed = true
             val win = java.awt.Window.getWindows().firstOrNull { it is androidx.compose.ui.awt.ComposeWindow }
-                ?: java.awt.Window.getWindows().firstOrNull { it.isVisible }
+                ?: java.awt.Window.getWindows().firstOrNull { it.isVisible && it.name != MAC_STATUS_MENU_ANCHOR }
             win?.let { w ->
                 runCatching {
                     w.isVisible = true
@@ -225,9 +256,10 @@ fun main(args: Array<String>) {
         var useSniTray by remember { mutableStateOf(isLinux) }
 
         androidx.compose.runtime.DisposableEffect(appIconVariant) {
-            // The packaged Mac bundle already has its icon. Only an explicit variant selection
-            // needs a persistent Finder update; startup updates the live Dock through Taskbar.
-            if (!isMacHost) runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
+            com.alananasss.kittytune.utils.StartupTimeline.markOnce("icon installer: start")
+            if (isMacHost) com.alananasss.kittytune.core.AppIconRuntime.applyMacDockIcon(appIconVariant)
+            com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant)
+            com.alananasss.kittytune.utils.StartupTimeline.markOnce("icon installer: done")
             onDispose { }
         }
 
@@ -279,26 +311,54 @@ fun main(args: Array<String>) {
 
         val trayMenuScope = androidx.compose.runtime.rememberCoroutineScope()
 
-        if (trayIcon != null && !useSniTray) {
-            if (isMacHost) {
-                // Media transport belongs to macOS Now Playing; the status menu contains app actions.
-                Tray(icon = trayIcon, tooltip = "KittyTune", onAction = { showMainWindow() }) {
-                    Item(str("menu_show_window"), onClick = { showMainWindow() })
-                    Item(
-                        if (playerViewModel.isMiniPlayerVisible) str("menu_mini_player_hide") else str("menu_mini_player_show"),
-                        onClick = { playerViewModel.toggleMiniPlayer() },
-                    )
-                    Item(
-                        if (com.alananasss.kittytune.ui.pet.PetWindowState.visible) str("pet_desk_hide") else str("pet_desk_tray_show"),
-                        onClick = { com.alananasss.kittytune.ui.pet.PetWindowState.toggle() },
-                    )
-                    Separator()
-                    Item(str("menu_exit"), onClick = {
-                        com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
-                        exitApplication()
-                    })
+        fun openSettings() {
+            showMainWindow()
+            playerViewModel.navigateToPlaylistId = "settings"
+        }
+
+        var showMacAbout by remember { mutableStateOf(false) }
+        if (isMacHost) {
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                val desktop = java.awt.Desktop.getDesktop()
+                val preferences = desktop.isSupported(java.awt.Desktop.Action.APP_PREFERENCES)
+                val about = desktop.isSupported(java.awt.Desktop.Action.APP_ABOUT)
+                if (preferences) desktop.setPreferencesHandler { openSettings() }
+                if (about) desktop.setAboutHandler {
+                    showMainWindow()
+                    showMacAbout = true
                 }
-            } else if (isWindowsHost) {
+                onDispose {
+                    if (preferences) desktop.setPreferencesHandler(null)
+                    if (about) desktop.setAboutHandler(null)
+                }
+            }
+            val statusIcon = remember(appIconVariant) {
+                com.alananasss.kittytune.core.AppIconRuntime.loadMacStatusIcon(appIconVariant)
+            }
+            if (statusIcon != null) {
+                MacStatusMenu(statusIcon, listOf(
+                    MacStatusMenuItem(str("menu_show_window")) { showMainWindow() },
+                    MacStatusMenuItem(str("profile_menu_settings")) { openSettings() },
+                    null,
+                    MacStatusMenuItem(str("player_play_pause")) { playerViewModel.togglePlayPause() },
+                    MacStatusMenuItem(str("player_previous")) { playerViewModel.smartPrevious() },
+                    MacStatusMenuItem(str("player_next")) { playerViewModel.playNext() },
+                    null,
+                    MacStatusMenuItem(
+                        str(if (playerViewModel.isMiniPlayerVisible) "menu_mini_player_hide" else "menu_mini_player_show")
+                    ) { playerViewModel.toggleMiniPlayer() },
+                    MacStatusMenuItem(
+                        str(if (com.alananasss.kittytune.ui.pet.PetWindowState.visible) "pet_desk_hide" else "pet_desk_tray_show")
+                    ) { com.alananasss.kittytune.ui.pet.PetWindowState.toggle() },
+                    null,
+                    MacStatusMenuItem(str("menu_exit")) {
+                        AppInstance.isShuttingDown = true
+                        exitApplication()
+                    }
+                ))
+            }
+        } else if (trayIcon != null && !useSniTray) {
+            if (isWindowsHost) {
                 // Windows gets a real Win32 menu (see Win32TrayMenu): dark when the app is, rounded on
                 // Windows 11, and the only kind the hidden-icons flyout stays open around.
                 Tray(
@@ -570,7 +630,48 @@ fun main(args: Array<String>) {
                 } else false
             },
         ) {
+            com.alananasss.kittytune.utils.StartupTimeline.markOnce("window content composing")
+            // The geometry this window is about to have, read here (in the composition) so the effect
+            // below can hand it to AWT before the window is shown.
+            val windowDensity = LocalDensity.current
+            LaunchedEffect(Unit) {
+                // Show the window as soon as the composition is applied instead of waiting for the
+                // toolkit's own coroutine, which the frames this window keeps producing leave queued
+                // (measured: first frame at 1.8 s, window on screen at 2.9 s, event thread composing
+                // the whole time). Size and position are applied first: Compose sets them itself, but
+                // after showing, so the window was seen opening small and growing into place. Every
+                // placement other than Floating — maximised, full screen — keeps the toolkit's own
+                // sequence, which is the one that knows how to ask the window manager for it.
+                if (!window.isVisible && isWindowVisible &&
+                    windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating
+                ) {
+                    val targetSize = windowState.size
+                    val targetWidth = with(windowDensity) { targetSize.width.roundToPx() }
+                    val targetHeight = with(windowDensity) { targetSize.height.roundToPx() }
+                    if (targetWidth > 0 && targetHeight > 0) {
+                        val targetPosition = windowState.position
+                        if (targetPosition is androidx.compose.ui.window.WindowPosition.Absolute) {
+                            window.setBounds(
+                                with(windowDensity) { targetPosition.x.roundToPx() },
+                                with(windowDensity) { targetPosition.y.roundToPx() },
+                                targetWidth,
+                                targetHeight,
+                            )
+                        } else {
+                            window.setSize(targetWidth, targetHeight)
+                        }
+                    }
+                    window.isVisible = true
+                    com.alananasss.kittytune.utils.StartupTimeline.markOnce("window shown on first composition")
+                }
+                androidx.compose.runtime.withFrameNanos {
+                    com.alananasss.kittytune.utils.StartupTimeline.mark("first frame drawn")
+                }
+                com.alananasss.kittytune.utils.StartupTimeline.traceUntilWindowVisible(window)
+            }
+            com.alananasss.kittytune.utils.StartupTimeline.markOnce("coil: start")
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
+            com.alananasss.kittytune.utils.StartupTimeline.markOnce("coil: done")
 
             androidx.compose.runtime.DisposableEffect(window) {
                 val removeMacListeners = com.alananasss.kittytune.core.MacWindowIntegration.install(window) {
@@ -593,9 +694,20 @@ fun main(args: Array<String>) {
                     override fun windowGainedFocus(event: java.awt.event.WindowEvent?) {
                         playerViewModel.refreshSyncedPlaybackOnForeground()
                     }
+
+                    override fun windowOpened(event: java.awt.event.WindowEvent?) {
+                        com.alananasss.kittytune.utils.StartupTimeline.markOnce("window opened (first shown)")
+                    }
                 }
                 window.addWindowFocusListener(listener)
-                onDispose { window.removeWindowFocusListener(listener) }
+                window.addWindowListener(listener)
+                if (window.isVisible) {
+                    com.alananasss.kittytune.utils.StartupTimeline.markOnce("window opened (first shown, already visible)")
+                }
+                onDispose {
+                    window.removeWindowFocusListener(listener)
+                    window.removeWindowListener(listener)
+                }
             }
 
             // Set dark background immediately on the AWT window before composition to prevent white flash on Win32/DirectX resize
@@ -707,11 +819,67 @@ fun main(args: Array<String>) {
                 }
             }
 
-            // The macOS Dock image and the multi-size window icons are outside what
-            // Window(icon = …) can set, so they are applied here — from inside the window's
-            // own composition, where `window` is guaranteed to exist.
+            if (isMacHost) {
+                MenuBar {
+                    Menu(str("menu_go")) {
+                        Item(str("nav_home"), onClick = { playerViewModel.navigateToPlaylistId = "home" })
+                        Item(
+                            str("nav_search"),
+                            shortcut = androidx.compose.ui.input.key.KeyShortcut(Key.F, meta = true),
+                            onClick = { playerViewModel.navigateToPlaylistId = "search" }
+                        )
+                        Item(str("history_title"), onClick = { playerViewModel.navigateToPlaylistId = "history" })
+                    }
+                    Menu(str("settings_cat_playback")) {
+                        val hasTrack = playerViewModel.uiCurrentTrack != null
+                        Item(str("player_play_pause"), enabled = hasTrack, onClick = { playerViewModel.togglePlayPause() })
+                        Item(str("player_previous"), enabled = hasTrack, onClick = { playerViewModel.smartPrevious() })
+                        Item(str("player_next"), enabled = hasTrack, onClick = { playerViewModel.playNext() })
+                        Separator()
+                        CheckboxItem(
+                            str("menu_shuffle"),
+                            checked = playerViewModel.uiShuffleEnabled,
+                            onCheckedChange = { playerViewModel.toggleShuffle() }
+                        )
+                        val repeat = playerViewModel.uiRepeatMode
+                        Item(str(when (repeat.name) {
+                            "ALL" -> "menu_repeat_all"
+                            "ONE" -> "menu_repeat_one"
+                            else -> "menu_repeat"
+                        }), onClick = { playerViewModel.toggleRepeatMode() })
+                        Separator()
+                        CheckboxItem(
+                            str("shortcut_mute"),
+                            checked = playerViewModel.uiVolume <= 0.001f,
+                            onCheckedChange = { playerViewModel.toggleMute() }
+                        )
+                    }
+                    Menu(str("menu_window")) {
+                        Item(str("player_queue"), onClick = { playerViewModel.navigateToPlaylistId = "expanded_queue" })
+                        CheckboxItem(
+                            str("player_lyrics"),
+                            checked = playerViewModel.showLyricsSheet,
+                            enabled = playerViewModel.uiCurrentTrack != null,
+                            onCheckedChange = { playerViewModel.showLyricsSheet = it }
+                        )
+                        Item(
+                            str(if (playerViewModel.isMiniPlayerVisible) "menu_mini_player_hide" else "menu_mini_player_show"),
+                            onClick = { playerViewModel.toggleMiniPlayer() }
+                        )
+                        Separator()
+                        Item(str("btn_fullscreen"), onClick = {
+                            val state = com.alananasss.kittytune.core.AppWindowState
+                            state.fullScreen = !state.fullScreen
+                        })
+                    }
+                }
+            }
+
+            // Apply the multi-size icons once the native window exists.
             androidx.compose.runtime.LaunchedEffect(appIconVariant) {
+                com.alananasss.kittytune.utils.StartupTimeline.markOnce("window icon: start")
                 com.alananasss.kittytune.core.AppIconRuntime.apply(appIconVariant, window)
+                com.alananasss.kittytune.utils.StartupTimeline.markOnce("window icon: done")
             }
 
             val prefs = remember { PlayerPreferences() }
@@ -727,6 +895,12 @@ fun main(args: Array<String>) {
                 com.alananasss.kittytune.core.LocalWindowSeen provides windowSeen,
             ) {
                 KittyTuneTheme {
+                    if (showMacAbout) {
+                        com.alananasss.kittytune.ui.profile.AboutDialog(
+                            onDismiss = { showMacAbout = false },
+                            onCreditsClick = { playerViewModel.navigateToPlaylistId = "credits" }
+                        )
+                    }
                     // Inside the theme, so the title bar and underlying window canvas track
                     // the live palette — the cover-seeded dynamic theme included — instead of
                     // a colour read once at startup (issue #33).
@@ -736,7 +910,13 @@ fun main(args: Array<String>) {
                     LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
                     androidx.compose.foundation.layout.Box(propagateMinConstraints = true) {
-                        Surface { AppRouter(playerViewModel = playerViewModel) }
+                        Surface {
+                            if (System.getProperty("kittytune.splashProbe") == "true") {
+                                androidx.compose.material3.Text("KittyTune")
+                            } else {
+                                AppRouter(playerViewModel = playerViewModel)
+                            }
+                        }
                         // Closing dialogs fade out over the app, drawn above it.
                         com.alananasss.kittytune.core.DialogExitHost()
                     }

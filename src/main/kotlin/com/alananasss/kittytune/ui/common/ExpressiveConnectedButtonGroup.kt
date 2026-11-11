@@ -12,6 +12,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonShapes
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -63,9 +66,10 @@ fun <T> ExpressiveConnectedButtonGroup(
                     checkedContainerColor = checkedContainerColor,
                     checkedContentColor = checkedContentColor,
                 ),
-                shapes = when (index) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                shapes = when {
+                    options.size == 1 -> ToggleButtonShapes(shape = CircleShape, pressedShape = RoundedCornerShape(12.dp), checkedShape = CircleShape)
+                    index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    index == options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
             ) {
