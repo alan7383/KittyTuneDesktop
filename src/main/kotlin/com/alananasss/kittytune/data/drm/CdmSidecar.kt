@@ -55,7 +55,7 @@ internal object CdmSidecar {
     private const val RETRY_AFTER_MS = 5 * 60_000L
 
     private val lock = Any()
-    private var installed: SidecarWidevineCdm? = null
+    @Volatile private var installed: SidecarWidevineCdm? = null
     private var installedCommand: List<String>? = null
     private var secondary: SidecarWidevineCdm? = null
     private var attempted = false
@@ -115,7 +115,7 @@ internal object CdmSidecar {
      * Slow (it may boot WSL), so never on the UI thread.
      */
     fun verify(): Boolean {
-        synchronized(lock) {
+        val (verified, retired) = synchronized(lock) {
             val command = explicitCommand()
             if (command == null) {
                 failureReason = null
@@ -128,12 +128,14 @@ internal object CdmSidecar {
             if (error != null) {
                 failureReason = "$label: $error"
                 Logger.w(TAG, "sidecar unavailable — $failureReason")
-                unregister()
-                return false
+                false to unregister()
+            } else {
+                installed ?: register(command)
+                true to emptyList()
             }
-            installed ?: register(command)
-            return true
         }
+        retired.forEach { runCatching { it.release() } }
+        return verified
     }
 
     /**
@@ -141,25 +143,25 @@ internal object CdmSidecar {
      * for the retry window, so the next tracks do not fail the same way.
      */
     internal fun markFailed(cdm: SidecarWidevineCdm, reason: String) {
-        synchronized(lock) {
+        val retired = synchronized(lock) {
             // The download's daemon failing says nothing about playback's: only the second instance
             // and the download session go. Dropping the registered one here would stop the music for
             // a failed download.
             if (cdm === secondary) {
                 failureReason = "${cdm.name}: $reason"
                 Logger.w(TAG, "secondary sidecar failed — $failureReason")
-                runCatching { secondary?.release() }
                 secondary = null
-                SoundCloudDrm.releaseDownloadSession()
-                return
+                listOf(cdm)
+            } else {
+                if (cdm !== installed) return
+                failureReason = "${cdm.name}: $reason"
+                Logger.w(TAG, "sidecar failed — $failureReason")
+                attempted = true
+                lastAttemptAt = System.currentTimeMillis()
+                unregister()
             }
-            if (cdm !== installed) return
-            failureReason = "${cdm.name}: $reason"
-            Logger.w(TAG, "sidecar failed — $failureReason")
-            attempted = true
-            lastAttemptAt = System.currentTimeMillis()
-            unregister()
         }
+        retired.forEach { runCatching { it.release() } }
     }
 
     private fun register(command: List<String>): SidecarWidevineCdm {
@@ -171,21 +173,19 @@ internal object CdmSidecar {
         // A refusal earned by the in-process CDM (always refused on Windows) says nothing about
         // this one, which SoundCloud licenses.
         SoundCloudWidevineLicense.resetLicenceRefusal()
-        SoundCloudDrm.forgetSessions()
         Logger.d(TAG, "sidecar CDM registered: ${cdm.name}")
         return cdm
     }
 
-    private fun unregister() {
+    private fun unregister(): List<SidecarWidevineCdm> {
         val previous = installed
-        runCatching { previous?.release() }
-        runCatching { secondary?.release() }
+        val retired = listOfNotNull(installed, secondary)
         installed = null
         installedCommand = null
         secondary = null
         // Only our own registration: on Linux the in-process CDM may be the registered one.
         if (previous != null && WidevineCdmRegistry.current() === previous) WidevineCdmRegistry.install(null)
-        SoundCloudDrm.forgetSessions()
+        return retired
     }
 
     /**
@@ -203,14 +203,18 @@ internal object CdmSidecar {
         }
     }
 
+    fun isCurrentSecondary(cdm: WidevineCdm): Boolean = synchronized(lock) { secondary === cdm }
+
     /** Drops the registration and forgets the retry window: the method or the setup changed. */
     fun reset() {
-        synchronized(lock) {
-            unregister()
+        val retired = synchronized(lock) {
+            val previous = unregister()
             attempted = false
             lastAttemptAt = 0L
             failureReason = null
+            previous
         }
+        retired.forEach { runCatching { it.release() } }
     }
 
     /**
@@ -328,6 +332,10 @@ internal class SidecarWidevineCdm(
     private val command: List<String>,
     override val name: String,
 ) : WidevineCdm {
+
+    override fun fork(): WidevineCdm = SidecarWidevineCdm(command, "$name (playback)")
+
+    override fun close() = release()
 
     private val lock = Any()
     private var transport: SidecarTransport? = null

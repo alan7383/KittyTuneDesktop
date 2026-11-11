@@ -102,6 +102,7 @@ class MixTransition internal constructor(
      */
     fun noteShown(fraction: Float) {
         lastShown = fraction
+        glideFrom = null
         catchUpFrom = null
     }
 

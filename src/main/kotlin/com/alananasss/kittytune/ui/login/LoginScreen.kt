@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ButtonDefaults
@@ -53,7 +56,6 @@ import com.alananasss.kittytune.data.SoundCloudOAuthServer
 import com.alananasss.kittytune.data.MacSoundCloudOAuth
 import androidx.compose.runtime.key
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.awaitCancellation
 
 private const val TAG = "LoginScreen"
 
@@ -78,16 +80,17 @@ private val authHttpClient: OkHttpClient
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    embedded: Boolean = false
 ) {
     var attempt by remember { mutableStateOf(0) }
     key(attempt) {
-        LoginAttempt(onLoginSuccess, onBackClick, onRetry = { attempt++ })
+        LoginAttempt(onLoginSuccess, onBackClick, onRetry = { attempt++ }, embedded = embedded)
     }
 }
 
 @Composable
-private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, onRetry: () -> Unit) {
+private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, onRetry: () -> Unit, embedded: Boolean) {
     val tokenManager = remember { TokenManager }
     val pkceVerifier = remember { PkceHelper.generateVerifier() }
     val pkceChallenge = remember(pkceVerifier) { PkceHelper.generateChallenge(pkceVerifier) }
@@ -117,7 +120,7 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
 
     var loginError by remember { mutableStateOf<String?>(null) }
     var callbackServer by remember { mutableStateOf<SoundCloudOAuthServer?>(null) }
-    var macRegistration by remember { mutableStateOf<AutoCloseable?>(null) }
+    var protocolRegistration by remember { mutableStateOf<AutoCloseable?>(null) }
     var isProtocolReady by remember { mutableStateOf(false) }
     var serverPort by remember { mutableStateOf<Int?>(null) }
 
@@ -142,7 +145,7 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
             null
         }
         onDispose {
-            macRegistration?.close()
+            protocolRegistration?.close()
             server?.close()
         }
     }
@@ -154,117 +157,70 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
 
     LaunchedEffect(loginError) {
         if (loginError != null) {
-            macRegistration?.close()
+            protocolRegistration?.close()
             callbackServer?.close()
         }
     }
 
-    LaunchedEffect(serverPort) {
-        if (serverPort != null && !isProtocolReady) {
+    SoundCloudProtocolRegistration(
+        port = serverPort,
+        prepare = { port ->
             var registration: AutoCloseable? = null
             try {
                 withContext(Dispatchers.IO) {
-                    try {
-                        if (os.contains("windows")) {
-                            val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
-                            if (!appDir.exists()) appDir.mkdirs()
+                    if (os.contains("windows")) {
+                        registration = com.alananasss.kittytune.data.WindowsSoundCloudOAuth.prepare(port)
+                    } else if (os.contains("mac")) {
+                        registration = MacSoundCloudOAuth.prepare(authState, port)
+                    } else if (os.contains("linux")) {
+                        val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
+                        if (!appDir.exists()) appDir.mkdirs()
 
-                            // Write the current port to a side-car file so the VBS always reads
-                            // the live port rather than a value baked in at registration time.
-                            val portFile = java.io.File(appDir, "sc_oauth_port.txt")
-                            portFile.writeText(serverPort.toString())
+                        val shellFile = java.io.File(appDir, "sc_handler.sh")
+                        shellFile.writeText(buildString {
+                            append("#!/bin/bash\n")
+                            append("# Forward success and denial; ignore parameter-free probes.\n")
+                            append("# SoundCloud's deep-link check sends sc://auth without code=\n")
+                            append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
+                            append("if [[ \"\$1\" == *\"code=\"* || \"\$1\" == *\"error=\"* ]]; then\n")
+                            append("  curl -s -X POST 'http://127.0.0.1:$port/callback' -d \"\$1\"\n")
+                            append("fi\n")
+                        })
+                        shellFile.setExecutable(true)
 
-                            val vbsFile = java.io.File(appDir, "sc_handler.vbs")
-                            val portFilePath = portFile.absolutePath
-                            val vbsContent = buildString {
-                                append("If WScript.Arguments.Count > 0 Then\r\n")
-                                append("  url = WScript.Arguments(0)\r\n")
-                                append("  If InStr(url, \"code=\") > 0 Or InStr(url, \"error=\") > 0 Then\r\n")
-                                append("    Dim fso, port\r\n")
-                                append("    Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\n")
-                                append("    port = Trim(fso.OpenTextFile(\"$portFilePath\", 1).ReadAll())\r\n")
-                                append("    Set req = CreateObject(\"MSXML2.ServerXMLHTTP.6.0\")\r\n")
-                                append("    req.open \"POST\", \"http://127.0.0.1:\" & port & \"/callback\", False\r\n")
-                                append("    req.setRequestHeader \"Content-Type\", \"text/plain\"\r\n")
-                                append("    req.send url\r\n")
-                                append("  End If\r\n")
-                                append("End If\r\n")
-                            }
-                            vbsFile.writeText(vbsContent)
-                        
-                            if (!vbsFile.exists()) {
-                                throw Exception("VBS file creation failed at ${vbsFile.absolutePath}")
-                            }
+                        val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
+                        mimeDir.mkdirs()
+                        val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
+                        targetDesktop.writeText(buildString {
+                            append("[Desktop Entry]\n")
+                            append("Name=KittyTune SC Auth\n")
+                            append("Exec=${shellFile.absolutePath} %u\n")
+                            append("Type=Application\n")
+                            append("NoDisplay=true\n")
+                            append("MimeType=x-scheme-handler/sc;\n")
+                            append("Terminal=false\n")
+                        })
 
-                            // Use reg.exe directly to avoid PowerShell backslash-escaping complexity.
-                            // The VBS path needs no escaping since reg.exe receives it as a raw argument.
-                            val handlerCmd = """wscript.exe "${vbsFile.absolutePath}" "%1""""
-                            val regExe = "${System.getenv("SystemRoot") ?: "C:\\Windows"}\\System32\\reg.exe"
-                            fun regAdd(key: String, vararg args: String) {
-                                val cmd = arrayOf(regExe, "add", key, "/f") + args
-                                val proc = Runtime.getRuntime().exec(cmd)
-                                val stderr = proc.errorStream.bufferedReader().readText()
-                                val exit = proc.waitFor()
-                                if (exit != 0) throw Exception("reg add failed (exit $exit): $stderr")
-                            }
-                            regAdd("HKCU\\Software\\Classes\\sc",
-                                "/ve", "/d", "URL:sc Protocol")
-                            regAdd("HKCU\\Software\\Classes\\sc",
-                                "/v", "URL Protocol", "/d", "")
-                            regAdd("HKCU\\Software\\Classes\\sc\\shell\\open\\command",
-                                "/ve", "/d", handlerCmd)
-                            println("Successfully registered sc:// protocol handler with VBS wrapper")
-                        } else if (os.contains("mac")) {
-                            registration = MacSoundCloudOAuth.prepare(authState, requireNotNull(serverPort))
-                            macRegistration = registration
-                        } else if (os.contains("linux")) {
-                            val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
-                            if (!appDir.exists()) appDir.mkdirs()
+                        Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
+                        Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
 
-                            val shellFile = java.io.File(appDir, "sc_handler.sh")
-                            shellFile.writeText(buildString {
-                                append("#!/bin/bash\n")
-                                append("# Forward success and denial; ignore parameter-free probes.\n")
-                                append("# SoundCloud's deep-link check sends sc://auth without code=\n")
-                                append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
-                                append("if [[ \"\$1\" == *\"code=\"* || \"\$1\" == *\"error=\"* ]]; then\n")
-                                append("  curl -s -X POST 'http://127.0.0.1:$serverPort/callback' -d \"\$1\"\n")
-                                append("fi\n")
-                            })
-                            shellFile.setExecutable(true)
-
-                            val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
-                            mimeDir.mkdirs()
-                            val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
-                            targetDesktop.writeText(buildString {
-                                append("[Desktop Entry]\n")
-                                append("Name=KittyTune SC Auth\n")
-                                append("Exec=${shellFile.absolutePath} %u\n")
-                                append("Type=Application\n")
-                                append("NoDisplay=true\n")
-                                append("MimeType=x-scheme-handler/sc;\n")
-                                append("Terminal=false\n")
-                            })
-
-                            Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
-                            Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
-                        
-                            println("Successfully registered sc:// protocol handler for Linux")
-                        }
-                    } catch (e: Exception) {
-                        println("Failed to register protocol handler: ${e.message}")
-                        loginError = e.message ?: "Could not register the SoundCloud link handler. Please try again."
+                        println("Successfully registered sc:// protocol handler for Linux")
                     }
                 }
-                if (loginError == null) {
-                    isProtocolReady = true
-                }
-                awaitCancellation()
-            } finally {
+                registration ?: AutoCloseable { }
+            } catch (e: Exception) {
                 registration?.close()
+                throw e
             }
+        },
+        onReady = { registration ->
+            protocolRegistration = registration
+            isProtocolReady = true
+        },
+        onError = { e ->
+            loginError = e.message ?: "Could not register the SoundCloud link handler. Please try again."
         }
-    }
+    )
 
     LaunchedEffect(authUrl, isProtocolReady) {
         if (!hasLaunchedBrowser && isProtocolReady) {
@@ -278,7 +234,7 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
         if (code != null && code != lastHandledCode) {
             lastHandledCode = code
             isLoading = true
-            macRegistration?.close()
+            protocolRegistration?.close()
             callbackServer?.close()
             val wasGuestMode = tokenManager.isGuestMode()
 
@@ -298,7 +254,7 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
                 // logout() stops the keep-alive loop and nothing else would restart it.
                 SessionManager.start()
                 // Library and home reload on the session-ready event this ends up sending.
-                SessionManager.requestSessionRefresh(force = true)
+                SessionManager.onLoginCompleted()
 
                 if (wasGuestMode) {
                     val summary = GuestDataTransferManager.getGuestDataSummary()
@@ -346,6 +302,14 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
                 }
             }
         )
+    }
+
+    if (embedded) {
+        SoundCloudLoginStatus(
+            error = loginError, loading = isLoading, ready = isProtocolReady,
+            onReopen = { launchSoundCloudAuth(authUrl) }, onRetry = onRetry, onCancel = onBackClick
+        )
+        return
     }
 
     Scaffold(
@@ -403,6 +367,37 @@ onClick = { if (isProtocolReady) launchSoundCloudAuth(authUrl) }) {
                         Text(str("login_reopen_browser"))
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Compact auth feedback used inside the setup; authentication remains owned by LoginAttempt. */
+@Composable
+internal fun SoundCloudLoginStatus(
+    error: String?, loading: Boolean, ready: Boolean,
+    onReopen: () -> Unit, onRetry: () -> Unit, onCancel: () -> Unit
+) {
+    androidx.compose.material3.Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (error == null) CircularWavyProgressIndicator(modifier = Modifier.size(32.dp))
+                else Icon(Icons.Rounded.ErrorOutline, null, tint = MaterialTheme.colorScheme.error)
+                Text(error ?: str(if (loading) "login_auth_in_progress" else "login_waiting_browser"),
+                    style = MaterialTheme.typography.titleMedium)
+            }
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (error != null) {
+                    androidx.compose.material3.FilledTonalButton(onClick = onRetry, shapes = ButtonDefaults.shapes()) { Text(str("login_oauth_retry")) }
+                } else if (!loading) {
+                    androidx.compose.material3.FilledTonalButton(onClick = onReopen, enabled = ready, shapes = ButtonDefaults.shapes()) { Text(str("login_reopen_browser")) }
+                }
+                OutlinedButton(onClick = onCancel, shapes = ButtonDefaults.shapes()) { Text(str("btn_cancel")) }
             }
         }
     }
@@ -478,11 +473,11 @@ private fun exchangeCodeForTokens(
             }
 
             val request = requestBuilder.post(formBody).build()
-            
+
             val response = authHttpClient.newCall(request).execute()
             try {
                 val bodyStr = response.body?.string() ?: ""
-                
+
                 if (!response.isSuccessful) {
                     println("Token exchange failed at $tokenUrl: ${response.code}")
                     continue
@@ -498,7 +493,7 @@ private fun exchangeCodeForTokens(
                     continue
                 }
 
-                tokenManager.saveTokens(
+                tokenManager.replaceSession(
                     accessToken = accessToken,
                     refreshToken = refreshToken,
                     expiresInSeconds = if (expiresIn > 0) expiresIn else null,
