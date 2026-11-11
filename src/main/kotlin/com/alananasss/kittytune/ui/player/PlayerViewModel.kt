@@ -144,8 +144,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         get() = if (isRemotePlayback) remotePeer?.connected == true && remotePeer?.snapshot?.isPlaying == true else (isPlaying || (isLoading && playWhenReady))
     val uiDuration: Long
         get() = if (isRemotePlayback) uiCurrentTrack?.durationMs ?: 0L else duration
-    val uiCurrentPosition: Long
+    internal val uiPlaybackPosition: Long
         get() = if (isRemotePlayback) remotePosition else currentPosition
+    val uiCurrentPosition: Long
+        get() = uiScrubPosition ?: uiPlaybackPosition
     val uiQueueState: List<Track>
         get() = if (isRemotePlayback) remotePeer?.snapshot?.queue.orEmpty() else queueState
     val uiCurrentQueueIndex: Int
@@ -253,7 +255,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var currentPosition by mutableLongStateOf(
         if (playerPrefs.getPersistentQueueEnabled() && playerPrefs.getSavePositionEnabled()) playerPrefs.getLastPosition() else 0L
     )
-    var isScrubbing by mutableStateOf(false)
+    private data class ScrubPreview(val owner: Any, val positionMs: Long)
+    private var scrubPreview by mutableStateOf<ScrubPreview?>(null)
+    internal val uiScrubPosition: Long? get() = scrubPreview?.positionMs
+    val isScrubbing: Boolean get() = scrubPreview != null
+    internal var seekBarRevision by mutableLongStateOf(0L)
+        private set
     var isPlayerExpanded by mutableStateOf(false)
     var isLiked by mutableStateOf(false)
 
@@ -5106,7 +5113,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
      * from the very beginning" for anyone whose track came in without a duration (issue #33).
      */
     fun seekTo(position: Long) {
-        if (routeRemote("seek", position)) { isScrubbing = false; return }
+        scrubPreview = null
+        if (routeRemote("seek", position)) return
         SyncPlayback.claimLocal()
         if (!applyingTogether && com.alananasss.kittytune.data.together.Together.active.value != null) {
             com.alananasss.kittytune.data.together.Together.control(com.alananasss.kittytune.data.together.TogetherMessage.CONTROL_SEEK, position)
@@ -5114,7 +5122,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         val known = duration.takeIf { it > 0L }
         val target =
             if (known != null) position.coerceIn(0L, known) else position.coerceAtLeast(0L)
-        isScrubbing = false
         seekTargetPosition = target
         lastSeekTimestamp = System.currentTimeMillis()
         currentPosition = target
@@ -6619,10 +6626,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         return if (wanted > planTrigger && latest > planTrigger) minOf(wanted, latest) else planTrigger
     }
 
-    fun updateScrubPosition(position: Long) {
-        isScrubbing = true
-        currentPosition = position
-        player.seekTo(position)
+    internal fun updateScrubPosition(owner: Any, positionMs: Long) {
+        scrubPreview = ScrubPreview(owner, positionMs)
+    }
+
+    internal fun finishScrub(owner: Any): Long? {
+        val position = scrubPreview?.takeIf { it.owner === owner }?.positionMs ?: return null
+        seekTo(position)
+        seekBarRevision++
+        return position
+    }
+
+    internal fun cancelScrub(owner: Any) {
+        if (scrubPreview?.owner === owner) scrubPreview = null
     }
 
     // â”€â”€â”€ Sleep Timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

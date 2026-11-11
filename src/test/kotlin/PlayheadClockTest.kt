@@ -1,10 +1,53 @@
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.ImageComposeScene
 import com.alananasss.kittytune.ui.player.slider.PlayheadClock
+import com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PlayheadClockTest {
     private val frameNanos = 16_000_000L
+
+    @Test
+    fun `a click shows its committed position in the first frame`() {
+        var reported by mutableLongStateOf(10_000L)
+        var revision by mutableLongStateOf(0L)
+        var displayed = 0L
+        val scene = ImageComposeScene(width = 1, height = 1) {
+            val shown = rememberSmoothPlayhead(
+                reportedMs = reported,
+                isRunning = false,
+                followsInput = false,
+                trackKey = "track",
+                seekRevision = revision,
+            )
+            SideEffect { displayed = shown }
+        }
+        try {
+            scene.render(0L).close()
+            assertEquals(10_000L, displayed)
+
+            reported = 80_000L
+            revision++
+            scene.render(frameNanos).close()
+            assertEquals(80_000L, displayed)
+
+            reported = 50_000L
+            revision++
+            reported = 25_000L
+            revision++
+            scene.render(2 * frameNanos).close()
+            assertEquals(25_000L, displayed)
+            scene.render(3 * frameNanos).close()
+            assertEquals(25_000L, displayed)
+        } finally {
+            scene.close()
+        }
+    }
 
     @Test
     fun `moves every frame between reports and never steps back`() {

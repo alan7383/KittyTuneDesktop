@@ -3,7 +3,6 @@ package com.alananasss.kittytune.ui.player.slider
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -41,48 +40,46 @@ private const val IDLE_CHECK_MS = 64L
  * @param isRunning whether the playhead is moving: playing, and neither loading nor being dragged.
  * @param followsInput while dragging or scrubbing: draw [reportedMs] as is, no glide and no prediction.
  * @param trackKey a different track starts over from its own position (the mix glide handles that change).
+ * @param seekRevision changes when a seek bar commits, including when a whole click lands between frames.
  */
 @Composable
-fun rememberSmoothPlayhead(
+internal fun rememberSmoothPlayhead(
     reportedMs: Long,
     isRunning: Boolean,
     followsInput: Boolean,
     trackKey: Any?,
-): State<Long> {
+    seekRevision: Long,
+): Long {
     val clock = remember { PlayheadClock() }
-    val shown = remember { mutableLongStateOf(reportedMs) }
+    val shown = remember(trackKey, seekRevision) { mutableLongStateOf(reportedMs) }
     val reported by rememberUpdatedState(reportedMs)
     val running by rememberUpdatedState(isRunning)
     val direct by rememberUpdatedState(followsInput)
-    val key by rememberUpdatedState(trackKey)
 
     val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
     // A hidden window draws no playhead, so the clock must not keep asking for frames for one: it sat there
     // awaiting the ambient pulse for as long as music played, even minimised (see WindowVisibility).
     val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    LaunchedEffect(clock, ambientClock, isSeen) {
-        if (!isSeen) {
-            shown.longValue = reported
-            clock.snapTo(reported, System.nanoTime())
-            return@LaunchedEffect
-        }
+    LaunchedEffect(shown, ambientClock, isSeen) {
+        shown.longValue = clock.step(reported, trackKey, direct = true, running = false, now = System.nanoTime())
+        if (!isSeen) return@LaunchedEffect
         while (isActive) {
             val animate = running || clock.isGliding
             if (!animate) {
                 // Still: follow what the player says without asking for frames, unless a seek starts a slide.
-                shown.longValue = clock.step(reported, key, direct, running = false, now = System.nanoTime())
+                shown.longValue = clock.step(reported, trackKey, direct, running = false, now = System.nanoTime())
                 if (!clock.isGliding) delay(IDLE_CHECK_MS)
                 continue
             }
             // Steady playback moves the playhead a few pixels a second, which the shared ambient pulse draws as
             // smoothly as every frame would; a glide after a seek or a drag answers the user, so it keeps the
             // window's full rate (see AmbientClock).
-            val step = { now: Long -> shown.longValue = clock.step(reported, key, direct, running, now) }
+            val step = { now: Long -> shown.longValue = clock.step(reported, trackKey, direct, running, now) }
             if (clock.isGliding || direct) withFrameNanos(step)
             else com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock, step)
         }
     }
-    return shown
+    return if (followsInput) reportedMs else shown.longValue
 }
 
 /** The bookkeeping behind [rememberSmoothPlayhead]; plain fields, advanced once per frame. */
