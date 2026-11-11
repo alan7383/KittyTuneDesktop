@@ -886,13 +886,15 @@ abstract class EnableSegmentHeapTask : DefaultTask() {
         val base = distributionDir.get().asFile
         val exes = listOf("main/app/KittyTune/KittyTune.exe", "main-release/app/KittyTune/KittyTune.exe")
             .map { File(base, it) }.filter { it.isFile }
-        if (exes.isEmpty()) return
-        val command = listOf("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-            "-File", script.get().asFile.absolutePath, "-Executable") + exes.map { it.absolutePath }
-        val process = ProcessBuilder(command).redirectErrorStream(true).start()
-        val output = process.inputStream.bufferedReader().readText()
-        if (process.waitFor() != 0) throw GradleException("Enabling the segment heap failed:\n$output")
-        logger.lifecycle(output.trim())
+        for (exe in exes) {
+            // powershell.exe -File binds one value per named parameter, even for string[].
+            val command = listOf("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-File", script.get().asFile.absolutePath, "-Executable", exe.absolutePath)
+            val process = ProcessBuilder(command).redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().readText()
+            if (process.waitFor() != 0) throw GradleException("Enabling the segment heap failed:\n$output")
+            logger.lifecycle(output.trim())
+        }
     }
 }
 
@@ -911,6 +913,18 @@ tasks.matching { it.name in listOf("createDistributable", "createReleaseDistribu
 
 tasks.matching { it.name == "zipWindowsPortable" || (it.name.startsWith("package") && it.name.endsWith("Msi")) }.configureEach {
     if (desktopIsWindows) dependsOn(enableSegmentHeap)
+}
+
+if (desktopIsWindows) {
+    tasks.register<Exec>("optimizeWindowsStartup") {
+        description = "Prepares a Java AOT startup cache for the unpacked Windows release image."
+        group = "distribution"
+        dependsOn("createReleaseDistributable", stripForeignNativesDistributable, enableSegmentHeap)
+        val script = layout.projectDirectory.file("scripts/optimize-windows-startup.ps1")
+        val image = desktopDistributionDirectory.get().dir("main-release/app/KittyTune").asFile
+        commandLine("pwsh.exe", "-NoProfile", "-File", script.asFile.absolutePath,
+            "-AppImage", image.absolutePath, "-JavaHome", packagingJdkHome)
+    }
 }
 
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask>().configureEach {

@@ -24,6 +24,7 @@ kotlin-js-store/
 !scripts/build-smtc-bridge.ps1
 !scripts/build-native-windows.ps1
 !scripts/build-windows.ps1
+!scripts/optimize-windows-startup.ps1
 !scripts/build-native-cdm.ps1
 !scripts/setup-cdm-sidecar.ps1
 /release/

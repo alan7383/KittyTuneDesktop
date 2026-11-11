@@ -56,6 +56,27 @@ are in `build/generated/native-resources/`; the source tree is not overwritten.
 `packageReleaseMsi` remains available for installer builds with the tools
 required by `jpackage`.
 
+## Prepare the startup cache
+
+On Windows, use PowerShell 7.2+ to build the release app image and prepare its
+Java AOT startup cache.
+
+```powershell
+.\gradlew.bat optimizeWindowsStartup -PdesktopOnly=true
+```
+
+For an existing extracted image, use the Zulu 25 JDK used to build it.
+
+```powershell
+.\scripts\optimize-windows-startup.ps1 -AppImage 'C:\path\to\KittyTune' -JavaHome 'C:\path\to\Zulu-25'
+```
+
+The preparation opens the real home screen with a temporary guest profile and
+closes it automatically. Open `KittyTune.exe` as usual afterwards. The cache
+uses about 100 MB on disk. HotSpot checks JAR timestamps, so prepare it again
+after updating or re-extracting the app. If the cache is absent or incompatible,
+the launcher starts normally.
+
 ## Rendering and checks
 
 App zoom scales controls and text once in both the main window and mini-player,
