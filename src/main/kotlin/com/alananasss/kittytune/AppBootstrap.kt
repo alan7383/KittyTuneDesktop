@@ -53,7 +53,7 @@ object AppBootstrap {
     var windowVisible: Boolean = true
 
     @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
-    fun init() {
+    fun init(trainStartupCache: Boolean = false) {
         if (done) return
         done = true
 
@@ -214,12 +214,12 @@ object AppBootstrap {
 
         // 4b. Anonymous client_id: validate/scrape in background (replaces the ghost
         // WebView interception on Android). Guest mode depends on this.
-        scope.launch {
-            com.alananasss.kittytune.data.ClientIdScraper.ensureClientId()
+        if (!trainStartupCache) {
+            scope.launch {
+                com.alananasss.kittytune.data.ClientIdScraper.ensureClientId()
+            }
+            NetworkMonitor.start()
         }
-
-        // 5. Connectivity watcher (replaces ConnectivityManager callback).
-        NetworkMonitor.start()
 
         // 6. End4 dotfiles Material You watcher (live color updates)
         if (com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled()) {

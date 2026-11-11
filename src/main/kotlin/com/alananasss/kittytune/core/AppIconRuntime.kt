@@ -1,6 +1,8 @@
 package com.alananasss.kittytune.core
 
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.awt.Taskbar
 import java.awt.Window
 import java.awt.image.BufferedImage
@@ -31,9 +33,30 @@ object AppIconRuntime {
      *   first pass — which is exactly the launch where the icon matters most.
      */
     fun apply(variantKey: String, window: Window? = null) {
-        val source = load(variantKey) ?: return
-        if (!isMacOs) setDockIcon(source)
-        setWindowIcons(source, window)
+        loadWindowIcons(variantKey)?.applyTo(window)
+    }
+
+    internal suspend fun applyAsync(variantKey: String, window: Window) {
+        val icons = withContext(Dispatchers.IO) { loadWindowIcons(variantKey) }
+        icons?.applyTo(window)
+    }
+
+    private class WindowIcons(val dock: BufferedImage, val sizes: List<BufferedImage>) {
+        fun applyTo(window: Window?) {
+            if (!isMacOs) setDockIcon(dock)
+            val targets = if (window != null) listOf(window) else Window.getWindows().toList()
+            targets.forEach { target -> runCatching { target.iconImages = sizes } }
+        }
+    }
+
+    private fun loadWindowIcons(variantKey: String): WindowIcons? {
+        val source = load(variantKey) ?: return null
+        return runCatching {
+            val dock = if (maxOf(source.width, source.height) > 512) IconEncoders.scaled(source, 512) else source
+            WindowIcons(dock, WINDOW_ICON_SIZES.map { size ->
+                if (isMacOs) IconEncoders.macOsIcon(source, size) else IconEncoders.scaled(source, size)
+            })
+        }.getOrNull()
     }
 
     fun applyMacDockIcon(variantKey: String) {
@@ -74,17 +97,6 @@ object AppIconRuntime {
     fun loadPreviewPainter(variantKey: String): androidx.compose.ui.graphics.painter.Painter? =
         load(variantKey)?.let { androidx.compose.ui.graphics.painter.BitmapPainter(it.toComposeImageBitmap()) }
 
-    /**
-     * Hands the window the full ladder of sizes. Runs after Compose has applied its own
-     * single-bitmap icon, so this replaces it rather than being replaced by it.
-     */
-    private fun setWindowIcons(source: BufferedImage, window: Window?) {
-        runCatching {
-            val images = WINDOW_ICON_SIZES.map { if (isMacOs) IconEncoders.macOsIcon(source, it) else IconEncoders.scaled(source, it) }
-            val targets = if (window != null) listOf(window) else Window.getWindows().toList()
-            targets.forEach { target -> runCatching { target.iconImages = images } }
-        }
-    }
     /**
      * Loads a variant icon specially prepared for the system tray (Linux/Windows/macOS).
      *

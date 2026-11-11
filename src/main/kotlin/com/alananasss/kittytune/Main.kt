@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.ui.theme.withUiScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -121,6 +123,8 @@ private const val DROP_HIDDEN_WINDOW_AFTER_MS = 20_000L
 
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main(args: Array<String>) {
+    // The Windows cache preparation script runs this with a disposable guest profile.
+    val trainStartupCache = System.getProperty("kittytune.trainStartupCache") == "true"
     com.alananasss.kittytune.utils.StartupTimeline.mark("main() entered")
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
@@ -146,7 +150,7 @@ fun main(args: Array<String>) {
     }
     com.alananasss.kittytune.data.MacSoundCloudOAuth.installUriHandler()
     com.alananasss.kittytune.utils.StartupTimeline.mark("platform init")
-    AppBootstrap.init()
+    AppBootstrap.init(trainStartupCache = trainStartupCache)
     com.alananasss.kittytune.utils.StartupTimeline.mark("AppBootstrap.init")
     ProtectedTracksDemo.prepare()
     com.alananasss.kittytune.utils.StartupTimeline.mark("ProtectedTracksDemo.prepare")
@@ -175,9 +179,7 @@ fun main(args: Array<String>) {
         val appIcon = androidx.compose.runtime.remember(appIconVariant) {
             com.alananasss.kittytune.core.AppIconRuntime.loadAppPainter(appIconVariant)
         }
-        val trayIcon = androidx.compose.runtime.remember(appIconVariant) {
-            com.alananasss.kittytune.core.AppIconRuntime.loadTrayPainter(appIconVariant) ?: appIcon
-        }
+        var mainWindowDrawn by remember { mutableStateOf(false) }
         var isWindowVisible by remember { mutableStateOf(true) }
 
         // Whether the main window exists at all. Closed to the tray it used to be merely hidden, keeping its
@@ -229,6 +231,7 @@ fun main(args: Array<String>) {
 
         // Zapret, once: find it if it is running, and add the domains of whichever services are blocked.
         LaunchedEffect(Unit) {
+            if (trainStartupCache) return@LaunchedEffect
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching {
                     val zapret = com.alananasss.kittytune.data.zapret.ZapretManager
@@ -254,13 +257,25 @@ fun main(args: Array<String>) {
         }
 
         var useSniTray by remember { mutableStateOf(isLinux) }
+        // The main window already carries its own icon. Prepare the separate tray image
+        // after the first draw, away from the AWT thread.
+        val trayReady = !isWindowsHost || mainWindowDrawn || !isWindowVisible
+        val trayIcon by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.painter.Painter?>(
+            null, appIconVariant, trayReady && !useSniTray
+        ) {
+            if (trayReady && !useSniTray) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.alananasss.kittytune.core.AppIconRuntime.loadTrayPainter(appIconVariant)
+                } ?: appIcon
+            }
+        }
 
-        androidx.compose.runtime.DisposableEffect(appIconVariant) {
-            com.alananasss.kittytune.utils.StartupTimeline.markOnce("icon installer: start")
-            if (isMacHost) com.alananasss.kittytune.core.AppIconRuntime.applyMacDockIcon(appIconVariant)
-            com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant)
-            com.alananasss.kittytune.utils.StartupTimeline.markOnce("icon installer: done")
-            onDispose { }
+        val iconIntegrationReady = isMacHost || mainWindowDrawn
+        LaunchedEffect(appIconVariant, iconIntegrationReady) {
+            if (iconIntegrationReady && !trainStartupCache) {
+                if (isMacHost) com.alananasss.kittytune.core.AppIconRuntime.applyMacDockIcon(appIconVariant)
+                runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
+            }
         }
 
         if (isLinux) {
@@ -311,6 +326,7 @@ fun main(args: Array<String>) {
 
         val trayMenuScope = androidx.compose.runtime.rememberCoroutineScope()
 
+        val currentTrayIcon = trayIcon
         fun openSettings() {
             showMainWindow()
             playerViewModel.navigateToPlaylistId = "settings"
@@ -357,16 +373,16 @@ fun main(args: Array<String>) {
                     }
                 ))
             }
-        } else if (trayIcon != null && !useSniTray) {
+        } else if (currentTrayIcon != null && !useSniTray) {
             if (isWindowsHost) {
                 // Windows gets a real Win32 menu (see Win32TrayMenu): dark when the app is, rounded on
                 // Windows 11, and the only kind the hidden-icons flyout stays open around.
                 Tray(
-                    icon = trayIcon,
+                    icon = currentTrayIcon,
                     tooltip = "KittyTune",
                     onAction = { showMainWindow() },
                 )
-                androidx.compose.runtime.DisposableEffect(trayIcon) {
+                androidx.compose.runtime.DisposableEffect(currentTrayIcon) {
                     com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope) { _, _ ->
                         com.alananasss.kittytune.core.Win32TrayMenu.show(
                             trayMenuEntries(
@@ -385,11 +401,11 @@ fun main(args: Array<String>) {
                 // No AWT PopupMenu (that is the XP-looking system menu) — right-click is hooked to
                 // the custom Compose tray menu below, which matches KittyTune's theme.
                 Tray(
-                    icon = trayIcon,
+                    icon = currentTrayIcon,
                     tooltip = "KittyTune",
                     onAction = { showMainWindow() },
                 )
-                androidx.compose.runtime.DisposableEffect(trayIcon, useSniTray) {
+                androidx.compose.runtime.DisposableEffect(currentTrayIcon, useSniTray) {
                     com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope)
                     onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
                 }
@@ -631,43 +647,12 @@ fun main(args: Array<String>) {
             },
         ) {
             com.alananasss.kittytune.utils.StartupTimeline.markOnce("window content composing")
-            // The geometry this window is about to have, read here (in the composition) so the effect
-            // below can hand it to AWT before the window is shown.
-            val windowDensity = LocalDensity.current
-            LaunchedEffect(Unit) {
-                // Show the window as soon as the composition is applied instead of waiting for the
-                // toolkit's own coroutine, which the frames this window keeps producing leave queued
-                // (measured: first frame at 1.8 s, window on screen at 2.9 s, event thread composing
-                // the whole time). Size and position are applied first: Compose sets them itself, but
-                // after showing, so the window was seen opening small and growing into place. Every
-                // placement other than Floating — maximised, full screen — keeps the toolkit's own
-                // sequence, which is the one that knows how to ask the window manager for it.
-                if (!window.isVisible && isWindowVisible &&
-                    windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating
-                ) {
-                    val targetSize = windowState.size
-                    val targetWidth = with(windowDensity) { targetSize.width.roundToPx() }
-                    val targetHeight = with(windowDensity) { targetSize.height.roundToPx() }
-                    if (targetWidth > 0 && targetHeight > 0) {
-                        val targetPosition = windowState.position
-                        if (targetPosition is androidx.compose.ui.window.WindowPosition.Absolute) {
-                            window.setBounds(
-                                with(windowDensity) { targetPosition.x.roundToPx() },
-                                with(windowDensity) { targetPosition.y.roundToPx() },
-                                targetWidth,
-                                targetHeight,
-                            )
-                        } else {
-                            window.setSize(targetWidth, targetHeight)
-                        }
-                    }
-                    window.isVisible = true
-                    com.alananasss.kittytune.utils.StartupTimeline.markOnce("window shown on first composition")
+            LaunchedEffect(window) {
+                val timeline = com.alananasss.kittytune.utils.StartupTimeline
+                if (timeline.isEnabled) {
+                    androidx.compose.runtime.withFrameNanos { timeline.markOnce("first frame callback") }
+                    timeline.traceUntilWindowVisible(window)
                 }
-                androidx.compose.runtime.withFrameNanos {
-                    com.alananasss.kittytune.utils.StartupTimeline.mark("first frame drawn")
-                }
-                com.alananasss.kittytune.utils.StartupTimeline.traceUntilWindowVisible(window)
             }
             com.alananasss.kittytune.utils.StartupTimeline.markOnce("coil: start")
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
@@ -697,6 +682,10 @@ fun main(args: Array<String>) {
 
                     override fun windowOpened(event: java.awt.event.WindowEvent?) {
                         com.alananasss.kittytune.utils.StartupTimeline.markOnce("window opened (first shown)")
+                        if (trainStartupCache) {
+                            println("KittyTune startup cache training finished")
+                            exitApplication()
+                        }
                     }
                 }
                 window.addWindowFocusListener(listener)
@@ -876,9 +865,10 @@ fun main(args: Array<String>) {
             }
 
             // Apply the multi-size icons once the native window exists.
-            androidx.compose.runtime.LaunchedEffect(appIconVariant) {
+            LaunchedEffect(appIconVariant, mainWindowDrawn) {
+                if (!mainWindowDrawn) return@LaunchedEffect
                 com.alananasss.kittytune.utils.StartupTimeline.markOnce("window icon: start")
-                com.alananasss.kittytune.core.AppIconRuntime.apply(appIconVariant, window)
+                com.alananasss.kittytune.core.AppIconRuntime.applyAsync(appIconVariant, window)
                 com.alananasss.kittytune.utils.StartupTimeline.markOnce("window icon: done")
             }
 
@@ -909,7 +899,20 @@ fun main(args: Array<String>) {
                     val menuDark = androidx.compose.material3.MaterialTheme.colorScheme.surface.luminance() < 0.5f
                     LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
-                    androidx.compose.foundation.layout.Box(propagateMinConstraints = true) {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = if (mainWindowDrawn) Modifier else Modifier.drawWithContent {
+                            drawContent()
+                            // Let Compose size and show the native window itself. Showing it
+                            // during composition can re-enter Skiko while it is rendering.
+                            java.awt.EventQueue.invokeLater {
+                                if (!mainWindowDrawn) {
+                                    com.alananasss.kittytune.utils.StartupTimeline.markOnce("window content drawn")
+                                    mainWindowDrawn = true
+                                }
+                            }
+                        },
+                        propagateMinConstraints = true,
+                    ) {
                         Surface {
                             if (System.getProperty("kittytune.splashProbe") == "true") {
                                 androidx.compose.material3.Text("KittyTune")

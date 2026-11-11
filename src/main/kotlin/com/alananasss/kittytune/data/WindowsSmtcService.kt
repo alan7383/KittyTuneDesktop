@@ -27,7 +27,9 @@ class WindowsSmtcService(
 ) : Closeable {
 
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val bridge = if (System.getProperty("os.name").lowercase().contains("win")) {
+    private val bridge = if (System.getProperty("os.name").lowercase().contains("win") &&
+        !java.lang.Boolean.getBoolean("kittytune.trainStartupCache")
+    ) {
         SmtcBridgeWorker(::start, ::handleBridgeLine)
     } else null
 
