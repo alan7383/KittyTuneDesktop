@@ -3332,4 +3332,10 @@
     <string name="onboard_desktop_zoom_body">Válassz kényelmes méretet a szövegeknek és a vezérlőknek. A módosítás azonnal érvénybe lép.</string>
     <string name="account_return_title">Üdv újra!</string>
     <string name="account_return_body">Csatlakoztasd a SoundCloudot a kedvelt számaidhoz és lejátszási listáidhoz, vagy hallgass vendégként. A beállításaid megmaradtak.</string>
+
+    <!-- macOS menus and updates -->
+    <string name="menu_go">Ugrás</string>
+    <string name="menu_window">Ablak</string>
+    <string name="update_mac_manual">A frissítés befejezéséhez nyisd meg a lemezképet, és másold a KittyTune-t az Alkalmazások mappába.</string>
+    <string name="update_mac_failed">A KittyTune nem tudta telepíteni a frissítést. A részletekért nyisd meg a frissítési naplót.</string>
 </resources>
