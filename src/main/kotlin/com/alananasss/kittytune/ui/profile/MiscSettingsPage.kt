@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.profile
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lock
@@ -83,6 +84,15 @@ fun MiscGeneralPage() {
     SettingsGroup(
         title = str("settings_cat_general"),
         items = listOf(
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("onboard_replay"),
+                    subtitle = str("onboard_replay_body"),
+                    icon = Icons.AutoMirrored.Rounded.MenuBook,
+                    onClick = { com.alananasss.kittytune.ui.setup.SetupLauncher.requested = true },
+                )
+            },
             { shape ->
                 SettingsItem(
                     shape = shape,
