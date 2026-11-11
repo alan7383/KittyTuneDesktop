@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -974,6 +975,10 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) },
             highlightKey = "pref_precise_speed",
         ),
+
+        SettingsSearchItem(str("onboard_replay"), str("onboard_replay_body"), SettingsCategory.MISC,
+            SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_GENERAL)), Icons.AutoMirrored.Rounded.MenuBook,
+            keywords = listOf("setup", "onboarding", "welcome", "configuration", "initiale", "bienvenue")),
 
         // SOURCES - Folders & Options
         SettingsSearchItem(str("settings_tab_sources"), null, SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.ImportExport, keywords = listOf("sources", "providers", "streaming", "источники", "сервисы")),

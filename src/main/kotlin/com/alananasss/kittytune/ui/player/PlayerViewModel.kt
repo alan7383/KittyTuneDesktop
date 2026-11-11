@@ -1,4 +1,4 @@
-﻿package com.alananasss.kittytune.ui.player
+package com.alananasss.kittytune.ui.player
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.History
@@ -243,6 +243,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private val _uiEvent = MutableSharedFlow<String>()
     val uiEvent = _uiEvent.asSharedFlow()
 
+    private var profileJob: Job? = null
     var currentUserId by mutableLongStateOf(0L)
     var currentUser by mutableStateOf<User?>(null)
     private val initialTrack = if (playerPrefs.getPersistentQueueEnabled()) playerPrefs.getLastTrack() else null
@@ -1908,11 +1909,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     init {
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: fields initialised")
         MusicManager.init()
         playerInitialized = true
         MusicManager.player.addListener(playerListener)
         MusicManager.applyEffects(effectsState)
         MusicManager.applyEqualizer(equalizerState)
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: audio engine")
         HeadphoneDetector.start()
         viewModelScope.launch {
             MusicManager.playWhenReadyRequestedFlow.collect { req ->
@@ -1940,13 +1943,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             }
         }
         applyRepeatMode()
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: repeat mode")
         fetchUserProfile()
         observeArtworkColors()
         observeAnimatedCovers()
         observePlayerSliderStyle()
         observeTrackGain()
         startTrimWatcher()
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: observers")
         com.alananasss.kittytune.data.together.Together.start(this)
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: together")
 
         if (System.getProperty("os.name").lowercase().contains("win")) {
             viewModelScope.launch {
@@ -1971,6 +1977,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             playNext(manual = true, isCrossfade = crossfadeEnabled)
         }
         initContentFiltering()
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: content filtering")
         MusicManager.onPreviousClick = {
             val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
             smartPrevious(isCrossfade = crossfadeEnabled)
@@ -4026,14 +4033,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    fun resetAccountProfile() {
+        profileJob?.cancel()
+        currentUser = null
+        currentUserId = 0L
+        SoundCloudTelemetryTracker.updateCurrentUserId(0L)
+        fetchUserProfile()
+    }
+
     fun fetchUserProfile() {
         if (tokenManager.isGuestMode() || tokenManager.getAccessToken().isNullOrEmpty()) return
 
-        viewModelScope.launch {
+        val sessionToken = tokenManager.getAccessToken()
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
             try {
                 val me = api.getMe()
+                if (tokenManager.getAccessToken() != sessionToken) return@launch
                 currentUserId = me.id
                 currentUser = me
+                tokenManager.rememberActiveAccount(me.id, me.username.orEmpty(), me.avatarUrl)
                 me.username?.let { com.alananasss.kittytune.data.together.Together.defaultName = it }
                 SoundCloudTelemetryTracker.updateCurrentUserId(me.id)
                 com.alananasss.kittytune.data.RepostRepository.refreshReposts()
