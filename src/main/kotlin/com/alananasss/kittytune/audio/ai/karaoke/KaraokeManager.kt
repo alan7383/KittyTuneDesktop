@@ -1342,6 +1342,7 @@ object KaraokeManager {
                 }
                 runCatching { grabber?.stop() }
                 runCatching { grabber?.release() }
+                hlsAdapter?.releaseDrm()
                 com.alananasss.kittytune.utils.NativeMemoryManager.trim()
             }
         }
