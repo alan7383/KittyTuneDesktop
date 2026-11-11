@@ -1,6 +1,9 @@
 package com.alananasss.kittytune.core
 
+import java.awt.AlphaComposite
+import java.awt.Color
 import java.awt.RenderingHints
+import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -27,8 +30,8 @@ object IconEncoders {
      * (ic11..ic14) are what Retina displays read, so they are not optional.
      */
     private val ICNS_CHUNKS = listOf(
-        "icp4" to 16,   // 16x16
-        "icp5" to 32,   // 32x32
+        "ic04" to 16,   // 16x16 (ARGB)
+        "ic05" to 32,   // 32x32 (ARGB)
         "ic11" to 32,   // 16x16@2x
         "ic12" to 64,   // 32x32@2x
         "ic07" to 128,  // 128x128
@@ -45,6 +48,28 @@ object IconEncoders {
         val out = ByteArrayOutputStream()
         ImageIO.write(image, "png", out)
         return out.toByteArray()
+    }
+
+    /** Renders the artwork on a transparent macOS icon canvas. */
+    fun macOsIcon(source: BufferedImage, size: Int): BufferedImage {
+        val inset = (size * 0.1).roundToInt()
+        val artworkSize = size - 2 * inset
+        val artwork = scaled(source, artworkSize)
+        val canvas = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val graphics = canvas.createGraphics()
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            graphics.color = Color.WHITE
+            val arc = artworkSize * 0.44
+            graphics.fill(RoundRectangle2D.Double(
+                inset.toDouble(), inset.toDouble(), artworkSize.toDouble(), artworkSize.toDouble(), arc, arc
+            ))
+            graphics.composite = AlphaComposite.SrcIn
+            graphics.drawImage(artwork, inset, inset, null)
+        } finally {
+            graphics.dispose()
+        }
+        return canvas
     }
 
     /**
@@ -112,12 +137,13 @@ object IconEncoders {
     /** Apple ICNS: a magic, a big-endian total length, then one typed chunk per size. */
     fun icns(source: BufferedImage): ByteArray {
         val usable = ICNS_CHUNKS.filter { it.second <= longestSide(source) }
-            .ifEmpty { listOf("icp5" to 32) }
+            .ifEmpty { listOf("ic04" to 16) }
 
         val body = ByteArrayOutputStream()
-        val rendered = HashMap<Int, ByteArray>()
+        val rendered = HashMap<Int, BufferedImage>()
         for ((type, size) in usable) {
-            val data = rendered.getOrPut(size) { png(scaled(source, size)) }
+            val image = rendered.getOrPut(size) { macOsIcon(source, size) }
+            val data = if (type == "ic04" || type == "ic05") icnsArgb(image) else png(image)
             body.write(type.toByteArray(Charsets.US_ASCII))
             be32(body, data.size + 8)   // chunk length counts its own 8-byte header
             body.write(data)
@@ -127,6 +153,21 @@ object IconEncoders {
         out.write("icns".toByteArray(Charsets.US_ASCII))
         be32(out, 8 + body.size())
         out.write(body.toByteArray())
+        return out.toByteArray()
+    }
+
+    /** Small ICNS entries store four planar channels. Literal runs carry up to 128 samples. */
+    private fun icnsArgb(image: BufferedImage): ByteArray {
+        val pixels = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+        val out = ByteArrayOutputStream()
+        out.write("ARGB".toByteArray(Charsets.US_ASCII))
+        for (shift in intArrayOf(24, 16, 8, 0)) {
+            for (start in pixels.indices step 128) {
+                val length = minOf(128, pixels.size - start)
+                out.write(length - 1)
+                for (index in start until start + length) out.write(pixels[index] ushr shift)
+            }
+        }
         return out.toByteArray()
     }
 
