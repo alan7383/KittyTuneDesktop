@@ -439,6 +439,12 @@ object UpdateManager {
                 return
             }
 
+            if (osName.contains("mac")) {
+                require(file.isFile && file.extension.equals("dmg", ignoreCase = true))
+                _status.value = UpdateStatus.READY_TO_INSTALL
+                return
+            }
+
             val args = when {
                 osName.contains("nux") || osName.contains("nix") -> {
                     when {
@@ -465,9 +471,6 @@ object UpdateManager {
                         }
                         else -> emptyArray()
                     }
-                }
-                osName.contains("mac") -> {
-                    arrayOf("hdiutil", "attach", file.absolutePath)
                 }
                 else -> emptyArray()
             }
@@ -742,20 +745,17 @@ object UpdateManager {
                     }
                 }
                 osName.contains("mac") -> {
-                    val devNull = File("/dev/null")
-                    val jpackagePath = System.getProperty("jpackage.app.path")
-                    if (!jpackagePath.isNullOrBlank() && File(jpackagePath).exists()) {
-                        ProcessBuilder("open", "-a", jpackagePath)
-                            .redirectOutput(devNull)
-                            .redirectError(devNull)
-                            .start()
+                    if (!_status.compareAndSet(UpdateStatus.READY_TO_INSTALL, UpdateStatus.INSTALLING)) return
+                    try {
+                        if (!startMacUpdate()) {
+                            _status.value = UpdateStatus.READY_TO_INSTALL
+                            return
+                        }
                         launched = true
-                    } else {
-                        ProcessBuilder("open", "-a", "KittyTune")
-                            .redirectOutput(devNull)
-                            .redirectError(devNull)
-                            .start()
-                        launched = true
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        _status.value = UpdateStatus.ERROR
+                        return
                     }
                 }
             }
@@ -779,6 +779,41 @@ object UpdateManager {
         } else {
             kotlin.system.exitProcess(0)
         }
+    }
+
+    private fun startMacUpdate(): Boolean {
+        val dmg = requireNotNull(downloadedInstallerFile).canonicalFile
+        require(dmg.isFile && dmg.extension.equals("dmg", ignoreCase = true))
+        val bundle = sequenceOf(System.getProperty("jpackage.app-path"), System.getProperty("java.home"))
+            .filterNotNull()
+            .flatMap { path -> generateSequence(File(path).canonicalFile) { it.parentFile } }
+            .firstOrNull { it.name.endsWith(".app") && File(it, "Contents/MacOS/KittyTune").isFile }
+
+        if (bundle == null || !bundle.parentFile.canWrite()) {
+            // A development launch or a read-only installation needs the regular Finder workflow.
+            check(ProcessBuilder("/usr/bin/open", dmg.path).start().waitFor() == 0)
+            com.alananasss.kittytune.core.Toaster.show(com.alananasss.kittytune.core.str("update_mac_manual"))
+            hideDialog()
+            return false
+        }
+
+        val arch = when (System.getProperty("os.arch").lowercase()) {
+            "aarch64", "arm64" -> "arm64"
+            "amd64", "x86_64" -> "x86_64"
+            else -> error("Unsupported macOS architecture")
+        }
+        val work = java.nio.file.Files.createTempDirectory("kittytune-mac-update-").toFile()
+        val script = File(work, "install.sh")
+        checkNotNull(javaClass.getResourceAsStream("/updater/install-macos.sh")).use { input ->
+            script.outputStream().use { input.copyTo(it) }
+        }
+        val log = File(work, "update.log")
+        ProcessBuilder(
+            "/bin/bash", script.path, ProcessHandle.current().pid().toString(),
+            dmg.path, bundle.path, arch, work.path,
+            com.alananasss.kittytune.core.str("update_mac_failed") + "\n" + log.path
+        ).redirectErrorStream(true).redirectOutput(log).start()
+        return true
     }
 
     private fun relaunchJavaDevMode() {
