@@ -916,6 +916,8 @@
     <string name="menu_repeat_one">Répéter (1)</string>
     <string name="menu_repost">Republier</string>
     <string name="menu_reposted">Republié</string>
+    <string name="menu_go">Aller à</string>
+    <string name="menu_window">Fenêtre</string>
     <string name="menu_show_window">Afficher KittyTune</string>
     <string name="menu_mini_player_show">Afficher le mini-lecteur</string>
     <string name="menu_mini_player_hide">Masquer le mini-lecteur</string>

@@ -916,6 +916,8 @@
     <string name="menu_repeat_one">Repeat (1)</string>
     <string name="menu_repost">Repost</string>
     <string name="menu_reposted">Reposted</string>
+    <string name="menu_go">Go</string>
+    <string name="menu_window">Window</string>
     <string name="menu_show_window">Show KittyTune</string>
     <string name="menu_mini_player_show">Show Mini Player</string>
     <string name="menu_mini_player_hide">Hide Mini Player</string>
