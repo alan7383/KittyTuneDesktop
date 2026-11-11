@@ -1269,11 +1269,11 @@ class PlayerPreferences {
     fun getRightPanelOpen(): Boolean = Prefs.getBoolean(KEY_RIGHT_PANEL_OPEN, true)
     fun setRightPanelOpen(open: Boolean) = Prefs.putBoolean(KEY_RIGHT_PANEL_OPEN, open)
 
-    fun getKeyColor(): Int = Prefs.getInt(KEY_KEY_COLOR, 0)
+    fun getKeyColor(): Int = Prefs.getInt(KEY_KEY_COLOR, 0xFF1565C0.toInt())
     fun setKeyColor(color: Int) = Prefs.putInt(KEY_KEY_COLOR, color)
 
     fun getColorStyle(): String {
-        val style = Prefs.getString(KEY_COLOR_STYLE, "System") ?: "System"
+        val style = Prefs.getString(KEY_COLOR_STYLE, "TonalSpot") ?: "TonalSpot"
         val isWindowsOS = System.getProperty("os.name").lowercase().contains("win")
         if (!isWindowsOS && style.contains("windows", ignoreCase = true)) {
             return "Vibrant"

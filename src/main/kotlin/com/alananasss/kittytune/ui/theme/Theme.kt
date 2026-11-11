@@ -44,7 +44,7 @@ object ThemeState {
     var coverMeshColors by mutableStateOf<List<Int>>(emptyList())
 }
 
-internal val KittyTuneDefaultSeedColor = Color(0xFFFF7A1A)
+internal val KittyTuneDefaultSeedColor = Color(0xFF1565C0)
 
 /**
  * How long the palette takes to travel to a new cover's colour. Long enough to read as a
