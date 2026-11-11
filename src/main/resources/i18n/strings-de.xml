@@ -3553,4 +3553,10 @@
     <string name="onboard_desktop_zoom_body">Wähle eine angenehme Größe für Texte und Bedienelemente. Die Änderung wird sofort übernommen.</string>
     <string name="account_return_title">Willkommen zurück.</string>
     <string name="account_return_body">Verbinde SoundCloud für deine Likes und Playlists oder höre als Gast. Deine Einstellungen sind noch da.</string>
+
+    <!-- macOS menus and updates -->
+    <string name="menu_go">Gehe zu</string>
+    <string name="menu_window">Fenster</string>
+    <string name="update_mac_manual">Öffne das Disk-Image und kopiere KittyTune in den Ordner „Programme“, um das Update abzuschließen.</string>
+    <string name="update_mac_failed">KittyTune konnte das Update nicht installieren. Öffne das Update-Protokoll für weitere Details.</string>
 </resources>
