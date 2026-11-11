@@ -972,15 +972,15 @@ tasks.register<Test>("headlessTest") {
     filter {
         listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
-            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest",
+            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest", "DownloadFilesTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
-            "WindowsNativeDspTest", "AudioLineCloserTest", "DesktopRenderTest", "DesktopDensityTest",
+            "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
-            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ThemePersistenceTest", "SetupOnboardingTest",
+            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
-            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "KittyTuneProcessesTest"
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest"
         ).forEach(::includeTestsMatching)
     }
 }
