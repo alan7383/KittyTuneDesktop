@@ -1482,39 +1482,31 @@ class PlayerPreferences {
     }
     fun setLyricsTranslationLang(lang: String) = Prefs.putString(KEY_LYRICS_TRANSLATION_LANG, lang)
 
-    /**
-     * Which optional buttons the player bar shows on the right, and the heart on the left.
-     *
-     * Rather than removing the queue button for everyone — the panel behind the settings button has
-     * a queue tab, so it is genuinely redundant for some people and one click for others — the row
-     * is configurable and ships as it was (issue #33). The lyrics button is not in here: it already
-     * had its own switch in the lyrics settings.
-     */
+    /** Reads the visible optional buttons and applies pending player bar migrations. */
     fun getPlayerBarButtons(): Set<String> {
         val raw = Prefs.getString(KEY_PLAYER_BAR_BUTTONS, null) ?: return PLAYER_BAR_BUTTONS_DEFAULT
         var saved = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-        val hasNewKeys = saved.any {
-            it == PLAYER_BAR_BUTTON_LYRICS || it == PLAYER_BAR_BUTTON_MINIPLAYER ||
-                it == PLAYER_BAR_BUTTON_SHUFFLE || it == PLAYER_BAR_BUTTON_REPEAT
-        }
-        if (!hasNewKeys) {
-            saved = saved + setOf(
+        val migrateDevices = !Prefs.getBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, false)
+        val migratePet = !Prefs.getBoolean(KEY_PLAYER_BAR_PET_MIGRATED, false)
+
+        if (migrateDevices) {
+            // The Devices migration also saves the Player Design defaults for older profiles.
+            val playerDesignButtons = setOf(
                 PLAYER_BAR_BUTTON_LYRICS,
                 PLAYER_BAR_BUTTON_MINIPLAYER,
                 PLAYER_BAR_BUTTON_SHUFFLE,
                 PLAYER_BAR_BUTTON_REPEAT,
             )
-        }
-        // the Kitty pet button arrived later: shown once to everyone, removable like the rest
-        if (!Prefs.getBoolean(KEY_PLAYER_BAR_PET_MIGRATED, false)) {
-            saved = saved + PLAYER_BAR_BUTTON_PET
-            Prefs.putBoolean(KEY_PLAYER_BAR_PET_MIGRATED, true)
-            Prefs.putString(KEY_PLAYER_BAR_BUTTONS, saved.joinToString(","))
-        }
-        if (!Prefs.getBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, false)) {
+            if (saved.none { it in playerDesignButtons }) {
+                saved = saved + playerDesignButtons
+            }
             saved = saved + PLAYER_BAR_BUTTON_DEVICES
-            Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
-            Prefs.putString(KEY_PLAYER_BAR_BUTTONS, saved.joinToString(","))
+        }
+        if (migratePet) {
+            saved = saved + PLAYER_BAR_BUTTON_PET
+        }
+        if (migrateDevices || migratePet) {
+            setPlayerBarButtons(saved)
         }
         return saved
     }
