@@ -329,6 +329,10 @@ internal class SidecarWidevineCdm(
     override val name: String,
 ) : WidevineCdm {
 
+    override fun fork(): WidevineCdm = SidecarWidevineCdm(command, "$name (playback)")
+
+    override fun close() = release()
+
     private val lock = Any()
     private var transport: SidecarTransport? = null
     private var openSessions = 0
