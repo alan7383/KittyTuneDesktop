@@ -1497,6 +1497,8 @@
     <string name="update_btn_download">Télécharger &amp; Installer</string>
     <string name="update_btn_minimize">Réduire en arrière-plan</string>
     <string name="update_btn_pause">Mettre en pause</string>
+    <string name="update_mac_manual">Ouvre l’image disque et copie KittyTune dans Applications pour terminer la mise à jour.</string>
+    <string name="update_mac_failed">KittyTune n’a pas pu installer la mise à jour. Consulte le journal pour les détails.</string>
     <string name="update_btn_restart">Redémarrer l\'application</string>
     <string name="update_btn_resume">Reprendre</string>
     <string name="update_btn_retry_auth">Réessayer l\'authentification</string>

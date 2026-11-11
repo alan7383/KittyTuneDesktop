@@ -1497,6 +1497,8 @@
     <string name="update_btn_download">Download &amp; Install</string>
     <string name="update_btn_minimize">Minimize to background</string>
     <string name="update_btn_pause">Pause</string>
+    <string name="update_mac_manual">Open the disk image and copy KittyTune to Applications to finish the update.</string>
+    <string name="update_mac_failed">KittyTune could not install the update. Open the update log for details.</string>
     <string name="update_btn_restart">Restart application</string>
     <string name="update_btn_resume">Resume</string>
     <string name="update_btn_retry_auth">Retry authentication</string>
