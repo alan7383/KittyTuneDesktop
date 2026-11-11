@@ -3452,7 +3452,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         try {
             val selection = java.awt.datatransfer.StringSelection(urlToShare)
             java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
-            com.alananasss.kittytune.core.Toaster.show(str("copied_to_clipboard"))
+            com.alananasss.kittytune.core.Toaster.confirm(str("artist_link_copied"))
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -6108,7 +6108,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         try {
             val selection = java.awt.datatransfer.StringSelection(urlToShare)
             java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
-            com.alananasss.kittytune.core.Toaster.show(str("copied_to_clipboard"))
+            com.alananasss.kittytune.core.Toaster.confirm(str("artist_link_copied"))
         } catch (e: Exception) {
             e.printStackTrace()
         }

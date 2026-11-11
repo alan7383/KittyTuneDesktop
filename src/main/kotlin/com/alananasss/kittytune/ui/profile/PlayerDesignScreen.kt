@@ -1176,7 +1176,7 @@ private fun menuTileIcon(id: String): ImageVector = when (id) {
     "go_artist" -> Icons.Rounded.Person
     "edit_track" -> Icons.Rounded.Edit
     "track_radio" -> Icons.Rounded.Radio
-    "share" -> Icons.Rounded.Share
+    "share" -> Icons.Rounded.Link
     "block_track" -> Icons.Rounded.VisibilityOff
     "block_artist" -> Icons.Rounded.PersonOff
     "remove_from_playlist" -> Icons.Rounded.RemoveCircleOutline
