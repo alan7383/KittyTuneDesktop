@@ -978,7 +978,7 @@ tasks.register<Test>("headlessTest") {
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
-            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ThemePersistenceTest", "SetupOnboardingTest",
+            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
             "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest"
         ).forEach(::includeTestsMatching)
