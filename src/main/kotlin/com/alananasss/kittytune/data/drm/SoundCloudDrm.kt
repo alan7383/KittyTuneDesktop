@@ -25,6 +25,7 @@ object SoundCloudDrm {
     /** The CDM bridge holds a single session at a time, so only the current track's is kept. */
     private var currentKey: String? = null
     private var currentSession: WidevineLicenseSession? = null
+    private var currentCdm: WidevineCdm? = null
 
     /**
      * The download side's own CDM instance and session.
@@ -114,15 +115,20 @@ object SoundCloudDrm {
         // token means a seek or a re-resolve inside the token's lifetime reuses the session instead of
         // paying for a second license exchange.
         val key = (encryption.keyIdHex ?: IsoBmff.hex(pssh)) + ":" + licenseToken.hashCode()
-        currentSession?.let { if (currentKey == key && !it.isExpired) return it }
+        val cdm = requireCdm()
+        currentSession?.let { if (currentCdm === cdm && currentKey == key && !it.isExpired) return it }
 
         runCatching { currentSession?.close() }
         currentSession = null
         currentKey = null
 
-        val cdm = requireCdm()
         val session = openLicensedSession(cdm, pssh, licenseToken, encryption.keyIdHex)
+        if (WidevineCdmRegistry.current() !== cdm) {
+            session.close()
+            throw DrmUnavailableException("the CDM changed while the stream was being licensed")
+        }
         currentSession = session
+        currentCdm = cdm
         currentKey = key
         Logger.d(TAG, "session ready for kid=${encryption.keyIdHex}")
         return session
@@ -152,26 +158,31 @@ object SoundCloudDrm {
     fun sessionForDownload(encryption: HlsEncryptionInfo, licenseToken: String): WidevineLicenseSession {
         val pssh = requireWidevinePssh(encryption, licenseToken)
         val key = (encryption.keyIdHex ?: IsoBmff.hex(pssh)) + ":" + licenseToken.hashCode()
-        downloadSession?.let { if (downloadKey == key && !it.isExpired) return it }
-
-        runCatching { downloadSession?.close() }
-        downloadSession = null
-        downloadKey = null
-
         // With the sidecar, the second instance is a second daemon: the in-process CDM is the one
         // SoundCloud refuses on Windows. The sidecar has to be registered before that choice is made,
         // which is exactly what a caller that never resolved a track would otherwise skip.
         CdmSidecar.installIfConfigured()
-        val cdm = downloadCdm
-            ?: (if (CdmSidecar.isInstalled) CdmSidecar.secondaryCdm() else NativeWidevineCdm.secondaryCdm())?.also {
-                downloadCdm = it
-                Logger.d(TAG, "download CDM ready: ${it.name}")
-            }
+        val sidecar = CdmSidecar.isInstalled
+        if (!sidecar) NativeWidevineCdm.installIfAvailable()
+        val registration = WidevineCdmRegistry.current()
+        val cdm = (if (sidecar) CdmSidecar.secondaryCdm() else NativeWidevineCdm.secondaryCdm())
             ?: throw DrmUnavailableException(
                 "no second Widevine CDM instance is available for downloads: " +
                     (NativeWidevineCdm.secondaryFailureReason ?: "unknown reason")
             )
+        downloadSession?.let {
+            if (downloadCdm === cdm && downloadKey == key && !it.isExpired &&
+                WidevineCdmRegistry.current() === registration && (!sidecar || CdmSidecar.isCurrentSecondary(cdm))) return it
+        }
+        runCatching { downloadSession?.close() }
+        downloadSession = null
+        downloadKey = null
+        downloadCdm = cdm
         val session = openLicensedSession(cdm, pssh, licenseToken, encryption.keyIdHex)
+        if (WidevineCdmRegistry.current() !== registration || (sidecar && !CdmSidecar.isCurrentSecondary(cdm))) {
+            session.close()
+            throw DrmUnavailableException("the CDM changed while the download was being licensed")
+        }
         downloadSession = session
         downloadKey = key
         return session
