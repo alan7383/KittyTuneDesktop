@@ -179,9 +179,9 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                 )
             }
             val targetRoute = when {
-                destinationId == "pet_settings" -> "settings"
+                destinationId == "pet_settings" || destinationId == "settings" -> "settings"
                 destinationId == "history" -> "history"
-                destinationId == "home" -> "home"
+                destinationId == "home" || destinationId == "search" -> "home"
                 destinationId == "charts" -> "charts"
                 destinationId == "upload" -> "upload"
                 destinationId == "recognition" -> "recognition"
@@ -210,6 +210,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                 if (!isSameRoute(navController, targetRoute)) {
                     navController.navigate(targetRoute)
                 }
+                if (destinationId == "search") homeViewModel.activateSearch()
             }
             playerViewModel.onNavigationHandled()
         }

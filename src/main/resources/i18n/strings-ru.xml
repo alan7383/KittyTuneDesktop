@@ -3333,4 +3333,10 @@
     <string name="onboard_desktop_zoom_body">Выбери удобный размер текста и элементов управления. Изменения применяются сразу.</string>
     <string name="account_return_title">С возвращением.</string>
     <string name="account_return_body">Подключи SoundCloud для доступа к избранному и плейлистам или слушай как гость. Настройки сохранены.</string>
+
+    <!-- macOS menus and updates -->
+    <string name="menu_go">Переход</string>
+    <string name="menu_window">Окно</string>
+    <string name="update_mac_manual">Чтобы завершить обновление, откройте образ диска и скопируйте KittyTune в папку «Программы».</string>
+    <string name="update_mac_failed">KittyTune не удалось установить обновление. Подробности см. в журнале обновления.</string>
 </resources>

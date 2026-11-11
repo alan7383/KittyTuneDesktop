@@ -21,6 +21,8 @@ import kotlin.math.roundToInt
  */
 object AppIconRuntime {
 
+    private val isMacOs = System.getProperty("os.name").startsWith("Mac", ignoreCase = true)
+
     private val WINDOW_ICON_SIZES = intArrayOf(16, 20, 24, 32, 48, 64, 128, 256)
 
     /**
@@ -30,8 +32,18 @@ object AppIconRuntime {
      */
     fun apply(variantKey: String, window: Window? = null) {
         val source = load(variantKey) ?: return
-        setDockIcon(source)
+        if (!isMacOs) setDockIcon(source)
         setWindowIcons(source, window)
+    }
+
+    fun applyMacDockIcon(variantKey: String) {
+        load(variantKey)?.let(::setDockIcon)
+    }
+
+    fun loadAppPainter(variantKey: String): androidx.compose.ui.graphics.painter.Painter? =
+        load(variantKey)?.let { source ->
+            val image = if (isMacOs) IconEncoders.macOsIcon(source, 256) else source
+            androidx.compose.ui.graphics.painter.BitmapPainter(image.toComposeImageBitmap())
     }
 
     private fun load(variantKey: String): BufferedImage? = runCatching {
@@ -46,12 +58,21 @@ object AppIconRuntime {
             if (!Taskbar.isTaskbarSupported()) return
             val taskbar = Taskbar.getTaskbar()
             if (!taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) return
-            // Hand over the source at its own size; macOS scales it down for whatever the
-            // Dock is currently showing, and upscaling here would only invent detail.
-            taskbar.iconImage =
-                if (maxOf(source.width, source.height) > 512) IconEncoders.scaled(source, 512) else source
+            val sourceSize = maxOf(source.width, source.height)
+            taskbar.iconImage = when {
+                isMacOs ->
+                    IconEncoders.macOsIcon(source, sourceSize.coerceAtMost(512))
+                sourceSize > 512 -> IconEncoders.scaled(source, 512)
+                else -> source
+            }
         }
     }
+
+    fun loadMacStatusIcon(variantKey: String): BufferedImage? =
+        load(variantKey)?.let { IconEncoders.macOsIcon(it, 48) }
+
+    fun loadPreviewPainter(variantKey: String): androidx.compose.ui.graphics.painter.Painter? =
+        load(variantKey)?.let { androidx.compose.ui.graphics.painter.BitmapPainter(it.toComposeImageBitmap()) }
 
     /**
      * Hands the window the full ladder of sizes. Runs after Compose has applied its own
@@ -59,7 +80,7 @@ object AppIconRuntime {
      */
     private fun setWindowIcons(source: BufferedImage, window: Window?) {
         runCatching {
-            val images = WINDOW_ICON_SIZES.map { IconEncoders.scaled(source, it) }
+            val images = WINDOW_ICON_SIZES.map { if (isMacOs) IconEncoders.macOsIcon(source, it) else IconEncoders.scaled(source, it) }
             val targets = if (window != null) listOf(window) else Window.getWindows().toList()
             targets.forEach { target -> runCatching { target.iconImages = images } }
         }
@@ -82,7 +103,7 @@ object AppIconRuntime {
         val source = load(variantKey) ?: return@runCatching null
         val os = System.getProperty("os.name").lowercase()
         val filled = if (os.contains("linux") || os.contains("nix")) fillTransparentCorners(source) else source
-        val scaled = IconEncoders.scaled(filled, 48)
+        val scaled = if (isMacOs) IconEncoders.macOsIcon(filled, 48) else IconEncoders.scaled(filled, 48)
         androidx.compose.ui.graphics.painter.BitmapPainter(
             scaled.toComposeImageBitmap()
         )

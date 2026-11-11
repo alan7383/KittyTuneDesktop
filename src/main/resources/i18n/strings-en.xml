@@ -916,6 +916,8 @@
     <string name="menu_repeat_one">Repeat (1)</string>
     <string name="menu_repost">Repost</string>
     <string name="menu_reposted">Reposted</string>
+    <string name="menu_go">Go</string>
+    <string name="menu_window">Window</string>
     <string name="menu_show_window">Show KittyTune</string>
     <string name="menu_mini_player_show">Show Mini Player</string>
     <string name="menu_mini_player_hide">Hide Mini Player</string>
@@ -1495,6 +1497,8 @@
     <string name="update_btn_download">Download &amp; Install</string>
     <string name="update_btn_minimize">Minimize to background</string>
     <string name="update_btn_pause">Pause</string>
+    <string name="update_mac_manual">Open the disk image and copy KittyTune to Applications to finish the update.</string>
+    <string name="update_mac_failed">KittyTune could not install the update. Open the update log for details.</string>
     <string name="update_btn_restart">Restart application</string>
     <string name="update_btn_resume">Resume</string>
     <string name="update_btn_retry_auth">Retry authentication</string>

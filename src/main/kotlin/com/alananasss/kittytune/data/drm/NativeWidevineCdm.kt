@@ -25,14 +25,30 @@ class NativeWidevineCdm private constructor(
 ) : WidevineCdm {
 
     private val lock = Any()
+    private var closed = false
+
+    override fun fork(): WidevineCdm = synchronized(Companion) {
+        val path = cdmPath ?: throw DrmUnavailableException("the Widevine module is no longer installed")
+        val error = ByteArray(ERROR_SIZE)
+        val instance = native.ktwv_create(path, error, ERROR_SIZE)
+            ?: throw DrmUnavailableException("could not open another Widevine instance: ${cString(error)}")
+        NativeWidevineCdm(native, instance, "$name (playback)")
+    }
+
+    override fun close() = shutdown()
 
     override fun openSession(pssh: ByteArray): WidevineLicenseSession = synchronized(lock) {
+        check(!closed) { "the Widevine instance was released" }
         native.ktwv_reset_session(handle)
         NativeWidevineSession(native, handle, pssh, lock)
     }
 
     internal fun shutdown() {
-        runCatching { native.ktwv_destroy(handle) }
+        synchronized(lock) {
+            if (closed) return
+            closed = true
+            runCatching { native.ktwv_destroy(handle) }
+        }
     }
 
     /** Raw C API exposed by the native bridge (`libkittytune_widevine.so`, `.dylib` or `.dll`). */
