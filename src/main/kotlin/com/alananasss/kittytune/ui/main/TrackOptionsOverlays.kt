@@ -61,7 +61,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Description
@@ -595,7 +595,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("track_radio", Icons.Rounded.Radio, str("menu_track_radio")) {
                     if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) viewModel.startYoutubeRadio(track) else viewModel.startRadioFromTrack(track)
                 })
-                add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.shareTrack(track) })
+                add(MenuOptionItem("share", Icons.Outlined.Link, str("cover_copy_link")) { viewModel.shareTrack(track) })
             }
             // Content filtering (issue #41): hide track / block artist, like Android.
             run {
@@ -1168,7 +1168,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 })
             }
             if (shareUrl.isNotEmpty()) {
-                add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.sharePlaylist(playlist) })
+                add(MenuOptionItem("share", Icons.Outlined.Link, str("cover_copy_link")) { viewModel.sharePlaylist(playlist) })
             }
             if (!isLocal && offerTrackActions && !isStation) {
                 add(

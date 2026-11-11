@@ -397,6 +397,10 @@ private fun ProfileMenu(
             onDismiss()
             com.alananasss.kittytune.data.TokenManager.logout()
         }
+        if (!isGuest) ProfileMenuItem(str("onboard_account_switch"), Icons.Rounded.SwapHoriz) {
+            onDismiss()
+            com.alananasss.kittytune.ui.setup.AccountLauncher.requested = true
+        }
         androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 4.dp))
         ProfileMenuItem(str("menu_about"), Icons.Rounded.Info) {
             onDismiss()

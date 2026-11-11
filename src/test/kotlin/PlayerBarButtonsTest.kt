@@ -14,6 +14,7 @@ class PlayerBarButtonsTest {
     fun setUp() {
         Prefs.remove("player_bar_buttons")
         Prefs.remove("player_bar_devices_migrated")
+        Prefs.remove("player_bar_pet_migrated")
     }
 
     @Test
@@ -44,6 +45,40 @@ class PlayerBarButtonsTest {
         )
         assertTrue(buttons.contains(PlayerPreferences.PLAYER_BAR_BUTTON_LIKE))
         assertTrue(buttons.contains(PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE))
+    }
+
+    @Test
+    fun testPreDesignProfileGetsNewButtonsOnce() {
+        Prefs.putString("player_bar_buttons", "like,queue")
+
+        assertEquals(
+            PlayerPreferences.PLAYER_BAR_BUTTONS_DEFAULT - PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
+            prefs.getPlayerBarButtons(),
+        )
+
+        prefs.setPlayerBarButtons(emptySet())
+        assertEquals(emptySet<String>(), prefs.getPlayerBarButtons())
+    }
+
+    @Test
+    fun testShuffleAndRepeatVisibilityAreIndependent() {
+        val shuffle = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE
+        val repeat = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT
+        val pet = PlayerPreferences.PLAYER_BAR_BUTTON_PET
+
+        for (transportButtons in listOf(setOf(repeat), emptySet(), setOf(shuffle), setOf(shuffle, repeat))) {
+            val visible = transportButtons + pet
+            prefs.setPlayerBarButtons(visible)
+            assertEquals(visible, prefs.getPlayerBarButtons())
+        }
+    }
+
+    @Test
+    fun testPetMigrationPreservesHiddenPlayerDesignButtons() {
+        Prefs.putString("player_bar_buttons", "")
+        Prefs.putBoolean("player_bar_devices_migrated", true)
+
+        assertEquals(setOf(PlayerPreferences.PLAYER_BAR_BUTTON_PET), prefs.getPlayerBarButtons())
     }
 
     @Test

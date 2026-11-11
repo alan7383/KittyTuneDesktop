@@ -34,7 +34,8 @@ import javax.swing.SwingUtilities
 
 @Composable
 fun LocalMediaSettingsScreen(
-    onBackClick: (() -> Unit)? = null
+    onBackClick: (() -> Unit)? = null,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 16.dp
 ) {
     val prefs = remember { PlayerPreferences() }
     val scope = rememberCoroutineScope()
@@ -76,6 +77,7 @@ fun LocalMediaSettingsScreen(
     Column(modifier = Modifier.fillMaxWidth()) {
             Box {
                 SettingsGroup(
+                    horizontalPadding = horizontalPadding,
                     title = str("settings_cat_general"),
                     items = listOf(
                         { shape ->
@@ -218,6 +220,7 @@ fun LocalMediaSettingsScreen(
                         itemsList.add(dynamicContentItem)
 
                         SettingsGroup(
+                            horizontalPadding = horizontalPadding,
                             title = str("pref_local_folders"),
                             items = itemsList
                         )
@@ -250,7 +253,7 @@ fun LocalMediaSettingsScreen(
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp)
+                                        .padding(horizontal = horizontalPadding)
                                         .height(56.dp)
                                 ) {
                                     if (isScanning) {

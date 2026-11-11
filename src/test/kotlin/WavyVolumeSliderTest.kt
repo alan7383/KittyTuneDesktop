@@ -36,17 +36,18 @@ class WavyVolumeSliderTest {
     @Test
     fun `full player seekBar uses PlayerSlider with styled slider`() {
         val fullPlayerSource = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/player/FullPlayer.kt").readText()
+        val seekBarSource = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/main/PlaybackSeekBar.kt").readText()
         assertTrue(
-            fullPlayerSource.contains("PlayerSlider("),
-            "FullPlayerSeekBar must use PlayerSlider instead of hardcoded hairline bar",
+            fullPlayerSource.contains("PlaybackSeekBar("),
+            "FullPlayerSeekBar must use the shared playback seek bar",
         )
         assertTrue(
-            fullPlayerSource.contains("sliderStyle = sliderStyle"),
-            "FullPlayerSeekBar must bind user's chosen sliderStyle",
+            seekBarSource.contains("PlayerSlider(") && seekBarSource.contains("sliderStyle = sliderStyle"),
+            "PlaybackSeekBar must use PlayerSlider with the selected style",
         )
         assertTrue(
-            fullPlayerSource.contains("rememberPlayerSliderStyle()"),
-            "FullPlayerSeekBar must read reactive player slider style preference",
+            seekBarSource.contains("Prefs.flow.collectAsState()") && seekBarSource.contains(".getPlayerSliderStyle()"),
+            "PlaybackSeekBar must observe the slider style preference",
         )
     }
 
