@@ -52,8 +52,10 @@ object AppDatabase {
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
+        com.alananasss.kittytune.utils.StartupTimeline.mark("db: driver loaded")
         conn = DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}")
         conn.autoCommit = true
+        com.alananasss.kittytune.utils.StartupTimeline.mark("db: connected")
         conn.createStatement().use { st ->
             st.execute("PRAGMA journal_mode=WAL")
             st.execute("PRAGMA foreign_keys=ON")
@@ -62,7 +64,9 @@ object AppDatabase {
             st.execute("PRAGMA cache_size=-1000")
             st.execute("PRAGMA mmap_size=0")
         }
+        com.alananasss.kittytune.utils.StartupTimeline.mark("db: pragmas")
         createSchema()
+        com.alananasss.kittytune.utils.StartupTimeline.mark("db: schema")
     }
 
     private fun createSchema() {

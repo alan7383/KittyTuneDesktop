@@ -117,9 +117,30 @@ private const val FULLSCREEN_EXIT_MS = 220
 fun MainScreen(
     playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(AppInstance.application) },
 ) {
+    // Leaving MAIN cancels work and drops the state of every account screen.
+    val accountOwner = remember {
+        object : androidx.lifecycle.ViewModelStoreOwner {
+            override val viewModelStore = androidx.lifecycle.ViewModelStore()
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(accountOwner) {
+        onDispose { accountOwner.viewModelStore.clear() }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner provides accountOwner
+    ) {
+        MainAccountScreen(playerViewModel)
+    }
+}
+
+@Composable
+private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
+    com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: composition start")
     com.alananasss.kittytune.ui.debug.TraceRecompositions("MainScreen")
     val homeViewModel: HomeViewModel = viewModel { HomeViewModel(AppInstance.application) }
     val libraryViewModel: LibraryViewModel = viewModel { LibraryViewModel(AppInstance.application) }
+    com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: view models created")
+    LaunchedEffect(playerViewModel) { playerViewModel.resetAccountProfile() }
 
     val navController = rememberNavController()
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
@@ -158,9 +179,9 @@ fun MainScreen(
                 )
             }
             val targetRoute = when {
-                destinationId == "pet_settings" -> "settings"
+                destinationId == "pet_settings" || destinationId == "settings" -> "settings"
                 destinationId == "history" -> "history"
-                destinationId == "home" -> "home"
+                destinationId == "home" || destinationId == "search" -> "home"
                 destinationId == "charts" -> "charts"
                 destinationId == "upload" -> "upload"
                 destinationId == "recognition" -> "recognition"
@@ -189,6 +210,7 @@ fun MainScreen(
                 if (!isSameRoute(navController, targetRoute)) {
                     navController.navigate(targetRoute)
                 }
+                if (destinationId == "search") homeViewModel.activateSearch()
             }
             playerViewModel.onNavigationHandled()
         }
@@ -592,6 +614,7 @@ fun MainScreen(
                         .fillMaxHeight()
                         .width(sidebarWidth)
                 )
+                com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: sidebar composed")
             }
 
             // Resize handle: drag to resize the library, drag far left to snap it
@@ -731,6 +754,7 @@ fun MainScreen(
                                 playerViewModel = playerViewModel,
                                 navController = navController,
                             )
+                            com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: home composed")
                         }
                         composable("genres") {
                             com.alananasss.kittytune.ui.home.GenresScreen(
@@ -1371,12 +1395,14 @@ fun MainScreen(
                         .onPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Enter) { PanelHistory.pointerInside = true }
                         .onPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Exit) { PanelHistory.pointerInside = false }
                 )
+                com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: right panel composed")
             }
             }
         }
 
         // Docked styles sit below the panels; the floating one is drawn over them, further down.
         if (!isBarFloating) playerBar(playerBarModifier)
+        com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: player bar composed")
     }
 
     if (isBarFloating) {
@@ -1415,6 +1441,7 @@ fun MainScreen(
             }
         }
     }
+    com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: overlays composed")
 
     Box(
         modifier = Modifier.fillMaxSize(),

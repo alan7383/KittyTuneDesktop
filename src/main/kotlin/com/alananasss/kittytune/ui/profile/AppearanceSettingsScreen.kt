@@ -539,7 +539,7 @@ private fun ThemePresetCard(
     onClick: () -> Unit,
 ) {
     val scheme = rememberDynamicColorScheme(
-        seedColor = if (seed == 0) Color(0xFFFF7A1A) else Color(seed),
+        seedColor = if (seed == 0) com.alananasss.kittytune.ui.theme.KittyTuneDefaultSeedColor else Color(seed),
         isDark = isDark,
         isAmoled = pureBlack,
         style = style,
@@ -767,7 +767,6 @@ private fun AppIconDialog(prefs: PlayerPreferences, appIconVariant: String, onDi
                                     .clip(RoundedCornerShape(16.dp))
                                     .clickable {
                                         prefs.setAppIconVariant(variant.key)
-                                        com.alananasss.kittytune.core.AppIconInstaller.apply(variant.key)
                                     }
                             ) {
                                 Row(
@@ -776,22 +775,18 @@ private fun AppIconDialog(prefs: PlayerPreferences, appIconVariant: String, onDi
                                         .padding(horizontal = 16.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val painter = remember(variant.key) { loadIconVariantPainter(variant.key) }
+                                    val painter = remember(variant.key) {
+                                        com.alananasss.kittytune.core.AppIconRuntime.loadPreviewPainter(variant.key)
+                                    }
                                     if (painter != null) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            shadowElevation = 1.dp,
-                                            color = Color.Transparent,
-                                            modifier = Modifier.size(46.dp)
-                                        ) {
-                                            androidx.compose.foundation.Image(
-                                                painter = painter,
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .clip(CircleShape)
-                                            )
-                                        }
+                                        androidx.compose.foundation.Image(
+                                            painter = painter,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .padding(3.dp)
+                                                .clip(RoundedCornerShape(11.dp))
+                                        )
                                     } else {
                                         Spacer(Modifier.size(46.dp))
                                     }
@@ -898,18 +893,6 @@ private fun FontAxesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
  * it throws from composition, which took the whole app down when the icons were missing from
  * the packaged jar (issue #33). Here a missing file is just an empty tile.
  */
-private fun loadIconVariantPainter(key: String): androidx.compose.ui.graphics.painter.Painter? =
-    runCatching {
-        val path = com.alananasss.kittytune.core.AppIconVariants.resourcePath(key)
-        val loader = Thread.currentThread().contextClassLoader
-            ?: com.alananasss.kittytune.core.AppIconVariants::class.java.classLoader
-        loader?.getResourceAsStream(path)?.use { stream ->
-            androidx.compose.ui.graphics.painter.BitmapPainter(
-                androidx.compose.ui.res.loadImageBitmap(stream)
-            )
-        }
-    }.getOrNull()
-
 /** A compact switch row whose whole width is the target, for lists inside dialogs and small windows. */
 @Composable
 internal fun SwitchRow(

@@ -102,15 +102,20 @@
         companion object {
             suspend fun getUserInfo(token: String): Result<UserInfo> = runCatching {
                 val client = HttpClient()
-                val response = client.get("https://discord.com/api/v9/users/@me") {
-                    header("Authorization", token)
-                }.bodyAsText()
-                val json = JSONObject(response)
-                val username = json.getString("username")
-                val name = json.getString("global_name")
-                client.close()
-    
-                UserInfo(username, name)
+                try {
+                    val response = client.get("https://discord.com/api/v9/users/@me") {
+                        header("Authorization", token)
+                    }
+                    check(response.status.value in 200..299) { "Discord profile request failed: ${response.status.value}" }
+                    val json = JSONObject(response.bodyAsText())
+                    val username = json.getString("username")
+                    val name = json.optString("global_name").takeUnless { it.isBlank() || it == "null" } ?: username
+                    val avatar = json.optString("avatar").takeUnless { it.isBlank() || it == "null" }
+                    val avatarUrl = avatar?.let { "https://cdn.discordapp.com/avatars/${json.getString("id")}/$it.png?size=128" }
+                    UserInfo(username, name, avatarUrl)
+                } finally {
+                    client.close()
+                }
             }
         }
     }

@@ -5,7 +5,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.rememberSliderState
+import androidx.compose.material3.SliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,11 +22,8 @@ import androidx.compose.material3.Slider as Material3Slider
  * the one `VerticalSlider` defaults to — keeps drawing it and lets the corner radius shrink with
  * it, so the stub squeezes shut and reopens smoothly. Only the second one reads as motion.
  *
- * The difference is a single flag inside the library (`enableCornerShrinking`), reachable only by
- * naming the track explicitly, which is all this wrapper does. Everything else — colours, thumb,
- * sizing, the `Dp.Unspecified` corner size that still means "half the track height" — matches the
- * default so this stays a drop-in replacement: call sites keep their signature and only their
- * import changes.
+ * The default track uses the expressive overload to shrink its corners near the ends. A custom
+ * thumb or track can use the same controlled slider state and input handling.
  *
  * Note that a stepped slider (`steps > 0`) opts itself back out inside the library, since ticks
  * need the track to end on a full corner. That is upstream behaviour, not a limitation here.
@@ -43,37 +40,38 @@ fun Slider(
     onValueChangeFinished: (() -> Unit)? = null,
     colors: SliderColors = SliderDefaults.colors(),
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    thumb: @Composable (SliderState) -> Unit = {
+        SliderDefaults.Thumb(interactionSource = interactionSource, colors = colors, enabled = enabled)
+    },
+    track: @Composable (SliderState) -> Unit = { state ->
+        SliderDefaults.Track(
+            sliderState = state,
+            trackCornerSize = Dp.Unspecified,
+            drawStopIndicator = null,
+            enabled = enabled,
+            colors = colors,
+        )
+    },
 ) {
-    val state = rememberSliderState(
-        value = value,
-        steps = steps,
-        trackRange = valueRange,
-    )
-    state.value = value
+    val state = remember(steps, valueRange.start, valueRange.endInclusive) {
+        SliderState(valueRange.start, steps, valueRange)
+    }
+    if (state.value != value) state.value = value
 
     Material3Slider(
         state = state,
         modifier = modifier,
         enabled = enabled,
-        onValueChange = onValueChange,
+        onValueChange = {
+            // Material compares each input against state.value. Keep it current even when two
+            // clicks land before the owner has recomposed with the first click's value.
+            state.value = it
+            onValueChange(it)
+        },
         onValueChangeFinished = onValueChangeFinished,
         colors = colors,
         interactionSource = interactionSource,
-        thumb = {
-            SliderDefaults.Thumb(
-                interactionSource = interactionSource,
-                colors = colors,
-                enabled = enabled,
-            )
-        },
-        track = { sliderState ->
-            SliderDefaults.Track(
-                sliderState = sliderState,
-                trackCornerSize = Dp.Unspecified,
-                drawStopIndicator = null,
-                enabled = enabled,
-                colors = colors,
-            )
-        },
+        thumb = thumb,
+        track = track,
     )
 }

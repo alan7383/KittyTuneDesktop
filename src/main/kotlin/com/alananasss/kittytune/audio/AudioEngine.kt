@@ -16,6 +16,7 @@ import org.bytedeco.javacv.FrameGrabber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
+import java.util.concurrent.atomic.AtomicReference
 import javax.sound.sampled.FloatControl
 import javax.sound.sampled.SourceDataLine
 import kotlin.concurrent.thread
@@ -49,8 +50,9 @@ class AudioEngine {
         private set
 
     @Volatile
-    var positionMs: Long = 0L
-        private set
+    private var decodedPositionMs = 0L
+
+    val positionMs: Long get() = seekRequest.get()?.positionMs ?: decodedPositionMs
 
     @Volatile
     var durationMs: Long = 0L
@@ -143,8 +145,10 @@ class AudioEngine {
      */
     private var trackGainDb: Float = 0f
 
-    @Volatile
-    private var seekRequestMs: Long = -1L
+    private class SeekRequest(val positionMs: Long, val warmUp: Boolean = false)
+
+    // Keep the latest target visible until the decoder has applied that specific request.
+    private val seekRequest = AtomicReference<SeekRequest?>()
 
     @Volatile
     private var paused = true
@@ -219,10 +223,10 @@ class AudioEngine {
         }
         currentUrl = url
         currentHeaders = headers
-        positionMs = startPositionMs
+        decodedPositionMs = startPositionMs
         durationMs = 0L
         liveBeat.onFlush(startPositionMs.toDouble())
-        seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
+        seekRequest.set(startPositionMs.takeIf { it > 0L }?.let { SeekRequest(it) })
         if (startPositionMs > 0) {
             aiDetection.notifySeek(startPositionMs)
             vocalRemover.seekToPositionMs(startPositionMs)
@@ -323,13 +327,6 @@ class AudioEngine {
     @Volatile
     private var pausedTimestamp = 0L
 
-    /**
-     * Set while the decode loop is servicing a reconnect nobody is waiting for, which changes two
-     * things: recovery is bounded instead of retrying forever, and success resets the pause clock.
-     */
-    @Volatile
-    private var warmUpRequested = false
-
     private var warmUpJob: kotlinx.coroutines.Job? = null
 
     private companion object {
@@ -392,7 +389,7 @@ class AudioEngine {
         } else if (!workerAlive && currentUrl != null) {
             Logger.e("AudioEngine", "play() with no live decoder; re-preparing at $positionMs ms")
             setState(State.BUFFERING)
-            seekRequestMs = positionMs
+            seekRequest.compareAndSet(null, SeekRequest(decodedPositionMs))
             prepare()
         } else if (pausedFor > RECONNECT_AFTER_PAUSE_MS && currentUrl?.startsWith("http") == true) {
             // A CDN keep-alive rarely survives even half a minute, and SoundCloud's signed
@@ -445,17 +442,16 @@ class AudioEngine {
         if (!paused || pausedTimestamp <= 0L) return
         if (currentUrl?.startsWith("http") != true) return
         if (worker?.isAlive != true) return
-        if (seekRequestMs >= 0L) return
-        Logger.e("AudioEngine", "Warming up paused stream at $positionMs ms")
-        warmUpRequested = true
-        seekRequestMs = positionMs
+        val request = SeekRequest(decodedPositionMs, warmUp = true)
+        if (seekRequest.compareAndSet(null, request)) {
+            Logger.e("AudioEngine", "Warming up paused stream at ${request.positionMs} ms")
+        }
     }
 
     fun seekTo(ms: Long) {
         if (released) return
         val coerced = ms.coerceAtLeast(0)
-        seekRequestMs = coerced
-        positionMs = coerced
+        seekRequest.set(SeekRequest(coerced))
         aiDetection.notifySeek(coerced)
         vocalRemover.seekToPositionMs(coerced)
         vocalBoost.seekToPositionMs(coerced)
@@ -513,9 +509,9 @@ class AudioEngine {
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         currentUrl = null
         currentHeaders = emptyMap()
-        positionMs = 0L
+        decodedPositionMs = 0L
         durationMs = 0L
-        seekRequestMs = -1L
+        seekRequest.set(null)
         setState(State.IDLE)
     }
 
@@ -794,14 +790,15 @@ class AudioEngine {
         url: String,
         headers: Map<String, String>,
         resumePosMs: Long,
-        maxAttempts: Int = Int.MAX_VALUE
+        maxAttempts: Int = Int.MAX_VALUE,
+        shouldRecover: () -> Boolean = { true },
     ): Pair<FFmpegFrameGrabber?, String?> {
         oldGrabber?.releaseUnlockedQuietly()
 
         var currentUrlToTry = url
         var attempt = 0
 
-        while (!stopFlag && attempt < maxAttempts) {
+        while (!stopFlag && shouldRecover() && attempt < maxAttempts) {
             attempt++
             Logger.e("AudioEngine", "Network recovery attempt $attempt at $resumePosMs ms...")
 
@@ -828,7 +825,7 @@ class AudioEngine {
                 if (resumeTargetTs > 0 && f != null) {
                     var droppedCount = 0
                     var lastTs = Long.MIN_VALUE
-                    while (f != null && !stopFlag) {
+                    while (f != null && !stopFlag && shouldRecover()) {
                         val ts = newG.timestamp
                         if (ts >= resumeTargetTs - 25_000L || (lastTs != Long.MIN_VALUE && ts <= lastTs)) {
                             break
@@ -839,7 +836,7 @@ class AudioEngine {
                         if (droppedCount > 1500) break
                     }
                 }
-                if (f != null) {
+                if (f != null && !stopFlag && shouldRecover()) {
                     val samples = f.samples
                     if (samples != null) {
                         pushFrame(samples, f.audioChannels)
@@ -851,6 +848,7 @@ class AudioEngine {
                 Logger.e("AudioEngine", "Reopen attempt $attempt failed (${e.message}).")
             }
             newG?.releaseUnlockedQuietly()
+            if (!shouldRecover()) break
 
             val backoffMs = (attempt * 400L).coerceAtMost(2000L)
             try {
@@ -920,10 +918,11 @@ class AudioEngine {
                     line = localLine
                 }
 
-                val seek = seekRequestMs
-                if (seek >= 0) {
+                val request = seekRequest.get()
+                if (request != null) {
+                    val seek = request.positionMs
                     val targetTimestamp = seek * 1000L
-                    seekRequestMs = -1L
+                    fun isCurrentSeek() = !stopFlag && activeWorkerId == workerId && seekRequest.get() === request
 
                     Logger.e("AudioEngine", "Seeking to targetTimestamp=$targetTimestamp (ms=$seek)")
 
@@ -961,41 +960,44 @@ class AudioEngine {
                         Logger.e("AudioEngine", "Seek error - ${e.message}")
                     }
 
-                    if (!seekOk) {
-                        if (durationMs > 0 && seek >= durationMs - 1500L) {
-                            Logger.e("AudioEngine", "Seek reached end of stream at $seek ms (duration=$durationMs ms). Ending track.")
-                            positionMs = durationMs
-                            drainStretcher(outBuf, localLine)
-                            setStateAsync(State.ENDED)
-                            break
-                        }
+                    if (!isCurrentSeek()) continue
+                    var reachedEnd = !seekOk && durationMs > 0L && seek >= durationMs - 1500L
 
+                    if (!seekOk && !reachedEnd) {
                         val recovered = recoverStream(
                             grabber,
                             activeUrl,
                             headers,
                             seek,
-                            maxAttempts = if (warmUpRequested) WARM_UP_RECOVERY_ATTEMPTS else Int.MAX_VALUE,
+                            maxAttempts = if (request.warmUp) WARM_UP_RECOVERY_ATTEMPTS else Int.MAX_VALUE,
+                            shouldRecover = ::isCurrentSeek,
                         )
-                        if (recovered.first != null) {
-                            grabber = recovered.first
-                            if (recovered.second != null) activeUrl = recovered.second!!
-                            seekFrame = try { grabber?.grabSamples() } catch (_: Exception) { null }
+                        grabber = recovered.first
+                        recovered.second?.let { activeUrl = it }
+                        if (!isCurrentSeek()) continue
+                        if (grabber != null) {
+                            seekFrame = try { grabber.grabSamples() } catch (_: Exception) { null }
                             seekOk = seekFrame != null
-                        } else if (durationMs > 0 && seek >= durationMs - 3000L) {
-                            Logger.e("AudioEngine", "Seek recovery at end of track failed at $seek ms. Ending track.")
-                            positionMs = durationMs
-                            drainStretcher(outBuf, localLine)
-                            setStateAsync(State.ENDED)
-                            break
+                        } else {
+                            reachedEnd = durationMs > 0L && seek >= durationMs - 3000L
                         }
+                    }
+
+                    if (reachedEnd) {
+                        decodedPositionMs = durationMs
+                        if (!seekRequest.compareAndSet(request, null)) continue
+                        Logger.e("AudioEngine", "Seek reached end of stream at $seek ms (duration=$durationMs ms). Ending track.")
+                        drainStretcher(outBuf, localLine)
+                        if (seekRequest.get() != null || stopFlag || activeWorkerId != workerId) continue
+                        setStateAsync(State.ENDED)
+                        break
                     }
 
                     if (seekOk && grabber != null) {
                         var f = seekFrame
                         var droppedCount = 0
                         var lastTs = Long.MIN_VALUE
-                        while (f != null && !stopFlag && activeWorkerId == workerId) {
+                        while (f != null && isCurrentSeek()) {
                             val ts = grabber.timestamp
                             // Accept frame if timestamp is within ~1 audio frame (25ms) of target or past it,
                             // or if timestamps stop advancing (e.g. malformed stream without PTS)
@@ -1025,7 +1027,8 @@ class AudioEngine {
                         }
                     }
 
-                    positionMs = seek
+                    if (!isCurrentSeek()) continue
+                    decodedPositionMs = seek
                     aiDetection.notifySeek(seek)
                     vocalRemover.seekToPositionMs(seek)
                     vocalBoost.seekToPositionMs(seek)
@@ -1034,9 +1037,9 @@ class AudioEngine {
                     chain.forEach { it.flush() }
                     liveBeat.onFlush(seek.toDouble())
                     localLine?.flush()
+                    if (!seekRequest.compareAndSet(request, null)) continue
 
-                    if (warmUpRequested) {
-                        warmUpRequested = false
+                    if (request.warmUp && paused) {
                         // The pause clock measures how long it has been since the stream was known
                         // good, which is what play() reads to decide whether to reconnect. A
                         // successful warm-up makes that "just now"; a failed one leaves it alone so
@@ -1063,6 +1066,7 @@ class AudioEngine {
                     Logger.e("AudioEngine", "Read error from grabber: ${e.message}")
                     frame = null
                 }
+                if (seekRequest.get() != null) continue
 
                 if (frame == null) {
                     if (!stopFlag && activeWorkerId == workerId) {
@@ -1076,10 +1080,14 @@ class AudioEngine {
                                 "AudioEngine",
                                 "Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream..."
                             )
-                            val recovered = recoverStream(grabber, activeUrl, headers, positionMs)
+                            val recovered = recoverStream(
+                                grabber, activeUrl, headers, decodedPositionMs,
+                                shouldRecover = { seekRequest.get() == null && activeWorkerId == workerId },
+                            )
+                            grabber = recovered.first
+                            recovered.second?.let { activeUrl = it }
+                            if (seekRequest.get() != null || stopFlag || activeWorkerId != workerId) continue
                             if (recovered.first != null) {
-                                grabber = recovered.first
-                                if (recovered.second != null) activeUrl = recovered.second!!
                                 Logger.e("AudioEngine", "Stream recovery succeeded at $positionMs ms!")
                                 continue
                             } else {
@@ -1097,9 +1105,9 @@ class AudioEngine {
                 pushFrame(samples, frame.audioChannels)
                 drainStretcher(outBuf, localLine)
 
-                if (seekRequestMs == -1L) {
+                if (seekRequest.get() == null) {
                     val rawPos = (grabber?.timestamp ?: 0L) / 1000L
-                    positionMs = if (durationMs > 0L) rawPos.coerceIn(0L, durationMs) else rawPos.coerceAtLeast(0L)
+                    decodedPositionMs = if (durationMs > 0L) rawPos.coerceIn(0L, durationMs) else rawPos.coerceAtLeast(0L)
                 }
             }
         } catch (t: Throwable) {
@@ -1308,7 +1316,6 @@ class AudioEngine {
     private fun stopInternal() {
         warmUpJob?.cancel()
         warmUpJob = null
-        warmUpRequested = false
         stopFlag = true
         activeWorkerId++
         paused = true
