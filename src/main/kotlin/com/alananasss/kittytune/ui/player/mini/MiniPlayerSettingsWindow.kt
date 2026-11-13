@@ -128,7 +128,6 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
         // for, and there is no hide/show cycle to freeze the window (issue #66). The mini player uses
         // the same pattern for the same reason.
         DisposableEffect(window) {
-            if (!compat) runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
             // Opaque mode: the card's 24 dp corners, inside its 12 dp margin, cut by the window's shape.
             val removeShape = if (compat) com.alananasss.kittytune.core.FloatingWindowCompat.keepRoundedShape(window, inset = 12.0) { 24.0 } else null
             if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {

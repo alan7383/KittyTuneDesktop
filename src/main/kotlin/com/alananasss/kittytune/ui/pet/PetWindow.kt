@@ -166,8 +166,6 @@ fun PetDesktopWindow(
         // Same pre-map setup as the mini player: a floating tool, not another app window.
         DisposableEffect(window) {
             runCatching { window.type = java.awt.Window.Type.UTILITY }
-            // A see-through background makes AWT turn the window translucent: never in the opaque mode.
-            if (!compat) runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
             val shownListener = object : java.awt.event.ComponentAdapter() {
                 override fun componentShown(e: java.awt.event.ComponentEvent?) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
@@ -237,7 +235,6 @@ fun PetDesktopWindow(
 
         DisposableEffect(window) {
             runCatching {
-                if (!compat) window.background = java.awt.Color(0, 0, 0, 0)
                 window.minimumSize = java.awt.Dimension(minWpx, minHpx)
                 window.maximumSize = java.awt.Dimension(maxWpx, maxHpx)
             }

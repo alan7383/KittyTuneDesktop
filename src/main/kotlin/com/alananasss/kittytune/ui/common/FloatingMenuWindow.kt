@@ -110,8 +110,6 @@ fun FloatingMenuWindow(
                 val remove = com.alananasss.kittytune.core.FloatingWindowCompat.keepRoundedShape(window, inset = SHADOW_PAD.value.toDouble()) { 16.0 }
                 onDispose { remove() }
             }
-        } else {
-            runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
         }
 
         // A tool window, so the menu never flashes a taskbar button of its own. On Linux it takes focus so
