@@ -1,0 +1,16 @@
+{
+  "baselineCommit": "02c7574d55b68125f3328cb88111d000d3d078ff",
+  "compiler": "Kotlin JVM compiler 2.4.21",
+  "jvmTarget": "21",
+  "method": "Both variants compiled from their actual production sources against the same packaged 1.5.1 dependencies.",
+  "sources": {
+    "src/main/kotlin/com/alananasss/kittytune/data/LyricsMatcher.kt": {
+      "baseline": "87d1e8238a4a36e2c4bd374e71cdd874e5a664fc52984007be56c68daae11944",
+      "candidate": "003c81002f874a2603852918ec525835107c16e01ef22e999f2014699cb775f1"
+    },
+    "src/main/kotlin/com/alananasss/kittytune/ui/player/ManualLyricsSearch.kt": {
+      "baseline": "1da84e4984bfc3a972c32f061c2e75f49da061b8391c5d4e01ce9c3fc95f03b4",
+      "candidate": "74fcf82b26ea5da9807d902a93fbcb4bb72327495bd77b74a6b0accecbec8f39"
+    }
+  }
+}

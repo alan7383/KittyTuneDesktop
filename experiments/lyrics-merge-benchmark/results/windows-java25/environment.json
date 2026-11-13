@@ -1,0 +1,64 @@
+{
+  "platform": "Windows-10-10.0.19045-SP0",
+  "processor": "Intel64 Family 6 Model 94 Stepping 3, GenuineIntel",
+  "java": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment Zulu25.38+107-CA (build 25.0.5+8-LTS)\nOpenJDK 64-Bit Server VM Zulu25.38+107-CA (build 25.0.5+8-LTS, mixed mode, sharing)\n",
+  "flags": [
+    "-Xms256m",
+    "-Xmx512m",
+    "-XX:+UseG1GC",
+    "-XX:ParallelGCThreads=2",
+    "-XX:ConcGCThreads=1",
+    "-XX:MaxGCPauseMillis=50",
+    "-Djava.awt.headless=true"
+  ],
+  "pairs": 5,
+  "order": [
+    {
+      "pair": 0,
+      "variant": "baseline"
+    },
+    {
+      "pair": 0,
+      "variant": "candidate"
+    },
+    {
+      "pair": 1,
+      "variant": "candidate"
+    },
+    {
+      "pair": 1,
+      "variant": "baseline"
+    },
+    {
+      "pair": 2,
+      "variant": "baseline"
+    },
+    {
+      "pair": 2,
+      "variant": "candidate"
+    },
+    {
+      "pair": 3,
+      "variant": "candidate"
+    },
+    {
+      "pair": 3,
+      "variant": "baseline"
+    },
+    {
+      "pair": 4,
+      "variant": "baseline"
+    },
+    {
+      "pair": 4,
+      "variant": "candidate"
+    }
+  ],
+  "samplesPerSizePerFork": 25,
+  "warmupBurstsPerSize": 12,
+  "sizes": [
+    24,
+    96,
+    240
+  ]
+}
