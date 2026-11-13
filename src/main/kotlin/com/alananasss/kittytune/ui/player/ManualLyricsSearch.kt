@@ -77,17 +77,27 @@ internal object ManualLyricsSearch {
         target: LyricsMatcher.Target,
     ): List<UnifiedLyricResult> {
         val targetSec = target.durationMs / 1000.0
-        return (current + incoming)
+        val candidates = (current + incoming)
             .groupBy { duplicateKey(it) }
             .values
             .map { copies -> copies.minBy { lengthMiss(it, targetSec) } }
+        if (candidates.size < 2) return candidates
+
+        class Scored(val result: UnifiedLyricResult) {
+            val matchesSong = isAboutThisSong(result, target)
+            val tier = syncTier(result)
+            val score by lazy(LazyThreadSafetyMode.NONE) { rank(result, target) }
+        }
+
+        return candidates.map(::Scored)
             // Word timings first, then line timings, then plain text, whoever the source is; within a kind the
             // closest to this song. An unrelated song never outranks the right one by its timings alone.
             .sortedWith(
-                compareByDescending<UnifiedLyricResult> { isAboutThisSong(it, target) }
-                    .thenByDescending { syncTier(it) }
-                    .thenByDescending { rank(it, target) },
+                compareByDescending<Scored> { it.matchesSong }
+                    .thenByDescending { it.tier }
+                    .thenByDescending { it.score },
             )
+            .map { it.result }
     }
 
     fun syncTier(result: UnifiedLyricResult): Int = when {
