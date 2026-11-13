@@ -1,0 +1,9 @@
+gradle.projectsEvaluated {
+    def project = gradle.rootProject
+    project.tasks.register('writeLyricsBenchmarkClasspath') {
+        dependsOn project.tasks.named('testClasses')
+        doLast {
+            project.file('build/lyrics-benchmark-classpath.txt').text = project.sourceSets.test.runtimeClasspath.asPath
+        }
+    }
+}

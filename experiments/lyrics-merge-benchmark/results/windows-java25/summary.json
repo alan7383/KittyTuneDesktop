@@ -1,0 +1,104 @@
+{
+  "24": {
+    "baseline": {
+      "samples": 125,
+      "burstMedianMs": 37.3357,
+      "burstP95Ms": 63.8592,
+      "cpuMedianMs": 31.25,
+      "allocatedMedianBytes": 26283720,
+      "singleMergeP95Ms": 23.8615,
+      "mergesOver16ms": 30,
+      "forkMedianMs": [
+        35.3719,
+        30.3624,
+        42.9484,
+        27.5298,
+        47.3851
+      ]
+    },
+    "candidate": {
+      "samples": 125,
+      "burstMedianMs": 13.5632,
+      "burstP95Ms": 25.7305,
+      "cpuMedianMs": 15.625,
+      "allocatedMedianBytes": 3293880,
+      "singleMergeP95Ms": 9.1705,
+      "mergesOver16ms": 0,
+      "forkMedianMs": [
+        9.5788,
+        14.7304,
+        15.3032,
+        10.3529,
+        14.8226
+      ]
+    }
+  },
+  "96": {
+    "baseline": {
+      "samples": 125,
+      "burstMedianMs": 241.9322,
+      "burstP95Ms": 334.9293,
+      "cpuMedianMs": 203.125,
+      "allocatedMedianBytes": 153829384,
+      "singleMergeP95Ms": 101.0726,
+      "mergesOver16ms": 601,
+      "forkMedianMs": [
+        193.4536,
+        149.622,
+        285.2867,
+        233.4245,
+        280.9001
+      ]
+    },
+    "candidate": {
+      "samples": 125,
+      "burstMedianMs": 21.7513,
+      "burstP95Ms": 63.4081,
+      "cpuMedianMs": 15.625,
+      "allocatedMedianBytes": 12128600,
+      "singleMergeP95Ms": 24.8613,
+      "mergesOver16ms": 16,
+      "forkMedianMs": [
+        19.3586,
+        38.355,
+        31.8547,
+        17.5869,
+        20.7027
+      ]
+    }
+  },
+  "240": {
+    "baseline": {
+      "samples": 125,
+      "burstMedianMs": 734.163,
+      "burstP95Ms": 1494.7067,
+      "cpuMedianMs": 593.75,
+      "allocatedMedianBytes": 466160872,
+      "singleMergeP95Ms": 422.1131,
+      "mergesOver16ms": 750,
+      "forkMedianMs": [
+        397.7898,
+        652.2956,
+        456.5134,
+        853.7415,
+        1357.4975
+      ]
+    },
+    "candidate": {
+      "samples": 125,
+      "burstMedianMs": 46.5979,
+      "burstP95Ms": 108.0698,
+      "cpuMedianMs": 46.875,
+      "allocatedMedianBytes": 28803320,
+      "singleMergeP95Ms": 34.3282,
+      "mergesOver16ms": 76,
+      "forkMedianMs": [
+        42.7354,
+        93.4496,
+        51.4261,
+        40.5706,
+        46.3757
+      ]
+    }
+  }
+}

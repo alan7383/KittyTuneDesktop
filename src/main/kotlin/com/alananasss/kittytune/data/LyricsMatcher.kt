@@ -250,6 +250,11 @@ object LyricsMatcher {
             // so fall back to the raw words rather than throwing the candidate away.
             .ifEmpty { normalized.split(' ').filter { it.isNotBlank() }.toSet() }
 
+    private val BRACKETED_ASIDES = Regex("\\[.*?\\]|\\(.*?\\)|\\{.*?\\}")
+    private val NORMALIZE_TRAILING_CREDIT = Regex("(?i)\\b(feat|ft|featuring|prod|w)\\.?\\s.*$")
+    private val DIACRITICAL_MARKS = Regex("\\p{InCombiningDiacriticalMarks}+")
+    private val NORMALIZATION_SEPARATORS = Regex("[^\\p{L}\\p{Nd}]+")
+
     /**
      * Folds a title or artist credit down to comparable words: accents removed, bracketed asides
      * and everything after a "feat."-style marker dropped, punctuation flattened to spaces.
@@ -261,12 +266,12 @@ object LyricsMatcher {
         // `PatternSyntaxException: Syntax error in regexp pattern near index 21`, which crashed the app on
         // the first lyrics lookup. Escaping is valid on both, so the file stays identical between them
         // (issue #33).
-        text = text.replace(Regex("\\[.*?\\]|\\(.*?\\)|\\{.*?\\}"), " ")
-        text = text.replace(Regex("(?i)\\b(feat|ft|featuring|prod|w)\\.?\\s.*$"), " ")
+        text = text.replace(BRACKETED_ASIDES, " ")
+        text = text.replace(NORMALIZE_TRAILING_CREDIT, " ")
         text = Normalizer.normalize(text, Normalizer.Form.NFD)
-            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
-        text = text.replace(Regex("[^\\p{L}\\p{Nd}]+"), " ")
-        return text.trim().replace(Regex("\\s+"), " ")
+            .replace(DIACRITICAL_MARKS, "")
+        text = text.replace(NORMALIZATION_SEPARATORS, " ")
+        return text.trim().replace(WHITESPACE_REGEX, " ")
     }
 
     // --- ArchiveTune-inspired intelligent title detection & FuzzyMatcher ---
