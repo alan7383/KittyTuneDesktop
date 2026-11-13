@@ -372,8 +372,6 @@ fun MiniLyricsPlayerWindow(
         // maps the window, which is what makes tiling WMs float it as a utility.
         DisposableEffect(window) {
             runCatching { window.type = java.awt.Window.Type.UTILITY }
-            // A see-through background makes AWT turn the window translucent: never in the opaque mode.
-            if (!compat) runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
             val shownListener = object : java.awt.event.ComponentAdapter() {
                 override fun componentShown(e: java.awt.event.ComponentEvent?) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
@@ -528,7 +526,6 @@ fun MiniLyricsPlayerWindow(
 
         DisposableEffect(window, isElongated) {
             runCatching {
-                if (!compat) window.background = java.awt.Color(0, 0, 0, 0)
                 window.isAlwaysOnTop = isPinned
                 window.minimumSize = java.awt.Dimension(minWidthPx, minHeightPx)
                 window.maximumSize = java.awt.Dimension(maxWidthPx, maxHeightPx)
