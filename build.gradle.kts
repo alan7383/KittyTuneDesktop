@@ -47,6 +47,8 @@ configurations.all {
 }
 
 dependencies {
+    implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation("org.tukaani:xz:1.12")
     implementation("com.github.z-huang.InnerTune:lrclib:0.5.10")
     implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
     implementation(compose.desktop.currentOs)
@@ -994,7 +996,7 @@ tasks.register<Test>("headlessTest") {
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
-            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest"
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest"
         ).forEach(::includeTestsMatching)
     }
 }

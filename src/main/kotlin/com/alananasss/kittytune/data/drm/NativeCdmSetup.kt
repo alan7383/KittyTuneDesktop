@@ -9,7 +9,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
 /**
  * The native route: Chrome's Linux Widevine module, run **inside a Windows process** by KittyTune's
@@ -36,16 +35,9 @@ internal object NativeCdmSetup {
     private const val CHROME_DEB =
         "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
 
-    /** The member inside the package. Chrome has shipped this layout for years. */
-    private const val CDM_MEMBER =
-        "./opt/google/chrome/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so"
-
     private const val MODULE_NAME = "libwidevinecdm.so"
     private const val HOST_NAME = "ktcdm.exe"
     private const val CONFIG_NAME = "cdm-sidecar.json"
-
-    /** A real module is ~21 MB; anything much smaller is a failed extraction. */
-    private const val MINIMUM_MODULE_BYTES = 8L * 1024 * 1024
 
     val windows: Boolean = System.getProperty("os.name").startsWith("Windows", true)
 
@@ -298,58 +290,16 @@ internal object NativeCdmSetup {
         null
     }
 
-    /**
-     * Pulls the module out of the package with Windows' own `tar.exe` (bsdtar). A `.deb` is an `ar`
-     * archive containing `data.tar.xz`, which bsdtar reads, so no external tool has to be shipped or
-     * installed — and the module is written straight to its destination, without a shell.
-     */
-    private fun extractModule(packageFile: File, destination: File, report: (String) -> Unit): Boolean {
-        val tar = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32/tar.exe")
-        if (!tar.isFile) {
-            report("  extract: tar.exe not found")
-            return false
-        }
-        val payload = File(installDirectory, "data.tar.xz")
-        val first = ProcessBuilder(tar.absolutePath, "-xf", packageFile.absolutePath, "data.tar.xz")
-            .directory(installDirectory)
-            .redirectErrorStream(true)
-            .start()
-        val firstOutput = first.inputStream.readBytes().toString(Charsets.UTF_8)
-        if (!first.waitFor(120, TimeUnit.SECONDS) || first.exitValue() != 0) {
-            report("  extract: tar failed (${firstOutput.take(160).trim()})")
-            payload.delete()
-            return false
-        }
-        destination.delete()
-        val second = ProcessBuilder(tar.absolutePath, "-xOf", payload.absolutePath, CDM_MEMBER)
-            .redirectErrorStream(false)
-            .redirectOutput(destination)
-            .start()
-        val secondError = second.errorStream.readBytes().toString(Charsets.UTF_8)
-        if (!second.waitFor(120, TimeUnit.SECONDS) || second.exitValue() != 0) {
-            report("  extract: ${secondError.take(160).trim().ifEmpty { "tar exited ${second.exitValue()}" }}")
-            destination.delete()
-            payload.delete()
-            return false
-        }
-        payload.delete()
+    private fun extractModule(packageFile: File, destination: File, report: (String) -> Unit): Boolean = try {
+        ChromeCdmArchive.extract(packageFile, destination)
         report("  extract: ${destination.length() / (1024 * 1024)} MiB")
-        return true
+        true
+    } catch (e: Exception) {
+        report("  extract: ${e.message ?: e.javaClass.simpleName}")
+        false
     }
 
-    /** A Linux x86-64 ELF, and a plausible size. Catches a truncated download before it is used. */
-    private fun isUsableModule(file: File): Boolean = runCatching {
-        if (!file.isFile || file.length() < MINIMUM_MODULE_BYTES) return false
-        file.inputStream().use { input ->
-            val header = ByteArray(20)
-            if (input.read(header) != header.size) return false
-            header[0] == 0x7f.toByte() && header[1] == 'E'.code.toByte() &&
-                header[2] == 'L'.code.toByte() && header[3] == 'F'.code.toByte() &&
-                header[4] == 2.toByte() && header[5] == 1.toByte() &&
-                // e_machine at offset 18, little-endian: 0x3e is x86-64.
-                header[18] == 0x3e.toByte() && header[19] == 0.toByte()
-        }
-    }.getOrDefault(false)
+    private fun isUsableModule(file: File): Boolean = ChromeCdmArchive.isUsableModule(file)
 
     private fun writeConfiguration(host: File, module: File) {
         val command = JSONArray().put(host.absolutePath).put(module.absolutePath)
