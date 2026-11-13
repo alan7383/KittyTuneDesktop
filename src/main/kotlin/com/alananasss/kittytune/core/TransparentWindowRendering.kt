@@ -1,35 +1,29 @@
 package com.alananasss.kittytune.core
 
+import org.jetbrains.skiko.DelicateSkikoApi
 import org.jetbrains.skiko.GraphicsApi
 import org.jetbrains.skiko.SkiaLayer
+import org.jetbrains.skiko.transparentWindowBackgroundHack
 import java.awt.AWTEvent
 import java.awt.Toolkit
 import java.awt.event.AWTEventListener
 import java.awt.event.HierarchyEvent
+import java.util.Collections
+import java.util.WeakHashMap
 import javax.swing.SwingUtilities
 
-/**
- * On Windows, draws KittyTune's transparent windows (Kitty pet, mini player and its settings, floating
- * menus) in software instead of Direct3D.
- *
- * Skiko renders a transparent window through its own Direct3D path, and on some GPU drivers the very
- * first frame of such a window never comes back: the native `flushAndSubmit` blocks forever. That frame
- * is drawn on the event thread (while the window is laid out, before it is shown), so the whole app
- * froze the moment the pet or the mini player opened, and again on every launch since both are
- * remembered.
- *
- * These windows are small, so drawing them on the CPU costs next to nothing, and the main window
- * (opaque) keeps Direct3D.
- *
- * Compose gives no access to a window's SkiaLayer before its first frame, so this listens to AWT itself:
- * SkiaLayer.addNotify() runs JComponent.addNotify() — which reports the layer becoming displayable — and
- * only then creates its renderer. Setting the API at that moment means Direct3D is never even started
- * for these windows.
- */
+/** Keeps floating windows' native transparency compatible with their renderer on Windows. */
+@OptIn(DelicateSkikoApi::class)
 object TransparentWindowRendering {
     private val API: GraphicsApi get() = FloatingWindowCompat.transparentRenderApi
 
     @Volatile private var installed = false
+    private val trackedLayers = Collections.newSetFromMap(WeakHashMap<SkiaLayer, Boolean>())
+
+    private fun syncBackground(layer: SkiaLayer) {
+        val window = SwingUtilities.getWindowAncestor(layer) as? androidx.compose.ui.awt.ComposeWindow ?: return
+        if (window.isTransparent) window.background = transparentWindowBackgroundHack(layer.renderApi)
+    }
 
     private val listener = AWTEventListener { event ->
         if (event !is HierarchyEvent) return@AWTEventListener
@@ -49,7 +43,12 @@ object TransparentWindowRendering {
                 }
                 return@runCatching
             }
+            if (trackedLayers.add(layer)) {
+                // Fallback happens after Compose's initial transparency setup.
+                layer.onStateChanged(SkiaLayer.PropertyKind.Renderer) { syncBackground(it) }
+            }
             if (layer.renderApi != API) layer.renderApi = API
+            syncBackground(layer)
         }
     }
 

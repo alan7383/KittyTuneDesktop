@@ -21,6 +21,9 @@ jobs:
       - name: Test and package portable Windows app
         shell: pwsh
         run: ./scripts/build-windows.ps1 -JavaHome $env:JAVA_HOME
+      - name: Test transparent window renderer fallback
+        shell: pwsh
+        run: ./gradlew.bat :test --tests '*TransparentWindowRenderingTest' -PdesktopOnly=true --console=plain
       - uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Windows-Portable
@@ -33,4 +36,6 @@ jobs:
           path: |
             build/reports/tests/headlessTest
             build/test-results/headlessTest
+            build/reports/tests/test
+            build/test-results/test
             build/previews
