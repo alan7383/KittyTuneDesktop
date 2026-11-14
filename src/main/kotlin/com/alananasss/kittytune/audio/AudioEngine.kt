@@ -189,6 +189,7 @@ class AudioEngine {
      * through every `setMediaItem` call site. Absent for ordinary streams, which is the common case.
      */
     private var licenseToken: String? = null
+    private var sourceAnalysisPending = false
 
     init {
         val fmt = AudioFormat(outputSampleRate, outputChannels)
@@ -243,8 +244,7 @@ class AudioEngine {
             // The previous track's stream no longer needs its DRM session (and the CDM behind it).
             hlsAdapter?.releaseDrm()
             hlsAdapter = if (url.contains(".m3u8")) {
-                (HlsHeadCache.take(url, ::reResolveUrl)
-                    ?: HlsStreamAdapter(url, headers, refreshPlaylistUrl = ::reResolveUrl)).also {
+                HlsHeadCache.take(url, ::reResolveUrl)?.also {
                     it.licenseToken = licenseToken
                 }
             } else null
@@ -254,15 +254,8 @@ class AudioEngine {
             hlsAdapter = null
         }
 
-        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-        if (com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
-            com.alananasss.kittytune.audio.ai.AiDetectionManager.analyzeTrackUpfront(
-                urlOrPath = url,
-                headers = headers,
-                hlsAdapter = hlsAdapter,
-            )
-        }
-        
+        sourceAnalysisPending = true
+
         setState(State.BUFFERING)
     }
 
@@ -315,12 +308,13 @@ class AudioEngine {
         val url = currentUrl ?: return
         stopFlag = false
         val newWorkerId = ++activeWorkerId
+        val headers = currentHeaders
         worker = thread(name = "kittytune-audio-$newWorkerId", isDaemon = true) {
             // One grabber open at a time: the predecessors are holding theirs until they notice
             // they have been replaced.
             awaitPredecessors(newWorkerId)
             if (stopFlag || activeWorkerId != newWorkerId) return@thread
-            runDecodeLoop(newWorkerId, url, currentHeaders)
+            runDecodeLoop(newWorkerId, url, headers)
         }
     }
 
@@ -509,6 +503,7 @@ class AudioEngine {
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         currentUrl = null
         currentHeaders = emptyMap()
+        sourceAnalysisPending = false
         decodedPositionMs = 0L
         durationMs = 0L
         seekRequest.set(null)
@@ -706,17 +701,49 @@ class AudioEngine {
      */
     var onReResolveUrl: (suspend (failedUrl: String) -> String?)? = null
 
-    private fun createGrabber(targetUrl: String, headers: Map<String, String>, startPositionMs: Long = 0L): FFmpegFrameGrabber {
+    private fun requireCurrentWorker(workerId: Long) {
+        if (released || stopFlag || activeWorkerId != workerId) {
+            throw java.io.InterruptedIOException("Playback source was superseded")
+        }
+    }
+
+    private fun startSourceAnalysis(workerId: Long, url: String, headers: Map<String, String>, adapter: HlsStreamAdapter?) {
+        synchronized(this) {
+            requireCurrentWorker(workerId)
+            if (!sourceAnalysisPending) return
+            sourceAnalysisPending = false
+            val prefs = PlayerPreferences()
+            if (com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
+                com.alananasss.kittytune.audio.ai.AiDetectionManager.analyzeTrackUpfront(url, headers, adapter)
+            }
+        }
+    }
+
+    private fun createGrabber(workerId: Long, targetUrl: String, headers: Map<String, String>, startPositionMs: Long = 0L): FFmpegFrameGrabber {
         val isHls = targetUrl.contains(".m3u8")
         if (isHls) {
-            var adapter = hlsAdapter
+            val (cached, token) = synchronized(this) {
+                requireCurrentWorker(workerId)
+                hlsAdapter to licenseToken
+            }
+            var adapter = cached
             if (adapter == null || adapter.playlistUrl != targetUrl) {
                 adapter?.releaseDrm()
                 adapter = HlsStreamAdapter(targetUrl, headers, refreshPlaylistUrl = ::reResolveUrl).also {
-                    it.licenseToken = licenseToken
+                    it.licenseToken = token
                 }
-                hlsAdapter = adapter
+                val opened = adapter
+                try {
+                    synchronized(this) {
+                        requireCurrentWorker(workerId)
+                        hlsAdapter = opened
+                    }
+                } catch (e: Throwable) {
+                    opened.releaseDrm()
+                    throw e
+                }
             }
+            startSourceAnalysis(workerId, targetUrl, headers, adapter)
             // A maximum size of 0 reads the fragments in order and nothing else. javacv's default treats the stream as
             // seekable: it keeps every byte read in memory, and FFmpeg asking for the stream's size made it read to
             // the end first, so a track only started once all of it had been downloaded, the longer the slower
@@ -734,6 +761,7 @@ class AudioEngine {
                 sampleMode = FrameGrabber.SampleMode.FLOAT
             }
         } else {
+            startSourceAnalysis(workerId, targetUrl, headers, null)
             return FFmpegFrameGrabber(targetUrl).apply {
                 if (headers.isNotEmpty()) {
                     val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
@@ -786,6 +814,7 @@ class AudioEngine {
     }
 
     private fun recoverStream(
+        workerId: Long,
         oldGrabber: FFmpegFrameGrabber?,
         url: String,
         headers: Map<String, String>,
@@ -798,7 +827,7 @@ class AudioEngine {
         var currentUrlToTry = url
         var attempt = 0
 
-        while (!stopFlag && shouldRecover() && attempt < maxAttempts) {
+        while (!stopFlag && activeWorkerId == workerId && shouldRecover() && attempt < maxAttempts) {
             attempt++
             Logger.e("AudioEngine", "Network recovery attempt $attempt at $resumePosMs ms...")
 
@@ -812,7 +841,7 @@ class AudioEngine {
             // the network stays down.
             var newG: FFmpegFrameGrabber? = null
             try {
-                newG = createGrabber(currentUrlToTry, headers, resumePosMs)
+                newG = createGrabber(workerId, currentUrlToTry, headers, resumePosMs)
                 newG.startUnlocked()
                 val isHls = currentUrlToTry.contains(".m3u8")
                 val resumeTargetTs = if (resumePosMs > 0) resumePosMs * 1000L else 0L
@@ -878,7 +907,7 @@ class AudioEngine {
             try {
                 // Both halves can fail on a dead URL: an HLS playlist 403s while the grabber is
                 // still being built, a progressive one only on start().
-                opening = createGrabber(activeUrl, headers, positionMs)
+                opening = createGrabber(workerId, activeUrl, headers, positionMs)
                 opening.startUnlocked()
                 grabber = opening
             } catch (e: Exception) {
@@ -886,7 +915,7 @@ class AudioEngine {
                 // about the deadline). Re-resolve and retry a couple of times before handing the
                 // failure up: the owner's own error path is a full teardown and reload.
                 Logger.e("AudioEngine", "Initial open failed (${e.message}); recovering")
-                val recovered = recoverStream(opening, activeUrl, headers, positionMs, INITIAL_OPEN_ATTEMPTS)
+                val recovered = recoverStream(workerId, opening, activeUrl, headers, positionMs, INITIAL_OPEN_ATTEMPTS)
                 grabber = recovered.first ?: throw e
                 recovered.second?.let { activeUrl = it }
             }
@@ -947,7 +976,7 @@ class AudioEngine {
                             grabber?.releaseUnlockedQuietly()
                             grabber = null
 
-                            grabber = createGrabber(activeUrl, headers, seek)
+                            grabber = createGrabber(workerId, activeUrl, headers, seek)
                             grabber.startUnlocked()
                             seekFrame = try { grabber.grabSamples() } catch (_: Exception) { null }
                             seekOk = seekFrame != null
@@ -965,6 +994,7 @@ class AudioEngine {
 
                     if (!seekOk && !reachedEnd) {
                         val recovered = recoverStream(
+                            workerId,
                             grabber,
                             activeUrl,
                             headers,
@@ -1081,6 +1111,7 @@ class AudioEngine {
                                 "Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream..."
                             )
                             val recovered = recoverStream(
+                                workerId,
                                 grabber, activeUrl, headers, decodedPositionMs,
                                 shouldRecover = { seekRequest.get() == null && activeWorkerId == workerId },
                             )
