@@ -1,16 +1,100 @@
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ImageComposeScene
+import com.alananasss.kittytune.core.LocalWindowSeen
+import com.alananasss.kittytune.ui.player.slider.MixTransition
 import com.alananasss.kittytune.ui.player.slider.PlayheadClock
 import com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead
+import com.alananasss.kittytune.ui.player.slider.rememberSliderWavePhase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PlayheadClockTest {
     private val frameNanos = 16_000_000L
+
+    @Test
+    fun `slider wave resumes from its last visible phase`() {
+        var seen by mutableStateOf(true)
+        var phase = 0f
+        val scene = ImageComposeScene(width = 1, height = 1) {
+            CompositionLocalProvider(LocalWindowSeen provides seen) {
+                phase = rememberSliderWavePhase(true, speedPx = 50f, wavelengthPx = 80f).floatValue
+            }
+        }
+        try {
+            repeat(5) { scene.render(it * frameNanos).close() }
+            assertTrue(phase > 0f)
+
+            seen = false
+            scene.render(5 * frameNanos).close()
+            val before = phase
+            scene.render(2_000_000_000L).close()
+            assertEquals(before, phase)
+
+            seen = true
+            val restored = 3_000_000_000L
+            scene.render(restored).close()
+            assertEquals(before, phase)
+            scene.render(restored + frameNanos).close()
+            assertEquals(before, phase)
+            scene.render(restored + 2 * frameNanos).close()
+            scene.render(restored + 3 * frameNanos).close()
+            assertTrue(phase > before)
+            assertTrue(phase - before <= 1.601f)
+        } finally {
+            scene.close()
+        }
+    }
+
+    @Test
+    fun `restoring during a mix skips the old track glide`() {
+        val fade = mutableFloatStateOf(0f)
+        val mixing = mutableStateOf(false)
+        val mix = MixTransition(fade, mutableFloatStateOf(0f), mutableFloatStateOf(1f), mixing)
+        assertEquals(0.9f, mix.shownFraction(0.9f, "old", isSeen = true))
+        mix.shownFraction(0.95f, "old", isSeen = false)
+
+        mixing.value = true
+        fade.floatValue = 0.3f
+        assertEquals(0.1f, mix.shownFraction(0.1f, "new", isSeen = true))
+        assertEquals(0.11f, mix.shownFraction(0.11f, "new", isSeen = true))
+    }
+
+    @Test
+    fun `restoring the window immediately shows the latest position`() {
+        var seen by mutableStateOf(true)
+        var reported by mutableLongStateOf(10_000L)
+        var displayed = 0L
+        val scene = ImageComposeScene(width = 1, height = 1) {
+            CompositionLocalProvider(LocalWindowSeen provides seen) {
+                val shown = rememberSmoothPlayhead(reported, true, false, "track", 0L)
+                SideEffect { displayed = shown }
+            }
+        }
+        try {
+            scene.render(0L).close()
+            assertEquals(10_000L, displayed)
+
+            seen = false
+            scene.render(frameNanos).close()
+            reported = 60_000L
+            scene.render(2 * frameNanos).close()
+            assertEquals(60_000L, displayed)
+
+            seen = true
+            reported = 61_000L
+            scene.render(3 * frameNanos).close()
+            assertEquals(61_000L, displayed)
+        } finally {
+            scene.close()
+        }
+    }
 
     @Test
     fun `a click shows its committed position in the first frame`() {

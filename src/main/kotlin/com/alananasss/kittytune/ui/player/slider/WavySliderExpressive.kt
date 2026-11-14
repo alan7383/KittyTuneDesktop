@@ -15,10 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -41,7 +39,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.times
-import kotlinx.coroutines.isActive
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
@@ -73,9 +70,6 @@ fun WavySliderExpressive(
     onValueChangeCancelled: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
-    // Nobody can see the window: stop the wave and the per-frame smoothing, which would otherwise keep
-    // the whole window repainting at 60 fps for as long as music plays.
-    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
     val strokeWidthPx = with(density) { strokeWidth.toPx() }
     val thumbRadiusPx = with(density) { thumbRadius.toPx() }
     val trackEdgePaddingPx = with(density) { trackEdgePadding.coerceAtLeast(0.dp).toPx() }
@@ -141,22 +135,12 @@ fun WavySliderExpressive(
         }
     }
 
-    val wavePhasePx = remember { mutableFloatStateOf(0f) }
     val wavelengthPx = with(density) { wavelength.toPx() }.coerceAtLeast(1f)
-    val waveSpeedPx = with(density) { waveSpeed.toPx() }
-
-    // Keep wave redraws on the shared ambient clock while the slider is visible and idle.
-    val isWaveMoving = isSeen && isPlaying && enabled && !isInteracting
-    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
-    LaunchedEffect(isWaveMoving, wavelengthPx, waveSpeedPx, ambientClock) {
-        if (!isWaveMoving) return@LaunchedEffect
-        while (isActive) {
-            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) {
-                wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx)
-            }
-        }
-    }
-
+    val wavePhase = rememberSliderWavePhase(
+        moving = isPlaying && enabled && !isInteracting,
+        speedPx = with(density) { waveSpeed.toPx() },
+        wavelengthPx = wavelengthPx,
+    )
     val containerHeight = max(44.dp, max(WavyProgressIndicatorDefaults.LinearContainerHeight, max(thumbRadius * 2, thumbLineHeightWhenInteracting)))
 
     Box(
@@ -225,7 +209,7 @@ fun WavySliderExpressive(
             if (activeEnd > trackStart) {
                 wave.rewind()
                 var x = trackStart
-                val phase = wavePhasePx.floatValue
+                val phase = wavePhase.floatValue
                 val k = (2.0 * Math.PI / wavelengthPx).toFloat()
                 wave.moveTo(x, thumbY + amplitudePx * kotlin.math.sin(k * (x - phase)))
                 while (x < activeEnd) {
