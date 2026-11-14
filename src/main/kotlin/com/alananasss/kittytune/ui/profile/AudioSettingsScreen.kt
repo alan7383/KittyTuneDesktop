@@ -63,6 +63,10 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
     var persistentQueueEnabled by remember { mutableStateOf(prefs.getPersistentQueueEnabled()) }
     var savePositionEnabled by remember { mutableStateOf(prefs.getSavePositionEnabled()) }
     var youtubeFallbackEnabled by remember { mutableStateOf(prefs.getYouTubeFallbackEnabled()) }
+    var hideVideoSongs by remember { mutableStateOf(prefs.getHideVideoSongs()) }
+    var hideYoutubeShorts by remember { mutableStateOf(prefs.getHideYoutubeShorts()) }
+    var pauseListenHistory by remember { mutableStateOf(prefs.getPauseListenHistory()) }
+    var pauseSearchHistory by remember { mutableStateOf(prefs.getPauseSearchHistory()) }
     var seekWheelSeconds by remember { mutableStateOf(prefs.getSeekWheelSeconds()) }
     var showSeekWheelDialog by remember { mutableStateOf(false) }
 
@@ -104,7 +108,7 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
         SettingsGroupTitle(str("settings_cat_playback"))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
-            val totalVisibleItems = if (!isGuest) 11 else 10
+            val totalVisibleItems = if (!isGuest) 13 else 12
 
             SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) }, highlightKey = "pref_autoplay")
             SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) }, highlightKey = "pref_continuous_playback")
@@ -115,11 +119,13 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
             SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) }, highlightKey = "pref_save_position")
             SettingsItem(shape = getSettingsShape(totalVisibleItems, 7), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) }, highlightKey = "pref_youtube_fallback")
             SettingsItem(shape = getSettingsShape(totalVisibleItems, 8), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) }, highlightKey = "pref_precise_speed")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 9), title = str("pref_hide_video_songs"), subtitle = str("pref_hide_video_songs_sub"), hasSwitch = true, switchState = hideVideoSongs, onSwitchChange = { hideVideoSongs = it; prefs.setHideVideoSongs(it) }, highlightKey = "pref_hide_video_songs")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 10), title = str("pref_hide_youtube_shorts"), subtitle = str("pref_hide_youtube_shorts_sub"), hasSwitch = true, switchState = hideYoutubeShorts, onSwitchChange = { hideYoutubeShorts = it; prefs.setHideYoutubeShorts(it) }, highlightKey = "pref_hide_youtube_shorts")
 
             if (!isGuest) {
                 var scHistorySyncEnabled by remember { mutableStateOf(prefs.getSoundCloudHistorySyncEnabled()) }
                 SettingsItem(
-                    shape = getSettingsShape(totalVisibleItems, 9),
+                    shape = getSettingsShape(totalVisibleItems, 11),
                     title = str("pref_sc_sync_title"),
                     subtitle = str("pref_sc_sync_sub"),
                     hasSwitch = true,
@@ -132,7 +138,7 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
             }
 
             SettingsItem(
-                shape = getSettingsShape(totalVisibleItems, if (!isGuest) 9 else 8),
+                shape = getSettingsShape(totalVisibleItems, if (!isGuest) 12 else 11),
                 title = str("pref_seek_wheel_step"),
                 subtitle = str(
                     "pref_seek_wheel_step_value",
@@ -143,6 +149,12 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
                 ),
                 onClick = { showSeekWheelDialog = true }
             )
+        }
+
+        SettingsGroupTitle(str("pref_privacy_title"))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            SettingsItem(shape = getSettingsShape(2, 0), title = str("pref_pause_listen_history"), subtitle = str("pref_pause_listen_history_sub"), hasSwitch = true, switchState = pauseListenHistory, onSwitchChange = { pauseListenHistory = it; prefs.setPauseListenHistory(it) }, highlightKey = "pref_pause_listen_history")
+            SettingsItem(shape = getSettingsShape(2, 1), title = str("pref_pause_search_history"), subtitle = str("pref_pause_search_history_sub"), hasSwitch = true, switchState = pauseSearchHistory, onSwitchChange = { pauseSearchHistory = it; prefs.setPauseSearchHistory(it) }, highlightKey = "pref_pause_search_history")
         }
     }
 }

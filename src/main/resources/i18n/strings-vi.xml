@@ -3420,4 +3420,12 @@
     <string name="menu_window">Cửa sổ</string>
     <string name="update_mac_manual">Mở ảnh đĩa và sao chép KittyTune vào thư mục Ứng dụng để hoàn tất cập nhật.</string>
     <string name="update_mac_failed">KittyTune không thể cài đặt bản cập nhật. Mở nhật ký cập nhật để xem chi tiết.</string>
+    <string name="pref_pause_listen_history">Tạm dừng lịch sử nghe</string>
+    <string name="pref_pause_listen_history_sub">Khi bật, mọi thứ bạn phát sẽ không được ghi lại</string>
+    <string name="pref_pause_search_history">Tạm dừng lịch sử tìm kiếm</string>
+    <string name="pref_pause_search_history_sub">Khi bật, các lượt tìm kiếm mới sẽ không được lưu</string>
+    <string name="pref_hide_video_songs">Ẩn bài hát dạng video</string>
+    <string name="pref_hide_video_songs_sub">Chỉ tìm bài hát thay vì video trên YouTube</string>
+    <string name="pref_hide_youtube_shorts">Ẩn YouTube Shorts</string>
+    <string name="pref_hide_youtube_shorts_sub">Lọc Shorts khỏi kết quả tìm kiếm YouTube</string>
 </resources>

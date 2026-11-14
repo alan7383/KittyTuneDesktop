@@ -3339,4 +3339,12 @@
     <string name="menu_window">Окно</string>
     <string name="update_mac_manual">Чтобы завершить обновление, откройте образ диска и скопируйте KittyTune в папку «Программы».</string>
     <string name="update_mac_failed">KittyTune не удалось установить обновление. Подробности см. в журнале обновления.</string>
+    <string name="pref_pause_listen_history">Не записывать историю прослушиваний</string>
+    <string name="pref_pause_listen_history_sub">Пауза учёта статистики прослушиваний</string>
+    <string name="pref_pause_search_history">Не записывать историю поиска</string>
+    <string name="pref_pause_search_history_sub">Пауза сохранения поисковых запросов</string>
+    <string name="pref_hide_video_songs">Скрывать видеоклипы</string>
+    <string name="pref_hide_video_songs_sub">Убирать видеоверсии треков из результатов поиска</string>
+    <string name="pref_hide_youtube_shorts">Скрывать YouTube Shorts</string>
+    <string name="pref_hide_youtube_shorts_sub">Убирать Shorts из результатов поиска YouTube</string>
 </resources>

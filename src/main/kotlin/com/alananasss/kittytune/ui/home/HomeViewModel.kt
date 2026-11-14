@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import com.alananasss.kittytune.core.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.alananasss.kittytune.data.HistoryRepository
+import com.alananasss.kittytune.data.search.isYoutubeShort
 import com.alananasss.kittytune.data.LikeRepository
 import com.alananasss.kittytune.data.RecentSearchRepository
 import com.alananasss.kittytune.data.SearchCategory
@@ -259,6 +260,8 @@ import com.alananasss.kittytune.utils.Logger
 
         /** Called when a search is actually run, so a half-typed word never becomes history. */
         private fun recordSearch(query: String) {
+            // Pause search history: nothing is written while the setting is on.
+            if (playerPrefs.getPauseSearchHistory()) return
             viewModelScope.launch { RecentSearchRepository.record(query) }
         }
 
@@ -282,11 +285,14 @@ import com.alananasss.kittytune.utils.Logger
          * list, and an artist picked for this query counts towards making them its best result next time.
          */
         private fun noteOpened(visit: com.alananasss.kittytune.data.search.RecentVisits.Visit) {
+            // Queries, artists, tracks and playlists alike stay out of the recent searches.
+            if (playerPrefs.getPauseSearchHistory()) return
             com.alananasss.kittytune.data.search.RecentVisits.record(visit)
             searchQuery.trim().takeIf { it.isNotEmpty() }?.let(::forgetSearch)
         }
 
         fun noteOpenedArtist(user: User) {
+            if (playerPrefs.getPauseSearchHistory()) return
             com.alananasss.kittytune.data.search.SearchPicks.record(searchQuery, user.id)
             noteOpened(
                 com.alananasss.kittytune.data.search.RecentVisits.Visit(
@@ -1198,6 +1204,30 @@ import com.alananasss.kittytune.utils.Logger
         private suspend fun performYoutubeSearch(query: String) {
             withContext(Dispatchers.IO) {
                 try {
+                    // "Hide video songs": the YouTube tab lists YouTube Music songs instead of videos.
+                    if (playerPrefs.getHideVideoSongs()) {
+                        val songs = com.zionhuang.innertube.YouTube.search(
+                            query,
+                            com.zionhuang.innertube.YouTube.SearchFilter.FILTER_SONG
+                        ).getOrNull()?.items?.filterIsInstance<com.zionhuang.innertube.models.SongItem>().orEmpty()
+                        val mappedSongs = songs.map { song ->
+                            val videoUrl = "https://www.youtube.com/watch?v=${song.id}"
+                            Track(
+                                id = videoUrl.hashCode().toLong(),
+                                title = song.title,
+                                user = User(0L, song.artists.joinToString(", ") { it.name }, null),
+                                artworkUrl = song.thumbnail,
+                                durationMs = (song.duration ?: 0) * 1000L,
+                                permalinkUrl = videoUrl,
+                                source = "youtube"
+                            )
+                        }
+                        withContext(Dispatchers.Main) {
+                            searchResultsYoutube.clear()
+                            searchResultsYoutube.addAll(mappedSongs)
+                        }
+                        return@withContext
+                    }
                     com.alananasss.kittytune.data.StreamResolver.init()
                     val youtubeService = org.schabi.newpipe.extractor.ServiceList.YouTube
                     val searchInfo = org.schabi.newpipe.extractor.search.SearchInfo.getInfo(
@@ -1205,7 +1235,10 @@ import com.alananasss.kittytune.utils.Logger
                         youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), "")
                     )
     
-                    val mappedTracks = searchInfo.relatedItems.filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>().mapNotNull { item ->
+                    val hideShorts = playerPrefs.getHideYoutubeShorts()
+                    val mappedTracks = searchInfo.relatedItems.filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>()
+                        .filterNot { hideShorts && isYoutubeShort(it.isShortFormContent, it.url) }
+                        .mapNotNull { item ->
                         Track(
                             id = item.url.hashCode().toLong(),
                             title = item.name,

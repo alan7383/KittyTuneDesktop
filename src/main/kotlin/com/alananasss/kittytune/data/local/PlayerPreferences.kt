@@ -482,6 +482,10 @@ class PlayerPreferences {
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
+        private const val KEY_PAUSE_LISTEN_HISTORY = "pause_listen_history"
+        private const val KEY_PAUSE_SEARCH_HISTORY = "pause_search_history"
+        private const val KEY_HIDE_VIDEO_SONGS = "hide_video_songs"
+        private const val KEY_HIDE_YOUTUBE_SHORTS = "hide_youtube_shorts"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_PROTECTED_TRACKS = "protected_tracks_enabled"
         private const val KEY_PROTECTED_ANNOUNCED = "protected_tracks_announced"
@@ -787,6 +791,27 @@ class PlayerPreferences {
 
     fun getYouTubeFallbackEnabled(): Boolean = Prefs.getBoolean(KEY_YOUTUBE_FALLBACK, true)
     fun setYouTubeFallbackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_YOUTUBE_FALLBACK, enabled)
+
+    // ─── Privacy (same keys as Android) ───────────────────────────────────────
+
+    /** While on, nothing played is written to the history, the play counter or the listening stats. */
+    fun getPauseListenHistory(): Boolean = Prefs.getBoolean(KEY_PAUSE_LISTEN_HISTORY, false)
+    fun setPauseListenHistory(enabled: Boolean) = Prefs.putBoolean(KEY_PAUSE_LISTEN_HISTORY, enabled)
+
+    /** While on, no query and nothing opened from search lands in the recent searches. */
+    fun getPauseSearchHistory(): Boolean = Prefs.getBoolean(KEY_PAUSE_SEARCH_HISTORY, false)
+    fun setPauseSearchHistory(enabled: Boolean) = Prefs.putBoolean(KEY_PAUSE_SEARCH_HISTORY, enabled)
+
+    /**
+     * YouTube search returns songs (YouTube Music) instead of videos. Off by default on desktop,
+     * where YouTube Music already has its own search tab and the YouTube tab has always shown videos.
+     */
+    fun getHideVideoSongs(): Boolean = Prefs.getBoolean(KEY_HIDE_VIDEO_SONGS, false)
+    fun setHideVideoSongs(enabled: Boolean) = Prefs.putBoolean(KEY_HIDE_VIDEO_SONGS, enabled)
+
+    /** Drops YouTube Shorts from search results. */
+    fun getHideYoutubeShorts(): Boolean = Prefs.getBoolean(KEY_HIDE_YOUTUBE_SHORTS, true)
+    fun setHideYoutubeShorts(enabled: Boolean) = Prefs.putBoolean(KEY_HIDE_YOUTUBE_SHORTS, enabled)
 
     /** A CDM the user pointed at, when automatic discovery did not find one. Empty means "search". */
     fun getWidevineCdmPath(): String = Prefs.getString(KEY_WIDEVINE_CDM_PATH, "") ?: ""

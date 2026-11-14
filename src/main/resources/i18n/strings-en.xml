@@ -3337,4 +3337,12 @@
     <string name="onboard_desktop_zoom_body">Choose a comfortable text and control size. The change is applied immediately.</string>
     <string name="account_return_title">Welcome back.</string>
     <string name="account_return_body">Connect SoundCloud to access your likes and playlists, or listen as a guest. Your settings are still here.</string>
+    <string name="pref_pause_listen_history">Pause listen history</string>
+    <string name="pref_pause_listen_history_sub">Nothing you play is recorded while this is on</string>
+    <string name="pref_pause_search_history">Pause search history</string>
+    <string name="pref_pause_search_history_sub">New searches are not saved while this is on</string>
+    <string name="pref_hide_video_songs">Hide video songs</string>
+    <string name="pref_hide_video_songs_sub">Search songs only instead of videos on YouTube</string>
+    <string name="pref_hide_youtube_shorts">Hide YouTube Shorts</string>
+    <string name="pref_hide_youtube_shorts_sub">Filter Shorts out of YouTube search results</string>
 </resources>
