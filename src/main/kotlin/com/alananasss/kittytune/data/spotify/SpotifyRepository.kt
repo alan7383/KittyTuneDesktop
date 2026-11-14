@@ -58,7 +58,7 @@ object SpotifyRepository {
      */
     private suspend fun <T> execute(
         url: String,
-        parse: (JSONObject) -> T?
+        parse: (String) -> T?
     ): T? = withContext(Dispatchers.IO) {
         var attempt = 0
         var refreshedAfter401 = false
@@ -100,19 +100,11 @@ object SpotifyRepository {
                                 outcome = FetchOutcome.GIVE_UP
                             } else {
                                 try {
-                                    val json = JSONObject(bodyStr)
-                                    val errors = json.optJSONArray("errors")
-                                    if (errors != null && hasPersistedQueryNotFound(errors)) {
-                                        Logger.e(
-                                            TAG,
-                                            "Spotify rejected a persisted-query hash (PersistedQueryNotFound); " +
-                                                "the internal API contract changed and needs an update."
-                                        )
-                                        outcome = FetchOutcome.GIVE_UP
-                                    } else {
-                                        parsed = parse(json)
-                                        outcome = if (parsed != null) FetchOutcome.SUCCESS else FetchOutcome.GIVE_UP
-                                    }
+                                    // The raw body goes to [parse]: not every endpoint speaks JSON
+                                    // (seed_to_playlist answers protobuf), and parsing JSON first
+                                    // made those endpoints fail on every call.
+                                    parsed = parse(bodyStr)
+                                    outcome = if (parsed != null) FetchOutcome.SUCCESS else FetchOutcome.GIVE_UP
                                 } catch (e: Exception) {
                                     Logger.w(TAG, "Failed to parse Spotify response: ${e.message}")
                                     outcome = FetchOutcome.GIVE_UP
@@ -144,10 +136,62 @@ object SpotifyRepository {
 
     /** Fetch a pathfinder GraphQL query and return its `data` envelope. */
     private suspend fun fetchPathfinderData(url: String): JSONObject? =
-        execute(url) { it.optJSONObject("data") }
+        execute(url) { body -> parseJsonEnvelope(body)?.optJSONObject("data") }
 
     /** Fetch any bearer-authenticated JSON endpoint (non-pathfinder shape). */
-    private suspend fun fetchJsonObject(url: String): JSONObject? = execute(url) { it }
+    private suspend fun fetchJsonObject(url: String): JSONObject? = execute(url) { parseJsonEnvelope(it) }
+
+    /**
+     * Fetch a bearer-authenticated endpoint whose body is not JSON and return the raw text.
+     * The seed-to-playlist endpoint answers a small protobuf document; the caller extracts
+     * the playlist uri from it with a regex.
+     */
+    private suspend fun fetchRawBody(url: String): String? = execute(url) { it }
+
+    /** Parses a JSON body, returning null (and logging loudly) on a rotated persisted-query hash. */
+    private fun parseJsonEnvelope(body: String): JSONObject? {
+        val json = JSONObject(body)
+        val errors = json.optJSONArray("errors")
+        if (errors != null && hasPersistedQueryNotFound(errors)) {
+            Logger.e(
+                TAG,
+                "Spotify rejected a persisted-query hash (PersistedQueryNotFound); " +
+                    "the internal API contract changed and needs an update."
+            )
+            return null
+        }
+        return json
+    }
+
+    /** Extracts the editorial radio playlist id from a seed_to_playlist response body. */
+    internal fun extractRadioPlaylistId(body: String): String? =
+        Regex("spotify:playlist:(37i9dQZF[a-zA-Z0-9]+)").find(body)?.groupValues?.get(1)
+
+    /**
+     * Picks Spotify's own editorial radio playlists out of search results, best first.
+     * User playlists named "<x> Radio" are ignored: they used to win and starve the mix.
+     */
+    internal fun officialRadioCandidates(playlists: List<SpotifyPlaylist>, requiredName: String?): List<SpotifyPlaylist> {
+        val wanted = requiredName?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val official = playlists.filter { it.ownerName == "Spotify" && it.id.startsWith("37i9dQZF") }
+        return official.filter { wanted == null || it.name.lowercase().contains(wanted) }.ifEmpty { official }
+    }
+
+    /**
+     * Finds Spotify's own radio playlist by name: search "<track/artist> Radio", then fetch the
+     * Spotify-owned `37i9dQZF…` playlist that matches. The personalized radio returned by
+     * seed_to_playlist is invisible to the anonymous web-player token, while the public
+     * editorial radios of the same name do load.
+     */
+    private suspend fun findOfficialRadioPlaylist(query: String, requiredName: String? = null): SpotifyPlaylist? {
+        val results = runCatching { search(query, limit = 20) }.getOrNull() ?: return null
+        // Up to three candidates: the first one occasionally resolves to a regional variant.
+        for (candidate in officialRadioCandidates(results.playlists, requiredName).take(3)) {
+            val full = runCatching { getPlaylist(candidate.id) }.getOrNull() ?: continue
+            if (full.tracks.isNotEmpty()) return full
+        }
+        return null
+    }
 
     /**
      * Spotify's own cover-art color extraction (fetchExtractedColors): one
@@ -776,11 +820,10 @@ object SpotifyRepository {
         val url = "https://spclient.wg.spotify.com/inspiredby-mix/v2/seed_to_playlist/$cleanSeed"
 
         return try {
-            // The endpoint answers a JSON document whose playlist uri embeds the
-            // editorial radio id; extract it from the serialized payload.
-            val bodyJson = execute(url) { it } ?: return null
-            Regex("spotify:playlist:(37i9dQZF[a-zA-Z0-9]+)").find(bodyJson.toString())
-                ?.groupValues?.get(1)
+            // The endpoint answers a protobuf document, not JSON, with the editorial radio
+            // playlist uri embedded: read the raw body and extract the uri by regex.
+            val body = fetchRawBody(url) ?: return null
+            extractRadioPlaylistId(body)
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to resolve radio playlist ID for $seedUri: ${e.message}")
             null
@@ -796,8 +839,16 @@ object SpotifyRepository {
             if (playlist != null && playlist.tracks.isNotEmpty()) return playlist
         }
 
-        // Editorial radio first: the inspiredby-mix endpoint resolves a seed
-        // (track or artist) to a real Spotify radio playlist in one request.
+        // Track radio: the official "<track> Radio" playlist found by search is the fastest
+        // route an anonymous client can actually play.
+        val seedTrack = if (isArtist) null else getTrack(cleanId)
+        if (seedTrack != null) {
+            val editorialRadio = findOfficialRadioPlaylist("${seedTrack.name} Radio", requiredName = seedTrack.name)
+            if (editorialRadio != null && editorialRadio.tracks.isNotEmpty()) return editorialRadio
+        }
+
+        // Then the inspiredby-mix endpoint, which resolves a seed (track or artist) to a
+        // Spotify radio playlist in one request.
         val seedUri = if (isArtist) "spotify:artist:$cleanId" else "spotify:track:$cleanId"
         val radioPlaylistId = getRadioPlaylistId(seedUri)
         if (!radioPlaylistId.isNullOrBlank()) {
@@ -808,9 +859,13 @@ object SpotifyRepository {
         if (isArtist) {
             val artist = getArtist(cleanId) ?: return null
             if (artist.discoveredOn.isNotEmpty()) {
+                // Official editorial radios only: discoveredOn lists any playlist the artist
+                // appears in, and a user's "… Radio (90's hits)" compilation used to win.
                 val radioFromArtist = artist.discoveredOn.firstOrNull {
-                    it.id.startsWith("37i9dQZF1E4") || (it.name.contains("Radio", ignoreCase = true)
-                        && !it.name.contains("This Is", ignoreCase = true))
+                    it.id.startsWith("37i9dQZF1E4")
+                } ?: artist.discoveredOn.firstOrNull {
+                    it.ownerName == "Spotify" && it.name.contains("Radio", ignoreCase = true) &&
+                        !it.name.contains("This Is", ignoreCase = true)
                 } ?: artist.discoveredOn.firstOrNull { it.id.startsWith("37i9dQZF") }
 
                 if (radioFromArtist != null) {
@@ -827,7 +882,10 @@ object SpotifyRepository {
                 ).awaitAll().flatMap { it.playlists }
             }
 
+            // Spotify-owned first: a user playlist named "<artist> Radio" could win otherwise.
             val radioCandidate = candidates.firstOrNull {
+                it.ownerName == "Spotify" && it.id.startsWith("37i9dQZF1E4")
+            } ?: candidates.firstOrNull {
                 it.id.startsWith("37i9dQZF1E4") || (it.name.contains("Radio", ignoreCase = true)
                     && it.name.contains(artist.name, ignoreCase = true))
             } ?: candidates.firstOrNull { it.name.contains("This Is", ignoreCase = true) }
@@ -880,6 +938,13 @@ object SpotifyRepository {
         val cleanId = extractId(trackId)
         if (cleanId.isBlank()) return emptyList()
         val seedTrack = getTrack(cleanId) ?: return emptyList()
+
+        // The radio the Spotify client plays for a track is the public "<track> Radio"
+        // editorial playlist; use it when it exists, seed first.
+        val radioPlaylist = findOfficialRadioPlaylist("${seedTrack.name} Radio", requiredName = seedTrack.name)
+        if (radioPlaylist != null && radioPlaylist.tracks.size >= 10) {
+            return (listOf(seedTrack) + radioPlaylist.tracks).distinctBy { it.id }
+        }
 
         val mix = coroutineScope {
             seedTrack.artists.filter { it.id.isNotBlank() }.take(2).map { artistRef ->
