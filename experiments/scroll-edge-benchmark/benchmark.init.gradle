@@ -1,0 +1,23 @@
+gradle.projectsEvaluated {
+    def project = gradle.rootProject
+    project.tasks.register('writeScrollEdgeBenchmarkConfig') {
+        dependsOn project.tasks.named('classes')
+        doLast {
+            def compiler = project.configurations.detachedConfiguration(
+                project.dependencies.create('org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21'))
+            def plugin = project.configurations.detachedConfiguration(
+                project.dependencies.create('org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.4.21'))
+            plugin.transitive = false
+            def config = [
+                javaHome: System.getProperty('java.home'),
+                compilerClasspath: compiler.files.collect { it.absolutePath },
+                composePlugin: plugin.singleFile.absolutePath,
+                runtimeClasspath: project.sourceSets.main.runtimeClasspath.files.collect { it.absolutePath },
+                moduleName: project.tasks.named('compileKotlin').get().compilerOptions.moduleName.orNull ?:
+                    (project.group.toString() + '_' + project.name).replace('.', '_')
+            ]
+            project.file('build/scroll-edge-benchmark-config.json').text = groovy.json.JsonOutput.prettyPrint(
+                groovy.json.JsonOutput.toJson(config))
+        }
+    }
+}
