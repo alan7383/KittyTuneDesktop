@@ -145,7 +145,7 @@ class SoundCloudDrmPipelineTest {
     // --- the stand-in CDM -------------------------------------------------------------------------
 
     /** Returns a fixed key, and records what the app asked the license server for. */
-    private inner class FakeCdm : WidevineCdm {
+    private inner class FakeCdm(private val beforeOpen: () -> Unit = {}) : WidevineCdm {
         override val name = "test CDM"
         val forks = mutableListOf<FakeCdm>()
         var disposed = false
@@ -157,6 +157,7 @@ class SoundCloudDrmPipelineTest {
 
 
         override fun openSession(pssh: ByteArray): WidevineLicenseSession {
+            beforeOpen()
             psshSeen = pssh
             return object : WidevineLicenseSession {
                 override fun licenseRequest(): ByteArray = "REQUEST".toByteArray()
@@ -261,6 +262,84 @@ class SoundCloudDrmPipelineTest {
                 }
             }
         } finally { first.releaseDrm(); second.releaseDrm() }
+    }
+
+    @Test
+    fun retirementDuringLicensingReturnsThePrimaryCdmLease() {
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val finish = java.util.concurrent.CountDownLatch(1)
+        val cdm = FakeCdm {
+            entered.countDown()
+            check(finish.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        }
+        WidevineCdmRegistry.install(cdm)
+        val adapter = HlsStreamAdapter("$base/long.m3u8", emptyMap()).apply { licenseToken = "retired" }
+        val closed = java.util.concurrent.CountDownLatch(1)
+        val release = adapter.sessionRelease
+        adapter.sessionRelease = { release(it); closed.countDown() }
+        val read = java.util.concurrent.CompletableFuture<Throwable?>()
+        val worker = kotlin.concurrent.thread {
+            read.complete(runCatching { adapter.getInputStream(0).use { it.readBytes() } }.exceptionOrNull())
+        }
+        try {
+            assertTrue(entered.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            adapter.retire()
+            finish.countDown()
+            assertTrue(read.get(3, java.util.concurrent.TimeUnit.SECONDS) is java.io.IOException)
+            assertTrue(closed.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue(cdm.closed)
+            val next = HlsStreamAdapter("$base/playlist.m3u8", emptyMap()).apply { licenseToken = "next" }
+            try {
+                next.getInputStream(0).use { it.readBytes() }
+                assertTrue("the retired reader kept the primary CDM reserved", cdm.forks.isEmpty())
+            } finally { next.releaseDrm() }
+        } finally {
+            finish.countDown()
+            worker.join(2000)
+            adapter.releaseDrm()
+        }
+    }
+
+    @Test
+    fun retiringOneAdapterLeavesAnotherProtectedReaderUsable() {
+        val cdm = FakeCdm()
+        WidevineCdmRegistry.install(cdm)
+        val first = HlsStreamAdapter("$base/long.m3u8", emptyMap()).apply { licenseToken = "first" }
+        val second = HlsStreamAdapter("$base/long.m3u8?second", emptyMap()).apply { licenseToken = "second" }
+        val closed = java.util.concurrent.CountDownLatch(1)
+        val release = first.sessionRelease
+        first.sessionRelease = { release(it); closed.countDown() }
+        try {
+            val buffer = ByteArray(64 * 1024)
+            first.getInputStream(0).use { it.read(buffer); it.read(buffer) }
+            second.getInputStream(0).use { input ->
+                input.read(buffer)
+                input.read(buffer)
+                first.retire()
+                assertTrue(closed.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                assertTrue("retirement left the primary session open", cdm.closed)
+                assertFalse("retirement closed the other reader's CDM", cdm.forks.single().disposed)
+                assertTrue("the other reader could no longer decrypt", input.read(buffer) > 0)
+            }
+        } finally { first.releaseDrm(); second.releaseDrm() }
+    }
+
+    @Test
+    fun temporaryReleaseStillAllowsAnUncachedFragmentToBeLicensed() {
+        val cdm = FakeCdm()
+        WidevineCdmRegistry.install(cdm)
+        val adapter = HlsStreamAdapter("$base/long.m3u8", emptyMap()).apply { licenseToken = "fixture" }
+        try {
+            val buffer = ByteArray(64 * 1024)
+            adapter.getInputStream(0).use { input ->
+                input.read(buffer)
+                input.read(buffer)
+                adapter.releaseDrm()
+                assertTrue(cdm.closed)
+                assertTrue(input.read(buffer) > 0)
+                assertEquals(2, licensePosts.get())
+            }
+        } finally { adapter.releaseDrm() }
     }
 
     @Test

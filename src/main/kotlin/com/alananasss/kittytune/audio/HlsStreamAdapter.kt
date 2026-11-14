@@ -7,6 +7,10 @@ import com.alananasss.kittytune.data.drm.WidevineLicenseSession
 import com.alananasss.kittytune.data.drm.isExpired
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.Request
 import okhttp3.Response
 import java.io.ByteArrayInputStream
@@ -95,6 +99,8 @@ class HlsStreamAdapter(
     @Volatile
     private var drmSession: WidevineLicenseSession? = null
 
+    private val retired = java.util.concurrent.atomic.AtomicBoolean()
+
     /**
      * How a session this stream no longer needs is handed back.
      *
@@ -161,6 +167,8 @@ class HlsStreamAdapter(
 
         /** About fifty minutes of AAC 160: enough for nearly every track, bounded for mixes. */
         private const val CLEAR_CACHE_LIMIT = 64L * 1024 * 1024
+
+        private val drmCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     /** Keeps a decrypted fragment; once every fragment is kept, the CDM is no longer needed. */
@@ -189,6 +197,12 @@ class HlsStreamAdapter(
     fun releaseDrm() {
         val session = synchronized(this) { drmSession.also { drmSession = null } } ?: return
         runCatching { sessionRelease(session) }
+    }
+
+    /** Discards this adapter without making the caller wait for a licence or CDM operation. */
+    fun retire() {
+        if (!retired.compareAndSet(false, true)) return
+        drmCleanupScope.launch { releaseDrm() }
     }
 
     private fun loadPlaylist(url: String): Playlist {
@@ -239,9 +253,11 @@ class HlsStreamAdapter(
      * handles them, rather than a DRM error escaping a background thread.
      */
     private fun acquireSession(): WidevineLicenseSession {
+        if (retired.get()) throw IOException("HLS adapter has been retired")
         // An expired session lost its keys with its CDM process (the WSL sidecar stops when idle).
         drmSession?.takeIf { !it.isExpired }?.let { return it }
         synchronized(this) {
+            if (retired.get()) throw IOException("HLS adapter has been retired")
             drmSession?.takeIf { !it.isExpired }?.let { return it }
             val info = encryption
                 ?: throw IOException("Stream is not DRM-protected but a license was requested")
@@ -258,6 +274,10 @@ class HlsStreamAdapter(
             } catch (e: Exception) {
                 Logger.e("HlsStreamAdapter", "Could not open a Widevine session: ${e.message}")
                 throw IOException(e.message ?: "Widevine license failed", e)
+            }
+            if (retired.get()) {
+                runCatching { sessionRelease(session) }
+                throw IOException("HLS adapter was retired while opening its licence")
             }
             drmSession = session
             return session
