@@ -186,7 +186,8 @@ object AutomixManager {
         val currentDbg = _automixDebugInfo.value ?: AutomixDebugInfo("standby")
 
         val existing = AppDatabase.beatInfoDao.getBeatInfo(songId)
-        if (existing != null && existing.bpm > 0f) {
+        // A row from an older analyzer is analysed again (its key may be one of the old collapsed ones).
+        if (existing != null && existing.bpm > 0f && existing.isCurrent) {
             if (isCurrent) {
                 _automixDebugInfo.value = currentDbg.copy(
                     outTitle = track.title,
@@ -447,6 +448,8 @@ object AutomixManager {
             val energyGap = if (outBeat.energy != null && inBeat.energy != null) abs(outBeat.energy - inBeat.energy) else 0f
             overlapMs = when (effectiveFit) {
                 KeyHarmony.Fit.SAME, KeyHarmony.Fit.NEIGHBOUR -> (overlapMs * 1.2f).toLong()
+                // Mixable with a little less margin: a mode change one step away, or the +2 lift.
+                KeyHarmony.Fit.DIAGONAL, KeyHarmony.Fit.LIFT -> (overlapMs * 1.1f).toLong()
                 KeyHarmony.Fit.CLASH -> minOf(overlapMs, SHORT_BLEND_MS)
                 else -> overlapMs
             }
