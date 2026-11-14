@@ -1,0 +1,8 @@
+{
+  "baselineRef": "c4885d6",
+  "sources": {
+    "baseline": "0e52874114bd48392afde33d8144311dd3a9407a0085e6b939d2e7955bfb3115",
+    "candidate": "a88586af9f4ebedffc53e6109af0912891e2be3290246ba67404c31d3c6aa888"
+  },
+  "fixtureSha256": "9f948c31b8b134d6f0d4c7733cca25f712798498b369e7dbc9c49ade0b05fd19"
+}

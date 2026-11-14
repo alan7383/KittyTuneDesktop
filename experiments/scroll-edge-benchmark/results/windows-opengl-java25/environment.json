@@ -1,0 +1,20 @@
+{
+  "platform": "Windows-10-10.0.19045-SP0",
+  "processor": "Intel64 Family 6 Model 94 Stepping 3, GenuineIntel",
+  "java": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment Zulu25.38+107-CA (build 25.0.5+8-LTS)\nOpenJDK 64-Bit Server VM Zulu25.38+107-CA (build 25.0.5+8-LTS, mixed mode, sharing)\n",
+  "pairs": 5,
+  "warmupMs": 3000,
+  "measureMs": 6000,
+  "jvmFlags": [
+    "-Xms256m",
+    "-Xmx512m",
+    "-XX:+UseG1GC",
+    "-XX:ParallelGCThreads=2",
+    "-XX:ConcGCThreads=1"
+  ],
+  "windowSize": [
+    1280,
+    720
+  ],
+  "repaintTimerMs": 16
+}
