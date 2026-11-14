@@ -1697,7 +1697,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 SoundCloudTelemetryTracker.onTrackPaused(currentPosition)
             }
             updateDiscordPresence()
-            updateMprisMedia()
+            updateMprisMedia(windowsPositionMs = player.currentPosition)
         }
 
 
@@ -1806,6 +1806,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 currentPosition = newPosition.positionMs
 
                 saveStateAsync(saveQueue = false)
+                updateWindowsMedia()
                 updateDiscordPresence()
             }
         }
@@ -2235,7 +2236,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    fun updateMprisMedia() {
+    fun updateMprisMedia(windowsPositionMs: Long = currentPosition) {
         initMprisService()
         mprisService?.let { service ->
             service.updateRate(effectsState.speed.toDouble())
@@ -2246,12 +2247,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
 
         initWindowsSmtcService()
-        windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
+        updateWindowsMedia(windowsPositionMs)
 
         initMacNowPlayingService()
         macNowPlayingService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
 
         updateDiscordPresence()
+    }
+
+    private fun updateWindowsMedia(positionMs: Long = currentPosition, periodic: Boolean = false) {
+        windowsSmtcService?.updateMedia(currentTrack, isPlaying, positionMs, duration, effectsState.speed, periodic)
     }
 
     fun updateDiscordPresence() {
@@ -6480,6 +6485,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             var lastAutomixCheckTime = 0L
             while (isActive && isPlaying) {
                 try {
+                    if (!isLoading) {
+                        updateWindowsMedia(MusicManager.player.currentPosition, periodic = true)
+                    }
                     if (!isScrubbing && !isLoading) {
                         val now = System.currentTimeMillis()
                         if (now - lastSaveTime > 5000L) {

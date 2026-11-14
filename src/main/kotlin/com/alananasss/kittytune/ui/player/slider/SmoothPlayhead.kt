@@ -50,8 +50,10 @@ internal fun rememberSmoothPlayhead(
     trackKey: Any?,
     seekRevision: Long,
 ): Long {
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
     val clock = remember { PlayheadClock() }
-    val shown = remember(trackKey, seekRevision) { mutableLongStateOf(reportedMs) }
+    // The restored window can draw before the frame loop restarts.
+    val shown = remember(trackKey, seekRevision, isSeen) { mutableLongStateOf(reportedMs) }
     val reported by rememberUpdatedState(reportedMs)
     val running by rememberUpdatedState(isRunning)
     val direct by rememberUpdatedState(followsInput)
@@ -59,8 +61,7 @@ internal fun rememberSmoothPlayhead(
     val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
     // A hidden window draws no playhead, so the clock must not keep asking for frames for one: it sat there
     // awaiting the ambient pulse for as long as music played, even minimised (see WindowVisibility).
-    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    LaunchedEffect(shown, ambientClock, isSeen) {
+    LaunchedEffect(shown, ambientClock) {
         shown.longValue = clock.step(reported, trackKey, direct = true, running = false, now = System.nanoTime())
         if (!isSeen) return@LaunchedEffect
         while (isActive) {
@@ -79,7 +80,7 @@ internal fun rememberSmoothPlayhead(
             else com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock, step)
         }
     }
-    return if (followsInput) reportedMs else shown.longValue
+    return if (!isSeen || followsInput) reportedMs else shown.longValue
 }
 
 /** The bookkeeping behind [rememberSmoothPlayhead]; plain fields, advanced once per frame. */

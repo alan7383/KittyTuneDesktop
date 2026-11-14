@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.alananasss.kittytune.core.LocalWindowSeen
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -72,9 +73,9 @@ internal fun PlaybackSeekBar(
     val mix = rememberMixTransition()
     val fraction = fractionOf(position)
     val shownFraction = if (preview != null || wheel.isActive) {
-        fraction.also { mix.noteShown(it) }
+        fraction.also { mix.noteShown(it, trackKey) }
     } else {
-        mix.shownFraction(fraction, trackKey)
+        mix.shownFraction(fraction, trackKey, isSeen = LocalWindowSeen.current)
     }
 
     content(position, duration) { modifier ->

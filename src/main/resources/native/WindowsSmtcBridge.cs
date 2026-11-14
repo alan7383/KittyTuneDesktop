@@ -4,7 +4,7 @@
 // without a native shim. It talks to the app over stdin/stdout, one message per line, fields
 // separated by tabs, and exits as soon as stdin closes, so it can never outlive the app.
 //
-//   app -> bridge  UPDATE \t title \t artist \t album \t artworkUrl \t playing(0|1) \t positionMs \t durationMs
+//   app -> bridge  UPDATE \t title \t artist \t album \t artworkUrl \t playing(0|1) \t positionMs \t durationMs \t playbackRate
 //                  QUIT
 //   bridge -> app  READY | CMD:PLAY | CMD:PAUSE | CMD:NEXT | CMD:PREV | SEEK:<ms> | ERROR:<message>
 //
@@ -40,6 +40,7 @@ namespace KittyTuneSmtc {
         static readonly object OutputLock = new object();
         static SystemMediaTransportControls smtc;
         static string lastArtworkUrl = "";
+        static Tuple<string, string, string, string> lastMetadata;
         static TextWriter output;
 
         // What the flyout shows as the session's owner is not the exe's file name and not its
@@ -307,20 +308,32 @@ namespace KittyTuneSmtc {
             long positionMs = ParseLong(f[6]);
             long durationMs = ParseLong(f[7]);
 
-            var updater = smtc.DisplayUpdater;
-            updater.Type = MediaPlaybackType.Music;
-            updater.MusicProperties.Title = title;
-            updater.MusicProperties.Artist = artist;
-            updater.MusicProperties.AlbumTitle = album;
-            // Only on change: every assignment makes Windows fetch the image again.
-            if (artworkUrl != lastArtworkUrl) {
+            var metadata = Tuple.Create(title, artist, album, artworkUrl);
+            if (!metadata.Equals(lastMetadata)) {
+                var updater = smtc.DisplayUpdater;
+                updater.Type = MediaPlaybackType.Music;
+                updater.MusicProperties.Title = title;
+                updater.MusicProperties.Artist = artist;
+                updater.MusicProperties.AlbumTitle = album;
+                if (artworkUrl != lastArtworkUrl) {
+                    Uri uri;
+                    updater.Thumbnail = Uri.TryCreate(artworkUrl, UriKind.Absolute, out uri)
+                        ? RandomAccessStreamReference.CreateFromUri(uri)
+                        : null;
+                }
+                updater.Update();
                 lastArtworkUrl = artworkUrl;
-                Uri uri;
-                updater.Thumbnail = Uri.TryCreate(artworkUrl, UriKind.Absolute, out uri)
-                    ? RandomAccessStreamReference.CreateFromUri(uri)
-                    : null;
+                lastMetadata = metadata;
             }
-            updater.Update();
+
+            double rate;
+            if (f.Length < 9 || !double.TryParse(f[8], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out rate) ||
+                    !(rate > 0) || double.IsInfinity(rate)) rate = 1;
+            if (smtc.PlaybackRate != rate) smtc.PlaybackRate = rate;
+
+            var status = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
+            if (smtc.PlaybackStatus != status) smtc.PlaybackStatus = status;
 
             var timeline = new SystemMediaTransportControlsTimelineProperties();
             if (durationMs > 0) {
@@ -332,8 +345,6 @@ namespace KittyTuneSmtc {
                 timeline.Position = TimeSpan.FromMilliseconds(Math.Min(Math.Max(positionMs, 0), durationMs));
             }
             smtc.UpdateTimelineProperties(timeline);
-
-            smtc.PlaybackStatus = isPlaying ? MediaPlaybackStatus.Playing : MediaPlaybackStatus.Paused;
         }
 
         static long ParseLong(string s) {

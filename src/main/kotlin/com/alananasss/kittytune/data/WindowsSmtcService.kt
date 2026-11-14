@@ -32,6 +32,7 @@ class WindowsSmtcService(
     ) {
         SmtcBridgeWorker(::start, ::handleBridgeLine)
     } else null
+    private var lastTimelineUpdateNanos: Long? = null
 
     private fun start(): Process? {
         val exe = extractBridge() ?: return null
@@ -81,9 +82,20 @@ class WindowsSmtcService(
         return target
     }
 
-    /** Pushes what is playing. Cheap to call often: identical updates are not re-sent. */
-    fun updateMedia(track: Track?, isPlaying: Boolean, positionMs: Long, durationMs: Long) {
+    /** Playback events publish immediately. Continuous playback refreshes the Windows timeline once a second. */
+    fun updateMedia(
+        track: Track?,
+        isPlaying: Boolean,
+        positionMs: Long,
+        durationMs: Long,
+        playbackRate: Float,
+        periodic: Boolean = false,
+    ) {
         if (bridge == null) return
+        val now = System.nanoTime()
+        val lastUpdate = lastTimelineUpdateNanos
+        if (periodic && (track == null || (lastUpdate != null && now - lastUpdate < 1_000_000_000L))) return
+        lastTimelineUpdateNanos = now
         val fields = listOf(
             "UPDATE",
             track?.title.orEmpty(),
@@ -93,6 +105,7 @@ class WindowsSmtcService(
             if (isPlaying) "1" else "0",
             positionMs.coerceAtLeast(0L).toString(),
             durationMs.coerceAtLeast(0L).toString(),
+            playbackRate.toString(),
         )
         val message = fields.joinToString("\t") { it.replace(CONTROL_CHARS, " ") }
         bridge.update(message)

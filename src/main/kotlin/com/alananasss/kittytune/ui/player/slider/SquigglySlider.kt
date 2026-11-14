@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -23,7 +21,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.isActive
 
 @Composable
 fun SquigglySlider(
@@ -58,28 +55,7 @@ fun SquigglySlider(
     val waveLength = 80f
     val lineAmplitude = 6f
     val transitionLength = 1.5f * waveLength
-    val phaseSpeed = 24f
-    var phaseOffset by remember { mutableFloatStateOf(0f) }
-
-    // Continuous wave animation loop, paused while nobody can see the window.
-    // On the shared ambient clock rather than every frame: this bar is on screen for as long as music plays, and at
-    // the display's rate it had the whole window redrawn 240 times a second on a 240 Hz monitor (see AmbientClock).
-    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
-    LaunchedEffect(isPlaying, isSeen, ambientClock) {
-        if (!isPlaying || !isSeen) return@LaunchedEffect
-
-        var lastFrameTime = com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { it }
-        while (isActive) {
-            com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { frameTimeNanos ->
-                val deltaTime = (frameTimeNanos - lastFrameTime) / 1_000_000_000f
-                phaseOffset += deltaTime * phaseSpeed
-                phaseOffset %= waveLength
-                lastFrameTime = frameTimeNanos
-            }
-        }
-    }
-
+    val phaseOffset = rememberSliderWavePhase(isPlaying, speedPx = 24f, wavelengthPx = waveLength)
     // One path for the life of the slider, refilled each draw: a new one per frame was a native Skia object per frame
     // left for the garbage collector to find.
     val path = remember { Path() }
@@ -108,7 +84,7 @@ fun SquigglySlider(
 
         path.rewind()
         val halfWave = waveLength / 2f
-        val waveStart = -phaseOffset - halfWave
+        val waveStart = -phaseOffset.floatValue - halfWave
 
         path.moveTo(waveStart, centerY)
 

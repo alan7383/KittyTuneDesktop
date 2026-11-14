@@ -80,6 +80,7 @@ class MixTransition internal constructor(
     // Bookkeeping, not state: it is read and written while the bar computes what to draw, and every value
     // here follows from the inputs of that same call, so nothing needs to recompose when it changes.
     private var lastTrackKey: Any? = NO_TRACK
+    private var wasSeen = true
     private var lastShown = 0f
     private var glideFrom: Float? = null
     private var switchedAtNanos = 0L
@@ -100,7 +101,8 @@ class MixTransition internal constructor(
      * next track change glides from wherever the bar was before the drag began, which showed as a short step
      * left, a run back to the end, and then the slide (issue #66).
      */
-    fun noteShown(fraction: Float) {
+    fun noteShown(fraction: Float, trackKey: Any? = lastTrackKey) {
+        lastTrackKey = trackKey
         lastShown = fraction
         glideFrom = null
         catchUpFrom = null
@@ -119,7 +121,13 @@ class MixTransition internal constructor(
      * Where the bar should show the playhead of the track identified by [trackKey]: the real [actualFraction],
      * except around a mix, when it glides from where the old track was to the new track's position.
      */
-    fun shownFraction(actualFraction: Float, trackKey: Any?): Float {
+    fun shownFraction(actualFraction: Float, trackKey: Any?, isSeen: Boolean): Float {
+        val resumed = !wasSeen && isSeen
+        wasSeen = isSeen
+        if (!isSeen || resumed) {
+            noteShown(actualFraction, trackKey)
+            return actualFraction
+        }
         frameTick.longValue
         val now = System.nanoTime()
         val fade = progress.value
