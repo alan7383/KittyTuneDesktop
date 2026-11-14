@@ -66,9 +66,10 @@ for pair in range(args.pairs):
             env[variable] = str(directory)
         (profile / 'home').mkdir(parents=True, exist_ok=True)
         cp = [str(out / variant / 'classes'), *config['runtimeClasspath']]
+        native_args = ['-Dskiko.library.path=' + config['nativeDir']] if config.get('nativeDir') else []
         stdout = invoke(['--enable-native-access=ALL-UNNAMED', '-Xms256m', '-Xmx512m', '-XX:+UseG1GC',
             '-XX:ParallelGCThreads=2', '-XX:ConcGCThreads=1', '-Duser.home=' + str(profile / 'home'),
-            '-Dskiko.library.path=' + config.get('nativeDir', ''), '-cp', os.pathsep.join(cp),
+            *native_args, '-cp', os.pathsep.join(cp),
             'ScrollEdgeBenchmark', args.warmup_ms, args.measure_ms], f'run-{pair}-{variant}', env)
         parsed = [json.loads(line) for line in stdout.splitlines() if line.startswith('{"scenario":')]
         if len(parsed) != 2:
