@@ -3338,4 +3338,12 @@
     <string name="menu_window">Ablak</string>
     <string name="update_mac_manual">A frissítés befejezéséhez nyisd meg a lemezképet, és másold a KittyTune-t az Alkalmazások mappába.</string>
     <string name="update_mac_failed">A KittyTune nem tudta telepíteni a frissítést. A részletekért nyisd meg a frissítési naplót.</string>
+    <string name="pref_pause_listen_history">Hallgatási előzmények szüneteltetése</string>
+    <string name="pref_pause_listen_history_sub">Amíg ez be van kapcsolva, semmit nem rögzítünk abból, amit lejátszol</string>
+    <string name="pref_pause_search_history">Keresési előzmények szüneteltetése</string>
+    <string name="pref_pause_search_history_sub">Amíg ez be van kapcsolva, az új keresések nem kerülnek mentésre</string>
+    <string name="pref_hide_video_songs">Videós dalok elrejtése</string>
+    <string name="pref_hide_video_songs_sub">A YouTube-on csak dalokra keres videók helyett</string>
+    <string name="pref_hide_youtube_shorts">YouTube Shorts elrejtése</string>
+    <string name="pref_hide_youtube_shorts_sub">A Shorts videók kiszűrése a YouTube-keresési találatokból</string>
 </resources>

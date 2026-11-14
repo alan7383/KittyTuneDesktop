@@ -3340,4 +3340,12 @@
     <string name="menu_window">Pencere</string>
     <string name="update_mac_manual">Güncellemeyi tamamlamak için disk görüntüsünü aç ve KittyTune’u Uygulamalar klasörüne kopyala.</string>
     <string name="update_mac_failed">KittyTune güncellemeyi yükleyemedi. Ayrıntılar için güncelleme günlüğünü aç.</string>
+    <string name="pref_pause_listen_history">Dinleme geçmişini duraklat</string>
+    <string name="pref_pause_listen_history_sub">Bu açıkken çaldığınız hiçbir şey kaydedilmez</string>
+    <string name="pref_pause_search_history">Arama geçmişini duraklat</string>
+    <string name="pref_pause_search_history_sub">Bu açıkken yeni aramalar kaydedilmez</string>
+    <string name="pref_hide_video_songs">Video şarkıları gizle</string>
+    <string name="pref_hide_video_songs_sub">YouTube\'da videolar yerine yalnızca şarkıları ara</string>
+    <string name="pref_hide_youtube_shorts">YouTube Shorts\'u gizle</string>
+    <string name="pref_hide_youtube_shorts_sub">Shorts videolarını YouTube arama sonuçlarından çıkar</string>
 </resources>

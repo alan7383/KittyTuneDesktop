@@ -3559,4 +3559,12 @@
     <string name="menu_window">Fenster</string>
     <string name="update_mac_manual">Öffne das Disk-Image und kopiere KittyTune in den Ordner „Programme“, um das Update abzuschließen.</string>
     <string name="update_mac_failed">KittyTune konnte das Update nicht installieren. Öffne das Update-Protokoll für weitere Details.</string>
+    <string name="pref_pause_listen_history">Hörverlauf pausieren</string>
+    <string name="pref_pause_listen_history_sub">Solange dies aktiviert ist, wird nichts aufgezeichnet, was du abspielst</string>
+    <string name="pref_pause_search_history">Suchverlauf pausieren</string>
+    <string name="pref_pause_search_history_sub">Solange dies aktiviert ist, werden neue Suchanfragen nicht gespeichert</string>
+    <string name="pref_hide_video_songs">Video-Songs ausblenden</string>
+    <string name="pref_hide_video_songs_sub">Auf YouTube nur nach Songs statt nach Videos suchen</string>
+    <string name="pref_hide_youtube_shorts">YouTube Shorts ausblenden</string>
+    <string name="pref_hide_youtube_shorts_sub">Shorts aus den YouTube-Suchergebnissen entfernen</string>
 </resources>

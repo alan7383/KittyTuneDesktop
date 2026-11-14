@@ -3338,4 +3338,12 @@
     <string name="onboard_desktop_zoom_body">Choisissez une taille confortable pour les textes et les commandes. Le changement s’applique immédiatement.</string>
     <string name="account_return_title">Bon retour.</string>
     <string name="account_return_body">Connectez SoundCloud pour retrouver vos favoris et playlists, ou écoutez en mode invité. Vos réglages sont toujours là.</string>
+    <string name="pref_pause_listen_history">Suspendre l’historique d’écoute</string>
+    <string name="pref_pause_listen_history_sub">Rien de ce que vous écoutez n’est enregistré tant que cette option est activée</string>
+    <string name="pref_pause_search_history">Suspendre l’historique de recherche</string>
+    <string name="pref_pause_search_history_sub">Les nouvelles recherches ne sont pas enregistrées tant que cette option est activée</string>
+    <string name="pref_hide_video_songs">Masquer les chansons vidéo</string>
+    <string name="pref_hide_video_songs_sub">Rechercher uniquement des chansons plutôt que des vidéos sur YouTube</string>
+    <string name="pref_hide_youtube_shorts">Masquer les YouTube Shorts</string>
+    <string name="pref_hide_youtube_shorts_sub">Retirer les Shorts des résultats de recherche YouTube</string>
 </resources>
