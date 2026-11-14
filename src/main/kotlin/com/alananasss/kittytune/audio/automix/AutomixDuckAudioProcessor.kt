@@ -88,8 +88,12 @@ class AutomixDuckAudioProcessor(
     }
 
     override fun onFlush() {
-        x1L = 0.0; x2L = 0.0; y1L = 0.0; y2L = 0.0
-        x1R = 0.0; x2R = 0.0; y1R = 0.0; y2R = 0.0
+        // A flush arrives on seeks, including ones made while a blend has the shelf engaged. Zeroing the
+        // biquad memory then is a step discontinuity, a click inside the blend; only a dry shelf restarts clean.
+        if (targetMix <= 0f) {
+            x1L = 0.0; x2L = 0.0; y1L = 0.0; y2L = 0.0
+            x1R = 0.0; x2R = 0.0; y1R = 0.0; y2R = 0.0
+        }
     }
 
     override fun queueInput(input: ByteBuffer) {
@@ -136,6 +140,8 @@ class AutomixDuckAudioProcessor(
                 buffer.putShort((output * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort())
             }
         }
+        // Absorb a trailing partial frame instead of leaving it unread for the caller to loop on.
+        if (input.hasRemaining()) input.position(input.limit())
         buffer.flip()
     }
 }

@@ -1,62 +1,35 @@
 package com.alananasss.kittytune.audio.automix
 
-import kotlin.math.abs
-
-/**
- * How well two keys sit together, on the Camelot wheel DJs mix by.
- *
- * Two tracks blend when their keys are the same, a step apart on the wheel, or the relative major or minor of each
- * other: the notes of one are then nearly the notes of the other. Anything else fights while both are heard, which is
- * what a long overlap of two unrelated keys sounds like.
- */
+// Which keys mix, by the Camelot wheel (ported from desktop, PR #77).
+//
+// The notation and the compatibility rule live in [CamelotKey]; this object is the thin
+// decision layer the engine and the analyser call with raw `"8A"`-style codes.
+//
+// The moves a DJ can make, all verified against the wheel:
+//  - **SAME** - same number, either letter (relative major/minor holds the same notes);
+//  - **NEIGHBOUR** - ±1 number in the same mode (a fourth/fifth, the classic harmonic move);
+//  - **DIAGONAL** - ±1 number with a letter change (six of seven notes shared);
+//  - **LIFT** - +2 numbers in the same mode (the "+2 semitones" energy boost);
+//  - everything else **CLASH**.
+//
+// Five wheel steps (same mode) is a ±1 *semitone* transposition - only two of seven scale
+// degrees shared - and used to be classified as a "+7 semitones super boost". That was a
+// wheel-steps/semitones mix-up: a fifth up (+7 st) is one wheel step, i.e. a NEIGHBOUR.
+// The bogus rule made genuinely clashing pairs mix as if they fitted.
 internal object KeyHarmony {
 
-    enum class Fit {
-        /** The same key, or the same notes: relative major and minor. */
-        SAME,
-
-        /** A step round the wheel: a few notes differ, and they pass unnoticed in a blend. */
-        NEIGHBOUR,
-
-        /** Two steps up, the "energy boost" mix: it works, but with less margin. */
-        LIFT,
-
-        /** Unrelated keys. */
-        CLASH,
-
-        /** A key of one of them could not be told. */
-        UNKNOWN,
-    }
+    enum class Fit { SAME, NEIGHBOUR, DIAGONAL, LIFT, CLASH, UNKNOWN }
 
     fun between(outCode: String?, inCode: String?): Fit {
-        val out = parse(outCode) ?: return Fit.UNKNOWN
-        val into = parse(inCode) ?: return Fit.UNKNOWN
-        val step = wheelDistance(out.number, into.number)
-        val sameLetter = out.isMinor == into.isMinor
+        val out = CamelotKey.parse(outCode) ?: return Fit.UNKNOWN
+        val into = CamelotKey.parse(inCode) ?: return Fit.UNKNOWN
+        val step = out.harmonicDistanceTo(into)
+        val sameLetter = out.mode == into.mode
         return when {
-            sameLetter && step == 0 -> Fit.SAME
-            !sameLetter && step == 0 -> Fit.SAME
-            sameLetter && step == 1 -> Fit.NEIGHBOUR
-            sameLetter && step == 2 -> Fit.LIFT
+            step == 0 -> Fit.SAME // relative major and minor hold the same notes
+            step == 1 -> if (sameLetter) Fit.NEIGHBOUR else Fit.DIAGONAL
+            sameLetter && step == 2 -> Fit.LIFT // the classic +2 semitone "energy boost"
             else -> Fit.CLASH
         }
-    }
-
-    private data class Code(val number: Int, val isMinor: Boolean)
-
-    private fun parse(code: String?): Code? {
-        if (code == null || code.length < 2) return null
-        val number = code.dropLast(1).toIntOrNull()?.takeIf { it in 1..12 } ?: return null
-        return when (code.last()) {
-            'A' -> Code(number, isMinor = true)
-            'B' -> Code(number, isMinor = false)
-            else -> null
-        }
-    }
-
-    /** Steps between two positions on the twelve-hour wheel, the short way round. */
-    private fun wheelDistance(a: Int, b: Int): Int {
-        val d = abs(a - b)
-        return minOf(d, 12 - d)
     }
 }

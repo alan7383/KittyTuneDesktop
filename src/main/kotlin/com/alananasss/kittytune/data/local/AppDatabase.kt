@@ -177,6 +177,10 @@ object AppDatabase {
             try {
                 st.execute("ALTER TABLE beat_info ADD COLUMN energy REAL")
             } catch (_: Exception) {}
+            // Which analyzer wrote a row; rows from an older one are analysed again (see BeatInfoEntity).
+            try {
+                st.execute("ALTER TABLE beat_info ADD COLUMN analysisVersion INTEGER NOT NULL DEFAULT 1")
+            } catch (_: Exception) {}
             st.execute("UPDATE library_folders SET parentFolderId = NULL WHERE parentFolderId = 0")
             st.execute("UPDATE library_item_meta SET folderId = NULL WHERE folderId = 0")
 
