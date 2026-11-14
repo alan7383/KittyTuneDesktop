@@ -1,0 +1,20 @@
+gradle.projectsEvaluated {
+    def project = gradle.rootProject
+    project.tasks.register('writeHlsOpeningBenchmarkConfig') {
+        dependsOn project.tasks.named('classes')
+        doLast {
+            def compiler = project.configurations.detachedConfiguration(
+                project.dependencies.create('org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21'))
+            def config = [
+                javaHome: System.getProperty('java.home'),
+                compilerClasspath: compiler.files.collect { it.absolutePath },
+                runtimeClasspath: project.sourceSets.main.runtimeClasspath.files.collect { it.absolutePath },
+                friendPaths: project.sourceSets.main.output.classesDirs.files.collect { it.absolutePath },
+                moduleName: project.tasks.named('compileKotlin').get().compilerOptions.moduleName.orNull ?:
+                    (project.group.toString() + '_' + project.name).replace('.', '_')
+            ]
+            project.file('build/hls-opening-benchmark-config.json').text = groovy.json.JsonOutput.prettyPrint(
+                groovy.json.JsonOutput.toJson(config))
+        }
+    }
+}

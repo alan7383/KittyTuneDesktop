@@ -1,0 +1,17 @@
+{
+  "baselineRef": "c4885d6",
+  "sources": {
+    "baseline": {
+      "src/main/kotlin/com/alananasss/kittytune/audio/AudioEngine.kt": "d9f7f7c93ece069fb4a82d0eb38f62abecb0bb8da8dbb5fdf81f0fd5f1839f2f",
+      "src/main/kotlin/com/alananasss/kittytune/audio/HlsStreamAdapter.kt": "8e3fe29c2b8e6c6c2002bb2c9277b6983a8032b240bc5a93513f0d62dec0d364"
+    },
+    "candidate": {
+      "src/main/kotlin/com/alananasss/kittytune/audio/AudioEngine.kt": "f0c285d4647c426bf2ca339027787fd90f4f2b11c811416d4aebb08986b0aa93",
+      "src/main/kotlin/com/alananasss/kittytune/audio/HlsStreamAdapter.kt": "8e3fe29c2b8e6c6c2002bb2c9277b6983a8032b240bc5a93513f0d62dec0d364"
+    }
+  },
+  "dependencies": {
+    "KittyTuneWindows-1.5.1.jar": "e534046be028cff2a3b6e735622905c380764acdb86a837f03c5166616918c12"
+  },
+  "benchmarkSha256": "bd1ac1eff87fe1ff0b62f43773019b0cb52edd58108b428607e9888e243a1482"
+}
