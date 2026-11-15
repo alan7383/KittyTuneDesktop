@@ -17,7 +17,7 @@ The runner compiles both production `AudioEngine.kt` and `HlsStreamAdapter.kt` v
 Generate a configuration in the candidate checkout:
 
 ```
-./gradlew -I experiments/hls-opening-benchmark/benchmark.init.gradle writeHlsOpeningBenchmarkConfig -PdesktopOnly=true
+./gradlew -I experiments/hls-opening-benchmark/benchmark.init.gradle writeHlsOpeningBenchmarkConfig -PdesktopOnly=true --no-configuration-cache
 ```
 
 If the local CDM toolchain is unavailable, source setup does not use the CDM and can prepare this classpath with `-x compileNativeWidevine -x compileCdmNativeHost`. Then run:
