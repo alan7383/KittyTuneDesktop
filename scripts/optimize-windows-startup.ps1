@@ -29,7 +29,6 @@ foreach ($jar in $classpath) {
 
 # Record after extraction: HotSpot checks the actual timestamp of every JAR in the image.
 $work = Join-Path $app "startup-training-$([Guid]::NewGuid().ToString('N'))"
-$profile = Join-Path $work 'roaming/KittyTune'
 
 function Invoke-TrainingJvm([string[]]$Arguments) {
     $start = [Diagnostics.ProcessStartInfo]::new($java)
@@ -48,10 +47,10 @@ function Invoke-TrainingJvm([string[]]$Arguments) {
     foreach ($name in 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'KITTYTUNE_STARTUP_LOG') {
         [void]$start.Environment.Remove($name)
     }
-    $start.Environment['APPDATA'] = "$work/roaming"
-    $start.Environment['LOCALAPPDATA'] = "$work/local"
-    $start.Environment['TEMP'] = $start.Environment['TMP'] = "$work/temp"
-    $start.Environment['ProgramData'] = $start.Environment['OneDrive'] = $start.Environment['ALLUSERSPROFILE'] = "$work/home"
+    $start.Environment['APPDATA'] = "$scratch/roaming"
+    $start.Environment['LOCALAPPDATA'] = "$scratch/local"
+    $start.Environment['TEMP'] = $start.Environment['TMP'] = "$scratch/temp"
+    $start.Environment['ProgramData'] = $start.Environment['OneDrive'] = $start.Environment['ALLUSERSPROFILE'] = "$scratch/home"
     $process = [Diagnostics.Process]::Start($start)
     try {
         $stdout = $process.StandardOutput.ReadToEndAsync()
@@ -71,8 +70,13 @@ function Invoke-TrainingJvm([string[]]$Arguments) {
 }
 
 $copiedJava = $false
+$scratch = $null
 try {
-    New-Item -ItemType Directory -Path $profile, "$work/local", "$work/temp", "$work/home" | Out-Null
+    # Native libraries extracted under user.home and java.io.tmpdir need short paths.
+    # Keep the archive staging directory beside the final cache for same-volume moves.
+    $scratch = (New-Item -ItemType Directory -Path ([IO.Path]::GetTempPath()) -Name ("kt-" + [IO.Path]::GetRandomFileName())).FullName
+    $profile = Join-Path $scratch 'roaming/KittyTune'
+    New-Item -ItemType Directory -Path "$work", $profile, "$scratch/local", "$scratch/temp", "$scratch/home" | Out-Null
     '{"has_completed_setup":true,"protected_tracks_announced":true}' | Set-Content "$profile/prefs.json"
     '{"is_guest_mode":true}' | Set-Content "$profile/soundtune_auth.json"
     '{"announced":true}' | Set-Content "$profile/kitty_pet.json"
@@ -81,7 +85,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $JavaHome 'bin/java.exe') -Destination $java
         $copiedJava = $true
     }
-    $settings = $options + @("-Duser.home=$work/home", "-Djava.io.tmpdir=$work/temp")
+    $settings = $options + @("-Duser.home=$scratch/home", "-Djava.io.tmpdir=$scratch/temp")
     $launch = @('-cp', ($classpath -join ';'), 'com.alananasss.kittytune.MainKt')
     $configuration = Join-Path $work 'recording.aotconfig'
     $candidate = Join-Path $work 'kittytune-startup.aot'
@@ -113,5 +117,13 @@ try {
     if ($resolved -and [IO.Path]::GetDirectoryName($resolved) -eq $app) {
         try { Remove-Item -LiteralPath $resolved -Recurse -Force }
         catch { Write-Warning "Could not remove startup training files: $($_.Exception.Message)" }
+    }
+    if ($scratch) {
+        $tempRoot = (Resolve-Path -LiteralPath ([IO.Path]::GetTempPath()) -ErrorAction SilentlyContinue).Path
+        $resolved = (Resolve-Path -LiteralPath $scratch -ErrorAction SilentlyContinue).Path
+        if ($tempRoot -and $resolved -and [IO.Path]::GetDirectoryName($resolved) -eq [IO.Path]::TrimEndingDirectorySeparator($tempRoot)) {
+            try { Remove-Item -LiteralPath $resolved -Recurse -Force }
+            catch { Write-Warning "Could not remove the temporary training profile: $($_.Exception.Message)" }
+        }
     }
 }

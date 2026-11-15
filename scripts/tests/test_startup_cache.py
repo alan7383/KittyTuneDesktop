@@ -81,6 +81,11 @@ class StartupCacheTest(unittest.TestCase):
         arguments=log.read_text(encoding='utf-8-sig').splitlines()
         self.assertIn(long_option,arguments)
         self.assertTrue(any(str(self.image) in argument for argument in arguments))
+        home = Path(next(arg.removeprefix('-Duser.home=') for arg in arguments if arg.startswith('-Duser.home=')))
+        temp = Path(next(arg.removeprefix('-Djava.io.tmpdir=') for arg in arguments if arg.startswith('-Djava.io.tmpdir=')))
+        self.assertEqual(Path(tempfile.gettempdir()).resolve(), home.parent.parent.resolve())
+        self.assertEqual(home.parent / 'temp', temp)
+        self.assertFalse(home.parent.exists(), 'The temporary JVM profile must be cleaned up')
         self.assertIn('java-options=-XX:AOTCache=',self.cfg.read_text())
     def test_timeout_keeps_partial_diagnostics(self):
         result,elapsed=self.run_helper(('-TrainingTimeoutSeconds','1'),FAKE_DELAY='1')
