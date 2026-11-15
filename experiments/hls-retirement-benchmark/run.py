@@ -38,6 +38,18 @@ def invoke(arguments, name, env=None):
         raise RuntimeError(f'{name} failed: see {output / (name + ".stderr")}')
     return result.stdout
 
+def dependency_sha256(path):
+    if path.is_file():
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    if not path.is_dir():
+        raise FileNotFoundError(path)
+    entries = {
+        entry.relative_to(path).as_posix(): hashlib.sha256(entry.read_bytes()).hexdigest()
+        for entry in path.rglob('*') if entry.is_file()
+    }
+    manifest = json.dumps(entries, sort_keys=True).encode('utf-8')
+    return hashlib.sha256(manifest).hexdigest()
+
 provenance = {'baselineRef': args.baseline_ref, 'sources': {}, 'dependencies': {}}
 for variant in ('baseline', 'candidate'):
     sources = []
@@ -61,7 +73,7 @@ for variant in ('baseline', 'candidate'):
     provenance['sources'][variant] = hashes
 provenance['benchmarkSha256'] = hashlib.sha256((experiment / 'HlsRetirementBenchmark.kt').read_bytes()).hexdigest()
 for path in config['friendPaths']:
-    provenance['dependencies'][Path(path).name] = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    provenance['dependencies'][Path(path).name] = dependency_sha256(Path(path))
 (output / 'source-provenance.json').write_text(json.dumps(provenance, indent=2))
 version = subprocess.run([str(java), '-version'], capture_output=True, text=True, check=True)
 (output / 'environment.json').write_text(json.dumps({'platform': platform.platform(),

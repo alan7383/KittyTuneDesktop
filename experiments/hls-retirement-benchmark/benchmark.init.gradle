@@ -1,6 +1,7 @@
 gradle.projectsEvaluated {
     def project = gradle.rootProject
     project.tasks.register('writeHlsRetirementBenchmarkConfig') {
+        notCompatibleWithConfigurationCache('Resolves the benchmark classpaths from the project at execution time.')
         dependsOn project.tasks.named('classes')
         doLast {
             def compiler = project.configurations.detachedConfiguration(
