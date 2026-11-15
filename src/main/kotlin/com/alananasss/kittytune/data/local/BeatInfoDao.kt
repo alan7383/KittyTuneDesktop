@@ -43,6 +43,16 @@ class BeatInfoDao(private val db: AppDatabase) {
     suspend fun getBeatInfo(songId: String): BeatInfoEntity? =
         db.queryOne("SELECT * FROM beat_info WHERE songId = ? LIMIT 1", songId, mapper = ::row)
 
+    /** The rows of every song in [songIds] that has one, in no particular order. */
+    suspend fun getBeatInfoForSongs(songIds: List<String>): List<BeatInfoEntity> {
+        if (songIds.isEmpty()) return emptyList()
+        // SQLite caps the number of bound parameters; chunk to stay well under it.
+        return songIds.distinct().chunked(500).flatMap { chunk ->
+            val marks = chunk.joinToString(",") { "?" }
+            db.query("SELECT * FROM beat_info WHERE songId IN ($marks)", *chunk.toTypedArray(), mapper = ::row)
+        }
+    }
+
     suspend fun deleteBeatInfo(songId: String) =
         db.execSilent("DELETE FROM beat_info WHERE songId = ?", songId)
 
