@@ -575,7 +575,18 @@ import kotlin.math.roundToInt
                             lineHeight = (fontSize * 1.4).sp,
                             fontFamily = lyricsFontFamily
                         )
-                        LyricLineText(
+                        if (line.isInstrumental && line.text.isBlank()) {
+                            // A long instrumental gap: the chosen indicator counts it down instead of an empty line.
+                            InstrumentalLineIndicator(
+                                style = viewModel.instrumentalIndicatorStyle,
+                                startMs = line.startTime,
+                                endMs = line.endTime,
+                                positionProvider = { smoothDrawPosition.value.toLong() + viewModel.lyricsOffset },
+                                textAlign = lineTextAlign,
+                                accentColor = MaterialTheme.colorScheme.onSurface,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else LyricLineText(
                             line = line,
                             isActive = isActive,
                             // Interpolated, so the fill moves per frame rather than per report — and
@@ -590,6 +601,16 @@ import kotlin.math.roundToInt
                             inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unsungColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             textAlign = lineTextAlign,
+                            // The top-to-bottom fill of a line-timed line, when the Sweep animation is chosen.
+                            sweep = if (viewModel.lyricsSweepEnabled) LyricSweepSpec(
+                                brightColor = MaterialTheme.colorScheme.onSurface,
+                                dimColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                progress = {
+                                    val start = line.startTime.toFloat()
+                                    val end = line.endTime.toFloat().coerceAtLeast(start + 1f)
+                                    ((smoothDrawPosition.value + viewModel.lyricsOffset - start) / (end - start)).coerceIn(0f, 1f)
+                                },
+                            ) else null,
                         )
 
                         AnimatedVisibility(

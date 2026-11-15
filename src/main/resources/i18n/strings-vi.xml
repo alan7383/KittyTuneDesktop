@@ -3543,4 +3543,12 @@
     <string name="pref_show_codec_on_player">Hiện codec trên trình phát</string>
     <string name="pref_show_codec_on_player_sub">Huy hiệu nhỏ hiển thị codec, bitrate và tần số lấy mẫu hiện tại</string>
     <string name="diag_out_system_default">Đầu ra mặc định của hệ thống</string>
+    <string name="pref_lyrics_line_animation">Hiệu ứng từng dòng</string>
+    <string name="pref_lyrics_line_animation_sub">Dòng hiện tại được tô đầy bằng dải chuyển màu từ trên xuống</string>
+    <string name="pref_instrumental_indicator">Chỉ báo đoạn nhạc đệm</string>
+    <string name="pref_instrumental_indicator_sub">Hiển thị trong các đoạn nhạc đệm dài ở lời bài hát theo từng dòng</string>
+    <string name="pref_instrumental_note_wave">Nốt nhạc + sóng</string>
+    <string name="pref_instrumental_circle">Vòng tròn tiến trình</string>
+    <string name="pref_instrumental_dots">Chấm nhịp thở</string>
+    <string name="pref_instrumental_off">Tắt</string>
 </resources>

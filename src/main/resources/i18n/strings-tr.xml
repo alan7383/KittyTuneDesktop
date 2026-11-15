@@ -3463,4 +3463,12 @@
     <string name="pref_show_codec_on_player">Oynatıcıda kodeği göster</string>
     <string name="pref_show_codec_on_player_sub">Geçerli kodek, bit hızı ve örnekleme hızını gösteren küçük bir rozet</string>
     <string name="diag_out_system_default">Sistem varsayılan çıkışı</string>
+    <string name="pref_lyrics_line_animation">Satır satır animasyon</string>
+    <string name="pref_lyrics_line_animation_sub">Geçerli satır yukarıdan aşağıya bir gradyanla dolar</string>
+    <string name="pref_instrumental_indicator">Enstrümantal göstergesi</string>
+    <string name="pref_instrumental_indicator_sub">Satır satır şarkı sözlerinde uzun enstrümantal boşluklarda gösterilir</string>
+    <string name="pref_instrumental_note_wave">Nota + dalga</string>
+    <string name="pref_instrumental_circle">İlerleme çemberi</string>
+    <string name="pref_instrumental_dots">Nefes alan noktalar</string>
+    <string name="pref_instrumental_off">Kapalı</string>
 </resources>

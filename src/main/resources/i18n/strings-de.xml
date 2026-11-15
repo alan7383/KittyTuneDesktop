@@ -3682,4 +3682,12 @@
     <string name="pref_show_codec_on_player">Codec im Player anzeigen</string>
     <string name="pref_show_codec_on_player_sub">Ein kleines Abzeichen mit aktuellem Codec, Bitrate und Abtastrate</string>
     <string name="diag_out_system_default">Standardausgabe des Systems</string>
+    <string name="pref_lyrics_line_animation">Zeilenweise Animation</string>
+    <string name="pref_lyrics_line_animation_sub">Die aktuelle Zeile füllt sich mit einem Verlauf von oben nach unten</string>
+    <string name="pref_instrumental_indicator">Instrumental-Anzeige</string>
+    <string name="pref_instrumental_indicator_sub">Wird bei langen Instrumentalpassagen in zeilenweisen Songtexten angezeigt</string>
+    <string name="pref_instrumental_note_wave">Note + Welle</string>
+    <string name="pref_instrumental_circle">Fortschrittskreis</string>
+    <string name="pref_instrumental_dots">Atmende Punkte</string>
+    <string name="pref_instrumental_off">Aus</string>
 </resources>

@@ -215,6 +215,26 @@ val DEFAULT_PINNED_AUDIO_FX = listOf(
 
 private val isWindowsHost: Boolean = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)
 
+/** Line-by-line lyrics: how the current line fills in as it is sung (same values as Android). */
+enum class LyricsLineAnimation { FADE, SWEEP }
+
+/** What long instrumental gaps in the lyrics show (same values as Android). */
+enum class InstrumentalIndicatorStyle {
+    DOTS,
+    CIRCLE,
+    NOTE_WAVE,
+    OFF;
+
+    companion object {
+        fun fromString(name: String?): InstrumentalIndicatorStyle = when (name) {
+            "CIRCLE" -> CIRCLE
+            "NOTE_WAVE" -> NOTE_WAVE
+            "OFF" -> OFF
+            else -> DOTS
+        }
+    }
+}
+
 class PlayerPreferences {
     private val gson = Gson()
     private val queueFile = File(AppDirs.dataDir, "queue_cache.json")
@@ -483,6 +503,8 @@ class PlayerPreferences {
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_SHOW_CODEC_ON_PLAYER = "show_codec_on_player"
+        private const val KEY_LYRICS_LINE_ANIMATION = "lyrics_line_animation"
+        private const val KEY_INSTRUMENTAL_INDICATOR = "instrumental_indicator_style"
         private const val KEY_MIX_TRANSITION_STYLE = "mix_transition_style"
         private const val KEY_MIX_TRANSITION_BEATS = "mix_transition_beats"
         private const val KEY_SKIP_SILENCE = "skip_silence"
@@ -796,6 +818,24 @@ class PlayerPreferences {
 
     fun getYouTubeFallbackEnabled(): Boolean = Prefs.getBoolean(KEY_YOUTUBE_FALLBACK, true)
     fun setYouTubeFallbackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_YOUTUBE_FALLBACK, enabled)
+
+    // ─── Lyrics animation (same keys as Android) ──────────────────────────────
+
+    fun getLyricsLineAnimation(): LyricsLineAnimation =
+        runCatching { LyricsLineAnimation.valueOf(Prefs.getString(KEY_LYRICS_LINE_ANIMATION, null)!!) }
+            .getOrDefault(LyricsLineAnimation.SWEEP)
+    fun setLyricsLineAnimation(style: LyricsLineAnimation) = Prefs.putString(KEY_LYRICS_LINE_ANIMATION, style.name)
+    fun getLyricsSweepEnabled(): Boolean = getLyricsLineAnimation() == LyricsLineAnimation.SWEEP
+    fun setLyricsSweepEnabled(enabled: Boolean) =
+        setLyricsLineAnimation(if (enabled) LyricsLineAnimation.SWEEP else LyricsLineAnimation.FADE)
+    fun lyricsSweepEnabledFlow(): Flow<Boolean> =
+        Prefs.stringFlow(KEY_LYRICS_LINE_ANIMATION, LyricsLineAnimation.SWEEP.name).map { it != LyricsLineAnimation.FADE.name }
+
+    fun getInstrumentalIndicatorStyle(): InstrumentalIndicatorStyle =
+        InstrumentalIndicatorStyle.fromString(Prefs.getString(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.NOTE_WAVE.name))
+    fun setInstrumentalIndicatorStyle(style: InstrumentalIndicatorStyle) = Prefs.putString(KEY_INSTRUMENTAL_INDICATOR, style.name)
+    fun instrumentalIndicatorStyleFlow(): Flow<InstrumentalIndicatorStyle> =
+        Prefs.stringFlow(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.NOTE_WAVE.name).map { InstrumentalIndicatorStyle.fromString(it) }
 
     // ─── Codec badge (same key as Android) ─────────────────────────────────────
 

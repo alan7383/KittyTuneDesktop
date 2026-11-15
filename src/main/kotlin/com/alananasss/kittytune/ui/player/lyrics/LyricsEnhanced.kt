@@ -140,7 +140,10 @@ fun LyricsEnhanced(
     }
 
     val splitBacking = viewModel.lyricsSplitBackingVocals
-    val revealWords = viewModel.lyricsRevealWords
+    // Sweep and word-by-word reveal are two looks for the same line-timed lines, and the reveal turns every
+    // line into syllables, which the sweep would never reach. When the Sweep animation is chosen it wins.
+    val sweepSelected = viewModel.lyricsSweepEnabled && !isWordSyncedFormat
+    val revealWords = viewModel.lyricsRevealWords && !sweepSelected
     val syncedLyrics = remember(lines.toList(), isWordSyncedFormat, isDuetActive, userAlignment, splitBacking, revealWords) {
         buildSyncedLyrics(lines, isWordSyncedFormat, isDuetActive, userAlignment, splitBacking, revealWords)
     }
@@ -320,6 +323,8 @@ fun LyricsEnhanced(
                                 },
                                 horizontalMargin = lyricsHorizontalMarginDp,
                                 activeScale = lyricsActiveScale,
+                                lineSweepEnabled = sweepSelected,
+                                interludeIndicatorStyle = viewModel.instrumentalIndicatorStyle,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

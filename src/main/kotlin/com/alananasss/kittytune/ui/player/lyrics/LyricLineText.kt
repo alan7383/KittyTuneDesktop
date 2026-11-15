@@ -143,6 +143,17 @@ internal object LyricLineStyling {
  * @param textModifier applied to the text itself, for decoration that has to draw over the glyphs — the
  *   full screen's hover rule. Kept separate from [modifier] because that one lays the line out.
  */
+/**
+ * The top-to-bottom fill of a line-by-line lyric line (port of Android PR #83): while the line is current, a soft
+ * gradient band travels down the text at the pace of playback, lit above and dim below, with a glow that grows
+ * as the line goes. Only for lines without word timings.
+ */
+internal data class LyricSweepSpec(
+    val brightColor: Color,
+    val dimColor: Color,
+    val progress: () -> Float,
+)
+
 @Composable
 internal fun LyricLineText(
     line: LyricLine,
@@ -161,11 +172,44 @@ internal fun LyricLineText(
     onTextLayout: (TextLayoutResult) -> Unit = {},
     /** Fill the width given. Off, the line is as wide as its words are, up to what it was given. */
     fillWidth: Boolean = true,
+    /** The line-by-line sweep, for the current line; ignored when the line has word timings. */
+    sweep: LyricSweepSpec? = null,
 ) {
     val words = if (wordSync && isActive) line.words else emptyList()
     val fullWidth = if (fillWidth) Modifier.fillMaxWidth() else Modifier
 
     if (words.isEmpty()) {
+        if (sweep != null && isActive) {
+            // The band's position is read in a derivedStateOf, so only the current line follows the clock.
+            var textHeightPx by remember { mutableFloatStateOf(1f) }
+            val sweepProgress by remember(sweep) { derivedStateOf { sweep.progress().coerceIn(0f, 1f) } }
+            val bandOrigin = sweepProgress * textHeightPx
+            // A finished line is fully lit: the soft band would otherwise leave its last pixels half-dim.
+            val sweepDone = sweepProgress >= 1f
+            val brush = if (sweepDone) null else Brush.verticalGradient(
+                colors = listOf(sweep.brightColor, sweep.dimColor),
+                startY = bandOrigin - 10f,
+                endY = bandOrigin + 10f,
+            )
+            Text(
+                text = line.text,
+                style = activeStyle.copy(
+                    brush = brush,
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = sweep.brightColor.copy(alpha = 0.5f),
+                        blurRadius = sweepProgress * 20f,
+                    ),
+                ),
+                color = if (sweepDone) sweep.brightColor else Color.White, // ignored while a brush is set
+                textAlign = textAlign,
+                modifier = modifier.then(fullWidth).then(textModifier),
+                onTextLayout = {
+                    textHeightPx = it.size.height.toFloat().coerceAtLeast(1f)
+                    onTextLayout(it)
+                },
+            )
+            return
+        }
         Text(
             text = line.text,
             style = if (isActive) activeStyle else inactiveStyle,
