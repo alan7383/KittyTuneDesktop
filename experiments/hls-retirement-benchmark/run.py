@@ -20,6 +20,7 @@ parser.add_argument('--warmups', type=int, default=3)
 parser.add_argument('--hold-ms', type=int, default=500)
 args = parser.parse_args()
 config = json.loads(args.config.read_text())
+repo = args.repo.resolve()
 output = args.output.resolve()
 output.mkdir(parents=True, exist_ok=True)
 experiment = Path(__file__).resolve().parent
@@ -55,8 +56,8 @@ for variant in ('baseline', 'candidate'):
     sources = []
     hashes = {}
     for path in source_paths:
-        data = (subprocess.check_output(['git', 'show', args.baseline_ref + ':' + path], cwd=args.repo)
-                if variant == 'baseline' else (args.repo / path).read_bytes())
+        data = (subprocess.check_output(['git', 'show', args.baseline_ref + ':' + path], cwd=repo)
+                if variant == 'baseline' else (repo / path).read_bytes())
         target = output / variant / 'source' / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
@@ -73,7 +74,9 @@ for variant in ('baseline', 'candidate'):
     provenance['sources'][variant] = hashes
 provenance['benchmarkSha256'] = hashlib.sha256((experiment / 'HlsRetirementBenchmark.kt').read_bytes()).hexdigest()
 for path in config['friendPaths']:
-    provenance['dependencies'][Path(path).name] = dependency_sha256(Path(path))
+    dependency = Path(path).resolve()
+    name = dependency.relative_to(repo).as_posix() if repo in dependency.parents else dependency.name
+    provenance['dependencies'][name] = dependency_sha256(dependency)
 (output / 'source-provenance.json').write_text(json.dumps(provenance, indent=2))
 version = subprocess.run([str(java), '-version'], capture_output=True, text=True, check=True)
 (output / 'environment.json').write_text(json.dumps({'platform': platform.platform(),
@@ -92,7 +95,7 @@ for pair in range(args.pairs):
             path.mkdir(parents=True, exist_ok=True)
             env[variable] = str(path)
         (profile / 'home').mkdir(parents=True, exist_ok=True)
-        cp = [str(output / variant / 'classes'), str(args.repo / 'src/test/resources'), *config['runtimeClasspath']]
+        cp = [str(output / variant / 'classes'), str(repo / 'src/test/resources'), *config['runtimeClasspath']]
         stdout = invoke(['--enable-native-access=ALL-UNNAMED', '-Xms256m', '-Xmx512m',
             '-XX:+UseG1GC', '-XX:ParallelGCThreads=2', '-XX:ConcGCThreads=1',
             '-Djava.awt.headless=true', '-Duser.home=' + str(profile / 'home'),
