@@ -9,7 +9,7 @@ The AWT event queue records exact UI-thread allocations and CPU time. Results ar
 Generate a configuration from a candidate checkout:
 
 ```
-./gradlew -I experiments/scroll-edge-benchmark/benchmark.init.gradle writeScrollEdgeBenchmarkConfig -PdesktopOnly=true
+./gradlew -I experiments/scroll-edge-benchmark/benchmark.init.gradle writeScrollEdgeBenchmarkConfig -PdesktopOnly=true --no-configuration-cache
 ```
 
 If the native CDM toolchain is missing, this UI-only benchmark can use `-x compileNativeWidevine -x compileCdmNativeHost` when preparing the classpath. It does not play audio or use a CDM. The local recorded run used identical packaged 1.5.1 dependencies, Java 25, and the same Kotlin/Compose 2.4.21 compiler in a manual configuration of the same shape. `nativeDir` can optionally point to a packaged Skiko DLL directory.
