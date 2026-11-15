@@ -32,7 +32,11 @@ import javax.sound.sampled.AudioFormat as JavaAudioFormat
 const val TRACK_GAIN_MIN_DB = -12f
 const val TRACK_GAIN_MAX_DB = 6f
 
-class AudioEngine {
+/**
+ * @param isolated a deck that plays outside the player (the transition editor's preview): it never touches the
+ *   app-wide state the playing track owns, so no AI-detection tap, no AI verdict reset, no karaoke hand-over.
+ */
+class AudioEngine(private val isolated: Boolean = false) {
 
     enum class State { IDLE, BUFFERING, READY, ENDED }
 
@@ -99,6 +103,12 @@ class AudioEngine {
     /** The Mix transitions' sweep filter (RISE high-pass, WAVE band-pass, a Custom seam's filter legs). */
     val mixSweep = com.alananasss.kittytune.audio.automix.MixSweepAudioProcessor()
 
+    /** The transition editor preview's filter legs (state-variable, driven by a 0..1 fraction). Dry when idle. */
+    val transitionSweep = com.alananasss.kittytune.audio.automix.TransitionSweepAudioProcessor()
+
+    /** The transition editor preview's effect tail (damped feedback delay). Dry when idle. */
+    val transitionEffects = com.alananasss.kittytune.audio.automix.TransitionEffectsAudioProcessor()
+
     /**
      * ArtifactNet AI-music tap (issue #41): transparent pass-through that collects the
      * first seconds of PCM for on-device AI detection. First in the chain so it
@@ -120,12 +130,14 @@ class AudioEngine {
      */
     val silenceSkip = com.alananasss.kittytune.audio.silence.SilenceSkipAudioProcessor()
 
-    private val chain: List<AudioProcessor> = listOf(
-        aiDetection,
+    private val chain: List<AudioProcessor> = listOfNotNull(
+        aiDetection.takeUnless { isolated },
         liveBeatTap,
         silenceSkip,
         automixDuck,
         mixSweep,
+        transitionSweep,
+        transitionEffects,
         fx, equalizer, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
         superWide, vinylLoFi, phaser, megaphone, robotVocoder, chorus,
@@ -206,7 +218,7 @@ class AudioEngine {
         val fmt = AudioFormat(outputSampleRate, outputChannels)
         chain.forEach { it.configure(fmt) }
         aiDetection.setPreferences(PlayerPreferences())
-        if (!com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelLoaded() &&
+        if (!isolated && !com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelLoaded() &&
             com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() &&
             com.alananasss.kittytune.audio.ai.AiDetectionManager.isDetectionWanted()
         ) {
@@ -227,10 +239,10 @@ class AudioEngine {
         // New track: restart AI collection from zero and drop the previous verdict,
         // mirroring the Android MusicManager resetForNewTrack + resetResult pair.
         aiDetection.resetForNewTrack()
-        com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
+        if (!isolated) com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         vocalRemover.setTrack(trackId)
         vocalBoost.setTrack(trackId)
-        if (trackId != null) {
+        if (trackId != null && !isolated) {
             com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.notifyTrackChanged(trackId)
         }
         currentUrl = url
@@ -511,7 +523,7 @@ class AudioEngine {
     fun stop() {
         stopInternal()
         aiDetection.resetForNewTrack()
-        com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
+        if (!isolated) com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         currentUrl = null
         currentHeaders = emptyMap()
         sourceAnalysisPending = false
@@ -529,7 +541,7 @@ class AudioEngine {
         // Without this the CDM daemon (in WSL) would stay up until it noticed it was idle.
         hlsAdapter?.retire()
         aiDetection.resetForNewTrack()
-        com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
+        if (!isolated) com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         // Terminal: this engine is being discarded. stopInternal() only flush()es the
         // chain, which keeps native DSP state (normalisation handle, ebur128 histograms)
         // allocated. Every crossfade releases an engine, so without this reset each
@@ -735,7 +747,8 @@ class AudioEngine {
             if (!sourceAnalysisPending) return
             sourceAnalysisPending = false
             val prefs = PlayerPreferences()
-            if (com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
+            // An isolated deck (the transition preview) never touches the playing track's AI verdict.
+            if (!isolated && com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
                 com.alananasss.kittytune.audio.ai.AiDetectionManager.analyzeTrackUpfront(url, headers, adapter)
             }
         }
