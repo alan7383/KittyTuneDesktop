@@ -90,6 +90,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -1454,7 +1455,38 @@ private fun MiniLyricDisplay(
             MaterialTheme.typography.titleMedium.copy(shadow = textShadow)
         }
 
-        if (chunkWords.isEmpty() || !wordSync) {
+        val sweepPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+        val sweepEnabled by remember { sweepPrefs.lyricsSweepEnabledFlow() }
+            .collectAsState(initial = sweepPrefs.getLyricsSweepEnabled())
+        if ((chunkWords.isEmpty() || !wordSync) && sweepEnabled && line.endTime > line.startTime) {
+            // The Sweep line animation (Android PR #83): the line fills top to bottom as it is sung. Read in the
+            // draw phase, so the per-frame position redraws the line without recomposing it.
+            val bright = MaterialTheme.colorScheme.onSurface
+            val dim = bright.copy(alpha = 0.45f)
+            Text(
+                text = chunkText,
+                style = baseStyle.copy(fontWeight = if (compact) FontWeight.SemiBold else FontWeight.Bold),
+                color = bright,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.drawWithContent {
+                    val progress = ((positionMs() - line.startTime) / (line.endTime - line.startTime).toFloat()).coerceIn(0f, 1f)
+                    drawContent()
+                    if (progress < 1f) {
+                        val band = progress * size.height
+                        // Dim what the band has not reached yet; above it the line keeps its full colour.
+                        drawRect(
+                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Black.copy(alpha = 1f - dim.alpha)),
+                                startY = band - 6f,
+                                endY = band + 6f,
+                            ),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstOut,
+                        )
+                    }
+                }.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen },
+            )
+        } else if (chunkWords.isEmpty() || !wordSync) {
             Text(
                 text = chunkText,
                 style = baseStyle.copy(fontWeight = if (compact) FontWeight.SemiBold else FontWeight.Bold),
