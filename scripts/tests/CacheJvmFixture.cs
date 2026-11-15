@@ -6,7 +6,12 @@ using System.Threading;
 public class CacheJvmFixture {
   public static int Main(string[] args) {
     if (args.Length == 1 && args[0].StartsWith("@")) {
-      args = File.ReadAllLines(args[0].Substring(1)).Select(line =>
+      string argumentFile = args[0].Substring(1);
+      if (argumentFile.Any(c => c > 127)) {
+        Console.Error.WriteLine("Expected an ASCII argument file path for the Windows Java launcher");
+        return 10;
+      }
+      args = File.ReadAllLines(argumentFile).Select(line =>
         System.Text.RegularExpressions.Regex.Unescape(line.Substring(1, line.Length - 2))).ToArray();
     }
     string argumentLog = Environment.GetEnvironmentVariable("FAKE_ARGUMENT_LOG");

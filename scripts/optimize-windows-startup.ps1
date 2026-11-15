@@ -43,7 +43,8 @@ function Invoke-TrainingJvm([string[]]$Arguments) {
         '"' + $option.Replace('\', '\\').Replace('"', '\"').Replace("`r", '\r').Replace("`n", '\n').Replace("`t", '\t') + '"'
     }
     [IO.File]::WriteAllText($argumentFile, ($quoted -join "`n"))
-    $start.ArgumentList.Add('@' + $argumentFile)
+    # The Windows Java launcher can lose Unicode characters in the @file path.
+    $start.ArgumentList.Add('@' + [IO.Path]::GetRelativePath($image, $argumentFile))
     foreach ($name in 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'KITTYTUNE_STARTUP_LOG') {
         [void]$start.Environment.Remove($name)
     }

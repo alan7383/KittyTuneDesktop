@@ -65,7 +65,9 @@ Java AOT startup cache.
 .\gradlew.bat optimizeWindowsStartup -PdesktopOnly=true
 ```
 
-For an existing extracted image, use the Zulu 25 JDK used to build it.
+For an existing extracted image, use the Zulu 25 JDK used to build it. If the
+Java launcher cannot find its runtime DLLs under a Unicode path, extract the
+image to an ASCII path such as `C:\Tools\KittyTune` and prepare it there.
 
 ```powershell
 .\scripts\optimize-windows-startup.ps1 -AppImage 'C:\path\to\KittyTune' -JavaHome 'C:\path\to\Zulu-25'
