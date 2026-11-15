@@ -61,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import java.awt.Cursor
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.Tip
+import com.alananasss.kittytune.ui.player.CodecBadge
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
@@ -311,7 +312,11 @@ fun PlayerBar(
                                         modifier = Modifier.padding(start = 6.dp),
                                     )
                                 }
-
+                                CodecBadge(
+                                    viewModel = vm,
+                                    textColor = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
                             }
                         }
                         if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {

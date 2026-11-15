@@ -509,6 +509,24 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
     var fullPlayerCoverFeather by remember { mutableStateOf(playerViewModel.fullPlayerCoverFeather) }
 
+    fun setting(
+        key: String,
+        category: SettingsCategory,
+        page: SettingsSubPage,
+        icon: ImageVector,
+        subtitleKey: String? = "${key}_sub",
+        highlightKey: String = key,
+        keywords: List<String> = emptyList(),
+    ) = SettingsSearchItem(
+        title = str(key),
+        subtitle = subtitleKey?.let { str(it) },
+        category = category,
+        place = SettingsPlace(category, listOf(page)),
+        icon = icon,
+        highlightKey = highlightKey,
+        keywords = keywords,
+    )
+
     return listOf(
         // INTERFACE - Pages
         SettingsSearchItem(str("settings_cat_interface"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE), Icons.Rounded.Palette, keywords = listOf("interface", "ui", "look", "appearance", "интерфейс", "внешний вид")),
@@ -796,7 +814,21 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             highlightKey = "pref_lyrics_reveal_words",
         ),
 
+        setting("pref_lyrics_line_animation", SettingsCategory.INTERFACE, SettingsSubPage.LYRICS, Icons.Rounded.Lyrics,
+            keywords = listOf("sweep", "dégradé", "karaoké")),
+        setting("pref_instrumental_indicator", SettingsCategory.INTERFACE, SettingsSubPage.LYRICS, Icons.Rounded.Lyrics,
+            keywords = listOf("interlude", "breathing dots", "points", "vague")),
+
         // AUDIO - Folders & Direct Options
+        setting("pref_skip_silence", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_PLAYBACK, Icons.Rounded.FastForward),
+        setting("pref_instant_skip_silence", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_PLAYBACK, Icons.Rounded.FastForward,
+            highlightKey = if (prefs.getSkipSilence()) "pref_instant_skip_silence" else "pref_skip_silence"),
+        setting("pref_pause_listen_history", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_PLAYBACK, Icons.Rounded.PlayArrow),
+        setting("pref_pause_search_history", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_PLAYBACK, Icons.Rounded.Search),
+        setting("pref_hide_video_songs", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_PLAYBACK, Icons.Rounded.VisibilityOff),
+        setting("pref_hide_youtube_shorts", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_PLAYBACK, Icons.Rounded.VisibilityOff),
+        setting("diag_hero_title", SettingsCategory.AUDIO, SettingsSubPage.AUDIO_QUALITY, Icons.Rounded.GraphicEq,
+            subtitleKey = null, keywords = listOf("audio path", "codec", "bitrate", "resampling")),
         SettingsSearchItem(str("settings_cat_audio"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.GraphicEq, keywords = listOf("audio", "sound", "son", "звук")),
         SettingsSearchItem(str("settings_cat_playback"), str("settings_audio_playback_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_PLAYBACK)), Icons.Rounded.PlayArrow, keywords = listOf("playback", "autoplay", "queue", "воспроизведение")),
         SettingsSearchItem(str("settings_audio_quality_title"), str("settings_audio_quality_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_QUALITY)), Icons.Rounded.GraphicEq, keywords = listOf("quality", "sound", "output", "bitrate", "high", "flac", "качество")),
@@ -1026,6 +1058,8 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         SettingsSearchItem(str("zapret_title"), str("network_zapret_sub"), SettingsCategory.NETWORK, SettingsPlace(SettingsCategory.NETWORK, listOf(SettingsSubPage.NETWORK_ZAPRET)), Icons.Rounded.Security, keywords = listOf("zapret", "dpi", "block", "circumvention", "запрет", "блокировки")),
 
         // MISC - Folders & Options
+        setting("pref_show_codec_on_player", SettingsCategory.MISC, SettingsSubPage.MISC_GENERAL, Icons.Rounded.GraphicEq,
+            keywords = listOf("codec", "badge", "bitrate", "FLAC", "Opus", "AAC")),
         SettingsSearchItem(str("settings_cat_misc"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Tune, keywords = listOf("misc", "general", "options", "разное", "общие")),
         SettingsSearchItem(str("settings_cat_general"), str("misc_general_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_GENERAL)), Icons.Rounded.Tune, keywords = listOf("general", "language", "start screen", "update")),
         SettingsSearchItem(str("pref_discord_title"), str("misc_discord_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DISCORD)), Icons.Rounded.Forum, keywords = listOf("discord", "rpc", "presence", "дискорд", "статус")),
