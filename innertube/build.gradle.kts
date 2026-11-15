@@ -8,7 +8,7 @@ kotlin {
 }
 
 val ktorVersion = "3.6.1"
-val serializationVersion = "1.12.0"
+val serializationVersion = "1.13.0"
 val coroutinesVersion = "1.11.0"
 
 dependencies {
