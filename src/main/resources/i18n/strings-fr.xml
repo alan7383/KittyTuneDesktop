@@ -3346,4 +3346,8 @@
     <string name="pref_hide_video_songs_sub">Rechercher uniquement des chansons plutôt que des vidéos sur YouTube</string>
     <string name="pref_hide_youtube_shorts">Masquer les YouTube Shorts</string>
     <string name="pref_hide_youtube_shorts_sub">Retirer les Shorts des résultats de recherche YouTube</string>
+    <string name="pref_skip_silence">Passer les silences</string>
+    <string name="pref_skip_silence_sub">Supprimer les passages silencieux des morceaux pendant la lecture</string>
+    <string name="pref_instant_skip_silence">Passer instantanément les silences</string>
+    <string name="pref_instant_skip_silence_sub">Sauter directement les longs silences au lieu d’avancer rapidement</string>
 </resources>

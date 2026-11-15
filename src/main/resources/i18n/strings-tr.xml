@@ -3348,4 +3348,8 @@
     <string name="pref_hide_video_songs_sub">YouTube\'da videolar yerine yalnızca şarkıları ara</string>
     <string name="pref_hide_youtube_shorts">YouTube Shorts\'u gizle</string>
     <string name="pref_hide_youtube_shorts_sub">Shorts videolarını YouTube arama sonuçlarından çıkar</string>
+    <string name="pref_skip_silence">Sessizliği atla</string>
+    <string name="pref_skip_silence_sub">Oynatma sırasında parçaların sessiz kısımlarını kırp</string>
+    <string name="pref_instant_skip_silence">Sessizliği anında atla</string>
+    <string name="pref_instant_skip_silence_sub">Uzun sessizliklerde hızlı sarmak yerine doğrudan atla</string>
 </resources>

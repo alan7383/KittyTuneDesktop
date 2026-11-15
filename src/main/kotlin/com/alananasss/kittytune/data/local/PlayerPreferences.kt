@@ -482,6 +482,8 @@ class PlayerPreferences {
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
+        private const val KEY_SKIP_SILENCE = "skip_silence"
+        private const val KEY_INSTANT_SKIP_SILENCE = "instant_skip_silence"
         private const val KEY_PAUSE_LISTEN_HISTORY = "pause_listen_history"
         private const val KEY_PAUSE_SEARCH_HISTORY = "pause_search_history"
         private const val KEY_HIDE_VIDEO_SONGS = "hide_video_songs"
@@ -791,6 +793,14 @@ class PlayerPreferences {
 
     fun getYouTubeFallbackEnabled(): Boolean = Prefs.getBoolean(KEY_YOUTUBE_FALLBACK, true)
     fun setYouTubeFallbackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_YOUTUBE_FALLBACK, enabled)
+
+    // ─── Skip silence (same keys as Android) ──────────────────────────────────
+
+    fun getSkipSilence(): Boolean = Prefs.getBoolean(KEY_SKIP_SILENCE, false)
+    fun setSkipSilence(enabled: Boolean) = Prefs.putBoolean(KEY_SKIP_SILENCE, enabled)
+
+    fun getInstantSkipSilence(): Boolean = Prefs.getBoolean(KEY_INSTANT_SKIP_SILENCE, false)
+    fun setInstantSkipSilence(enabled: Boolean) = Prefs.putBoolean(KEY_INSTANT_SKIP_SILENCE, enabled)
 
     // ─── Privacy (same keys as Android) ───────────────────────────────────────
 

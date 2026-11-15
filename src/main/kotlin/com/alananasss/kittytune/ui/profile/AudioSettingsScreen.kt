@@ -67,6 +67,8 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
     var hideYoutubeShorts by remember { mutableStateOf(prefs.getHideYoutubeShorts()) }
     var pauseListenHistory by remember { mutableStateOf(prefs.getPauseListenHistory()) }
     var pauseSearchHistory by remember { mutableStateOf(prefs.getPauseSearchHistory()) }
+    var skipSilenceEnabled by remember { mutableStateOf(prefs.getSkipSilence()) }
+    var instantSkipSilenceEnabled by remember { mutableStateOf(prefs.getInstantSkipSilence()) }
     var seekWheelSeconds by remember { mutableStateOf(prefs.getSeekWheelSeconds()) }
     var showSeekWheelDialog by remember { mutableStateOf(false) }
 
@@ -149,6 +151,23 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
                 ),
                 onClick = { showSeekWheelDialog = true }
             )
+        }
+
+        SettingsGroupTitle(str("pref_skip_silence"))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val skipGroupItems = if (skipSilenceEnabled) 2 else 1
+            SettingsItem(shape = getSettingsShape(skipGroupItems, 0), title = str("pref_skip_silence"), subtitle = str("pref_skip_silence_sub"), hasSwitch = true, switchState = skipSilenceEnabled, onSwitchChange = { on ->
+                skipSilenceEnabled = on
+                prefs.setSkipSilence(on)
+                com.alananasss.kittytune.audio.silence.SkipSilence.applySettings(prefs)
+            }, highlightKey = "pref_skip_silence")
+            if (skipSilenceEnabled) {
+                SettingsItem(shape = getSettingsShape(skipGroupItems, 1), title = str("pref_instant_skip_silence"), subtitle = str("pref_instant_skip_silence_sub"), hasSwitch = true, switchState = instantSkipSilenceEnabled, onSwitchChange = { on ->
+                    instantSkipSilenceEnabled = on
+                    prefs.setInstantSkipSilence(on)
+                    com.alananasss.kittytune.audio.silence.SkipSilence.applySettings(prefs)
+                }, highlightKey = "pref_instant_skip_silence")
+            }
         }
 
         SettingsGroupTitle(str("pref_privacy_title"))
