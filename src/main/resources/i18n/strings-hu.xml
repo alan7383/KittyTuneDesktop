@@ -3469,4 +3469,13 @@
     <string name="pref_instrumental_circle">Haladási kör</string>
     <string name="pref_instrumental_dots">Lélegző pontok</string>
     <string name="pref_instrumental_off">Ki</string>
+    <string name="share_card_face_song">Dal</string>
+    <string name="share_card_face_lyrics">Dalszöveg</string>
+    <string name="share_card_qr">Borító QR-kódként</string>
+    <string name="share_card_title">Megosztás kártyaként</string>
+    <string name="share_card_pick_lines">Dalszövegsorok kiválasztása</string>
+    <string name="share_card_copy_text">Másolás szövegként</string>
+    <string name="share_card_text_copied">Dalszöveg másolva</string>
+    <string name="share_card_save_image">Kép mentése…</string>
+    <string name="share_card_saved">Kártya mentve: %1$s</string>
 </resources>

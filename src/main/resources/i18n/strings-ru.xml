@@ -3470,4 +3470,13 @@
     <string name="pref_instrumental_circle">Круг с прогрессом</string>
     <string name="pref_instrumental_dots">Дышащие точки</string>
     <string name="pref_instrumental_off">Выкл.</string>
+    <string name="share_card_face_song">Трек</string>
+    <string name="share_card_face_lyrics">Текст песни</string>
+    <string name="share_card_qr">Обложка как QR-код</string>
+    <string name="share_card_title">Поделиться карточкой</string>
+    <string name="share_card_pick_lines">Выбрать строки текста</string>
+    <string name="share_card_copy_text">Скопировать текстом</string>
+    <string name="share_card_text_copied">Текст скопирован</string>
+    <string name="share_card_save_image">Сохранить изображение…</string>
+    <string name="share_card_saved">Карточка сохранена: %1$s</string>
 </resources>
