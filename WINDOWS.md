@@ -65,15 +65,22 @@ Java AOT startup cache.
 .\gradlew.bat optimizeWindowsStartup -PdesktopOnly=true
 ```
 
-For an existing extracted image, use the Zulu 25 JDK used to build it.
+For an existing extracted image, use the Zulu 25 JDK used to build it. If the
+Java launcher cannot find its runtime DLLs under a Unicode path, extract the
+image to an ASCII path such as `C:\Tools\KittyTune` and prepare it there.
 
 ```powershell
 .\scripts\optimize-windows-startup.ps1 -AppImage 'C:\path\to\KittyTune' -JavaHome 'C:\path\to\Zulu-25'
 ```
 
-The preparation opens the real home screen with a temporary guest profile and
+The preparation keeps its guest profile and extracted native libraries in a
+short path under the Windows temporary directory. It opens the home screen and
 closes it automatically. Open `KittyTune.exe` as usual afterwards. The cache
-uses about 100 MB on disk. HotSpot checks JAR timestamps, so prepare it again
+uses about 100 MB on disk. Training can take several minutes on older hardware;
+the default timeout is ten minutes per Java process. Override it with
+`-TrainingTimeoutSeconds` when running the PowerShell script directly. Locked
+temporary files are reported as warnings after preparation. HotSpot checks JAR
+timestamps, so prepare it again
 after updating or re-extracting the app. If the cache is absent or incompatible,
 the launcher starts normally.
 
