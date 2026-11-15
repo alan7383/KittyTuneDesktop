@@ -6556,7 +6556,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                                     if (isGaplessAlbum) {
                                         com.alananasss.kittytune.audio.automix.AutomixManager.clearPlan()
                                     } else if (dur > 0L) {
-                                        com.alananasss.kittytune.audio.automix.AutomixManager.computeAutomixPlan(currTrack, nextTrack, currentPosition, dur, playerPrefs)
+                                        com.alananasss.kittytune.audio.automix.AutomixManager.computeAutomixPlan(
+                                            currTrack, nextTrack, currentPosition, dur, playerPrefs,
+                                            playlistKey = currentContext?.navigationId,
+                                        )
                                     }
                                 }
                             }
@@ -7125,6 +7128,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         return runCatching { Color(0xFF000000.toInt() or clean.toInt(16)) }.getOrNull()
     }
 
+    /**
+     * The transition saved in Mix Mode for the pair (playing track -> [next]), so a crossfade with no automix
+     * plan to carry it (a manual skip, a plain crossfade) still performs what was drawn in the editor.
+     */
+    private fun savedPairPlanTo(next: Track): com.alananasss.kittytune.audio.automix.TransitionPlan? {
+        val outgoing = MusicManager.player.currentMediaItem?.track ?: return null
+        if (outgoing.id == next.id) return null
+        val navId = currentContext?.navigationId ?: return null
+        return runCatching {
+            com.alananasss.kittytune.audio.automix.TransitionStore.loadAny(navId, outgoing.id, next.id)
+        }.getOrNull()?.takeUnless { it.isAuto }
+    }
+
     private fun playRobustly(
         index: Int,
         autoPlay: Boolean = true,
@@ -7156,7 +7172,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         startProgressUpdate()
                         val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L
                         val automixPlan = if (playerPrefs.getAutomixEnabled()) com.alananasss.kittytune.audio.automix.AutomixManager.currentAutomixPlan else null
-                        MusicManager.crossfadeToMediaItem(emptyItem, startPosition, crossfadeDurationMs, automixPlan)
+                        MusicManager.crossfadeToMediaItem(emptyItem, startPosition, crossfadeDurationMs, automixPlan, savedPairPlanTo(trackToPlay))
                         MusicManager.applyEffects(effectsState)
                         preloadNextTrack(index + 1)
                     } else {
@@ -7296,7 +7312,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L
                     val automixPlan = if (playerPrefs.getAutomixEnabled()) com.alananasss.kittytune.audio.automix.AutomixManager.currentAutomixPlan else null
                     if (shouldPlay && isCrossfade && (automixPlan != null || crossfadeDurationMs > 0) && MusicManager.player.isPlaying && startPosition == 0L) {
-                        MusicManager.crossfadeToMediaItem(newMediaItem, startPosition, crossfadeDurationMs, automixPlan)
+                        MusicManager.crossfadeToMediaItem(newMediaItem, startPosition, crossfadeDurationMs, automixPlan, savedPairPlanTo(trackToPlay))
                         startProgressUpdate()
                     } else {
                         if (isCrossfade) MusicManager.cancelCrossfade()

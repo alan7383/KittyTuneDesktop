@@ -482,6 +482,8 @@ class PlayerPreferences {
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
+        private const val KEY_MIX_TRANSITION_STYLE = "mix_transition_style"
+        private const val KEY_MIX_TRANSITION_BEATS = "mix_transition_beats"
         private const val KEY_SKIP_SILENCE = "skip_silence"
         private const val KEY_INSTANT_SKIP_SILENCE = "instant_skip_silence"
         private const val KEY_PAUSE_LISTEN_HISTORY = "pause_listen_history"
@@ -793,6 +795,19 @@ class PlayerPreferences {
 
     fun getYouTubeFallbackEnabled(): Boolean = Prefs.getBoolean(KEY_YOUTUBE_FALLBACK, true)
     fun setYouTubeFallbackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_YOUTUBE_FALLBACK, enabled)
+
+    // ─── Mix transitions (same keys as Android) ───────────────────────────────
+
+    /**
+     * The transition style every automix uses: a [com.alananasss.kittytune.audio.automix.MixTransitionPresets.MixTransitionStyle]
+     * name, or "AUTO" to let the engine pick per pair.
+     */
+    fun getMixTransitionStyle(): String = Prefs.getString(KEY_MIX_TRANSITION_STYLE, "AUTO") ?: "AUTO"
+    fun setMixTransitionStyle(style: String) = Prefs.putString(KEY_MIX_TRANSITION_STYLE, style)
+
+    /** The transition length in beats: 0 (follow the automix overlap setting) or 4/8/16/32. */
+    fun getMixTransitionBeats(): Int = Prefs.getInt(KEY_MIX_TRANSITION_BEATS, 0)
+    fun setMixTransitionBeats(beats: Int) = Prefs.putInt(KEY_MIX_TRANSITION_BEATS, beats)
 
     // ─── Skip silence (same keys as Android) ──────────────────────────────────
 
