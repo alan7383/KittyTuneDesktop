@@ -996,7 +996,8 @@ tasks.register<Test>("headlessTest") {
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
-            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest"
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest",
+            "*HlsOpeningTest"
         ).forEach(::includeTestsMatching)
     }
 }
