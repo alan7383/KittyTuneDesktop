@@ -220,4 +220,3 @@ for pair in range(args.pairs):
         launch(variant, f'pair-{pair}-{variant}')
         rows[-1]['pair'] = pair
     (out / 'samples.json').write_text(json.dumps(rows, indent=2), encoding='utf-8')
-

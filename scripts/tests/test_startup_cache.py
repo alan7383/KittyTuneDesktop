@@ -78,7 +78,9 @@ class StartupCacheTest(unittest.TestCase):
         log=self.root/'arguments.txt'
         result,_=self.run_helper(FAKE_ARGUMENT_LOG=str(log))
         self.assertEqual(0,result.returncode,result.stdout+result.stderr)
-        self.assertIn(long_option,log.read_text(encoding='utf-8-sig').splitlines())
+        arguments=log.read_text(encoding='utf-8-sig').splitlines()
+        self.assertIn(long_option,arguments)
+        self.assertTrue(any(str(self.image) in argument for argument in arguments))
         self.assertIn('java-options=-XX:AOTCache=',self.cfg.read_text())
     def test_timeout_keeps_partial_diagnostics(self):
         result,elapsed=self.run_helper(('-TrainingTimeoutSeconds','1'),FAKE_DELAY='1')
