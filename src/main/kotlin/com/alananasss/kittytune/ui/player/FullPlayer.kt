@@ -1279,6 +1279,7 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                     onClick = { viewModel.showAiDetectionSheet = true },
                     modifier = Modifier.padding(start = 6.dp),
                 )
+                CodecBadge(viewModel = viewModel, textColor = palette.bright, modifier = Modifier.padding(start = 6.dp))
             }
             androidx.compose.material3.Text(
                 // Artist and album on one line, separated by an em dash, which is how the reference reads and

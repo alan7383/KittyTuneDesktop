@@ -42,6 +42,17 @@ class AudioEngine(private val isolated: Boolean = false) {
 
     var onStateChanged: ((State) -> Unit)? = null
     var onPlayingChanged: ((Boolean) -> Unit)? = null
+
+    /** Called on the decoder thread whenever a stream is opened, with what it actually carries. */
+    var onSourceFormat: ((SourceAudioFormat?) -> Unit)? = null
+
+    /** What the open stream carries (codec, rate, depth...), or null before one is opened. */
+    @Volatile
+    var sourceFormat: SourceAudioFormat? = null
+        private set
+
+    /** The rate every stream is converted to before the effects and the output line. */
+    val outputRateHz: Int get() = outputSampleRate
     var onCompletion: (() -> Unit)? = null
     var onError: ((Throwable) -> Unit)? = null
 
@@ -693,7 +704,33 @@ class AudioEngine(private val isolated: Boolean = false) {
         limiter.setCeiling(peakLimiterCeilingFor(state))
     }
 
+    @Volatile
+    private var equalizerEnabled = false
+
+    /**
+     * The engine's processing stages in signal order, each with whether it is acting on the sound right now:
+     * the audio-path diagnostics show it live.
+     */
+    fun dspStages(): List<Pair<String, Boolean>> {
+        val mixing = com.alananasss.kittytune.audio.automix.AutomixManager.isAutomixing.value
+        val fxOn = effectToggles.any { runCatching { it.invoke(effects) == true }.getOrDefault(false) }
+        return listOf(
+            "AI-detection tap" to (!isolated && com.alananasss.kittytune.audio.ai.AiDetectionManager.isDetectionWanted()),
+            "Live-beat tap" to true,
+            "Silence skip" to (com.alananasss.kittytune.audio.silence.SkipSilence.trimEnabled ||
+                com.alananasss.kittytune.audio.silence.SkipSilence.instantEnabled),
+            "Automix · bass duck" to mixing,
+            "Automix · sweep filter" to mixing,
+            "Player FX" to fxOn,
+            "Equalizer" to equalizerEnabled,
+            "LUFS normalization" to effects.isNormalizationEnabled,
+            "Time stretch" to (effects.speed != 1f),
+            "Peak limiter" to true,
+        )
+    }
+
     fun applyEqualizer(state: EqualizerState) {
+        equalizerEnabled = state.isEnabled
         equalizer.setParameters(
             enabled = state.isEnabled,
             preampDb = state.preampDb,
@@ -956,6 +993,9 @@ class AudioEngine(private val isolated: Boolean = false) {
             }
 
             if (stopFlag || activeWorkerId != workerId) return
+
+            sourceFormat = SourceAudioFormat.of(grabber)
+            onSourceFormat?.invoke(sourceFormat)
 
             // Only trust the adapter's duration while it actually describes what we opened: a
             // re-resolve can hand back a progressive URL where the playlist used to be.

@@ -381,7 +381,14 @@ class Player {
         override fun seekTo(positionMs: Long) = this@Player.seekTo(positionMs)
     }
 
+    private val _currentAudioFormat = kotlinx.coroutines.flow.MutableStateFlow<com.alananasss.kittytune.audio.SourceAudioFormat?>(null)
+
+    /** What the playing engine's stream carries, for the codec badge and the audio-path diagnostics. */
+    val currentAudioFormat: kotlinx.coroutines.flow.StateFlow<com.alananasss.kittytune.audio.SourceAudioFormat?> = _currentAudioFormat
+
     private fun bindEngine(eng: AudioEngine) {
+        _currentAudioFormat.value = eng.sourceFormat
+        eng.onSourceFormat = { format -> if (eng === activeEngine) _currentAudioFormat.value = format }
         eng.silenceSkip.onLongSilence = {
             com.alananasss.kittytune.audio.silence.SkipSilence.onLongSilence(silenceTarget, eng.silenceSkip)
         }
@@ -434,6 +441,7 @@ class Player {
         eng.onCompletion = null
         eng.onReResolveUrl = null
         eng.silenceSkip.onLongSilence = null
+        eng.onSourceFormat = null
     }
 
     /** Starts a transition and returns its id. See [transitionId]. */

@@ -416,7 +416,17 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
         )
     }
 
+    var showAudioPath by remember { mutableStateOf(false) }
+    com.alananasss.kittytune.ui.player.AudioPathDiagnosticSheet(
+        visible = showAudioPath,
+        onDismiss = { showAudioPath = false },
+        playerViewModel = playerViewModel,
+    )
+
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        // The live audio path, source to output; the card opens the full diagnostics.
+        Spacer(Modifier.height(8.dp))
+        com.alananasss.kittytune.ui.player.AudioPathHeroCard(playerViewModel = playerViewModel, onOpen = { showAudioPath = true })
         SettingsGroupTitle(str("settings_audio_quality_title"))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsItem(

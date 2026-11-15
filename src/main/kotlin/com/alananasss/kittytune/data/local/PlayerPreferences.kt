@@ -482,6 +482,7 @@ class PlayerPreferences {
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
+        private const val KEY_SHOW_CODEC_ON_PLAYER = "show_codec_on_player"
         private const val KEY_MIX_TRANSITION_STYLE = "mix_transition_style"
         private const val KEY_MIX_TRANSITION_BEATS = "mix_transition_beats"
         private const val KEY_SKIP_SILENCE = "skip_silence"
@@ -795,6 +796,13 @@ class PlayerPreferences {
 
     fun getYouTubeFallbackEnabled(): Boolean = Prefs.getBoolean(KEY_YOUTUBE_FALLBACK, true)
     fun setYouTubeFallbackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_YOUTUBE_FALLBACK, enabled)
+
+    // ─── Codec badge (same key as Android) ─────────────────────────────────────
+
+    /** Whether the player shows what is playing ("OPUS • 160 kbps • 48 kHz"); click opens the audio path. */
+    fun getShowCodecOnPlayer(): Boolean = Prefs.getBoolean(KEY_SHOW_CODEC_ON_PLAYER, false)
+    fun setShowCodecOnPlayer(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_CODEC_ON_PLAYER, enabled)
+    fun showCodecOnPlayerFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_CODEC_ON_PLAYER, false)
 
     // ─── Mix transitions (same keys as Android) ───────────────────────────────
 
