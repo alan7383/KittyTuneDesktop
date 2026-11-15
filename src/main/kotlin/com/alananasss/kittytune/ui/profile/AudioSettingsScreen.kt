@@ -28,6 +28,7 @@ import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.SplitSettingsItem
 import com.alananasss.kittytune.ui.common.getSettingsShape
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ButtonDefaults
@@ -426,7 +427,11 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         // The live audio path, source to output; the card opens the full diagnostics.
         Spacer(Modifier.height(8.dp))
-        com.alananasss.kittytune.ui.player.AudioPathHeroCard(playerViewModel = playerViewModel, onOpen = { showAudioPath = true })
+        com.alananasss.kittytune.ui.player.AudioPathHeroCard(
+            playerViewModel = playerViewModel,
+            onOpen = { showAudioPath = true },
+            modifier = Modifier.settingHighlight("diag_hero_title", RoundedCornerShape(24.dp)),
+        )
         SettingsGroupTitle(str("settings_audio_quality_title"))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsItem(

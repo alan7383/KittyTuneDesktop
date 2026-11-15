@@ -1,11 +1,11 @@
 package com.alananasss.kittytune.ui.player
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alananasss.kittytune.data.MusicManager
@@ -28,6 +29,7 @@ import com.alananasss.kittytune.data.MusicManager
  * "OPUS • 160 kbps • 48 kHz", from the stream the decoder opened. Clicking it opens the live audio-path
  * diagnostics. Hidden unless the setting is on, while a track loads, and for a remote device.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CodecBadge(viewModel: PlayerViewModel, textColor: Color, modifier: Modifier = Modifier) {
     var showDiagnostics by remember { mutableStateOf(false) }
@@ -41,19 +43,21 @@ fun CodecBadge(viewModel: PlayerViewModel, textColor: Color, modifier: Modifier 
     val format by MusicManager.player.currentAudioFormat.collectAsState()
     val text = format?.badgeText().orEmpty()
     if (text.isBlank()) return
-    Box(
-        modifier = modifier
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable { showDiagnostics = true }
-            .background(textColor.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
-            .border(0.5.dp, textColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+    FilledTonalButton(
+        onClick = { showDiagnostics = true },
+        modifier = modifier.height(22.dp).pointerHoverIcon(PointerIcon.Hand),
+        shapes = ButtonDefaults.shapes(shape = CircleShape),
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = textColor.copy(alpha = 0.08f),
+            contentColor = textColor.copy(alpha = 0.8f),
+        ),
+        contentPadding = PaddingValues(horizontal = 8.dp),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, fontSize = 10.sp),
-            color = textColor.copy(alpha = 0.8f),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
