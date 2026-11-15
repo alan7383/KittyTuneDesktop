@@ -1201,6 +1201,8 @@ import com.alananasss.kittytune.ui.common.Slider
                                 highlightKey = "pref_lyrics_reveal_words",
                             )
                         }
+                        add { shape -> LyricsSweepSettingItem(shape) }
+                        add { shape -> InstrumentalIndicatorSettingItem(shape) }
                         add { shape ->
                             SettingsItem(
                                 shape = shape,

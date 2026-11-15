@@ -325,6 +325,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var effectsState by mutableStateOf(playerPrefs.getLastEffects())
     var equalizerState by mutableStateOf(playerPrefs.getEqualizerState())
         private set
+
+    /** Line-by-line lyrics fill top to bottom as they are sung (the "Sweep" line animation). */
+    var lyricsSweepEnabled by mutableStateOf(playerPrefs.getLyricsSweepEnabled())
+        private set
+
+    /** What long instrumental gaps in the lyrics show. */
+    var instrumentalIndicatorStyle by mutableStateOf(playerPrefs.getInstrumentalIndicatorStyle())
+        private set
+
+    init {
+        viewModelScope.launch { playerPrefs.lyricsSweepEnabledFlow().collect { lyricsSweepEnabled = it } }
+        viewModelScope.launch { playerPrefs.instrumentalIndicatorStyleFlow().collect { instrumentalIndicatorStyle = it } }
+    }
     var connectedHeadphone by mutableStateOf<ConnectedHeadphone?>(null)
         private set
     var autoEqAutoApplyEnabled by mutableStateOf(playerPrefs.getAutoEqAutoApply())

@@ -3460,4 +3460,12 @@
     <string name="pref_show_codec_on_player">Show codec on player</string>
     <string name="pref_show_codec_on_player_sub">A small badge with the current codec, bitrate and sample rate</string>
     <string name="diag_out_system_default">System default output</string>
+    <string name="pref_lyrics_line_animation">Line-by-line animation</string>
+    <string name="pref_lyrics_line_animation_sub">The current line fills with a top-down gradient</string>
+    <string name="pref_instrumental_indicator">Instrumental indicator</string>
+    <string name="pref_instrumental_indicator_sub">Shown during long instrumental gaps in line-by-line lyrics</string>
+    <string name="pref_instrumental_note_wave">Note + wave</string>
+    <string name="pref_instrumental_circle">Progress circle</string>
+    <string name="pref_instrumental_dots">Breathing dots</string>
+    <string name="pref_instrumental_off">Off</string>
 </resources>
