@@ -56,6 +56,18 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun AiDetectionOverlays(viewModel: PlayerViewModel, navController: NavController) {
+    // The share card (Android PR #83), hosted with the other app-wide overlays.
+    viewModel.shareCardTrack?.let { cardTrack ->
+        com.alananasss.kittytune.ui.share.ShareCardSheet(
+            artwork = viewModel.shareCardArtwork,
+            title = cardTrack.title ?: com.alananasss.kittytune.core.str("untitled_track"),
+            artist = cardTrack.displayArtist.ifBlank { com.alananasss.kittytune.core.str("unknown_artist") },
+            trackUrl = cardTrack.permalinkUrl,
+            lyrics = viewModel.shareCardLyrics,
+            allLyrics = viewModel.shareCardAllLyrics,
+            onDismiss = { viewModel.dismissShareCard() },
+        )
+    }
     if (viewModel.showAiDetectionSheet) {
         AiDetectionDialog(
             viewModel = viewModel,

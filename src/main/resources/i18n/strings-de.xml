@@ -3690,4 +3690,13 @@
     <string name="pref_instrumental_circle">Fortschrittskreis</string>
     <string name="pref_instrumental_dots">Atmende Punkte</string>
     <string name="pref_instrumental_off">Aus</string>
+    <string name="share_card_face_song">Titel</string>
+    <string name="share_card_face_lyrics">Songtext</string>
+    <string name="share_card_qr">Cover als QR-Code</string>
+    <string name="share_card_title">Als Karte teilen</string>
+    <string name="share_card_pick_lines">Songtextzeilen auswählen</string>
+    <string name="share_card_copy_text">Als Text kopieren</string>
+    <string name="share_card_text_copied">Songtext kopiert</string>
+    <string name="share_card_save_image">Bild speichern…</string>
+    <string name="share_card_saved">Karte gespeichert: %1$s</string>
 </resources>

@@ -3473,6 +3473,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         showMenuSheet = false; showDetailsSheet = false; navigateToPlaylistId = "track_detail:$trackId?tab=$initialTab"
     }
 
+    /** The track whose share card is open (port of Android PR #83), or null when none is. */
+    var shareCardTrack by mutableStateOf<Track?>(null)
+        private set
+
+    /** Its artwork, loaded once when the card opens. */
+    var shareCardArtwork by mutableStateOf<java.awt.image.BufferedImage?>(null)
+        private set
+
+    /** Up to two lines from where playback stands: the card's default lyrics, captured when it opens. */
+    var shareCardLyrics by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    /** Every sung line, for the card's line picker. */
+    var shareCardAllLyrics by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    fun openShareCard(track: Track) {
+        shareCardTrack = track
+        shareCardArtwork = null
+        // Lyrics only belong on the card of the track they were loaded for.
+        val isPlaying = uiCurrentTrack?.id == track.id
+        val sung = if (isPlaying) lyricsLines.filter { it.text.isNotBlank() } else emptyList()
+        shareCardAllLyrics = sung.map { it.text }
+        val start = sung.indexOfLast { it.startTime <= uiCurrentPosition }.coerceAtLeast(0)
+        shareCardLyrics = sung.drop(start).take(2).map { it.text }
+        showMenuSheet = false
+        viewModelScope.launch {
+            val image = withContext(Dispatchers.IO) {
+                runCatching {
+                    track.fullResArtwork?.let { url -> java.net.URI(url).toURL().openStream().use { javax.imageio.ImageIO.read(it) } }
+                }.getOrNull()
+            }
+            // A slow artwork for a card that was closed or replaced in the meantime is dropped.
+            if (shareCardTrack?.id == track.id) shareCardArtwork = image
+        }
+    }
+
+    fun dismissShareCard() {
+        shareCardTrack = null
+        shareCardArtwork = null
+        shareCardLyrics = emptyList()
+        shareCardAllLyrics = emptyList()
+    }
+
     fun shareTrack(track: Track) {
         val urlToShare = track.permalinkUrl ?: "https://soundcloud.com/tracks/${track.id}"
         try {

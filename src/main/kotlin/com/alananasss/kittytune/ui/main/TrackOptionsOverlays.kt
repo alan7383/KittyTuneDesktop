@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.rounded.Bedtime
@@ -596,6 +597,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) viewModel.startYoutubeRadio(track) else viewModel.startRadioFromTrack(track)
                 })
                 add(MenuOptionItem("share", Icons.Outlined.Link, str("cover_copy_link")) { viewModel.shareTrack(track) })
+                add(MenuOptionItem("share_card", Icons.Outlined.PhotoLibrary, str("share_card_title")) { viewModel.openShareCard(track) })
             }
             // Content filtering (issue #41): hide track / block artist, like Android.
             run {

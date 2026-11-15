@@ -993,7 +993,7 @@ tasks.register<Test>("headlessTest") {
             "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
-            "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest", "*MixQueuePlannerTest", "*MixRenderTest", "*AudioPathRenderTest", "*LyricsSweepRenderTest",
+            "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest", "*MixQueuePlannerTest", "*MixRenderTest", "*AudioPathRenderTest", "*LyricsSweepRenderTest", "*ShareCardTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
             "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest",

@@ -3471,4 +3471,13 @@
     <string name="pref_instrumental_circle">İlerleme çemberi</string>
     <string name="pref_instrumental_dots">Nefes alan noktalar</string>
     <string name="pref_instrumental_off">Kapalı</string>
+    <string name="share_card_face_song">Şarkı</string>
+    <string name="share_card_face_lyrics">Şarkı Sözleri</string>
+    <string name="share_card_qr">QR kodlu kapak</string>
+    <string name="share_card_title">Kart olarak paylaş</string>
+    <string name="share_card_pick_lines">Şarkı sözü satırlarını seç</string>
+    <string name="share_card_copy_text">Metin olarak kopyala</string>
+    <string name="share_card_text_copied">Şarkı sözleri kopyalandı</string>
+    <string name="share_card_save_image">Resmi kaydet…</string>
+    <string name="share_card_saved">Kart kaydedildi: %1$s</string>
 </resources>

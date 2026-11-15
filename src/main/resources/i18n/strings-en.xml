@@ -3468,4 +3468,13 @@
     <string name="pref_instrumental_circle">Progress circle</string>
     <string name="pref_instrumental_dots">Breathing dots</string>
     <string name="pref_instrumental_off">Off</string>
+    <string name="share_card_face_song">Song</string>
+    <string name="share_card_face_lyrics">Lyrics</string>
+    <string name="share_card_qr">Cover as QR code</string>
+    <string name="share_card_title">Share as card</string>
+    <string name="share_card_pick_lines">Pick lyrics lines</string>
+    <string name="share_card_copy_text">Copy as text</string>
+    <string name="share_card_text_copied">Lyrics copied</string>
+    <string name="share_card_save_image">Save image…</string>
+    <string name="share_card_saved">Card saved: %1$s</string>
 </resources>

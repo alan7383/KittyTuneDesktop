@@ -3551,4 +3551,13 @@
     <string name="pref_instrumental_circle">Vòng tròn tiến trình</string>
     <string name="pref_instrumental_dots">Chấm nhịp thở</string>
     <string name="pref_instrumental_off">Tắt</string>
+    <string name="share_card_face_song">Bài hát</string>
+    <string name="share_card_face_lyrics">Lời bài hát</string>
+    <string name="share_card_qr">Ảnh bìa dạng mã QR</string>
+    <string name="share_card_title">Chia sẻ dạng thẻ</string>
+    <string name="share_card_pick_lines">Chọn dòng lời bài hát</string>
+    <string name="share_card_copy_text">Sao chép dạng văn bản</string>
+    <string name="share_card_text_copied">Đã sao chép lời bài hát</string>
+    <string name="share_card_save_image">Lưu hình ảnh…</string>
+    <string name="share_card_saved">Đã lưu thẻ: %1$s</string>
 </resources>
