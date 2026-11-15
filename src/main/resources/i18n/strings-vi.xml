@@ -3428,4 +3428,8 @@
     <string name="pref_hide_video_songs_sub">Chỉ tìm bài hát thay vì video trên YouTube</string>
     <string name="pref_hide_youtube_shorts">Ẩn YouTube Shorts</string>
     <string name="pref_hide_youtube_shorts_sub">Lọc Shorts khỏi kết quả tìm kiếm YouTube</string>
+    <string name="pref_skip_silence">Bỏ qua khoảng lặng</string>
+    <string name="pref_skip_silence_sub">Cắt bớt các đoạn im lặng của bài hát khi phát</string>
+    <string name="pref_instant_skip_silence">Bỏ qua khoảng lặng ngay lập tức</string>
+    <string name="pref_instant_skip_silence_sub">Nhảy thẳng qua các khoảng lặng dài thay vì tua nhanh</string>
 </resources>

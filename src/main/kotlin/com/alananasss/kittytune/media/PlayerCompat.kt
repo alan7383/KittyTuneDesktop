@@ -373,7 +373,18 @@ class Player {
         bindEngine(activeEngine)
     }
     
+    /** What the instant skip-silence loop moves: always the engine that is playing now. */
+    private val silenceTarget = object : com.alananasss.kittytune.audio.silence.SkipSilence.Target {
+        override val activeProcessor get() = activeEngine.silenceSkip
+        override val positionMs get() = activeEngine.positionMs
+        override val durationMs get() = activeEngine.durationMs
+        override fun seekTo(positionMs: Long) = this@Player.seekTo(positionMs)
+    }
+
     private fun bindEngine(eng: AudioEngine) {
+        eng.silenceSkip.onLongSilence = {
+            com.alananasss.kittytune.audio.silence.SkipSilence.onLongSilence(silenceTarget, eng.silenceSkip)
+        }
         eng.onPlayingChanged = { playing -> listeners.forEach { it.onIsPlayingChanged(playing) } }
         eng.onStateChanged = { st ->
             val mapped = when (st) {
@@ -422,6 +433,7 @@ class Player {
         eng.onError = null
         eng.onCompletion = null
         eng.onReResolveUrl = null
+        eng.silenceSkip.onLongSilence = null
     }
 
     /** Starts a transition and returns its id. See [transitionId]. */

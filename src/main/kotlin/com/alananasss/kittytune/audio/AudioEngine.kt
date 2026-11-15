@@ -111,9 +111,16 @@ class AudioEngine {
     val liveBeat = com.alananasss.kittytune.audio.beat.LiveBeatTracker()
     private val liveBeatTap = com.alananasss.kittytune.audio.beat.LiveBeatAudioProcessor(liveBeat)
 
+    /**
+     * Skip silence (see [com.alananasss.kittytune.audio.silence.SkipSilence]). After the taps, which want the
+     * track as it is, and before every effect, so a reverb tail or a fade is never mistaken for silence.
+     */
+    val silenceSkip = com.alananasss.kittytune.audio.silence.SilenceSkipAudioProcessor()
+
     private val chain: List<AudioProcessor> = listOf(
         aiDetection,
         liveBeatTap,
+        silenceSkip,
         automixDuck,
         fx, equalizer, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,

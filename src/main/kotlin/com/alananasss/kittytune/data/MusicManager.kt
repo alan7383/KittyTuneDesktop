@@ -128,6 +128,8 @@ object MusicManager {
         _contextFlow.value = prefs.getLastContext()
 
         com.alananasss.kittytune.audio.automix.AutomixManager.init()
+        // Every engine reads these, including the decks a crossfade creates later.
+        com.alananasss.kittytune.audio.silence.SkipSilence.applySettings(prefs)
 
         // Content filtering (issue #41): warm the block cache and load the
         // ArtifactNet model if already downloaded (mirrors PlaybackService.onCreate).

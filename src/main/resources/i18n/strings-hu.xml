@@ -3346,4 +3346,8 @@
     <string name="pref_hide_video_songs_sub">A YouTube-on csak dalokra keres videók helyett</string>
     <string name="pref_hide_youtube_shorts">YouTube Shorts elrejtése</string>
     <string name="pref_hide_youtube_shorts_sub">A Shorts videók kiszűrése a YouTube-keresési találatokból</string>
+    <string name="pref_skip_silence">Csend átugrása</string>
+    <string name="pref_skip_silence_sub">A számok csendes részeinek kihagyása lejátszás közben</string>
+    <string name="pref_instant_skip_silence">Csend azonnali átugrása</string>
+    <string name="pref_instant_skip_silence_sub">A hosszú csendeken közvetlenül átugrik a gyors előretekerés helyett</string>
 </resources>

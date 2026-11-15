@@ -3567,4 +3567,8 @@
     <string name="pref_hide_video_songs_sub">Auf YouTube nur nach Songs statt nach Videos suchen</string>
     <string name="pref_hide_youtube_shorts">YouTube Shorts ausblenden</string>
     <string name="pref_hide_youtube_shorts_sub">Shorts aus den YouTube-Suchergebnissen entfernen</string>
+    <string name="pref_skip_silence">Stille überspringen</string>
+    <string name="pref_skip_silence_sub">Stille Abschnitte von Titeln während der Wiedergabe kürzen</string>
+    <string name="pref_instant_skip_silence">Stille sofort überspringen</string>
+    <string name="pref_instant_skip_silence_sub">Lange Stille direkt überspringen, statt vorzuspulen</string>
 </resources>

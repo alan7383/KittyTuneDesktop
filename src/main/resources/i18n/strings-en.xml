@@ -3345,4 +3345,8 @@
     <string name="pref_hide_video_songs_sub">Search songs only instead of videos on YouTube</string>
     <string name="pref_hide_youtube_shorts">Hide YouTube Shorts</string>
     <string name="pref_hide_youtube_shorts_sub">Filter Shorts out of YouTube search results</string>
+    <string name="pref_skip_silence">Skip silence</string>
+    <string name="pref_skip_silence_sub">Trim silent parts of tracks during playback</string>
+    <string name="pref_instant_skip_silence">Instantly skip silence</string>
+    <string name="pref_instant_skip_silence_sub">Jump straight over long silences instead of fast-forwarding</string>
 </resources>
