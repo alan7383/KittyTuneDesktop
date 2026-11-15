@@ -11,7 +11,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +37,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalDensity
@@ -46,7 +47,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.material.icons.Icons
@@ -365,7 +365,8 @@ fun MiniLyricsPlayerWindow(
         alwaysOnTop = isPinned,
         undecorated = true,
         transparent = !compat,
-        resizable = true,
+        // Native live resize can ignore AWT maximumSize. Use the bounded handles below.
+        resizable = false,
         title = "KittyTune Mini Player",
     ) {
         // Pre-map setup while the window is still hidden (see windowReady above):
@@ -409,18 +410,18 @@ fun MiniLyricsPlayerWindow(
             com.alananasss.kittytune.core.FloatingWindowCompat.opened()
         }
 
-        // Exact physical pixel limits for window sizing and OS window manager hints
-        val minWidthPx = with(density) { minW.dp.roundToPx() }
-        val maxWidthPx = with(density) { maxW.dp.roundToPx() }
-        val minHeightPx = with(density) { minH.dp.roundToPx() }
-        val maxHeightPx = with(density) { maxH.dp.roundToPx() }
+        // AWT bounds and MouseInfo use logical screen coordinates.
+        val widthRange = minW..maxW
+        val heightRange = minH..maxH
+        val resizeEdge = 6.dp
+        val gripSize = if (isElongated) 14.dp else 20.dp
 
-        val saveCurrentBounds: () -> Unit = remember(window, isElongated, density, minW, maxW, minH, maxH) {
+        val saveCurrentBounds: () -> Unit = remember(window, isElongated, widthRange, heightRange) {
             {
-                val x = (window.x / density.density).toInt()
-                val y = (window.y / density.density).toInt()
-                val w = (window.width / density.density).toInt().coerceIn(minW, maxW)
-                val h = (window.height / density.density).toInt().coerceIn(minH, maxH)
+                val x = window.x
+                val y = window.y
+                val w = window.width.coerceIn(minW, maxW)
+                val h = window.height.coerceIn(minH, maxH)
                 if (isElongated) {
                     viewModel.saveMiniPlayerElongatedBounds(x, y, w, h)
                 } else {
@@ -435,10 +436,10 @@ fun MiniLyricsPlayerWindow(
                 val prevStyle = lastAppliedStyle
                 lastAppliedStyle = miniPlayerStyle
 
-                val curX = (window.x / density.density).toInt()
-                val curY = (window.y / density.density).toInt()
-                val curW = (window.width / density.density).toInt()
-                val curH = (window.height / density.density).toInt()
+                val curX = window.x
+                val curY = window.y
+                val curW = window.width
+                val curH = window.height
 
                 if (prevStyle == MiniPlayerStyle.ELONGATED) {
                     viewModel.saveMiniPlayerElongatedBounds(
@@ -459,16 +460,16 @@ fun MiniLyricsPlayerWindow(
                     val ey = prefs.getMiniPlayerElongatedY()
                     val ew = prefs.getMiniPlayerElongatedWidth()
                     val eh = prefs.getMiniPlayerElongatedHeight()
-                    val newMinW = with(density) { PlayerPreferences.MINI_PLAYER_ELONGATED_MIN_WIDTH.dp.roundToPx() }
-                    val newMaxW = with(density) { PlayerPreferences.MINI_PLAYER_ELONGATED_MAX_WIDTH.dp.roundToPx() }
-                    val newMinH = with(density) { PlayerPreferences.MINI_PLAYER_ELONGATED_MIN_HEIGHT.dp.roundToPx() }
-                    val newMaxH = with(density) { PlayerPreferences.MINI_PLAYER_ELONGATED_MAX_HEIGHT.dp.roundToPx() }
+                    val newMinW = PlayerPreferences.MINI_PLAYER_ELONGATED_MIN_WIDTH
+                    val newMaxW = PlayerPreferences.MINI_PLAYER_ELONGATED_MAX_WIDTH
+                    val newMinH = PlayerPreferences.MINI_PLAYER_ELONGATED_MIN_HEIGHT
+                    val newMaxH = PlayerPreferences.MINI_PLAYER_ELONGATED_MAX_HEIGHT
                     runCatching {
                         window.minimumSize = java.awt.Dimension(newMinW, newMinH)
                         window.maximumSize = java.awt.Dimension(newMaxW, newMaxH)
-                        window.setSize((ew * density.density).toInt(), (eh * density.density).toInt())
+                        window.setSize(ew, eh)
                         if (ex != null && ey != null) {
-                            window.setLocation((ex * density.density).toInt(), (ey * density.density).toInt())
+                            window.setLocation(ex, ey)
                             windowState.position = WindowPosition(ex.dp, ey.dp)
                         }
                     }
@@ -478,16 +479,16 @@ fun MiniLyricsPlayerWindow(
                     val sy = prefs.getMiniPlayerY()
                     val sw = prefs.getMiniPlayerWidth()
                     val sh = prefs.getMiniPlayerHeight()
-                    val newMinW = with(density) { PlayerPreferences.MINI_PLAYER_MIN_WIDTH.dp.roundToPx() }
-                    val newMaxW = with(density) { PlayerPreferences.MINI_PLAYER_MAX_WIDTH.dp.roundToPx() }
-                    val newMinH = with(density) { PlayerPreferences.MINI_PLAYER_MIN_HEIGHT.dp.roundToPx() }
-                    val newMaxH = with(density) { PlayerPreferences.MINI_PLAYER_MAX_HEIGHT.dp.roundToPx() }
+                    val newMinW = PlayerPreferences.MINI_PLAYER_MIN_WIDTH
+                    val newMaxW = PlayerPreferences.MINI_PLAYER_MAX_WIDTH
+                    val newMinH = PlayerPreferences.MINI_PLAYER_MIN_HEIGHT
+                    val newMaxH = PlayerPreferences.MINI_PLAYER_MAX_HEIGHT
                     runCatching {
                         window.minimumSize = java.awt.Dimension(newMinW, newMinH)
                         window.maximumSize = java.awt.Dimension(newMaxW, newMaxH)
-                        window.setSize((sw * density.density).toInt(), (sh * density.density).toInt())
+                        window.setSize(sw, sh)
                         if (sx != null && sy != null) {
-                            window.setLocation((sx * density.density).toInt(), (sy * density.density).toInt())
+                            window.setLocation(sx, sy)
                             windowState.position = WindowPosition(sx.dp, sy.dp)
                         }
                     }
@@ -508,6 +509,7 @@ fun MiniLyricsPlayerWindow(
         }
 
         // Moved by the window manager itself where it can (smooth at the monitor's refresh rate), by hand otherwise.
+        val saveLatestBounds by rememberUpdatedState(saveCurrentBounds)
         val dragHandler = remember(window) {
             WindowDragHandler(
                 window = window,
@@ -520,7 +522,7 @@ fun MiniLyricsPlayerWindow(
                         // which read as a mini player that cannot be moved to the second screen (issue #66).
                         windowState.position = WindowPosition(window.x.dp, window.y.dp)
                     }
-                    saveCurrentBounds()
+                    saveLatestBounds()
                 }
             )
         }
@@ -528,13 +530,13 @@ fun MiniLyricsPlayerWindow(
         DisposableEffect(window, isElongated) {
             runCatching {
                 window.isAlwaysOnTop = isPinned
-                window.minimumSize = java.awt.Dimension(minWidthPx, minHeightPx)
-                window.maximumSize = java.awt.Dimension(maxWidthPx, maxHeightPx)
+                window.minimumSize = java.awt.Dimension(minW, minH)
+                window.maximumSize = java.awt.Dimension(maxW, maxH)
             }
             val listener = object : java.awt.event.ComponentAdapter() {
                 override fun componentResized(e: java.awt.event.ComponentEvent) {
-                    val clampedW = window.width.coerceIn(minWidthPx, maxWidthPx)
-                    val clampedH = window.height.coerceIn(minHeightPx, maxHeightPx)
+                    val clampedW = window.width.coerceIn(minW, maxW)
+                    val clampedH = window.height.coerceIn(minH, maxH)
                     if (window.width != clampedW || window.height != clampedH) {
                         window.setSize(clampedW, clampedH)
                     }
@@ -589,6 +591,21 @@ fun MiniLyricsPlayerWindow(
                 val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
                     alpha = if (compat) 1f else surfaceAlpha
                 )
+                if (compat) {
+                    DisposableEffect(window, surfaceColor) {
+                        // During a resize AWT can clear the newly exposed area before Skia
+                        // presents a frame. Its window and canvas must clear to the card color.
+                        val background = java.awt.Color(surfaceColor.toArgb())
+                        fun applyBackground(component: java.awt.Component) {
+                            component.background = background
+                            if (component is java.awt.Container) {
+                                component.components.forEach(::applyBackground)
+                            }
+                        }
+                        applyBackground(window)
+                        onDispose { }
+                    }
+                }
 
                 val surfaceBorder = when {
                     transparentBg && (!isEffectivelyHovered || !hoverIllumination) -> null
@@ -608,7 +625,7 @@ fun MiniLyricsPlayerWindow(
                 // through the translucent surface. The border does the separating instead.
                 val shadowElevation = 0.dp
 
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().background(if (compat) surfaceColor else Color.Transparent)) {
                     Surface(
                         shape = surfaceShape,
                         color = surfaceColor,
@@ -617,7 +634,7 @@ fun MiniLyricsPlayerWindow(
                         modifier = Modifier
                             .fillMaxSize()
                             .hoverable(windowInteractionSource)
-                            .dragsWindow(window, dragHandler)
+                            .dragsWindow(window, dragHandler, resizeEdge, gripSize)
                     ) {
                         // Context menu state: opened by right-click anywhere on the mini player
                         var contextMenuVisible by remember { mutableStateOf(false) }
@@ -721,82 +738,30 @@ fun MiniLyricsPlayerWindow(
                                 MiniPlayerSettingsWindow(onClose = { settingsVisible = false }, nearWindow = window)
                             }
 
-                            // Right edge resize handle
                             Box(
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .fillMaxHeight()
-                                    .width(6.dp)
+                                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(resizeEdge)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
-                                    .pointerInput(Unit) {
-                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
-                                    }
-                                    .pointerInput(minWidthPx, maxWidthPx) {
-                                        detectDragGestures(
-                                            onDragEnd = { saveCurrentBounds() },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                val newW = (window.width + dragAmount.x.toInt()).coerceIn(minWidthPx, maxWidthPx)
-                                                window.setSize(newW, window.height)
-                                            }
-                                        )
-                                    }
+                                    .resizesWindow(window, widthRange, null, saveCurrentBounds)
                             )
-
-                            // Bottom edge resize handle
                             Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .height(6.dp)
+                                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(resizeEdge)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.S_RESIZE_CURSOR)))
-                                    .pointerInput(Unit) {
-                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
-                                    }
-                                    .pointerInput(minHeightPx, maxHeightPx) {
-                                        detectDragGestures(
-                                            onDragEnd = { saveCurrentBounds() },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                val newH = (window.height + dragAmount.y.toInt()).coerceIn(minHeightPx, maxHeightPx)
-                                                window.setSize(window.width, newH)
-                                            }
-                                        )
-                                    }
+                                    .resizesWindow(window, null, heightRange, saveCurrentBounds)
                             )
 
-                            // Bottom-right corner resize grip
-                            var isGripHovered by remember { mutableStateOf(false) }
+                            var isGripDragging by remember { mutableStateOf(false) }
                             val gripInteraction = remember { MutableInteractionSource() }
-                            val isHoveredByState by gripInteraction.collectIsHoveredAsState()
-                            val gripActive = isGripHovered || isHoveredByState
+                            val isGripHovered by gripInteraction.collectIsHoveredAsState()
+                            val gripActive = isGripDragging || isGripHovered
 
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
-                                    .size(if (isElongated) 14.dp else 20.dp)
+                                    .size(gripSize)
                                     .hoverable(gripInteraction)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)))
-                                    .pointerInput(Unit) {
-                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
-                                    }
-                                    .pointerInput(minWidthPx, maxWidthPx, minHeightPx, maxHeightPx) {
-                                        detectDragGestures(
-                                            onDragEnd = {
-                                                isGripHovered = false
-                                                saveCurrentBounds()
-                                            },
-                                            onDragCancel = {
-                                                isGripHovered = false
-                                            },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                isGripHovered = true
-                                                val newW = (window.width + dragAmount.x.toInt()).coerceIn(minWidthPx, maxWidthPx)
-                                                val newH = (window.height + dragAmount.y.toInt()).coerceIn(minHeightPx, maxHeightPx)
-                                                window.setSize(newW, newH)
-                                            }
-                                        )
+                                    .resizesWindow(window, widthRange, heightRange, saveCurrentBounds) {
+                                        isGripDragging = it
                                     },
                                 contentAlignment = Alignment.BottomEnd
                             ) {
@@ -1696,6 +1661,57 @@ private fun sungPath(
     return path
 }
 
+/** Resize from the initial window size and mouse displacement in AWT screen coordinates. */
+private fun Modifier.resizesWindow(
+    window: java.awt.Window,
+    widthRange: IntRange?,
+    heightRange: IntRange?,
+    saveBounds: () -> Unit,
+    onResizing: (Boolean) -> Unit = {},
+): Modifier = pointerInput(window, widthRange, heightRange) {
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+        val start = java.awt.MouseInfo.getPointerInfo()?.location ?: return@awaitEachGesture
+        val initialSize = window.size
+        var pendingWidth = initialSize.width
+        var pendingHeight = initialSize.height
+        var lastResizeNanos = 0L
+        fun applySize() {
+            if (window.width != pendingWidth || window.height != pendingHeight) {
+                window.setSize(pendingWidth, pendingHeight)
+            }
+        }
+        down.consume()
+        onResizing(true)
+        try {
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (change.isConsumed) break
+                change.consume()
+                java.awt.MouseInfo.getPointerInfo()?.location?.let { pointer ->
+                    pendingWidth = widthRange?.let { (initialSize.width + pointer.x - start.x).coerceIn(it) } ?: initialSize.width
+                    pendingHeight = heightRange?.let { (initialSize.height + pointer.y - start.y).coerceIn(it) } ?: initialSize.height
+                }
+                if (!change.pressed) {
+                    applySize()
+                    break
+                }
+                // Leave time for the renderer to present before issuing another native resize.
+                val now = System.nanoTime()
+                if (now - lastResizeNanos >= MANUAL_MOVE_MIN_INTERVAL_NS) {
+                    applySize()
+                    lastResizeNanos = now
+                }
+            }
+        } finally {
+            onResizing(false)
+            if (window.size != initialSize) saveBounds()
+        }
+    }
+}
+
 /**
  * Moves [window] when the pointer is pressed on this and dragged, wherever the press lands: on the words, a button or
  * an empty pixel alike.
@@ -1705,13 +1721,22 @@ private fun sungPath(
  * read in screen coordinates: the window moves under it, so a position relative to the window would chase itself.
  * The strips along the right and bottom edge and the corner belong to the resize handles and are left to them.
  */
-internal fun Modifier.dragsWindow(window: java.awt.Window, handler: WindowDragHandler): Modifier = pointerInput(window, handler) {
+internal fun Modifier.dragsWindow(
+    window: java.awt.Window,
+    handler: WindowDragHandler,
+    resizeEdge: Dp = 10.dp,
+    resizeCorner: Dp = 0.dp,
+): Modifier = pointerInput(window, handler, resizeEdge, resizeCorner) {
     val slopPx = viewConfiguration.touchSlop
-    val edgePx = 10.dp.toPx()
+    val edgePx = resizeEdge.toPx()
+    val cornerPx = resizeCorner.toPx()
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        val onResizeEdge = down.position.x > size.width - edgePx || down.position.y > size.height - edgePx
-        if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed || onResizeEdge) return@awaitEachGesture
+        val fromRight = size.width - down.position.x
+        val fromBottom = size.height - down.position.y
+        val onResizeHandle = fromRight <= edgePx || fromBottom <= edgePx ||
+            (fromRight <= cornerPx && fromBottom <= cornerPx)
+        if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed || onResizeHandle) return@awaitEachGesture
         val start = java.awt.MouseInfo.getPointerInfo()?.location ?: return@awaitEachGesture
         var dragging = false
         while (true) {
