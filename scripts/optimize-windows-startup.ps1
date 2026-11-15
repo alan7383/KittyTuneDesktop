@@ -1,7 +1,8 @@
 #Requires -Version 7.2
 param(
     [Parameter(Mandatory)][string]$AppImage,
-    [Parameter(Mandatory)][string]$JavaHome
+    [Parameter(Mandatory)][string]$JavaHome,
+    [ValidateRange(1, 3600)][int]$TrainingTimeoutSeconds = 600
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +37,13 @@ function Invoke-TrainingJvm([string[]]$Arguments) {
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     $start.CreateNoWindow = $true
-    foreach ($option in $Arguments) { $start.ArgumentList.Add($option) }
+    # A packaged classpath can exceed Windows' command-line limit.
+    $argumentFile = Join-Path $work ("jvm-" + [Guid]::NewGuid().ToString('N') + '.args')
+    $quoted = foreach ($option in $Arguments) {
+        '"' + $option.Replace('\', '\\').Replace('"', '\"').Replace("`r", '\r').Replace("`n", '\n').Replace("`t", '\t') + '"'
+    }
+    [IO.File]::WriteAllText($argumentFile, ($quoted -join "`n"))
+    $start.ArgumentList.Add('@' + $argumentFile)
     foreach ($name in 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'KITTYTUNE_STARTUP_LOG') {
         [void]$start.Environment.Remove($name)
     }
@@ -48,10 +55,11 @@ function Invoke-TrainingJvm([string[]]$Arguments) {
     try {
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
-        if (!$process.WaitForExit(120000)) {
+        if (!$process.WaitForExit($TrainingTimeoutSeconds * 1000)) {
             $process.Kill($true)
             $process.WaitForExit()
-            throw 'Java startup cache preparation timed out.'
+            $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
+            throw "Java startup cache preparation timed out.`n$output"
         }
         $output = $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) { throw "Java startup cache preparation failed.`n$output" }
@@ -96,10 +104,13 @@ try {
     [IO.File]::Move($newConfig, $cfg, $true)
     Write-Output "Startup cache prepared for $image"
 } finally {
-    if ($copiedJava) { Remove-Item -LiteralPath $java }
+    if ($copiedJava) {
+        try { Remove-Item -LiteralPath $java } catch { Write-Warning "Could not remove temporary Java launcher: $($_.Exception.Message)" }
+    }
     # This directory was generated directly under the resolved app image.
     $resolved = (Resolve-Path -LiteralPath $work -ErrorAction SilentlyContinue).Path
     if ($resolved -and [IO.Path]::GetDirectoryName($resolved) -eq $app) {
-        Remove-Item -LiteralPath $resolved -Recurse -Force
+        try { Remove-Item -LiteralPath $resolved -Recurse -Force }
+        catch { Write-Warning "Could not remove startup training files: $($_.Exception.Message)" }
     }
 }
