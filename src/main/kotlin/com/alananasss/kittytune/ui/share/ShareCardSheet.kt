@@ -29,9 +29,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +50,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.KittyModalBottomSheet
 import com.alananasss.kittytune.ui.player.ArtworkPalette
 import kotlinx.coroutines.Dispatchers
@@ -121,7 +119,7 @@ fun ShareCardSheet(
 
     KittyModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.width(CARD_WIDTH).clip(RoundedCornerShape(20.dp))) {
@@ -137,18 +135,15 @@ fun ShareCardSheet(
             }
 
             if (lyrics.isNotEmpty() || allLyrics.isNotEmpty()) {
-                SingleChoiceSegmentedButtonRow(Modifier.padding(top = 20.dp)) {
-                    SegmentedButton(
-                        selected = !lyricsFace,
-                        onClick = { lyricsFace = false },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    ) { Text(str("share_card_face_song")) }
-                    SegmentedButton(
-                        selected = lyricsFace,
-                        onClick = { lyricsFace = true },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    ) { Text(str("share_card_face_lyrics")) }
-                }
+                ExpressiveConnectedButtonGroup(
+                    options = listOf(false, true),
+                    selectedOption = lyricsFace,
+                    onOptionSelected = { lyricsFace = it },
+                    modifier = Modifier.padding(top = 16.dp),
+                    labelProvider = { showLyrics ->
+                        Text(str(if (showLyrics) "share_card_face_lyrics" else "share_card_face_song"))
+                    },
+                )
             }
 
             if (styles.size > 1) {

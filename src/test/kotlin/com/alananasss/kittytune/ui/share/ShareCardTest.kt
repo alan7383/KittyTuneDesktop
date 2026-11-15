@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.share
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.graphics.toAwtImage
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.RGBLuminanceSource
@@ -44,6 +46,30 @@ class ShareCardTest {
             "a\nb\n\nHabits — Tove Lo\n$url",
             shareText(listOf("a", "b"), "Habits", "Tove Lo", url),
         )
+    }
+
+    @Test
+    fun `the share dialog opens in a short window`() {
+        assumeTrue("run through headlessTest (isolated profile)", System.getenv("APPDATA")?.contains("test-profile") == true)
+        val scene = ImageComposeScene(width = 800, height = 450) {
+            MaterialTheme {
+                ShareCardSheet(
+                    artwork = cover(),
+                    title = "Habits (Stay High)",
+                    artist = "Tove Lo",
+                    trackUrl = null,
+                    lyrics = listOf("First line"),
+                    allLyrics = listOf("First line", "Second line"),
+                    onDismiss = {},
+                )
+            }
+        }
+        try {
+            scene.render(0L).close()
+            scene.render(16_000_000L).close()
+        } finally {
+            scene.close()
+        }
     }
 
     @Test
