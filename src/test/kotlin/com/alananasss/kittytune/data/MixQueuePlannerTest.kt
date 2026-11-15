@@ -180,6 +180,11 @@ class MixQueuePlannerTest {
 
     @Test
     fun `reordering recomputes automatic seams and keeps hand-made ones`() {
+        // Writes transition plans to the preferences: only ever against headlessTest's throwaway profile.
+        org.junit.Assume.assumeTrue(
+            "run through headlessTest (isolated profile)",
+            System.getenv("APPDATA")?.contains("test-profile") == true,
+        )
         val key = "mixtest-" + System.nanoTime()
         val a = com.alananasss.kittytune.domain.Track(id = 9_000_001L, title = "A", artworkUrl = null, durationMs = 200_000L, user = null)
         val b = com.alananasss.kittytune.domain.Track(id = 9_000_002L, title = "B", artworkUrl = null, durationMs = 200_000L, user = null)
