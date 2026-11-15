@@ -832,10 +832,10 @@ class PlayerPreferences {
         Prefs.stringFlow(KEY_LYRICS_LINE_ANIMATION, LyricsLineAnimation.SWEEP.name).map { it != LyricsLineAnimation.FADE.name }
 
     fun getInstrumentalIndicatorStyle(): InstrumentalIndicatorStyle =
-        InstrumentalIndicatorStyle.fromString(Prefs.getString(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.NOTE_WAVE.name))
+        InstrumentalIndicatorStyle.fromString(Prefs.getString(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.DOTS.name))
     fun setInstrumentalIndicatorStyle(style: InstrumentalIndicatorStyle) = Prefs.putString(KEY_INSTRUMENTAL_INDICATOR, style.name)
     fun instrumentalIndicatorStyleFlow(): Flow<InstrumentalIndicatorStyle> =
-        Prefs.stringFlow(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.NOTE_WAVE.name).map { InstrumentalIndicatorStyle.fromString(it) }
+        Prefs.stringFlow(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.DOTS.name).map { InstrumentalIndicatorStyle.fromString(it) }
 
     // ─── Codec badge (same key as Android) ─────────────────────────────────────
 
