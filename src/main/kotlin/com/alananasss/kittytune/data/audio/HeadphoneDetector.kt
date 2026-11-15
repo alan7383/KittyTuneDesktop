@@ -76,9 +76,7 @@ object HeadphoneDetector {
     }
 
     private fun detect(): ConnectedHeadphone? {
-        // Linux needs pactl to know which *sink* is default; Windows/macOS are usually named
-        // correctly by the JVM, so start with the cheap Java Sound list and only spend a
-        // PowerShell/system_profiler process when that list has no headset.
+        // Linux needs the active sink; Windows and macOS cache their OS probe.
         if (isLinux) {
             val now = System.currentTimeMillis()
             if (now - lastProbe > 2_500) {
@@ -171,20 +169,16 @@ object HeadphoneDetector {
      * "Headphones (HyperX Cloud II)". If the JVM only restored the Realtek default, the
      * PnP endpoint list still names the connected headset, including its Bluetooth transport.
      */
-    private fun windowsOutput(): ConnectedHeadphone? {
-        val output = runPowerShell(
-            "Get-PnpDevice -Class AudioEndpoint -Status OK -ErrorAction SilentlyContinue | " +
-                "Select-Object -ExpandProperty FriendlyName"
-        )
-        val bluetooth = runPowerShell(
-            "Get-PnpDevice -Class Bluetooth -Status OK -ErrorAction SilentlyContinue | " +
-                "Select-Object -ExpandProperty FriendlyName"
-        )
-        val btNames = bluetooth.lines().filter { it.isNotBlank() }
-        val candidate = output.lines()
+    internal fun windowsOutput(
+        endpoints: () -> List<String> = WindowsDeviceNames::audioEndpoints,
+        bluetoothDevices: () -> List<String> = WindowsDeviceNames::bluetoothDevices,
+    ): ConnectedHeadphone? {
+        val output = endpoints()
+        val candidate = output.asSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() && looksLikeHeadphone(it) }
             .firstOrNull() ?: return null
+        val btNames = bluetoothDevices().filter { it.isNotBlank() }
         val isBt = btNames.any { bt ->
             bt.length > 3 && candidate.contains(bt, ignoreCase = true)
         } || candidate.contains("bluetooth", ignoreCase = true) ||
@@ -319,15 +313,6 @@ object HeadphoneDetector {
             .replace(Regex("""[^a-z0-9]+"""), "-")
             .trim('-')
         return cleaned.ifBlank { "unknown-headphone" }
-    }
-
-    private fun runPowerShell(script: String): String {
-        val encoded = java.util.Base64.getEncoder()
-            .encodeToString(script.toByteArray(Charsets.UTF_16LE))
-        return runCommand(
-            listOf("powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded),
-            5,
-        )
     }
 
     private fun runCommand(command: List<String>, timeoutSeconds: Long): String {
