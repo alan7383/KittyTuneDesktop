@@ -235,9 +235,10 @@ object MusicManager {
         item: com.alananasss.kittytune.media.MediaItem,
         startPositionMs: Long,
         crossfadeDurationMs: Long,
-        automixPlan: com.alananasss.kittytune.audio.automix.AutomixPlan? = null
+        automixPlan: com.alananasss.kittytune.audio.automix.AutomixPlan? = null,
+        pairPlan: com.alananasss.kittytune.audio.automix.TransitionPlan? = null,
     ) {
-        player.crossfadeToMediaItem(item, startPositionMs, crossfadeDurationMs, automixPlan)
+        player.crossfadeToMediaItem(item, startPositionMs, crossfadeDurationMs, automixPlan, pairPlan)
     }
 
     fun applyEffects(state: AudioEffectsState) {

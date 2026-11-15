@@ -96,6 +96,9 @@ class AudioEngine {
     private val nightDrive = NightDriveAudioProcessor()
     val automixDuck = com.alananasss.kittytune.audio.automix.AutomixDuckAudioProcessor()
 
+    /** The Mix transitions' sweep filter (RISE high-pass, WAVE band-pass, a Custom seam's filter legs). */
+    val mixSweep = com.alananasss.kittytune.audio.automix.MixSweepAudioProcessor()
+
     /**
      * ArtifactNet AI-music tap (issue #41): transparent pass-through that collects the
      * first seconds of PCM for on-device AI detection. First in the chain so it
@@ -122,6 +125,7 @@ class AudioEngine {
         liveBeatTap,
         silenceSkip,
         automixDuck,
+        mixSweep,
         fx, equalizer, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
         superWide, vinylLoFi, phaser, megaphone, robotVocoder, chorus,
@@ -691,6 +695,17 @@ class AudioEngine {
 
     fun resetDuckMix() {
         automixDuck.resetGain()
+    }
+
+    /** Runs the transition sweep filter in [mode] at [cutoffHz] (null keeps the last cutoff). */
+    fun setMixSweep(mode: com.alananasss.kittytune.audio.automix.MixSweepAudioProcessor.FilterMode, cutoffHz: Float?, q: Float) {
+        mixSweep.setMode(mode)
+        if (cutoffHz != null) mixSweep.setSweep(cutoffHz, q)
+    }
+
+    /** Glides the sweep filter home and out of the path once the transition is over. */
+    fun resetMixSweep() {
+        mixSweep.resetSweep()
     }
 
     fun setStretcherRatio(tempoRatio: Float, pitchRatio: Float) {

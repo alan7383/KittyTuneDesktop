@@ -532,7 +532,8 @@ class Player {
         item: MediaItem,
         startPositionMs: Long,
         crossfadeDurationMs: Long,
-        automixPlan: AutomixPlan? = null
+        automixPlan: AutomixPlan? = null,
+        pairPlan: com.alananasss.kittytune.audio.automix.TransitionPlan? = null,
     ) {
         val transition: Long
         lateinit var oldEngine: AudioEngine
@@ -613,7 +614,8 @@ class Player {
             effectivePlan = effectivePlan,
             isAdopted = isAdopted,
             preUrl = pre?.url,
-            preHeaders = pre?.headers
+            preHeaders = pre?.headers,
+            pairPlan = pairPlan.takeIf { effectivePlan == null && it?.isAuto == false },
         )
     }
 
@@ -627,7 +629,8 @@ class Player {
         effectivePlan: AutomixPlan?,
         isAdopted: Boolean,
         preUrl: String?,
-        preHeaders: Map<String, String>?
+        preHeaders: Map<String, String>?,
+        pairPlan: com.alananasss.kittytune.audio.automix.TransitionPlan? = null,
     ) {
         synchronized(this) {
             // Do not let a superseded transition replace the job handle of the one that
@@ -719,7 +722,18 @@ class Player {
 
                     if (!isActive || !isCurrentTransition(transitionId) || fadingEngine !== oldEngine) return@launch
 
-                    val transitionDuration = effectivePlan?.overlapMs ?: crossfadeDurationMs
+                    // The tempo the Mix presets quantize to, and the length a saved pair plan asks for in bars
+                    // when there is no automix plan to carry it (a manual skip or a plain crossfade).
+                    val mixBpm = AutomixManager.automixDebugInfo.value?.outBpm ?: 0f
+                    val pairDurationMs = pairPlan?.let { plan ->
+                        if (plan.preset == com.alananasss.kittytune.audio.automix.TransitionPreset.NONE) 2_000L
+                        else if (mixBpm > 0f) (plan.bars.beats * (60_000f / mixBpm)).toLong().coerceIn(2_000L, 30_000L)
+                        else null
+                    }
+                    val transitionDuration = effectivePlan?.overlapMs ?: pairDurationMs ?: crossfadeDurationMs
+                    val mixStyle = effectivePlan?.transitionStyle ?: pairPlan?.toEngineStyle()
+                    val mixCurves = effectivePlan?.exactCurves
+                        ?: pairPlan?.takeIf { it.preset == com.alananasss.kittytune.audio.automix.TransitionPreset.CUSTOM }
                     var remainingMs = oldEngine.durationMs - oldEngine.positionMs
                     if (remainingMs < 0) remainingMs = 0
 
@@ -750,6 +764,8 @@ class Player {
                     } else {
                         val steps = (actualCrossfadeMs / 15L).toInt().coerceIn(50, 800)
                         val delayMs = (actualCrossfadeMs / steps).coerceAtLeast(5L)
+                        val mixBeats = com.alananasss.kittytune.audio.automix.CrossfadeShaper.beatsFor(actualCrossfadeMs, mixBpm, mixStyle)
+                        var outgoingSpeed = 1f
 
                         for (i in 0..steps) {
                             if (!isActive || !isCurrentTransition(transitionId)) break
@@ -778,8 +794,13 @@ class Player {
                             }
 
                             val progress = i.toFloat() / steps
-                            val fadeOut = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
-                            val fadeIn = equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
+                            // A Mix style (or a hand-drawn Custom seam) shapes every control of both decks; a
+                            // plain crossfade keeps its own equal-power pair.
+                            val controls = com.alananasss.kittytune.audio.automix.CrossfadeShaper.shape(
+                                mixStyle, mixCurves, progress, mixBeats, mixBpm,
+                            )
+                            val fadeOut = controls?.fadeOut ?: equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
+                            val fadeIn = controls?.fadeIn ?: equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
 
                             // The artwork is lit by this, so the glow and the mix are the same event
                             // rather than two things that usually happen together.
@@ -798,7 +819,17 @@ class Player {
                             newEngine.setVolume(targetVolume * fadeIn)
                             oldEngine.setVolume(targetVolume * fadeOut)
 
-                            if (effectivePlan != null && bassDuckingEnabled) {
+                            if (controls != null) {
+                                oldEngine.setDuckMix(controls.duckOut)
+                                newEngine.setDuckMix(controls.duckIn)
+                                oldEngine.setMixSweep(controls.sweepModeOut, controls.sweepHzOut, controls.sweepQ)
+                                newEngine.setMixSweep(controls.sweepModeIn, controls.sweepHzIn, controls.sweepQ)
+                                if (controls.speedOut != outgoingSpeed) {
+                                    // MELT: the outgoing record slows down, speed and pitch together.
+                                    outgoingSpeed = controls.speedOut
+                                    oldEngine.setStretcherRatio(outgoingSpeed, outgoingSpeed)
+                                }
+                            } else if (effectivePlan != null && bassDuckingEnabled) {
                                 oldEngine.setDuckMix(equalPowerIn(0.45f, 1f, progress))
                                 newEngine.setDuckMix(1f - equalPowerIn(0f, 0.55f, progress))
                             }
@@ -820,6 +851,8 @@ class Player {
                             }
                             oldEngine.resetDuckMix()
                             newEngine.resetDuckMix()
+                            oldEngine.resetMixSweep()
+                            newEngine.resetMixSweep()
                             try {
                                 oldEngine.setVolume(0f)
                                 oldEngine.stop()
@@ -831,7 +864,31 @@ class Player {
                                 AutomixManager.setIsAutomixing(false)
                                 AutomixManager.clearPlan()
 
-                                if (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f) {
+                                val releaseBpm = AutomixManager.automixDebugInfo.value?.inBpm ?: 0f
+                                val releaseSchedule = if (effectivePlan.tempoSyncEnabled && effectivePlan.tempoRatio != 1f) {
+                                    com.alananasss.kittytune.audio.automix.MixTransitionPresets.tempoReleaseSchedule(
+                                        fromSpeed = effectivePlan.tempoRatio,
+                                        toSpeed = 1f,
+                                        bpm = releaseBpm,
+                                    )
+                                } else emptyList()
+                                if (releaseSchedule.isNotEmpty()) {
+                                    // A synced tempo walks home over 32 beats at no more than 0.5 %/s, so its return is
+                                    // never heard as a pitch bend; a harmonic correction walks home alongside it.
+                                    scope.launch {
+                                        val startPitch = effectivePlan.pitchRatio
+                                        val lastIndex = (releaseSchedule.size - 1).coerceAtLeast(1)
+                                        var previousAtMs = 0L
+                                        for ((index, step) in releaseSchedule.withIndex()) {
+                                            delay((step.atMs - previousAtMs).coerceAtLeast(0L))
+                                            previousAtMs = step.atMs
+                                            if (!isActive || !isCurrentTransition(transitionId)) break
+                                            val frac = if (releaseSchedule.size == 1) 1f else index.toFloat() / lastIndex
+                                            newEngine.setStretcherRatio(step.speed, startPitch + frac * (1f - startPitch))
+                                        }
+                                        if (isCurrentTransition(transitionId)) newEngine.setStretcherRatio(1f, 1f)
+                                    }
+                                } else if (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f) {
                                     // Back to the track's own tempo and key, in steps too small to hear. Ten jumps of a
                                     // fifth of a second each made the start of a mixed-in track warble, as if it were
                                     // playing at a lower quality for its first seconds (issue #66).

@@ -79,6 +79,28 @@ object AutomixManager {
         _mixProgress.value = progress.coerceIn(0f, 1f)
     }
 
+    /** The transition style the current plan will perform; the Mix badge reads this. */
+    private val _currentTransitionStyle = MutableStateFlow(MixTransitionPresets.DEFAULT_STYLE)
+    val currentTransitionStyle = _currentTransitionStyle.asStateFlow()
+
+    /**
+     * Live override of the transition style: when set, every plan uses this style instead of the Auto
+     * decision. Null = Auto (the engine picks per pair).
+     */
+    @Volatile
+    var transitionStyleOverride: MixTransitionPresets.MixTransitionStyle? = null
+
+    /** Picks a style for every transition, or null to give the choice back to Auto. */
+    @JvmName("applyTransitionStyleOverride")
+    fun setTransitionStyleOverride(style: MixTransitionPresets.MixTransitionStyle?) {
+        transitionStyleOverride = style
+        _currentTransitionStyle.value = style ?: _currentTransitionStyle.value
+    }
+
+    /** Emits a song id every time its beat analysis is stored, so lists can show it without polling. */
+    private val _onBeatAnalysisCompleted = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val onBeatAnalysisCompleted: kotlinx.coroutines.flow.SharedFlow<String> = _onBeatAnalysisCompleted
+
     @Volatile
     var currentAutomixPlan: AutomixPlan? = null
         private set
@@ -286,6 +308,7 @@ object AutomixManager {
         withContext(Dispatchers.IO) {
             AppDatabase.beatInfoDao.upsert(entity)
         }
+        _onBeatAnalysisCompleted.tryEmit(songId)
 
         val updatedDbg = _automixDebugInfo.value ?: currentDbg
         if (isCurrent) {
@@ -315,6 +338,7 @@ object AutomixManager {
         currentPosition: Long,
         trackDuration: Long,
         prefs: PlayerPreferences,
+        playlistKey: String? = null,
     ): AutomixPlanResult {
         val currentId = currentTrack.id.toString()
         val nextId = nextTrack.id.toString()
@@ -346,6 +370,8 @@ object AutomixManager {
         val isInFailed = failedSongIds.containsKey(nextId) || (inBeat != null && inBeat.bpm <= 0f)
 
         if (isOutFailed || isInFailed) {
+            // The previous pair's plan must not outlive it into this pair.
+            clearPlan()
             _automixDebugInfo.value = partialDebug.copy(
                 status = "fallback: stream unsupported"
             )
@@ -353,6 +379,7 @@ object AutomixManager {
         }
 
         if (outBeat == null || inBeat == null) {
+            clearPlan()
             _automixDebugInfo.value = partialDebug.copy(
                 status = "Analyzing: " +
                     (if (outBeat == null) "'${currentTrack.title}'" else "") +
@@ -363,6 +390,7 @@ object AutomixManager {
         }
 
         if (outBeat.confidence < 0.25f || inBeat.confidence < 0.25f || outBeat.bpm <= 0f || inBeat.bpm <= 0f) {
+            clearPlan()
             _automixDebugInfo.value = partialDebug.copy(status = "fallback: low confidence")
             return AutomixPlanResult(plan = null, pairAnalyzed = true)
         }
@@ -388,6 +416,26 @@ object AutomixManager {
             baseOverlapMs.coerceIn(4_000L, 20_000L)
         }
 
+        // The transition saved for exactly this pair (Mix Mode connector / Edit-transition screen) is the
+        // most specific wish for this seam: it outranks the global style and the Auto decision, both for
+        // the style and for the length in bars. Plans are stored under several route keys, all tried.
+        val savedPairPlan = if (playlistKey != null) {
+            runCatching { TransitionStore.loadAny(playlistKey, currentTrack.id, nextTrack.id) }.getOrNull()
+        } else null
+        val pairOverrideActive = savedPairPlan != null && !savedPairPlan.isAuto
+        if (pairOverrideActive) {
+            overlapMs = (savedPairPlan!!.bars.beats * periodMs).toLong().coerceIn(2_000L, 30_000L)
+            // "No transition": the seam collapses to the minimum, the new track simply takes over.
+            if (savedPairPlan.preset == TransitionPreset.NONE) overlapMs = 2_000L
+        }
+
+        // The global transition length (4/8/16/32 beats) overrides the overlap mode when it was set;
+        // 0 means "follow the automix overlap setting".
+        val mixBeats = runCatching { prefs.getMixTransitionBeats() }.getOrDefault(0)
+        if (!pairOverrideActive && (mixBeats == 4 || mixBeats == 8 || mixBeats == 16 || mixBeats == 32)) {
+            overlapMs = (mixBeats * periodMs).toLong().coerceIn(2_000L, 30_000L)
+        }
+
         val latestTrigger = trackDuration - overlapMs
         // A mix-out point is only believed near the end of what is playing. One from an analysis of another
         // length of the song (a preview, another upload) sat minutes before the end of a long track and set
@@ -406,7 +454,17 @@ object AutomixManager {
         // after it: the blend then covers the last bars of the drop going out, and does not begin in the empty tail.
         if (mixOut != null) {
             val nearest = (outBeat.firstBeatOffsetMs + Math.round((anchor - outBeat.firstBeatOffsetMs) / phraseMs) * phraseMs).toLong()
-            if (nearest >= currentPosition + 1000) triggerTime = nearest
+            // Clamped to the latest legal trigger: a phrase boundary rounded up past it left too little
+            // room and failed the whole plan with "trigger out of range".
+            if (nearest >= currentPosition + 1000) triggerTime = nearest.coerceAtMost(latestTrigger)
+        }
+
+        // Where the seam starts in the outgoing track, when it was placed by hand in the editor: snapped to
+        // the nearest phrase line, and dropped when it would fire in the past or crowd the track's tail.
+        val pairZoneStartMs = savedPairPlan?.zoneStartMs?.takeIf { it >= 0L }
+        if (pairZoneStartMs != null) {
+            val snappedZone = (outBeat.firstBeatOffsetMs + Math.round((pairZoneStartMs - outBeat.firstBeatOffsetMs) / phraseMs) * phraseMs).toLong()
+            if (snappedZone >= currentPosition + 1000 && snappedZone <= latestTrigger) triggerTime = snappedZone
         }
 
         val roomMs = trackDuration - 500 - triggerTime
@@ -415,13 +473,41 @@ object AutomixManager {
             return AutomixPlanResult(plan = null, pairAnalyzed = true)
         }
 
+        // Tempo match, octave-aware: only within 10 BPM and an 8 % stretch, beyond which a pitch-preserving
+        // stretch turns grainy. Otherwise both decks keep their own tempo and the style carries the seam.
         var tempoRatio = 1f
+        var tempoStretchViable = false
         if (prefs.getAutomixTempoMatchEnabled()) {
-            tempoRatio = outBeat.bpm / inBeat.bpm
-            while (tempoRatio > 1.5f) tempoRatio /= 2f
-            while (tempoRatio < 0.667f) tempoRatio *= 2f
-            if (tempoRatio !in 0.92f..1.08f) tempoRatio = 1f
+            val (canMatch, ratio) = MixTempoMatch.match(outBeat.bpm, inBeat.bpm)
+            tempoStretchViable = canMatch
+            tempoRatio = if (canMatch) ratio else 1f
         }
+
+        // Transition style. Priority: the pair's saved plan, then a style pinned by hand (live override,
+        // then the saved preference), then the Auto decision from tempo, key and energy.
+        val prefStyleResolved = runCatching { MixTransitionPresets.MixTransitionStyle.valueOf(prefs.getMixTransitionStyle()) }
+            .getOrDefault(MixTransitionPresets.MixTransitionStyle.AUTO)
+        val userPinnedStyle = transitionStyleOverride
+            ?: prefStyleResolved.takeIf { it != MixTransitionPresets.MixTransitionStyle.AUTO }
+        var resolvedStyle = savedPairPlan?.toEngineStyle() ?: (userPinnedStyle ?: MixTransitionPresets.autoSelect(
+            outBpm = outBeat.bpm,
+            inBpm = inBeat.bpm,
+            keyFit = keyFit.takeIf { it != KeyHarmony.Fit.UNKNOWN },
+            energyGap = if (outBeat.energy != null && inBeat.energy != null) abs(outBeat.energy - inBeat.energy) else null,
+        ))
+        // A beat-matched blend of two grooves that cannot be synced is mud: on Auto, BLEND/FADE move to a
+        // filter build (RISE) when the tempo climbs, or an echo wash-out (DISSOLVE) when it falls.
+        if (!tempoStretchViable && userPinnedStyle == null && !pairOverrideActive) {
+            resolvedStyle = when (resolvedStyle) {
+                MixTransitionPresets.MixTransitionStyle.BLEND,
+                MixTransitionPresets.MixTransitionStyle.FADE ->
+                    if (inBeat.bpm >= outBeat.bpm) MixTransitionPresets.MixTransitionStyle.RISE
+                    else MixTransitionPresets.MixTransitionStyle.DISSOLVE
+                else -> resolvedStyle
+            }
+        }
+        _currentTransitionStyle.value = resolvedStyle
+        val tempoSyncEnabled = prefs.getAutomixTempoMatchEnabled() && tempoRatio != 1f
 
         var pitchRatio = 1f
         if (prefs.getAutomixHarmonicMixEnabled()) {
@@ -443,7 +529,7 @@ object AutomixManager {
 
         // The blend is sized for the pair, in Auto only (a length chosen by hand is the listener's). Keys that agree, with a
         // similar drive, blend long; keys that fight, and a change from a loud track into a quiet one or back, are cut shorter.
-        if (overlapMode == 0) {
+        if (overlapMode == 0 && !pairOverrideActive) {
             val effectiveFit = if (pitchRatio != 1f) KeyHarmony.Fit.SAME else keyFit
             val energyGap = if (outBeat.energy != null && inBeat.energy != null) abs(outBeat.energy - inBeat.energy) else 0f
             overlapMs = when (effectiveFit) {
@@ -483,12 +569,24 @@ object AutomixManager {
                 (inBeat.firstBeatOffsetMs + inK * inPhraseMs).toLong()
             }
         }
+        // Where the incoming deck enters, when it was drawn by hand in the editor, snapped to its own bar grid.
+        val pairOffsetMs = savedPairPlan?.offsetMs?.takeIf { it > 0L }
+        val offsetAdjustedStart = if (pairOffsetMs != null) {
+            val inBarMs = inPeriodMs * 4
+            val inBars = kotlin.math.round((pairOffsetMs - inBeat.firstBeatOffsetMs) / inBarMs).toLong().coerceAtLeast(0)
+            (inBeat.firstBeatOffsetMs + inBars * inBarMs).toLong().coerceAtLeast(0L)
+        } else {
+            incomingStart
+        }
         val nextDuration = nextTrack.durationMs?.takeIf { it > 5000L }
         val effectiveIncomingStart = if (nextDuration != null) {
-            incomingStart.coerceIn(0L, nextDuration - 3000L)
+            offsetAdjustedStart.coerceIn(0L, nextDuration - 3000L)
         } else {
-            incomingStart.coerceAtLeast(0L)
+            offsetAdjustedStart.coerceAtLeast(0L)
         }
+
+        // A hand-shaped Custom seam plays its own drawn curves instead of the style's approximation.
+        val pairExactCurves = savedPairPlan?.takeIf { it.preset == TransitionPreset.CUSTOM }
 
         val plan = AutomixPlan(
             currentId = currentId,
@@ -498,11 +596,14 @@ object AutomixManager {
             tempoRatio = tempoRatio,
             pitchRatio = pitchRatio,
             overlapMs = overlapMs.coerceAtMost(roomMs),
+            transitionStyle = resolvedStyle,
+            tempoSyncEnabled = tempoSyncEnabled,
+            exactCurves = pairExactCurves,
         )
 
         currentAutomixPlan = plan
         _automixDebugInfo.value = partialDebug.copy(
-            status = "plan ready",
+            status = "plan ready (${resolvedStyle.name.lowercase()})",
             triggerTimeMs = plan.triggerTimeMs,
             incomingStartMs = plan.incomingStartMs,
             tempoRatio = plan.tempoRatio,
