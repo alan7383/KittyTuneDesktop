@@ -471,6 +471,54 @@ fun PlaylistDetailScreen(
 
     val isSpecialPlaylist = playlistId == "likes" || playlistId == "downloads" || playlistId == "local_files" || playlistId.startsWith("liked_by:") || playlistId.startsWith("station") || playlistId.startsWith("system_playlist:")
 
+    // --- Mix Mode (port of Android PR #83) ---------------------------------------------------------------
+    // Every row shows its analysed tempo and Camelot key, a transition connector sits between rows, and the
+    // harmonic smart sort is offered. Only on the user's own playlists: a mix belongs to a list they curate.
+    val mixAvailable = isUserCreated && !isSpecialPlaylist
+    var isMixMode by remember(playlistId) { mutableStateOf(false) }
+    LaunchedEffect(mixAvailable) { if (!mixAvailable) isMixMode = false }
+    // The pair whose transition is being edited; non-null shows the editor on top of the page.
+    var transitionEditor by remember { mutableStateOf<Pair<Track, Track>?>(null) }
+    // The order before the smart sort, restored when Mix Mode is switched off unless a drag saved a new one.
+    var preMixOrder by remember(playlistId) { mutableStateOf<List<Long>?>(null) }
+    // Bumped when a seam's plan is saved, so the connectors re-read the store.
+    var mixPlansVersion by remember { mutableStateOf(0) }
+    val mixScope = rememberCoroutineScope()
+    val mixReferenceProfile by remember(isMixMode, playerViewModel.uiCurrentTrack?.id) {
+        val playing = playerViewModel.uiCurrentTrack
+        if (isMixMode && playing != null) com.alananasss.kittytune.data.mix.MixPlaylistAnalyzer.profileFlow(playing)
+        else kotlinx.coroutines.flow.flowOf(null)
+    }.collectAsState(initial = null)
+    val applySmartMixSort: () -> Unit = {
+        mixScope.launch {
+            val source = tracks.toList()
+            if (source.size > 1) {
+                val profiles = com.alananasss.kittytune.data.mix.MixPlaylistAnalyzer.profilesFor(source)
+                val ordered = com.alananasss.kittytune.data.mix.MixQueuePlanner.greedyMixOrder(source) { profiles[it.id] }
+                if (preMixOrder == null) preMixOrder = source.map { it.id }
+                tracks.clear()
+                tracks.addAll(ordered)
+                com.alananasss.kittytune.core.Toaster.show(str("mix_smart_sort_applied"))
+            }
+        }
+    }
+    val setMixMode: (Boolean) -> Unit = { on ->
+        isMixMode = on
+        if (!on) {
+            transitionEditor = null
+            // Leaving Mix Mode drops the smart sort: the playlist shows its own order again.
+            preMixOrder?.let { original ->
+                val byId = tracks.associateBy { it.id }
+                val restored = original.mapNotNull { byId[it] }
+                if (restored.size == tracks.size) {
+                    tracks.clear()
+                    tracks.addAll(restored)
+                }
+            }
+            preMixOrder = null
+        }
+    }
+
     // Drag-to-reorder — only active for user-owned playlists with no active search/sort
     val canReorder = !isSpecialPlaylist && isUserCreated && playlistSearchQuery.isEmpty() && playlistSortBy == TrackSortBy.FIRST_ADDED
     val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
@@ -497,6 +545,16 @@ fun PlaylistDetailScreen(
             val newOrder = tracks.map { it.id }
             DownloadManager.reorderPlaylistTracks(currentIdLong, newOrder)
             DownloadManager.syncPlaylistOrderOnline(currentIdLong, newOrder)
+            // The dragged order is saved: it is the playlist's own order from now on.
+            preMixOrder = null
+            if (isMixMode && tracks.size > 1) {
+                val snapshot = tracks.toList()
+                mixScope.launch {
+                    val profiles = com.alananasss.kittytune.data.mix.MixPlaylistAnalyzer.profilesFor(snapshot)
+                    com.alananasss.kittytune.data.mix.MixQueuePlanner.recomputeTransitionsForReorderedTracks(playlistId, snapshot, profiles)
+                    mixPlansVersion++
+                }
+            }
         }
         wasDragging = isDragging
     }
@@ -1669,7 +1727,9 @@ fun PlaylistDetailScreen(
                         // Action row
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (tracksToDisplay.isNotEmpty()) {
-                                Button(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), 0, playbackContext) },
+                                if (isMixMode) {
+                                    MixCdjPlayButton(onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), 0, playbackContext) })
+                                } else Button(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), 0, playbackContext) },
                                     modifier = Modifier.height(44.dp)
                                 ) {
                                     Icon(Icons.Default.PlayArrow, null)
@@ -2049,6 +2109,10 @@ fun PlaylistDetailScreen(
                                     Triple(TrackViewMode.COMPACT, str("view_mode_compact"), Icons.Rounded.Menu),
                                     Triple(TrackViewMode.LIST, str("view_mode_list"), Icons.AutoMirrored.Rounded.FormatListBulleted),
                                 )
+                                if (mixAvailable) {
+                                    if (isMixMode) MixSmartSortButton(onClick = applySmartMixSort)
+                                    MixModeToggleButton(enabled = isMixMode, onToggle = { setMixMode(!isMixMode) })
+                                }
                                 com.alananasss.kittytune.ui.common.IconChoiceButton(
                                     options = viewModes,
                                     selected = viewModes.firstOrNull { it.first == TrackViewModePref.mode } ?: viewModes.first(),
@@ -2090,11 +2154,24 @@ fun PlaylistDetailScreen(
                         }
 
                         val itemKey = getPlaylistTrackStableKey(index, track.id, tracksToDisplay)
+                        // Mix Mode: the row's tempo and key, coloured against the track playing now. The flow also warms
+                        // the analysis cache the smart sort reads.
+                        val mixBadge = if (isMixMode) {
+                            com.alananasss.kittytune.data.mix.MixPlaylistAnalyzer.profileFlow(track)
+                                .collectAsState(initial = null).value?.let { profile ->
+                                    MixBadgeUi(
+                                        bpm = profile.bpm,
+                                        camelot = profile.camelot,
+                                        fit = com.alananasss.kittytune.data.mix.MixPlaylistAnalyzer.keyFit(profile.camelot, mixReferenceProfile?.camelot),
+                                    )
+                                }
+                        } else null
                         ReorderableItem(reorderableState, key = itemKey) { isDraggingThis ->
                             val dragHandleModifier = if (canReorder)
                                 Modifier.draggableHandle()
                             else Modifier
 
+                            Column {
                             if (TrackViewModePref.mode == TrackViewMode.COMPACT) {
                                 TrackCompactItem(
                                     track = track,
@@ -2114,7 +2191,9 @@ fun PlaylistDetailScreen(
                                     showAlbum = !isAlbum,
                                     showDate = showDateColumn,
                                     dragHandleModifier = dragHandleModifier,
-                                    isDragging = isDraggingThis
+                                    isDragging = isDraggingThis,
+                                    mixMode = isMixMode,
+                                    mixBadge = mixBadge,
                                 )
                             } else {
                                 TrackTableItem(
@@ -2137,8 +2216,20 @@ fun PlaylistDetailScreen(
                                     showDate = showDateColumn,
                                     useReleaseDate = useReleaseDate,
                                     dragHandleModifier = dragHandleModifier,
-                                    isDragging = isDraggingThis
+                                    isDragging = isDraggingThis,
+                                    mixMode = isMixMode,
+                                    mixBadge = mixBadge,
                                 )
+                            }
+                            // The transition into the next row; clicking it opens the editor for that pair.
+                            if (isMixMode && index < tracksToDisplay.lastIndex && !isDraggingThis) {
+                                val nextTrack = tracksToDisplay[index + 1]
+                                val plan = remember(track.id, nextTrack.id, mixPlansVersion) {
+                                    com.alananasss.kittytune.audio.automix.TransitionStore.loadAny(playlistId, track.id, nextTrack.id, currentIdLong)
+                                        ?: com.alananasss.kittytune.audio.automix.TransitionPlan()
+                                }
+                                MixTransitionConnector(plan = plan, onClick = { transitionEditor = track to nextTrack })
+                            }
                             }
                         }
                     }
@@ -2151,6 +2242,24 @@ fun PlaylistDetailScreen(
                     }
                 }
             }
+        }
+
+        // The transition editor for one connector. Save stores the plan under every route key the pair can be
+        // played from; Cancel just closes it.
+        transitionEditor?.let { (trackA, trackB) ->
+            com.alananasss.kittytune.ui.player.mix.EditTransitionScreen(
+                trackA = trackA,
+                trackB = trackB,
+                initialPlan = com.alananasss.kittytune.audio.automix.TransitionStore.loadAny(playlistId, trackA.id, trackB.id, currentIdLong)
+                    ?: com.alananasss.kittytune.audio.automix.TransitionPlan(),
+                playlistKey = playlistId,
+                onSave = { savedPlan ->
+                    com.alananasss.kittytune.audio.automix.TransitionStore.saveAll(playlistId, currentIdLong, trackA.id, trackB.id, savedPlan)
+                    mixPlansVersion++
+                    com.alananasss.kittytune.core.Toaster.show(str("transition_saved"))
+                },
+                onDismiss = { transitionEditor = null },
+            )
         }
 
     }
@@ -2438,7 +2547,10 @@ fun TrackTableItem(
     showPlays: Boolean = false,
     onPlayCountClick: (() -> Unit)? = null,
     dragHandleModifier: Modifier = Modifier,
-    isDragging: Boolean = false
+    isDragging: Boolean = false,
+    /** Mix Mode adds a tempo/key column before the duration; [mixBadge] is null until the track is analysed. */
+    mixMode: Boolean = false,
+    mixBadge: MixBadgeUi? = null,
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -2633,6 +2745,7 @@ fun TrackTableItem(
                     String.format("%d:%02d", m, s)
                 } ?: ""
             }
+            if (mixMode) MixTrackMeta(badge = mixBadge)
             Text(
                 text = durationStr,
                 style = MaterialTheme.typography.bodyMedium,
@@ -2788,7 +2901,10 @@ fun TrackCompactItem(
     showAlbum: Boolean = true,
     showDate: Boolean = true,
     dragHandleModifier: Modifier = Modifier,
-    isDragging: Boolean = false
+    isDragging: Boolean = false,
+    /** Mix Mode adds a tempo/key column before the duration; [mixBadge] is null until the track is analysed. */
+    mixMode: Boolean = false,
+    mixBadge: MixBadgeUi? = null,
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -2927,6 +3043,7 @@ fun TrackCompactItem(
                     String.format("%d:%02d", m, s)
                 } ?: ""
             }
+            if (mixMode) MixTrackMeta(badge = mixBadge)
             Text(
                 text = durationStr,
                 style = MaterialTheme.typography.bodyMedium,
