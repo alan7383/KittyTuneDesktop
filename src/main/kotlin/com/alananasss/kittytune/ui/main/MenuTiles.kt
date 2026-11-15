@@ -40,6 +40,7 @@ internal object MenuTiles {
         Tile("edit_track", "menu_edit_track"),
         Tile("track_radio", "menu_track_radio"),
         Tile("share", "cover_copy_link"),
+        Tile("share_card", "share_card_title"),
         Tile("block_track", "menu_block_track"),
         Tile("block_artist", "menu_block_artist"),
         Tile("remove_from_playlist", "menu_remove"),

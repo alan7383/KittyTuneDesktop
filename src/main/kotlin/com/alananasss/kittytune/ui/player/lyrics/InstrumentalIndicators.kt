@@ -7,8 +7,6 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -158,15 +156,13 @@ fun InterludeNoteWave(
         label = "InterludeProgress"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "InterludeBreathing")
-    val breatheScale by infiniteTransition.animateFloat(
-        initialValue = 0.82f,
-        targetValue = 1.18f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "BreathScale"
+    // The app's ambient clock rather than an infinite transition: it stops when the window is not seen.
+    val breatheScale by com.alananasss.kittytune.ui.common.rememberAmbientLoop(
+        periodMs = 1400,
+        from = 0.82f,
+        to = 1.18f,
+        repeatMode = RepeatMode.Reverse,
+        easing = FastOutSlowInEasing,
     )
 
     val iconAlpha by animateFloatAsState(

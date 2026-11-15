@@ -161,6 +161,12 @@ class Player {
     var onCompletion: (() -> Unit)? = null
     var onError: ((Throwable) -> Unit)? = null
 
+    // Declared before [activeEngine]: binding the first engine during construction already publishes its format.
+    private val _currentAudioFormat = kotlinx.coroutines.flow.MutableStateFlow<com.alananasss.kittytune.audio.SourceAudioFormat?>(null)
+
+    /** What the playing engine's stream carries, for the codec badge and the audio-path diagnostics. */
+    val currentAudioFormat: kotlinx.coroutines.flow.StateFlow<com.alananasss.kittytune.audio.SourceAudioFormat?> = _currentAudioFormat
+
     @Volatile
     var activeEngine = AudioEngine()
 
@@ -380,11 +386,6 @@ class Player {
         override val durationMs get() = activeEngine.durationMs
         override fun seekTo(positionMs: Long) = this@Player.seekTo(positionMs)
     }
-
-    private val _currentAudioFormat = kotlinx.coroutines.flow.MutableStateFlow<com.alananasss.kittytune.audio.SourceAudioFormat?>(null)
-
-    /** What the playing engine's stream carries, for the codec badge and the audio-path diagnostics. */
-    val currentAudioFormat: kotlinx.coroutines.flow.StateFlow<com.alananasss.kittytune.audio.SourceAudioFormat?> = _currentAudioFormat
 
     private fun bindEngine(eng: AudioEngine) {
         _currentAudioFormat.value = eng.sourceFormat
