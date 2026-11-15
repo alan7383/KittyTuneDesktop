@@ -241,7 +241,7 @@ class AudioEngine {
             // A protected URL decodes in-process like any other stream: the CDM sidecar decrypts each
             // fragment into the FFmpeg path, so the whole DSP chain runs.
             // The previous track's stream no longer needs its DRM session (and the CDM behind it).
-            hlsAdapter?.releaseDrm()
+            hlsAdapter?.retire()
             hlsAdapter = if (url.contains(".m3u8")) {
                 (HlsHeadCache.take(url, ::reResolveUrl)
                     ?: HlsStreamAdapter(url, headers, refreshPlaylistUrl = ::reResolveUrl)).also {
@@ -521,7 +521,7 @@ class AudioEngine {
         stop()
         lineCloser.close()
         // Without this the CDM daemon (in WSL) would stay up until it noticed it was idle.
-        hlsAdapter?.releaseDrm()
+        hlsAdapter?.retire()
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         // Terminal: this engine is being discarded. stopInternal() only flush()es the
@@ -711,7 +711,7 @@ class AudioEngine {
         if (isHls) {
             var adapter = hlsAdapter
             if (adapter == null || adapter.playlistUrl != targetUrl) {
-                adapter?.releaseDrm()
+                adapter?.retire()
                 adapter = HlsStreamAdapter(targetUrl, headers, refreshPlaylistUrl = ::reResolveUrl).also {
                     it.licenseToken = licenseToken
                 }
