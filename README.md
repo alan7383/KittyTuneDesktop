@@ -109,6 +109,60 @@ Connect your SoundCloud account full two-way synchronization: your likes, playli
 
 <br>
 
+<details>
+<summary>Keyboard shortcuts</summary>
+
+### Playback and track controls
+
+| Shortcut | Action |
+| :--- | :--- |
+| `Spacebar` | Play or pause |
+| `Shift + Right` | Next track |
+| `Shift + Left` | Previous track |
+| `Right` | Seek forward 5 seconds |
+| `Left` | Seek backward 5 seconds |
+| `0` to `9` | Seek to percentage (0% to 90%) |
+| `Shift + L` | Toggle repeat mode |
+| `Shift + S` | Toggle shuffle mode |
+| `L` | Like or unlike active track |
+| `R` | Repost or un-repost active track |
+
+### Volume and audio
+
+| Shortcut | Action |
+| :--- | :--- |
+| `Shift + Up` | Increase volume |
+| `Shift + Down` | Decrease volume |
+| `M` | Mute or unmute |
+
+### Navigation and panels
+
+| Shortcut | Action |
+| :--- | :--- |
+| `S` | Open search |
+| `P` | Open track details |
+| `Q` | Toggle queue panel |
+| `H` | Open keyboard shortcuts modal |
+| `Escape` | Close overlay or navigate back |
+| `Mouse Back / Forward` | Navigate history back or forward |
+| `G` then `L` | Go to likes |
+| `G` then `C` | Go to library |
+| `G` then `H` | Go to history |
+| `G` then `S` | Go to feed |
+| `G` then `P` | Go to profile |
+
+### Interface scaling
+
+| Shortcut | Action |
+| :--- | :--- |
+| `Ctrl + +` / `Ctrl + =` | Zoom in |
+| `Ctrl + -` | Zoom out |
+| `Ctrl + 0` | Reset zoom to 100% |
+
+</details>
+
+<br>
+
 # Download and installation
 
 Pre-built binaries for Linux, Windows, and macOS are available on the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
