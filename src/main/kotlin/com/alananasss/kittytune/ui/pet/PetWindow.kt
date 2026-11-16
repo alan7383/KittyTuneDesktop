@@ -61,7 +61,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Window
+import androidx.compose.ui.awt.SwingWindow
+import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.alananasss.kittytune.core.Prefs
@@ -75,6 +76,7 @@ import com.alananasss.kittytune.ui.common.FloatingMenuItem
 import com.alananasss.kittytune.ui.common.FloatingMenuWindow
 import com.alananasss.kittytune.ui.player.mini.WindowDragHandler
 import com.alananasss.kittytune.ui.player.mini.dragsWindow
+import com.alananasss.kittytune.core.LinuxWindowHelper
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import com.alananasss.kittytune.ui.theme.withUiScale
 import java.awt.Cursor
@@ -153,25 +155,26 @@ fun PetDesktopWindow(
     // Inside the key: a window built again is set up again before it shows.
     var windowReady by remember { mutableStateOf(false) }
 
-    Window(
+    SwingWindow(
         onCloseRequest = { PetWindowState.show(false) },
         state = windowState,
         visible = !isAppFullScreen && windowReady,
         alwaysOnTop = isPinned,
-        undecorated = true,
+        decoration = WindowDecoration.Undecorated(),
         transparent = !compat,
         resizable = true,
         title = "KittyTune Kitty pet",
+        init = { window ->
+            if (LinuxWindowHelper.isLinux) LinuxWindowHelper.configureUtilityWindow(window)
+            else window.type = java.awt.Window.Type.UTILITY
+        },
     ) {
         // Same pre-map setup as the mini player: a floating tool, not another app window.
         DisposableEffect(window) {
-            runCatching { window.type = java.awt.Window.Type.UTILITY }
             val shownListener = object : java.awt.event.ComponentAdapter() {
                 override fun componentShown(e: java.awt.event.ComponentEvent?) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
-                    } else {
-                        com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
                     }
                 }
             }
@@ -216,8 +219,6 @@ fun PetDesktopWindow(
             if (isAppFullScreen) return@LaunchedEffect
             if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                 com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
-            } else {
-                com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
             }
         }
 
