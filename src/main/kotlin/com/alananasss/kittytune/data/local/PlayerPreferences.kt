@@ -823,13 +823,13 @@ class PlayerPreferences {
 
     fun getLyricsLineAnimation(): LyricsLineAnimation =
         runCatching { LyricsLineAnimation.valueOf(Prefs.getString(KEY_LYRICS_LINE_ANIMATION, null)!!) }
-            .getOrDefault(LyricsLineAnimation.SWEEP)
+            .getOrDefault(LyricsLineAnimation.FADE)
     fun setLyricsLineAnimation(style: LyricsLineAnimation) = Prefs.putString(KEY_LYRICS_LINE_ANIMATION, style.name)
     fun getLyricsSweepEnabled(): Boolean = getLyricsLineAnimation() == LyricsLineAnimation.SWEEP
     fun setLyricsSweepEnabled(enabled: Boolean) =
         setLyricsLineAnimation(if (enabled) LyricsLineAnimation.SWEEP else LyricsLineAnimation.FADE)
     fun lyricsSweepEnabledFlow(): Flow<Boolean> =
-        Prefs.stringFlow(KEY_LYRICS_LINE_ANIMATION, LyricsLineAnimation.SWEEP.name).map { it != LyricsLineAnimation.FADE.name }
+        Prefs.stringFlow(KEY_LYRICS_LINE_ANIMATION, LyricsLineAnimation.FADE.name).map { it == LyricsLineAnimation.SWEEP.name }
 
     fun getInstrumentalIndicatorStyle(): InstrumentalIndicatorStyle =
         InstrumentalIndicatorStyle.fromString(Prefs.getString(KEY_INSTRUMENTAL_INDICATOR, InstrumentalIndicatorStyle.DOTS.name))
