@@ -506,7 +506,7 @@ object UpdateManager {
     }
 
     internal fun resolveKittyTuneExe(): File? {
-        val jpackagePath = System.getProperty("jpackage.app.path")
+        val jpackagePath = System.getProperty("jpackage.app-path") ?: System.getProperty("jpackage.app.path")
         val possibleExePaths = mutableListOf<File>()
         jpackagePath?.let { p ->
             val f = File(p)
@@ -534,36 +534,40 @@ object UpdateManager {
         val escapedLog = logFile.absolutePath.replace("'", "''")
         val escapedMsiLog = msiLogFile.absolutePath.replace("'", "''")
         val isMsi = installerFile.name.endsWith(".msi", ignoreCase = true)
+        val expectedVersion = releaseInfo?.versionName.orEmpty().replace("'", "''")
+        val support = requireNotNull(javaClass.getResourceAsStream("/updater/windows-install-support.ps1")).use {
+            it.bufferedReader(Charsets.UTF_8).readText()
+        }
 
         val installCmd = if (isMsi) {
             """
             Log "Executing msiexec..."
-            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru -WindowStyle Hidden
+            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/qn', 'REINSTALLMODE=amus', ('INSTALLDIR="{0}"' -f ${'$'}installDir), '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru -WindowStyle Hidden
             Log "msiexec silent install finished with exit code ${'$'}(${'$'}p.ExitCode)"
 
             # Fallback 1: If exit code 1638 (same version already installed), retry with REINSTALL=ALL
             if (${'$'}p.ExitCode -eq 1638) {
                 Log "Detected exit code 1638 (same version). Retrying silent reinstall..."
-                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru -WindowStyle Hidden
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', 'REINSTALL=ALL', '/qn', 'REINSTALLMODE=amus', ('INSTALLDIR="{0}"' -f ${'$'}installDir), '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru -WindowStyle Hidden
                 Log "msiexec silent reinstall finished with exit code ${'$'}(${'$'}p.ExitCode)"
             }
 
             # Fallback 2: If silent install failed (e.g. 1603 due to UAC elevation required), retry with basic UI (/qb)
-            if (${'$'}p.ExitCode -ne 0) {
+            if (${'$'}p.ExitCode -notin @(0, 3010, 1641)) {
                 Log "Silent install failed (${'$'}(${'$'}p.ExitCode)). Retrying with basic UI (/qb)..."
-                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/qb', 'REINSTALLMODE=amus', ('INSTALLDIR="{0}"' -f ${'$'}installDir), '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
                 Log "msiexec basic UI install finished with exit code ${'$'}(${'$'}p.ExitCode)"
                 if (${'$'}p.ExitCode -eq 1638) {
                     Log "Retrying basic UI install with REINSTALL=ALL..."
-                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
+                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', 'REINSTALL=ALL', '/qb', 'REINSTALLMODE=amus', ('INSTALLDIR="{0}"' -f ${'$'}installDir), '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
                     Log "msiexec basic UI reinstall finished with exit code ${'$'}(${'$'}p.ExitCode)"
                 }
             }
 
             # Fallback 3: Full interactive wizard if basic UI still failed
-            if (${'$'}p.ExitCode -ne 0) {
+            if (${'$'}p.ExitCode -notin @(0, 3010, 1641)) {
                 Log "Basic UI install failed (${'$'}(${'$'}p.ExitCode)). Retrying with interactive installer..."
-                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/norestart', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/norestart', 'REINSTALLMODE=amus', ('INSTALLDIR="{0}"' -f ${'$'}installDir), 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
                 Log "msiexec interactive install finished with exit code ${'$'}(${'$'}p.ExitCode)"
             }
             """.trimIndent()
@@ -572,7 +576,7 @@ object UpdateManager {
             Log "Executing setup executable..."
             ${'$'}p = Start-Process -FilePath '$escapedInstaller' -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-') -Wait -PassThru -WindowStyle Hidden
             Log "Setup finished with exit code ${'$'}(${'$'}p.ExitCode)"
-            if (${'$'}p.ExitCode -ne 0) {
+            if (${'$'}p.ExitCode -notin @(0, 3010, 1641)) {
                 Log "Silent setup failed (${'$'}(${'$'}p.ExitCode)). Retrying with interactive installer..."
                 ${'$'}p = Start-Process -FilePath '$escapedInstaller' -Wait -PassThru
                 Log "Interactive setup finished with exit code ${'$'}(${'$'}p.ExitCode)"
@@ -582,13 +586,30 @@ object UpdateManager {
 
         return """
             # KittyTune Windows Auto-Updater Script
+            ${'$'}ErrorActionPreference = 'Stop'
+            $support
+            ${'$'}exePath = '$escapedTargetExe'
             ${'$'}logFile = '$escapedLog'
             function Log(${'$'}msg) {
                 ${'$'}ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                "[${'$'}ts] ${'$'}msg" | Out-File -FilePath ${'$'}logFile -Append -Encoding utf8
+                "[${'$'}ts] ${'$'}msg" | Out-File -LiteralPath ${'$'}logFile -Append -Encoding utf8
             }
 
             Log "Starting updater for PID $targetPid"
+            try {
+                if (![IO.File]::Exists(${'$'}exePath)) { throw 'Cannot determine the running KittyTune installation.' }
+                ${'$'}installDir = [IO.Path]::GetDirectoryName(${'$'}exePath)
+                ${'$'}expectedVersion = '$expectedVersion'
+                if (![string]::IsNullOrWhiteSpace(${'$'}expectedVersion)) {
+                    ${'$'}expectedKey = Get-KittyTuneVersionKey ${'$'}expectedVersion
+                } else {
+                    ${'$'}expectedVersion = Get-KittyTuneMsiVersion '$escapedInstaller'
+                    ${'$'}expectedKey = Get-KittyTuneVersionKey ${'$'}expectedVersion
+                }
+            } catch {
+                Log "Cannot start update: ${'$'}(${'$'}_.Exception.Message)"
+                throw
+            }
             ${'$'}targetPid = $targetPid
             try {
                 ${'$'}proc = Get-Process -Id ${'$'}targetPid -ErrorAction Stop
@@ -598,8 +619,11 @@ object UpdateManager {
                 Log "Process ${'$'}targetPid is not running or already exited."
             }
 
-            Log "Ensuring all KittyTune processes are stopped..."
-            ${'$'}procs = Get-Process -Name "KittyTune", "kittytune", "WindowsSmtcBridge" -ErrorAction SilentlyContinue
+            Log "Stopping processes for ${'$'}exePath..."
+            ${'$'}procs = Get-Process -Name "KittyTune", "WindowsSmtcBridge" -ErrorAction SilentlyContinue | Where-Object {
+                try { [IO.Path]::GetFullPath(${'$'}_.Path).Equals(${'$'}exePath,[StringComparison]::OrdinalIgnoreCase) }
+                catch { ${'$'}false }
+            }
             if (${'$'}procs) {
                 ${'$'}procs | Stop-Process -Force -ErrorAction SilentlyContinue
                 ${'$'}procs | ForEach-Object {
@@ -608,29 +632,27 @@ object UpdateManager {
             }
             Start-Sleep -Seconds 2
 
-            $installCmd
-
-            ${'$'}exePath = '$escapedTargetExe'
-            if (-not (Test-Path -Path ${'$'}exePath)) {
-                ${'$'}candidates = @(
-                    "${'$'}env:LOCALAPPDATA\KittyTune\KittyTune.exe",
-                    "${'$'}env:LOCALAPPDATA\Programs\KittyTune\KittyTune.exe",
-                    "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe",
-                    "${'$'}{env:ProgramFiles(x86)}\KittyTune\KittyTune.exe"
-                )
-                foreach (${'$'}c in ${'$'}candidates) {
-                    if (Test-Path -Path ${'$'}c) {
-                        ${'$'}exePath = ${'$'}c
-                        break
-                    }
+            ${'$'}shortcuts = @(Save-KittyTuneShortcuts -Executable ${'$'}exePath)
+            ${'$'}installed = ${'$'}false
+            try {
+                $installCmd
+                if (${'$'}p.ExitCode -notin @(0, 3010, 1641)) { throw "Installer failed with exit code ${'$'}(${'$'}p.ExitCode)." }
+                if (${'$'}p.ExitCode -in @(3010, 1641)) { Log 'Update installed; Windows restart is required before relaunch.'; return }
+                ${'$'}actualVersion = Get-KittyTuneVersion ${'$'}exePath
+                if ((Get-KittyTuneVersionKey ${'$'}actualVersion) -ne ${'$'}expectedKey) {
+                    throw "Expected version ${'$'}expectedVersion at ${'$'}exePath, found ${'$'}actualVersion."
                 }
-            }
-
-            if (Test-Path -Path ${'$'}exePath) {
-                Log "Relaunching KittyTune from ${'$'}exePath"
+                try {
+                    [IO.File]::WriteAllText((Join-Path ${'$'}installDir 'version.txt'), ${'$'}actualVersion + [Environment]::NewLine)
+                } catch { Log "Could not refresh version.txt: ${'$'}(${'$'}_.Exception.Message)" }
+                ${'$'}installed = ${'$'}true
+            } catch {
+                Log "Update failed: ${'$'}(${'$'}_.Exception.Message)"
+                throw
+            } finally { Restore-KittyTuneShortcuts -Snapshot ${'$'}shortcuts }
+            if (${'$'}installed) {
+                Log "Relaunching verified version ${'$'}actualVersion from ${'$'}exePath"
                 Start-Process -FilePath ${'$'}exePath
-            } else {
-                Log "Could not find KittyTune.exe to relaunch"
             }
             Log "Updater script finished."
         """.trimIndent()
@@ -647,6 +669,10 @@ object UpdateManager {
                     if (installer != null && installer.exists()) {
                         val currentPid = runCatching { ProcessHandle.current().pid() }.getOrDefault(0L)
                         val targetExe = resolveKittyTuneExe()
+                        if (targetExe == null) {
+                            _status.value = UpdateStatus.ERROR
+                            return
+                        }
                         val tmpDir = File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates")
                         tmpDir.mkdirs()
                         val scriptFile = File(tmpDir, "update_install_${System.currentTimeMillis()}.ps1")
@@ -659,7 +685,7 @@ object UpdateManager {
                             logFile = logFile,
                             msiLogFile = msiLogFile
                         )
-                        scriptFile.writeText(scriptContent, Charsets.UTF_8)
+                        scriptFile.writeBytes(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + scriptContent.toByteArray(Charsets.UTF_8))
 
                         ProcessBuilder(
                             "powershell.exe",

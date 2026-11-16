@@ -909,8 +909,15 @@ val enableSegmentHeap = tasks.register<EnableSegmentHeapTask>("enableSegmentHeap
     mustRunAfter(stripForeignNativesDistributable, stripForeignNativesDistributableMain)
 }
 
-tasks.matching { it.name in listOf("createDistributable", "createReleaseDistributable") }.configureEach {
-    if (desktopIsWindows) finalizedBy(enableSegmentHeap)
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (desktopIsWindows && name in listOf("createDistributable", "createReleaseDistributable")) {
+        finalizedBy(enableSegmentHeap)
+        val packagedVersion = project.version.toString()
+        inputs.property("readableVersion", packagedVersion)
+        doLast {
+            destinationDir.get().asFile.resolve("version.txt").writeText("$packagedVersion\n", Charsets.UTF_8)
+        }
+    }
 }
 
 tasks.matching { it.name == "zipWindowsPortable" || (it.name.startsWith("package") && it.name.endsWith("Msi")) }.configureEach {
@@ -997,7 +1004,7 @@ tasks.register<Test>("headlessTest") {
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
             "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest",
-            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest"
+            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest", "*WindowsUpdateTest"
         ).forEach(::includeTestsMatching)
     }
 }
