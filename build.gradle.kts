@@ -915,8 +915,17 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageT
         val packagedVersion = project.version.toString()
         inputs.property("readableVersion", packagedVersion)
         doLast {
-            destinationDir.get().asFile.resolve("version.txt").writeText("$packagedVersion\n", Charsets.UTF_8)
+            destinationDir.get().asFile.resolve("KittyTune/version.txt").writeText("$packagedVersion\n", Charsets.UTF_8)
         }
+    }
+}
+
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (desktopIsWindows && name in listOf("packageMsi", "packageReleaseMsi")) {
+        val imageName = if (name == "packageReleaseMsi") "createReleaseDistributable" else "createDistributable"
+        val image = tasks.named<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>(imageName)
+        dependsOn(image)
+        appImage.set(image.flatMap { it.destinationDir.dir("KittyTune") })
     }
 }
 
