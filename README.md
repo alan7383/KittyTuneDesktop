@@ -15,25 +15,23 @@
 </p>
 
 > [!NOTE]
-> KittyTune Desktop is developed and tested primarily on Linux. Builds for Windows and macOS are experimental. If you hit bugs or rough edges on Windows or macOS, please report them in an issue or submit a pull request.
+> KittyTune Desktop is developed and tested primarily on Linux. Builds for Windows and especially macOS are experimental. If you hit bugs or rough edges on Windows or macOS, please report them in an issue or submit a pull request.
 
-## About
+# About
 
-KittyTune Desktop is a native desktop music player built with Kotlin and Compose Multiplatform, running directly on the JVM with zero Electron overhead.
+KittyTune Desktop is a native desktop music player built with Kotlin and Compose Multiplatform, running directly in a JVM with zero Electron overhead.
 
-Connect your real SoundCloud account with OAuth PKCE for full two-way synchronization: your likes, playlists, reposts, followed artists, listening history, and in-app direct messages stay in lockstep. You can stream your entire collection with instant full-library shuffle and zero advertisements.
-
-Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matches it via ISRC and swaps in lossless audio on the fly. For encrypted tracks (`ctr-encrypted-hls` streams, including Go+ releases), KittyTune uses native Widevine CDM decryption (on Linux directly, and on Windows via a native in-process ELF loader with no VM or WSL needed), routing raw PCM straight into the audio engine so equalizers, DSP effects, and offline caching work on protected music.
+Connect your SoundCloud account full two-way synchronization: your likes, playlists, reposts, followed artists, listening history, and in-app direct messages stay in sync. You can stream your entire collection with instant full-library shuffle and zero ads!
 
 <br>
 
-## Core features
+# Core features
 
 | Feature | What it does | Details |
 | :--- | :--- | :--- |
 | Real SoundCloud sync | Connects to your actual SoundCloud account | OAuth PKCE syncs likes, playlists, reposts, stream feed, and in-app DMs |
 | Lossless and protected HLS | Upgrades streams and decrypts protected audio | ISRC matching pulls studio masters (Qobuz, TIDAL, Deezer); native Widevine CDM on Linux and Windows |
-| Audio FX and Nightcore | Real-time audio transformations on any track | Independent pitch and tempo shift for nightcore or daycore, plus 34 DSP effects |
+| Audio Effects | Real-time audio transformations on any track | Independent pitch and speed shift, plus 34 DSP effects |
 | Studio EQ and AutoEQ | 16-band graphic EQ paired with headphone tuning | 8,850+ measured AutoEQ profiles, peak limiting, spatial 8D audio, and lo-fi filters |
 | Real-time lyrics | Syllable-level synchronized karaoke text | 14 providers, duet split, spring animations, and script translation |
 | AI stem isolation | Separates vocals and instruments on your machine | HTDemucs v4 model accelerated by Vulkan GPU or ONNX Runtime |
@@ -45,7 +43,8 @@ Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matc
 
 <br>
 
-### More in the box
+<details>
+<summary>Other notable features</summary>
 
 | Area | Capabilities |
 | :--- | :--- |
@@ -53,10 +52,15 @@ Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matc
 | SoundCloud creator tools | Direct track uploader with cover art cropper, full artist discographies, and in-app direct messaging |
 | Offline and local files | Offline track downloads, local folder media scanner, and full JSON library backup and restore |
 | Music discovery | My Wave personalized endless radio, ShazamKit song recognition, and collectible Music Passport |
+| Android & Desktop synchronized playback | Control your Music no matter where you go, completely wirelessly!
+
+ <sub><sup>To synchronize playback between paired Android and desktop devices, see the [Connect guide](CONNECT.md).</sup></sub>
+
+</details>
 
 <br>
 
-## Screenshots
+# Screenshots
 
 <p align="center">
   <img src="images/fullscreen_player.png" width="850" style="border-radius: 12px;" alt="Fullscreen player">
@@ -79,7 +83,7 @@ Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matc
 
 <br>
 
-## Comparison with the SoundCloud web app
+# What makes Kittytune better than Soundcloud?
 
 | Capability | SoundCloud web | KittyTune Desktop |
 | :--- | :--- | :--- |
@@ -88,94 +92,92 @@ Whenever a track has a studio release on Qobuz, TIDAL, or Deezer, KittyTune matc
 | Playlist shuffle | Limited by lazy loading | Instant full-library shuffle without pagination |
 | Audio quality upgrades | Standard 128 kbps MP3 or 256 kbps AAC | Lossless matching via Qobuz, TIDAL, Deezer |
 | Protected stream playback (`ctr-encrypted-hls`) | Web player only | Native Widevine CDM on Linux and Windows with raw PCM routing |
-| Audio FX and Nightcore | None | Speed and pitch shift (nightcore/daycore), 16-band EQ, 34 DSP effects |
+| Audio Effects | None | Speed and pitch shift, 16-band EQ, 34 DSP effects |
 | Advertisements | Audio and banner ads | Zero ads |
-| Synchronized lyrics | None | Syllable-level tracking, duet split, variable fonts |
+| Synchronized lyrics | None | Syllable-level tracking, duet split |
 | Video canvas | None | Apple Music Canvas and TIDAL animated artwork |
 | Headphone calibration | None | AutoEQ database with 8,850+ profiles |
 | DJ Automix | None | Beat-matched transitions and harmonic mixing |
 | AI tools | None | Stem isolation via Demucs and ArtifactNet detector |
 | Offline downloads | None | Full track and playlist downloads |
 | Desktop pet companion | None | Interactive reactive cat (Ivy) |
-| Collaborative rooms | None | Real-time synchronized listening rooms |
-| Song recognition | None | Built-in ShazamKit recognition |
+| Listen Together | None | Real-time synchronized listening rooms |
+| Song recognition | None | Built-in ShazamKit music recognition |
 | Operating system media controls | Basic browser media keys | Native MPRIS D-Bus (Linux) and SMTC (Windows) |
 | Discord status | Third-party browser extension required | Native Discord Rich Presence |
 | Network circumvention | None | Built-in HTTP and SOCKS5 proxy with Zapret DPI tools |
 
 <br>
 
-## Keyboard shortcuts
-
-### Playback and track controls
-
-| Shortcut | Action |
-| :--- | :--- |
-| `Spacebar` | Play or pause |
-| `Shift + Right` | Next track |
-| `Shift + Left` | Previous track |
-| `Right` | Seek forward 5 seconds |
-| `Left` | Seek backward 5 seconds |
-| `0` to `9` | Seek to percentage (0% to 90%) |
-| `Shift + L` | Toggle repeat mode |
-| `Shift + S` | Toggle shuffle mode |
-| `L` | Like or unlike active track |
-| `R` | Repost or un-repost active track |
-
-### Volume and audio
-
-| Shortcut | Action |
-| :--- | :--- |
-| `Shift + Up` | Increase volume |
-| `Shift + Down` | Decrease volume |
-| `M` | Mute or unmute |
-
-### Navigation and panels
-
-| Shortcut | Action |
-| :--- | :--- |
-| `S` | Open search |
-| `P` | Open track details |
-| `Q` | Toggle queue panel |
-| `H` | Open keyboard shortcuts modal |
-| `Escape` | Close overlay or navigate back |
-| `Mouse Back / Forward` | Navigate history back or forward |
-| `G` then `L` | Go to likes |
-| `G` then `C` | Go to library |
-| `G` then `H` | Go to history |
-| `G` then `S` | Go to feed |
-| `G` then `P` | Go to profile |
-
-### Interface scaling
-
-| Shortcut | Action |
-| :--- | :--- |
-| `Ctrl + +` / `Ctrl + =` | Zoom in |
-| `Ctrl + -` | Zoom out |
-| `Ctrl + 0` | Reset zoom to 100% |
-
-## Download and installation
+# Download and installation
 
 Pre-built binaries for Linux, Windows, and macOS are available on the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
 
 | Platform or distribution | Method | Package or command |
 | :--- | :--- | :--- |
+| Windows and macOS | Installer / DMG (Experimental) | [GitHub Releases](https://github.com/alan7383/KittyTuneDesktop/releases) |
+| Portable Linux | Standalone AppImage | `chmod +x KittyTune-*.AppImage && ./KittyTune-*.AppImage` |
 | Arch Linux | [AUR (kitty-tune-bin)](https://aur.archlinux.org/packages/kitty-tune-bin) | `yay -S kitty-tune-bin` |
 | Arch Linux | Pacman package | `sudo pacman -U kitty-tune-*.pkg.tar.zst` |
 | NixOS / Nix | Flake / Package | `nix run github:alan7383/KittyTuneDesktop` |
 | Debian / Ubuntu / Mint | Debian package (`.deb`) | `sudo apt install ./kitty-tune_*_amd64.deb` |
 | Fedora / RHEL / openSUSE | RPM package (`.rpm`) | `sudo dnf install ./kitty-tune-*.rpm` |
-| Portable Linux | Standalone AppImage | `chmod +x KittyTune-*.AppImage && ./KittyTune-*.AppImage` |
-| Windows and macOS | Installer / DMG (Experimental) | [GitHub Releases](https://github.com/alan7383/KittyTuneDesktop/releases) |
 | Windows x64 | Portable ZIP with bundled Java runtime | [Windows guide](WINDOWS.md) |
 
-To synchronize playback between paired Android and desktop devices, see the [Connect guide](CONNECT.md).
+## Windows and macOS
 
-### Arch Linux
+<details>
+<summary>Click to expand</summary>
 
-Option 1: AUR package
+Download pre-compiled binaries from the [releases](https://github.com/alan7383/KittyTuneDesktop/releases) page:
+* Windows: MSI installer or portable ZIP archive
+* MacOS: DMG disk image
 
-The package `kitty-tune-bin` is available on the Arch User Repository (AUR), maintained by Felitendo.
+Detailed Windows build and runtime notes are available in the [Windows guide](WINDOWS.md).
+
+</details>
+
+## Portable Linux AppImage (Universal)
+
+<details>
+<summary>Click to expand</summary>
+
+Download the standalone `.AppImage` from the [releases](https://github.com/alan7383/KittyTuneDesktop/releases) page:
+```bash
+chmod +x KittyTune-*.AppImage
+./KittyTune-*.AppImage
+```
+</details>
+
+## Debian, Ubuntu, and Linux Mint
+
+<details>
+<summary>Click to expand</summary>
+
+Download the `.deb` file from the [releases](https://github.com/alan7383/KittyTuneDesktop/releases) page and install with apt:
+```bash
+sudo apt install ./kitty-tune_*_amd64.deb
+```
+</details>
+
+## Fedora, openSUSE, and RHEL
+
+<details>
+<summary>Click to expand</summary>
+
+Download the `.rpm` file from the [releases](https://github.com/alan7383/KittyTuneDesktop/releases) page and install with dnf:
+```bash
+sudo dnf install ./kitty-tune-*.rpm
+```
+</details>
+
+## Arch Linux
+<details>
+<summary>Click to expand</summary>
+
+* Option 1: AUR package
+
+The package `kitty-tune-bin` is available on the [Arch User Repository](https://aur.archlinux.org/packages/kitty-tune-bin), maintained by Felitendo.
 
 Install with yay:
 ```bash
@@ -186,15 +188,18 @@ Or with paru:
 ```bash
 paru -S kitty-tune-bin
 ```
+* Option 2: Pacman package
 
-Option 2: Pacman package
-
-Download the latest `.pkg.tar.zst` archive directly from releases and install with pacman:
+Download the latest `.pkg.tar.zst` archive directly from [releases](https://github.com/alan7383/KittyTuneDesktop/releases) page and install with pacman:
 ```bash
 sudo pacman -U kitty-tune-*.pkg.tar.zst
 ```
 
-### NixOS and Nix
+</details>
+
+## NixOS and Nix
+<details>
+<summary>Click to expand</summary>
 
 KittyTune Desktop has Flake support, a package derivation, and a NixOS module.
 
@@ -202,14 +207,13 @@ Run directly without installing:
 ```bash
 nix run github:alan7383/KittyTuneDesktop
 ```
-
 Temporary shell:
 ```bash
 nix shell github:alan7383/KittyTuneDesktop
 ```
 
 Declarative NixOS configuration (Flake):
-Add KittyTune Desktop to your `flake.nix` inputs:
+* Add KittyTune Desktop to your `flake.nix` inputs:
 
 ```nix
 {
@@ -253,35 +257,7 @@ nix develop
 ./gradlew run
 ```
 
-### Debian, Ubuntu, and Linux Mint
-
-Download the `.deb` file from the releases page and install with apt:
-```bash
-sudo apt install ./kitty-tune_*_amd64.deb
-```
-
-### Fedora, openSUSE, and RHEL
-
-Download the `.rpm` file from the releases page and install with dnf:
-```bash
-sudo dnf install ./kitty-tune-*.rpm
-```
-
-### Portable Linux AppImage
-
-Download the standalone `.AppImage` from the releases page:
-```bash
-chmod +x KittyTune-*.AppImage
-./KittyTune-*.AppImage
-```
-
-### Windows and macOS
-
-Download pre-compiled binaries from the releases page:
-* Windows: MSI installer or portable ZIP archive
-* macOS: DMG disk image
-
-Detailed Windows build and runtime notes are available in the [Windows guide](WINDOWS.md).
+</details>
 
 ## Building from source
 
@@ -300,7 +276,7 @@ cd KittyTuneDesktop
 ./gradlew packageDistributionForCurrentOS
 ```
 
-## Credits and license
+# Credits and license
 
 * Based on KittyTune for Android.
 * Built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform), [MaterialKolor](https://github.com/jordond/MaterialKolor), and [FFmpeg](https://ffmpeg.org/).
@@ -309,7 +285,7 @@ KittyTune Desktop is licensed under the GNU General Public License v3.0. See [LI
 
 ## Contributors
 
-Thanks to everyone who contributes to KittyTune Desktop:
+Thanks to everyone who contributes to KittyTune Desktop!
 
 [![Contributors](https://contrib.rocks/image?repo=alan7383/KittyTuneDesktop)](https://github.com/alan7383/KittyTuneDesktop/graphs/contributors)
 
