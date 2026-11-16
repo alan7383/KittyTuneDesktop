@@ -113,7 +113,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Window
+import androidx.compose.ui.awt.SwingWindow
+import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
@@ -127,6 +128,7 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricWord
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
+import com.alananasss.kittytune.core.LinuxWindowHelper
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import java.awt.Cursor
 
@@ -199,7 +201,7 @@ internal class WindowDragHandler(
             loggedDragPath = true
             println(
                 "MiniPlayer: drag via " +
-                    if (nativeStarted) "native WM move" else "manual fallback" +
+                    (if (nativeStarted) "native WM move" else "manual fallback") +
                     " (wayland=${com.alananasss.kittytune.core.LinuxWindowHelper.isWayland})"
             )
         }
@@ -358,28 +360,29 @@ fun MiniLyricsPlayerWindow(
     // Inside the key, so a window built again is set up again before it shows.
     var windowReady by remember { mutableStateOf(false) }
 
-    Window(
+    SwingWindow(
         onCloseRequest = { closeMiniPlayer("os-close-request") },
         state = windowState,
         visible = !isFullScreen && windowReady,
         alwaysOnTop = isPinned,
-        undecorated = true,
+        decoration = WindowDecoration.Undecorated(),
         transparent = !compat,
         // Native live resize can ignore AWT maximumSize. Use the bounded handles below.
         resizable = false,
         title = "KittyTune Mini Player",
+        init = { window ->
+            if (LinuxWindowHelper.isLinux) LinuxWindowHelper.configureUtilityWindow(window)
+            else window.type = java.awt.Window.Type.UTILITY
+        },
     ) {
         // Pre-map setup while the window is still hidden (see windowReady above):
         // type, transparency and show-time styling land before the compositor ever
         // maps the window, which is what makes tiling WMs float it as a utility.
         DisposableEffect(window) {
-            runCatching { window.type = java.awt.Window.Type.UTILITY }
             val shownListener = object : java.awt.event.ComponentAdapter() {
                 override fun componentShown(e: java.awt.event.ComponentEvent?) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
-                    } else {
-                        com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
                     }
                 }
             }
@@ -503,8 +506,6 @@ fun MiniLyricsPlayerWindow(
             if (isFullScreen) return@LaunchedEffect
             if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                 com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
-            } else {
-                com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
             }
         }
 
