@@ -227,6 +227,19 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.alananasss.kittytune.core.TogetherUriRequests.requests.collect { req ->
+            playerViewModel.isPlayerExpanded = false
+            playerViewModel.showLyricsSheet = false
+            if (req.autoJoin) {
+                com.alananasss.kittytune.data.together.Together.joinAndListen(req.code)
+                playerViewModel.navigateToPlaylistId = "together:${req.code}"
+            } else {
+                playerViewModel.pendingTogetherInviteCode = req.code
+            }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
         homeViewModel.playTrack.collect { track ->
             playerViewModel.playPlaylist(listOf(track), 0)
         }
@@ -1169,7 +1182,8 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                         composable("together_home") {
                             com.alananasss.kittytune.ui.together.TogetherHomeScreen(
                                 onBack = { navController.popBackStack() },
-                                onOpen = { code -> navController.navigate("together/$code") }
+                                onOpen = { code -> navController.navigate("together/$code") },
+                                playerViewModel = playerViewModel,
                             )
                         }
                         composable("together/{code}") { backStackEntry ->
@@ -1496,6 +1510,34 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
 
     AiDetectionOverlays(playerViewModel, navController)
 
+    if (playerViewModel.showLiveListenDialog) {
+        com.alananasss.kittytune.ui.together.LiveListenDialog(
+            playerViewModel = playerViewModel,
+            onOpenRoom = { code ->
+                playerViewModel.showLiveListenDialog = false
+                playerViewModel.navigateToPlaylistId = "together:$code"
+            },
+            onDismissRequest = { playerViewModel.showLiveListenDialog = false },
+        )
+    }
+
+    playerViewModel.pendingTogetherInviteCode?.let { inviteCode ->
+        com.alananasss.kittytune.ui.together.TogetherInviteDialog(
+            code = inviteCode,
+            onJoinAndListen = { code ->
+                playerViewModel.pendingTogetherInviteCode = null
+                com.alananasss.kittytune.data.together.Together.joinAndListen(code)
+                playerViewModel.navigateToPlaylistId = "together:$code"
+            },
+            onOpenRoomOnly = { code ->
+                playerViewModel.pendingTogetherInviteCode = null
+                com.alananasss.kittytune.data.together.Together.join(code)
+                playerViewModel.navigateToPlaylistId = "together:$code"
+            },
+            onDismissRequest = { playerViewModel.pendingTogetherInviteCode = null },
+        )
+    }
+
     if (playerViewModel.showQueueHistoryDialog) {
         com.alananasss.kittytune.ui.player.QueueHistoryDialog(
             viewModel = playerViewModel,
@@ -1616,6 +1658,13 @@ private fun isSameRoute(navController: androidx.navigation.NavController, target
             } ?: ""
             val targetTrackId = targetRoute.removePrefix("track_detail:").removePrefix("track_detail/").substringBefore("?")
             currentTrackId == targetTrackId
+        }
+        pattern == "together/{code}" -> {
+            val currentCode = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("code") } }.getOrNull()
+            } ?: ""
+            val targetCode = targetRoute.removePrefix("together:").removePrefix("together/")
+            currentCode == targetCode
         }
         else -> pattern == targetRoute
     }

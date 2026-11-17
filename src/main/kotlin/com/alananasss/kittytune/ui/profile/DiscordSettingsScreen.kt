@@ -42,6 +42,9 @@ fun DiscordSettingsScreen(
     var token by remember { mutableStateOf(prefs.getDiscordToken()) }
     var isEnabled by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
     var statusDisplay by remember { mutableStateOf(prefs.getDiscordStatusDisplay()) }
+    var listenAlongEnabled by remember { mutableStateOf(prefs.getDiscordListenAlongEnabled()) }
+    var autoLiveEnabled by remember { mutableStateOf(prefs.getDiscordAutoLiveEnabled()) }
+    var liveCode by remember { mutableStateOf(com.alananasss.kittytune.data.together.Together.personalLiveCode) }
     val isLoggedIn = !token.isNullOrEmpty()
 
     // The token is written by the QR login on another destination. If this section is still
@@ -164,17 +167,68 @@ fun DiscordSettingsScreen(
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
-                        SettingsItem(
-                            shape = getSettingsShape(2, 1),
-                            title = str("pref_discord_status_display"),
-                            subtitle = when (statusDisplay) {
-                                DiscordStatusDisplay.ACTIVITY -> str("discord_status_activity")
-                                DiscordStatusDisplay.SOUNDCLOUD -> str("discord_status_soundcloud")
-                                DiscordStatusDisplay.ARTIST -> str("discord_status_artist")
-                                DiscordStatusDisplay.SONG -> str("discord_status_song")
-                            },
-                            onClick = { showStatusDialog = true }
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            val totalSubItems = if (listenAlongEnabled) 5 else 3
+                            SettingsItem(
+                                shape = getSettingsShape(totalSubItems + 1, 1),
+                                title = str("pref_discord_status_display"),
+                                subtitle = when (statusDisplay) {
+                                    DiscordStatusDisplay.ACTIVITY -> str("discord_status_activity")
+                                    DiscordStatusDisplay.SOUNDCLOUD -> str("discord_status_soundcloud")
+                                    DiscordStatusDisplay.ARTIST -> str("discord_status_artist")
+                                    DiscordStatusDisplay.SONG -> str("discord_status_song")
+                                },
+                                onClick = { showStatusDialog = true }
+                            )
+                            SettingsItem(
+                                shape = getSettingsShape(totalSubItems + 1, 2),
+                                title = str("discord_listen_along_title"),
+                                subtitle = str("discord_listen_along_desc"),
+                                hasSwitch = true,
+                                switchState = listenAlongEnabled,
+                                onSwitchChange = {
+                                    listenAlongEnabled = it
+                                    prefs.setDiscordListenAlongEnabled(it)
+                                    playerViewModel?.updateDiscordPresence()
+                                }
+                            )
+                            SettingsItem(
+                                shape = getSettingsShape(totalSubItems + 1, 3),
+                                title = str("discord_auto_live_title"),
+                                subtitle = str("discord_auto_live_desc"),
+                                hasSwitch = true,
+                                switchState = autoLiveEnabled,
+                                onSwitchChange = {
+                                    autoLiveEnabled = it
+                                    prefs.setDiscordAutoLiveEnabled(it)
+                                    if (it && playerViewModel?.isPlaying == true) {
+                                        playerViewModel.startLiveListenAlong()
+                                    } else {
+                                        playerViewModel?.updateDiscordPresence()
+                                    }
+                                }
+                            )
+                            if (listenAlongEnabled) {
+                                SettingsItem(
+                                    shape = getSettingsShape(totalSubItems + 1, 4),
+                                    title = str("together_copy_link"),
+                                    subtitle = com.alananasss.kittytune.data.together.TogetherLinks.inviteUrl(liveCode),
+                                    onClick = {
+                                        com.alananasss.kittytune.data.together.TogetherLinks.copyInviteLink(liveCode)
+                                    }
+                                )
+                                SettingsItem(
+                                    shape = getSettingsShape(totalSubItems + 1, 5),
+                                    title = str("together_reset_link"),
+                                    subtitle = str("together_reset_link_desc"),
+                                    onClick = {
+                                        liveCode = com.alananasss.kittytune.data.together.Together.regeneratePersonalLiveCode()
+                                        com.alananasss.kittytune.data.together.TogetherLinks.copyInviteLink(liveCode)
+                                        playerViewModel?.updateDiscordPresence()
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

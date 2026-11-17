@@ -72,6 +72,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Podcasts
 import com.alananasss.kittytune.ui.player.slider.mixGlow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -611,6 +612,30 @@ fun PlayerBar(
                     }
                 }
 
+                AnimatedVisibility(
+                    visible = !isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER in visibleButtons,
+                    enter = barButtonEnter,
+                    exit = barButtonExit,
+                ) {
+                    val activeTogether by com.alananasss.kittytune.data.together.Together.active.collectAsState()
+                    Tip(str("together_live_title")) {
+                        IconButton(
+                            shapes = iconShapes,
+                            onClick = { vm.showLiveListenDialog = !vm.showLiveListenDialog },
+                        ) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Rounded.Podcasts,
+                                contentDescription = str("together_live_title"),
+                                tint = if (activeTogether != null || vm.showLiveListenDialog) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
                 AnimatedVisibility(
                     visible = !isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_DEVICES in visibleButtons,
                     enter = barButtonEnter,

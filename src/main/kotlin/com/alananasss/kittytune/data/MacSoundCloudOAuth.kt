@@ -26,8 +26,14 @@ internal object MacSoundCloudOAuth {
             val desktop = Desktop.getDesktop()
             check(desktop.isSupported(Desktop.Action.APP_OPEN_URI))
             desktop.setOpenURIHandler { event ->
-                val active = target ?: return@setOpenURIHandler
                 val value = event.uri.toASCIIString()
+                if (com.alananasss.kittytune.core.TogetherUriRequests.submitUri(value)) {
+                    java.awt.EventQueue.invokeLater {
+                        com.alananasss.kittytune.core.MainWindowRaiser.raise()
+                    }
+                    return@setOpenURIHandler
+                }
+                val active = target ?: return@setOpenURIHandler
                 // Ignore sc://auth probes and stale callbacks before opening a connection.
                 if (SoundCloudOAuthCallback.parse(value, active.state) == null) return@setOpenURIHandler
                 worker.execute {

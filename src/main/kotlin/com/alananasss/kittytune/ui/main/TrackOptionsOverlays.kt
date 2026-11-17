@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.PointerMatcher
@@ -525,6 +526,17 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             }
             // In a shared playlist a song can go next for everyone, or be offered to the playlist itself.
             val togetherCode = com.alananasss.kittytune.data.together.Together.active.collectAsState().value
+            if (viewModel.isMenuContextFromPlayer) {
+                add(MenuOptionItem(
+                    id = "together_live",
+                    icon = androidx.compose.material.icons.Icons.Rounded.Podcasts,
+                    text = str("together_live_title"),
+                    tint = activeColor.takeIf { togetherCode != null },
+                ) {
+                    viewModel.showMenuSheet = false
+                    viewModel.showLiveListenDialog = true
+                })
+            }
             if (togetherCode != null) {
                 val shared = com.alananasss.kittytune.data.together.SharedTrack.of(track)
                 add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_play_next")) {

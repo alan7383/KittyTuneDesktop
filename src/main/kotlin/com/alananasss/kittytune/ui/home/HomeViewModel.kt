@@ -491,7 +491,12 @@ import com.alananasss.kittytune.utils.Logger
             val isYoutubeUrl = trimmed.contains("youtube.com") || trimmed.contains("youtu.be") || trimmed.startsWith("yt_radio:")
             val isProviderUrl = ProviderLinks.looksLikeProviderUrl(trimmed)
 
-            if (isSoundCloudUrl) {
+            val isTogetherUrl = com.alananasss.kittytune.data.together.TogetherLinks.extractCode(trimmed, allowRawCode = false) != null
+
+            if (isTogetherUrl) {
+                com.alananasss.kittytune.core.TogetherUriRequests.submitUri(trimmed)
+                clearSearch()
+            } else if (isSoundCloudUrl) {
                 handleSoundCloudUrl(trimmed)
             } else if (isSpotifyUrl) {
                 handleSpotifyUrl(trimmed)

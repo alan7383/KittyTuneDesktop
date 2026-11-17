@@ -60,13 +60,13 @@ object SingleInstance {
             handle.close()
             // If the running instance cannot be reached, starting anyway beats refusing to start.
             if (signalRunningInstance(filesToOpen)) return false
-            OpenFileRequests.submit(filesToOpen)
+            TogetherUriRequests.dispatchIncomingArgs(filesToOpen)
             return true
         }
         lockHandle = handle
         lock = acquired
         startListener()
-        OpenFileRequests.submit(filesToOpen)
+        TogetherUriRequests.dispatchIncomingArgs(filesToOpen)
         return true
     }
 
@@ -74,7 +74,16 @@ object SingleInstance {
         val lines = if (filesToOpen.isEmpty()) {
             listOf(SHOW_COMMAND)
         } else {
-            listOf(OPEN_COMMAND) + filesToOpen.map { File(it).absolutePath }
+            listOf(OPEN_COMMAND) + filesToOpen.map { raw ->
+                val trimmed = raw.trim().removeSurrounding("\"")
+                if (com.alananasss.kittytune.data.together.TogetherLinks.isCustomSchemeUri(trimmed) ||
+                    com.alananasss.kittytune.data.together.TogetherLinks.isTogetherUri(trimmed)
+                ) {
+                    trimmed
+                } else {
+                    File(trimmed).absolutePath
+                }
+            }
         }
         val message = lines.joinToString(separator = "\n", postfix = "\n")
         val port = runCatching { portFile.readText().trim().toInt() }.getOrNull() ?: return false
@@ -106,7 +115,7 @@ object SingleInstance {
                         when (lines.firstOrNull()) {
                             SHOW_COMMAND -> java.awt.EventQueue.invokeLater { MainWindowRaiser.raise() }
                             OPEN_COMMAND -> {
-                                OpenFileRequests.submit(lines.drop(1))
+                                TogetherUriRequests.dispatchIncomingArgs(lines.drop(1))
                                 java.awt.EventQueue.invokeLater { MainWindowRaiser.raise() }
                             }
                         }

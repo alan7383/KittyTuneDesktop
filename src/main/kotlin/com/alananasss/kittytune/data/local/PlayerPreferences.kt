@@ -353,6 +353,10 @@ class PlayerPreferences {
         /** Shows / hides the Kitty pet's floating window. */
         const val PLAYER_BAR_BUTTON_PET = "pet"
         private const val KEY_PLAYER_BAR_PET_MIGRATED = "player_bar_pet_migrated"
+        const val PLAYER_BAR_BUTTON_TOGETHER = "together"
+        private const val KEY_PLAYER_BAR_TOGETHER_MIGRATED = "player_bar_together_migrated"
+        private const val KEY_DISCORD_LISTEN_ALONG = "discord_listen_along_enabled"
+        private const val KEY_DISCORD_AUTO_LIVE = "discord_auto_live_enabled"
 
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(
@@ -360,6 +364,7 @@ class PlayerPreferences {
                 PLAYER_BAR_BUTTON_PANEL,
                 PLAYER_BAR_BUTTON_QUEUE,
                 PLAYER_BAR_BUTTON_DEVICES,
+                PLAYER_BAR_BUTTON_TOGETHER,
                 PLAYER_BAR_BUTTON_LYRICS,
                 PLAYER_BAR_BUTTON_MINIPLAYER,
                 PLAYER_BAR_BUTTON_SHUFFLE,
@@ -803,6 +808,12 @@ class PlayerPreferences {
 
     fun getDiscordRpcEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_ENABLED, false)
     fun setDiscordRpcEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_ENABLED, enabled)
+
+    fun getDiscordListenAlongEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_LISTEN_ALONG, true)
+    fun setDiscordListenAlongEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_LISTEN_ALONG, enabled)
+
+    fun getDiscordAutoLiveEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_AUTO_LIVE, false)
+    fun setDiscordAutoLiveEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_AUTO_LIVE, enabled)
 
     fun getDiscordAssetLogo(): String? = Prefs.getString(KEY_DISCORD_ASSET_LOGO, null)
     fun setDiscordAssetLogo(assetId: String?) = Prefs.putString(KEY_DISCORD_ASSET_LOGO, assetId)
@@ -1587,6 +1598,7 @@ class PlayerPreferences {
         var saved = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         val migrateDevices = !Prefs.getBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, false)
         val migratePet = !Prefs.getBoolean(KEY_PLAYER_BAR_PET_MIGRATED, false)
+        val migrateTogether = !Prefs.getBoolean(KEY_PLAYER_BAR_TOGETHER_MIGRATED, false)
 
         if (migrateDevices) {
             // The Devices migration also saves the Player Design defaults for older profiles.
@@ -1604,7 +1616,10 @@ class PlayerPreferences {
         if (migratePet) {
             saved = saved + PLAYER_BAR_BUTTON_PET
         }
-        if (migrateDevices || migratePet) {
+        if (migrateTogether) {
+            saved = saved + PLAYER_BAR_BUTTON_TOGETHER
+        }
+        if (migrateDevices || migratePet || migrateTogether) {
             setPlayerBarButtons(saved)
         }
         return saved
@@ -1613,6 +1628,7 @@ class PlayerPreferences {
     fun setPlayerBarButtons(buttons: Set<String>) {
         Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
         Prefs.putBoolean(KEY_PLAYER_BAR_PET_MIGRATED, true)
+        Prefs.putBoolean(KEY_PLAYER_BAR_TOGETHER_MIGRATED, true)
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
     }
 

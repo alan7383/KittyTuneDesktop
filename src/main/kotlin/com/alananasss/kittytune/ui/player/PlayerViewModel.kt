@@ -1565,6 +1565,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var prefetchWarmJob: Job? = null
     private var discordJob: Job? = null
     private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
+    var showLiveListenDialog by mutableStateOf(false)
+    var pendingTogetherInviteCode by mutableStateOf<String?>(null)
     /** Consecutive engine failures on the current track, bounding the retry in onPlayerError. */
     private var consecutivePlayerErrors = 0
     private var lastPlayerErrorTrackId: Long? = null
@@ -1967,6 +1969,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         startTrimWatcher()
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: observers")
         com.alananasss.kittytune.data.together.Together.start(this)
+        viewModelScope.launch {
+            com.alananasss.kittytune.data.together.Together.active.drop(1).collect {
+                updateDiscordPresence()
+            }
+        }
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: together")
 
         if (System.getProperty("os.name").lowercase().contains("win")) {
@@ -2273,22 +2280,43 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         windowsSmtcService?.updateMedia(currentTrack, isPlaying, positionMs, duration, effectsState.speed, periodic)
     }
 
+    fun startLiveListenAlong(lockControls: Boolean? = null): String {
+        val current = currentTrack?.let { listOf(com.alananasss.kittytune.data.together.SharedTrack.of(it)) }.orEmpty()
+        val seeds = current + sharedUpcoming()
+        val code = com.alananasss.kittytune.data.together.Together.startLiveBroadcast(
+            seedTracks = seeds,
+            lockControls = lockControls,
+        )
+        updateDiscordPresence()
+        return code
+    }
+
     fun updateDiscordPresence() {
         val track = currentTrack
         val token = playerPrefs.getDiscordToken()
         val enabled = playerPrefs.getDiscordRpcEnabled()
 
         if (enabled && !token.isNullOrEmpty() && track != null) {
+            if (isPlaying &&
+                playerPrefs.getDiscordAutoLiveEnabled() &&
+                com.alananasss.kittytune.data.together.Together.active.value == null
+            ) {
+                startLiveListenAlong()
+                return
+            }
             initDiscordRpc()
             val contextText = currentContext?.displayText
             val playing = isPlaying
             val pos = currentPosition
             val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: track.durationMs ?: 0L
+            val liveInviteUrl = com.alananasss.kittytune.data.together.Together.active.value
+                ?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
+                ?.let(com.alananasss.kittytune.data.together.TogetherLinks::inviteUrl)
             discordJob?.cancel()
             discordJob = viewModelScope.launch(Dispatchers.IO) {
                 delay(500.milliseconds)
                 try {
-                    discordRpc?.updatePresence(track, contextText, playing, pos, effectiveDuration)
+                    discordRpc?.updatePresence(track, contextText, playing, pos, effectiveDuration, liveInviteUrl)
                 } catch (e: Exception) {
                     if (e !is kotlinx.coroutines.CancellationException) {
                         e.printStackTrace()
@@ -4211,8 +4239,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             return
         }
 
-        // Playing something of one's own leaves the shared playlist; the others carry on without us.
-        if (!applyingTogether && context?.navigationId?.startsWith(TOGETHER_NAV_PREFIX) != true) {
+        // Playing something of one's own leaves the shared playlist when following someone else;
+        // when we are hosting a live session, keep broadcasting the newly selected track/queue.
+        val activeTogetherCode = com.alananasss.kittytune.data.together.Together.active.value
+        val isHostingTogether = activeTogetherCode != null &&
+            com.alananasss.kittytune.data.together.Together.isHostOf(activeTogetherCode)
+        if (!applyingTogether && !isHostingTogether && context?.navigationId?.startsWith(TOGETHER_NAV_PREFIX) != true) {
             com.alananasss.kittytune.data.together.Together.stopListening()
         }
         SyncPlayback.claimLocal()

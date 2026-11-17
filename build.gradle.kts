@@ -449,11 +449,18 @@ compose.desktop {
                 infoPlist {
                     extraKeysRawXml = """
                         <key>CFBundleURLTypes</key>
-                        <array><dict>
+                        <array>
+                        <dict>
                             <key>CFBundleURLName</key><string>SoundCloud OAuth</string>
                             <key>CFBundleURLSchemes</key><array><string>sc</string></array>
                             <key>CFBundleTypeRole</key><string>Viewer</string>
-                        </dict></array>
+                        </dict>
+                        <dict>
+                            <key>CFBundleURLName</key><string>KittyTune Live Session</string>
+                            <key>CFBundleURLSchemes</key><array><string>kittytune</string></array>
+                            <key>CFBundleTypeRole</key><string>Viewer</string>
+                        </dict>
+                        </array>
                     """.trimIndent()
                 }
                 appCategory = "public.app-category.music"

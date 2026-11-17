@@ -42,9 +42,15 @@ internal object LinuxDesktopIdentity {
             if (index != null) lines[index] = "$key=$value"
             else { lines.add(end, "$key=$value"); end++ }
         }
-        if (get("Exec")?.let { lines[it].substringAfter('=').isNotBlank() } != true) set("Exec", fallbackExec)
+        val existingExec = get("Exec")?.let { lines[it].substringAfter('=').trim() }.orEmpty()
+        val baseExec = existingExec.ifBlank { fallbackExec.trim() }
+        val execWithArg = if (baseExec.contains('%')) baseExec else "$baseExec %U"
+        set("Exec", execWithArg)
         val categories = get("Categories")?.let { lines[it].substringAfter('=').split(';') }.orEmpty()
         set("Categories", (categories + listOf("AudioVideo", "Audio", "Music", "Player"))
+            .filter { it.isNotBlank() }.distinct().joinToString(";", postfix = ";"))
+        val mimeTypes = get("MimeType")?.let { lines[it].substringAfter('=').split(';') }.orEmpty()
+        set("MimeType", (mimeTypes + listOf("x-scheme-handler/kittytune"))
             .filter { it.isNotBlank() }.distinct().joinToString(";", postfix = ";"))
         set("Icon", "$APP_ID-$variant")
         set("StartupWMClass", APP_ID)
