@@ -275,6 +275,7 @@ fun main(args: Array<String>) {
             if (iconIntegrationReady && !trainStartupCache) {
                 if (isMacHost) com.alananasss.kittytune.core.AppIconRuntime.applyMacDockIcon(appIconVariant)
                 runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
+                com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
             }
         }
 

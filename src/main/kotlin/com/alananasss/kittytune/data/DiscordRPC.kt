@@ -20,6 +20,7 @@ class DiscordRPC(
         isPlaying: Boolean,
         position: Long,
         durationOverride: Long = 0L,
+        liveInviteUrl: String? = null,
     ) {
         val duration = if (durationOverride > 0L) {
             durationOverride
@@ -49,7 +50,8 @@ class DiscordRPC(
                 contextName = contextName,
                 largeImage = if (trackArtwork.isNotEmpty() && !trackArtwork.contains("picsum")) RpcImage.ExternalImage(trackArtwork) else RpcImage.DiscordImage(logoAssetId),
                 startTime = startTime,
-                endTime = endTime
+                endTime = endTime,
+                liveInviteUrl = liveInviteUrl,
             )
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -62,14 +64,19 @@ class DiscordRPC(
         contextName: String?,
         largeImage: RpcImage?,
         startTime: Long?,
-        endTime: Long?
+        endTime: Long?,
+        liveInviteUrl: String? = null,
     ) {
         val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { "Unknown Artist" }
         val trackTitle = track.title ?: "Unknown Title"
         val playlistInfo = contextName ?: "KittyTune"
 
         val rpcButtons = mutableListOf<Pair<String, String>>()
-        if (!track.permalinkUrl.isNullOrEmpty() && track.permalinkUrl.startsWith("http")) {
+        if (!liveInviteUrl.isNullOrBlank() && liveInviteUrl.startsWith("https://")) {
+            val label = com.alananasss.kittytune.core.str("discord_rpc_btn_listen_along").take(32)
+            rpcButtons.add(label to liveInviteUrl)
+        }
+        if (!track.permalinkUrl.isNullOrEmpty() && track.permalinkUrl.startsWith("http") && rpcButtons.size < 2) {
             rpcButtons.add("Listen" to track.permalinkUrl)
         }
 

@@ -674,6 +674,13 @@ private fun PlayerButtonsSection(
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_DEVICES in visibleButtons
         ),
         ButtonConfigItem(
+            key = PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER,
+            label = str("together_live_title"),
+            desc = str("together_live_subtitle"),
+            mark = rememberVectorPainter(Icons.Rounded.Podcasts),
+            enabled = PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER in visibleButtons
+        ),
+        ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
             label = str("player_button_shuffle"),
             desc = str("player_button_shuffle_desc"),

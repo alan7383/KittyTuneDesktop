@@ -501,6 +501,8 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var verifiedFilterEnabled by remember { mutableStateOf(prefs.getVerifiedFilterEnabled()) }
     var discordRpc by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
+    var discordListenAlong by remember { mutableStateOf(prefs.getDiscordListenAlongEnabled()) }
+    var discordAutoLive by remember { mutableStateOf(prefs.getDiscordAutoLiveEnabled()) }
     var aiAutoSkip by remember { mutableStateOf(prefs.aiAutoSkip) }
     var aiAutoBlock by remember { mutableStateOf(prefs.aiAutoBlock) }
     var aiSpareFavorites by remember { mutableStateOf(prefs.aiSpareFavorites) }
@@ -1112,6 +1114,38 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 prefs.setDiscordRpcEnabled(it)
             },
             highlightKey = "pref_discord",
+        ),
+        SettingsSearchItem(
+            title = str("discord_listen_along_title"),
+            subtitle = str("discord_listen_along_desc"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DISCORD)),
+            icon = Icons.Rounded.Headphones,
+            keywords = listOf("discord", "listen along", "together", "live", "écouter ensemble", "salon", "lien"),
+            hasSwitch = true,
+            switchState = discordListenAlong,
+            onSwitchChange = {
+                discordListenAlong = it
+                prefs.setDiscordListenAlongEnabled(it)
+                playerViewModel.updateDiscordPresence()
+            },
+            highlightKey = "discord_listen_along_title",
+        ),
+        SettingsSearchItem(
+            title = str("discord_auto_live_title"),
+            subtitle = str("discord_auto_live_desc"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DISCORD)),
+            icon = Icons.Rounded.Podcasts,
+            keywords = listOf("discord", "auto live", "broadcast", "together", "direct", "écouter ensemble"),
+            hasSwitch = true,
+            switchState = discordAutoLive,
+            onSwitchChange = {
+                discordAutoLive = it
+                prefs.setDiscordAutoLiveEnabled(it)
+                playerViewModel.updateDiscordPresence()
+            },
+            highlightKey = "discord_auto_live_title",
         ),
         // MISC - Content filtering & AI detection (issue #41)
         SettingsSearchItem(str("pref_content_filter_title"), str("pref_content_filter_subtitle"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.Block, keywords = listOf("content filter", "ai detection", "block music", "auto skip", "blocked tracks", "blocked artists", "suno", "udio", "artifactnet", "filtrage contenu", "détection ia", "bloquer musique", "titres bloqués", "artistes bloqués", "фильтр контента", "ии", "заблокированные")),
