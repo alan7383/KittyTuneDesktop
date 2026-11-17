@@ -762,6 +762,7 @@
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
     <string name="lang_turkish">Türkçe</string>
+    <string name="lang_brazilian_portuguese">Português (Brasil)</string>
     <string name="lib_albums">Albums</string>
     <string name="lib_artists">Artistes</string>
     <string name="lib_collapse_tooltip">Réduire la Bibliothèque</string>
@@ -3478,4 +3479,7 @@
     <string name="share_card_text_copied">Paroles copiées</string>
     <string name="share_card_save_image">Enregistrer l’image…</string>
     <string name="share_card_saved">Carte enregistrée : %1$s</string>
+    <string name="home_greeting_morning">Bonjour</string>
+    <string name="home_greeting_afternoon">Bon après-midi</string>
+    <string name="home_greeting_evening">Bonsoir</string>
 </resources>

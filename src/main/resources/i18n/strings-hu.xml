@@ -762,6 +762,7 @@
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
     <string name="lang_turkish">Türkçe</string>
+    <string name="lang_brazilian_portuguese">Português (Brasil)</string>
     <string name="lib_albums">Albumok</string>
     <string name="lib_artists">Előadók</string>
     <string name="lib_collapse_tooltip">Könyvtár összecsukása</string>
@@ -3478,4 +3479,7 @@
     <string name="share_card_text_copied">Dalszöveg másolva</string>
     <string name="share_card_save_image">Kép mentése…</string>
     <string name="share_card_saved">Kártya mentve: %1$s</string>
+    <string name="home_greeting_morning">Jó reggelt</string>
+    <string name="home_greeting_afternoon">Jó napot</string>
+    <string name="home_greeting_evening">Jó estét</string>
 </resources>

@@ -53,7 +53,6 @@ import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.home.HomeViewModel
-import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.util.Calendar
 
@@ -230,11 +229,10 @@ private fun HomeShelfTitle(title: String, subtitle: String? = null) {
 @Composable
 private fun homeGreeting(): String {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val lang = Strings.resolvedLanguage
     return when (hour) {
-        in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; "ru" -> "Доброе утро"; "de" -> "Guten Morgen"; "vi" -> "Chào buổi sáng"; else -> "Good morning" }
-        in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; "ru" -> "Добрый день"; "de" -> "Guten Tag"; "vi" -> "Chào buổi chiều"; else -> "Good afternoon" }
-        else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; "ru" -> "Добрый вечер"; "de" -> "Guten Abend"; "vi" -> "Chào buổi tối"; else -> "Good evening" }
+        in 5..11 -> str("home_greeting_morning")
+        in 12..17 -> str("home_greeting_afternoon")
+        else -> str("home_greeting_evening")
     }
 }
 

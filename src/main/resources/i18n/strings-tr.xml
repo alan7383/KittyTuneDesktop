@@ -762,6 +762,7 @@
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
     <string name="lang_turkish">Türkçe</string>
+    <string name="lang_brazilian_portuguese">Português (Brasil)</string>
     <string name="lib_albums">Albümler</string>
     <string name="lib_artists">Sanatçılar</string>
     <string name="lib_collapse_tooltip">Kitaplığını Daralt</string>
@@ -3480,4 +3481,7 @@
     <string name="share_card_text_copied">Şarkı sözleri kopyalandı</string>
     <string name="share_card_save_image">Resmi kaydet…</string>
     <string name="share_card_saved">Kart kaydedildi: %1$s</string>
+    <string name="home_greeting_morning">Günaydın</string>
+    <string name="home_greeting_afternoon">İyi günler</string>
+    <string name="home_greeting_evening">İyi akşamlar</string>
 </resources>

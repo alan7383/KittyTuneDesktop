@@ -43,15 +43,16 @@ fun MiscGeneralPage() {
     var showStartDialog by remember { mutableStateOf(false) }
 
     val languages = listOf(
-        AppLanguage.SYSTEM to str("theme_system"),
-        AppLanguage.ENGLISH to str("lang_english"),
-        AppLanguage.RUSSIAN to str("lang_russian"),
-        AppLanguage.FRENCH to str("lang_french"),
-        AppLanguage.GERMAN to str("lang_german"),
-        AppLanguage.HUNGARIAN to str("lang_hungarian"),
-        AppLanguage.VIETNAMESE to str("lang_vietnamese"),
-        AppLanguage.TURKISH to str("lang_turkish"),
-    )
+        AppLanguage.SYSTEM,
+        AppLanguage.ENGLISH,
+        AppLanguage.RUSSIAN,
+        AppLanguage.FRENCH,
+        AppLanguage.GERMAN,
+        AppLanguage.HUNGARIAN,
+        AppLanguage.VIETNAMESE,
+        AppLanguage.TURKISH,
+        AppLanguage.BRAZILIAN_PORTUGUESE,
+    ).map { it to str(it.labelKey) }
     val startDestinations = listOf(
         StartDestination.HOME to str("nav_home"),
         StartDestination.LIBRARY to str("nav_library"),

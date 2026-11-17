@@ -2,18 +2,20 @@ package com.alananasss.kittytune
 
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.AppLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 
 class LocalizationParityTest {
 
-    private val languages = listOf("en", "fr", "de", "hu", "ru", "vi", "tr")
+    private val languages = AppLanguage.entries.filter { it != AppLanguage.SYSTEM }.map { it.code }
 
     private fun loadKeys(lang: String): Map<String, String> {
         val file = File("src/main/resources/i18n/strings-$lang.xml")
@@ -26,6 +28,7 @@ class LocalizationParityTest {
             val name = el.getAttribute("name")
             val text = el.textContent
             assertFalse("Duplicate localization key in $lang: $name", result.containsKey(name))
+            assertFalse("Empty localization string in $lang: $name", text.isBlank())
             result[name] = text
         }
         return result
@@ -44,6 +47,8 @@ class LocalizationParityTest {
                 "Language '$lang' is missing ${missing.size} keys from strings-en.xml: ${missing.take(10)}",
                 missing.isEmpty()
             )
+            val extra = langStrings.keys - enStrings.keys
+            assertTrue("Language '$lang' contains keys absent from English: ${extra.take(10)}", extra.isEmpty())
         }
     }
 
@@ -126,6 +131,37 @@ class LocalizationParityTest {
             }
         } finally {
             Strings.appLanguage = previousLang
+        }
+    }
+
+    @Test
+    fun testBrazilianPortugueseSelectionAndSystemLocale() {
+        val previousLanguage = Strings.appLanguage
+        val previousLocale = Locale.getDefault()
+        val previousDisplayLocale = Locale.getDefault(Locale.Category.DISPLAY)
+        val previousFormatLocale = Locale.getDefault(Locale.Category.FORMAT)
+        val brazil = Locale.forLanguageTag("pt-BR")
+        try {
+            Locale.setDefault(Locale.US)
+            Strings.appLanguage = AppLanguage.BRAZILIAN_PORTUGUESE.code
+            assertEquals(brazil, Strings.locale())
+            assertEquals("pt-BR,pt;q=0.9,en;q=0.8", Strings.getAcceptLanguage())
+            assertEquals("Português (Brasil)", str(AppLanguage.BRAZILIAN_PORTUGUESE.labelKey))
+            assertEquals("Bom dia", str("home_greeting_morning"))
+            assertEquals("Mix de KittyTune", str("artist_preset_mix", "KittyTune"))
+
+            Strings.appLanguage = AppLanguage.SYSTEM.code
+            Locale.setDefault(brazil)
+            assertEquals("pt-BR", Strings.resolvedLanguage)
+            assertEquals("Bom dia", str("home_greeting_morning"))
+
+            Locale.setDefault(Locale.forLanguageTag("pt-PT"))
+            assertEquals("en", Strings.resolvedLanguage)
+        } finally {
+            Locale.setDefault(previousLocale)
+            Locale.setDefault(Locale.Category.DISPLAY, previousDisplayLocale)
+            Locale.setDefault(Locale.Category.FORMAT, previousFormatLocale)
+            Strings.appLanguage = previousLanguage
         }
     }
 

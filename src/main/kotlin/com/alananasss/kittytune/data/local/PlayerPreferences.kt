@@ -95,15 +95,16 @@ data class FloatingBarLook(
     }
 }
 
-enum class AppLanguage(val code: String) {
-    SYSTEM("system"),
-    FRENCH("fr"),
-    ENGLISH("en"),
-    GERMAN("de"),
-    HUNGARIAN("hu"),
-    RUSSIAN("ru"),
-    VIETNAMESE("vi"),
-    TURKISH("tr")
+enum class AppLanguage(val code: String, val labelKey: String) {
+    SYSTEM("system", "theme_system"),
+    FRENCH("fr", "lang_french"),
+    ENGLISH("en", "lang_english"),
+    GERMAN("de", "lang_german"),
+    HUNGARIAN("hu", "lang_hungarian"),
+    RUSSIAN("ru", "lang_russian"),
+    VIETNAMESE("vi", "lang_vietnamese"),
+    TURKISH("tr", "lang_turkish"),
+    BRAZILIAN_PORTUGUESE("pt-BR", "lang_brazilian_portuguese")
 }
 
 /**

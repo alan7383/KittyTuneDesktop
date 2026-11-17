@@ -628,7 +628,7 @@ internal fun <T> ChoiceDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
                 options.forEach { (value, label) ->
                     ChoiceRow(label, value == selected) {
                         onSelect(value)
