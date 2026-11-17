@@ -7,14 +7,11 @@ import org.w3c.dom.Element
 
 /**
  * Desktop replacement for Android string resources.
- * Loads the exact same strings.xml files as the Android app (copied to resources/i18n/)
- * and resolves them with Android-style positional formatting (%1$s, %d, ...).
- *
- * Locales supported (same as the Android in-app picker): system / en / fr / hu.
+ * Loads the catalogs in resources/i18n/ and resolves Android-style positional formats (%1$s, %d, ...).
  */
 object Strings {
 
-    /** "system", "en", "fr" or "hu" — mirrors the Android `app_language` pref. */
+    /** A language tag or "system". */
     private var _appLanguage = androidx.compose.runtime.mutableStateOf("system")
     var appLanguage: String
         get() = _appLanguage.value
@@ -35,7 +32,7 @@ object Strings {
      */
     fun locale(): Locale = Locale.forLanguageTag(effectiveLang())
 
-    /** The concrete language in use after resolving "system": "en", "fr", "de", "hu", "ru" or "vi". */
+    /** The language tag in use after resolving "system". */
     val resolvedLanguage: String
         get() = effectiveLang()
 
@@ -47,6 +44,7 @@ object Strings {
             "ru" -> "ru-RU,ru;q=0.9,en;q=0.8"
             "vi" -> "vi-VN,vi;q=0.9,en;q=0.8"
             "tr" -> "tr-TR,tr;q=0.9,en;q=0.8"
+            "pt-BR" -> "pt-BR,pt;q=0.9,en;q=0.8"
             "en" -> "en-US,en;q=0.9"
             else -> {
                 val defaultLocale = Locale.getDefault()
@@ -62,16 +60,14 @@ object Strings {
     }
 
     private fun effectiveLang(): String = when (appLanguage) {
-        "fr", "en", "de", "hu", "ru", "vi", "tr" -> appLanguage
-        else -> when (Locale.getDefault().language) {
-            "fr" -> "fr"
-            "de" -> "de"
-            "hu" -> "hu"
-            "ru" -> "ru"
-            "vi" -> "vi"
-            "tr" -> "tr"
-            else -> "en"
-        }
+        "fr", "en", "de", "hu", "ru", "vi", "tr", "pt-BR" -> appLanguage
+        else -> defaultLanguage(Locale.getDefault())
+    }
+
+    private fun defaultLanguage(locale: Locale): String = when (locale.language) {
+        "fr", "de", "hu", "ru", "vi", "tr" -> locale.language
+        "pt" -> if (locale.country == "BR") "pt-BR" else "en"
+        else -> "en"
     }
 
     private fun table(lang: String): Map<String, String> = tables.getOrPut(lang) {

@@ -866,6 +866,7 @@
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
     <string name="lang_turkish">Türkçe</string>
+    <string name="lang_brazilian_portuguese">Português (Brasil)</string>
     <!-- TYPOGRAPHY -->
     <string name="dialog_font_settings_title">Cài đặt phông chữ</string>
     <string name="dialog_font_weight">Độ dày (wght): %1$d</string>
@@ -3560,4 +3561,7 @@
     <string name="share_card_text_copied">Đã sao chép lời bài hát</string>
     <string name="share_card_save_image">Lưu hình ảnh…</string>
     <string name="share_card_saved">Đã lưu thẻ: %1$s</string>
+    <string name="home_greeting_morning">Chào buổi sáng</string>
+    <string name="home_greeting_afternoon">Chào buổi chiều</string>
+    <string name="home_greeting_evening">Chào buổi tối</string>
 </resources>

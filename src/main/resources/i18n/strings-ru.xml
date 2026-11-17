@@ -83,7 +83,7 @@
     <string name="align_left">Слева</string>
     <string name="align_right">Справа</string>
     <string name="ambient_cafe">Кафе</string>
-    <string name="ambient_fireplace">Костер</string>
+    <string name="ambient_fireplace">Костёр</string>
     <string name="ambient_ocean">Океан</string>
     <string name="ambient_rain">Дождь</string>
     <string name="app_name">KittyTune</string>
@@ -253,7 +253,7 @@
     <string name="btn_download">Загрузить</string>
     <string name="btn_downloaded">Загружено</string>
     <string name="btn_earrape">Оглушительный звук</string>
-    <string name="btn_explore_all_effects">Все эффекты</string>
+    <string name="btn_explore_all_effects">Посмотреть все эффекты</string>
     <string name="btn_follow">Подписаться</string>
     <string name="btn_fullscreen">Полный экран</string>
     <string name="btn_logout">Выйти</string>
@@ -468,7 +468,7 @@
     <string name="playlist_menu_remove_download">Удалить загрузку</string>
     <string name="dialog_delete_playlist_title">Удалить плейлист?</string>
     <string name="dialog_font_roundness">Округлость (ROND): %1$d</string>
-    <string name="dialog_font_settings_title">Настройки шрифта</string>
+    <string name="dialog_font_settings_title">Настройки шрифтов</string>
     <string name="dialog_font_slant">Наклон (slnt): %1$d</string>
     <string name="dialog_font_weight">Толщина (wght): %1$d</string>
     <string name="dialog_font_width">Ширина (wdth): %1$d</string>
@@ -535,7 +535,7 @@
     <string name="effect_underwater">Под водой</string>
     <string name="effect_vintage_mp3">Винтажный MP3</string>
     <string name="effect_vinyl_lofi">Винил и кассета Lo-Fi</string>
-    <string name="effect_vocal_boost">Четкость вокала</string>
+    <string name="effect_vocal_boost">Усиление вокала</string>
     <string name="effect_vocal_remover">Приглушение вокала</string>
     <string name="effect_tip_bass_boost">Усиливает низы: больше баса и бочки.</string>
     <string name="effect_tip_sub_octaver">Добавляет саб-бас октавой ниже, как у 808.</string>
@@ -676,13 +676,13 @@
     <string name="home_liked_by_section_title">Понравилось</string>
     <string name="home_liked_by_user_title">Понравилось %1$s</string>
     <string name="home_more_of_what_you_like">Больше того, что вам нравится</string>
-    <string name="home_mixed_for_user">Микс для %1$s</string>
-    <string name="home_mixed_for_you">Микс для вас</string>
+    <string name="home_mixed_for_user">Миксы для %1$s</string>
+    <string name="home_mixed_for_you">Миксы для вас</string>
     <string name="home_trending_by_genre">В тренде по жанрам</string>
     <string name="home_trending_by_genre_val">В тренде по жанрам: %1$s</string>
     <string name="home_artists_to_watch">Перспективные исполнители</string>
     <string name="home_made_for_you">Создано для вас</string>
-    <string name="home_curated_by_soundcloud">Выбор SoundCloud</string>
+    <string name="home_curated_by_soundcloud">Подборка SoundCloud</string>
     <string name="home_pop">Поп</string>
     <string name="home_recently_played">Недавно прослушано</string>
     <string name="home_recommended_tracks">Рекомендовано вам</string>
@@ -762,6 +762,7 @@
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
     <string name="lang_turkish">Türkçe</string>
+    <string name="lang_brazilian_portuguese">Português (Brasil)</string>
     <string name="lib_albums">Альбомы</string>
     <string name="lib_artists">Исполнители</string>
     <string name="lib_collapse_tooltip">Свернуть библиотеку</string>
@@ -778,7 +779,7 @@
     <string name="lib_folder_play_ordered">Воспроизвести по порядку</string>
     <string name="lib_folder_play_recursive_ordered">Воспроизвести всё (+ подпапки)</string>
     <string name="lib_folder_play_recursive_shuffle">Перемешать всё (+ подпапки)</string>
-    <string name="lib_folder_play_shuffle">Перемешать</string>
+    <string name="lib_folder_play_shuffle">Слушать в случайном порядке</string>
     <string name="lib_folders">Папки</string>
     <string name="lib_guest_mode">Режим гостя • Войдите, чтобы синхронизировать</string>
     <string name="lib_import_playlist">Импортировать плейлисты</string>
@@ -1198,7 +1199,7 @@
     <string name="preset_chorus_juno">Juno 80-е</string>
     <string name="preset_chorus_shimmer">Быстрое мерцание</string>
     <string name="preset_flanger_classic">Классика</string>
-    <string name="preset_flanger_slow">Мягко</string>
+    <string name="preset_flanger_slow">Медленно</string>
     <string name="preset_flanger_turbine">Турбина</string>
     <string name="preset_gramo_cylinder">Восковой цилиндр</string>
     <string name="preset_gramo_fallout">Ретро-радио 1940</string>
@@ -1545,7 +1546,7 @@
     <string name="transfer_guest_warn_btn_delete_confirm">Удалить и продолжить</string>
     <string name="transfer_guest_warn_btn_cancel">Отмена</string>
     <!-- SoundCloud Upload Feature -->
-    <string name="nav_upload">Загрузка</string>
+    <string name="nav_upload">Загрузить</string>
     <string name="upload_screen_title">Загрузить трек</string>
     <string name="upload_login_required_title">Войдите для загрузки</string>
     <string name="upload_login_required_subtitle">Загрузка треков доступна только авторизованным пользователям.</string>
@@ -3479,4 +3480,7 @@
     <string name="share_card_text_copied">Текст скопирован</string>
     <string name="share_card_save_image">Сохранить изображение…</string>
     <string name="share_card_saved">Карточка сохранена: %1$s</string>
+    <string name="home_greeting_morning">Доброе утро</string>
+    <string name="home_greeting_afternoon">Добрый день</string>
+    <string name="home_greeting_evening">Добрый вечер</string>
 </resources>

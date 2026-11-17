@@ -333,7 +333,6 @@ internal fun <S> AnimatedContentTransitionScope<S>.swapInPlace(): ContentTransfo
 private fun WelcomePage(prefs: PlayerPreferences, direction: Int) {
     observePreferences()
     val cs = MaterialTheme.colorScheme
-    val names = listOf("System", "Français", "English", "Deutsch", "Magyar", "Русский", "Tiếng Việt", "Türkçe")
     val current = prefs.getAppLanguage()
     Reveal(3, direction) {
         Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = cs.surfaceContainerHigh) {
@@ -345,13 +344,13 @@ private fun WelcomePage(prefs: PlayerPreferences, direction: Int) {
                     Text(str("pref_language"), style = MaterialTheme.typography.titleMedium)
                 }
                 FlowRow(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppLanguage.entries.forEachIndexed { i, language ->
+                    AppLanguage.entries.forEach { language ->
                         ToggleButton(checked = language == current,
                             shapes = ToggleButtonShapes(shape = CircleShape, pressedShape = RoundedCornerShape(10.dp), checkedShape = RoundedCornerShape(16.dp)),
                             onCheckedChange = { prefs.setAppLanguage(language); Strings.appLanguage = language.code },
                             colors = ToggleButtonDefaults.colors(containerColor = cs.surfaceContainerHighest, contentColor = cs.onSurfaceVariant,
                                 checkedContainerColor = cs.primary, checkedContentColor = cs.onPrimary)) {
-                            Text(if (i == 0) str("theme_system") else names[i])
+                            Text(str(language.labelKey))
                         }
                     }
                 }

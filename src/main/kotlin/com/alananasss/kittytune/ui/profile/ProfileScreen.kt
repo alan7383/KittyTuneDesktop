@@ -1951,7 +1951,7 @@ fun UserCommentItem(
                 val appLang = com.alananasss.kittytune.core.Strings.appLanguage
                 val langCode = if (appLang == "system" || appLang.isBlank()) java.util.Locale.getDefault().language else appLang
                 val langName = remember(langCode) {
-                    val loc = java.util.Locale(langCode)
+                    val loc = Locale.forLanguageTag(langCode)
                     loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
                 }
 

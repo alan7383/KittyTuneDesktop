@@ -134,8 +134,9 @@ class SetupOnboardingTest {
         try {
             var frame = 0L
             var englishImage: ByteArray? = null
-            for (language in listOf(AppLanguage.ENGLISH, AppLanguage.VIETNAMESE, AppLanguage.GERMAN,
-                AppLanguage.HUNGARIAN, AppLanguage.RUSSIAN, AppLanguage.TURKISH, AppLanguage.FRENCH)) {
+            for (language in listOf(AppLanguage.ENGLISH) + AppLanguage.entries.filter {
+                it != AppLanguage.SYSTEM && it != AppLanguage.ENGLISH
+            }) {
                 prefs.setAppLanguage(language)
                 repeat(30) { scene.render(frame++ * 16_000_000L).close() }
                 assertEquals(language.code, Strings.resolvedLanguage)
