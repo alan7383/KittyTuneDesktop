@@ -534,6 +534,7 @@ class PlayerPreferences {
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
         private const val KEY_WAVE_MODE = "wave_mode"
         private const val KEY_DISCORD_TOKEN = "discord_token"
+        const val KEY_DISCORD_AVATAR_URL = "discord_avatar_url"
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
         private const val KEY_EARRAPE_WARNING = "has_seen_earrape_warning"
@@ -805,6 +806,9 @@ class PlayerPreferences {
 
     fun getDiscordToken(): String? = Prefs.getString(KEY_DISCORD_TOKEN, null)
     fun setDiscordToken(token: String?) = Prefs.putString(KEY_DISCORD_TOKEN, token)
+
+    fun getDiscordAvatarUrl(): String? = Prefs.getString(KEY_DISCORD_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
+    fun setDiscordAvatarUrl(avatarUrl: String?) = Prefs.putString(KEY_DISCORD_AVATAR_URL, avatarUrl?.takeIf { it.isNotBlank() })
 
     fun getDiscordRpcEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_ENABLED, false)
     fun setDiscordRpcEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_ENABLED, enabled)

@@ -52,6 +52,7 @@ object DiscordRemoteAuth {
     private const val TAG = "DiscordRemoteAuth"
     private const val GATEWAY_URL = "wss://remote-auth-gateway.discord.gg/?v=2"
     private const val LOGIN_URL = "https://discord.com/api/v9/users/@me/remote-auth/login"
+    private const val ME_URL = "https://discord.com/api/v9/users/@me"
     private const val ORIGIN = "https://discord.com"
     private const val USER_AGENT =
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
@@ -69,7 +70,7 @@ object DiscordRemoteAuth {
             val discriminator: String?,
             val avatarUrl: String?
         ) : State
-        data class Success(val token: String) : State
+        data class Success(val token: String, val avatarUrl: String? = null) : State
         /** The handshake window closed (Discord gives us a few minutes) — offer a new QR. */
         data object Expired : State
         data class Failed(val reason: String) : State
@@ -77,6 +78,11 @@ object DiscordRemoteAuth {
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
+
+    private val avatarScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val fetchedAvatarTokens = java.util.Collections.synchronizedSet(HashSet<String>())
+    @Volatile
+    private var pendingAvatarUrl: String? = null
 
     // Shares ProxyManager's pool and dispatcher; the WebSocket-specific timeouts are this flow's own.
     private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
@@ -152,6 +158,7 @@ object DiscordRemoteAuth {
         runCatching { socket?.close(1000, null) }
         socket = null
         keyPair = null
+        pendingAvatarUrl = null
         scope?.cancel()
         scope = null
     }
@@ -240,24 +247,94 @@ object DiscordRemoteAuth {
         val parts = decoded.split(':', limit = 4)
         val id = parts.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return
         val avatarHash = parts.getOrNull(2)?.takeIf { it.isNotBlank() }
+        val resolvedAvatarUrl = avatarHash?.let { "https://cdn.discordapp.com/avatars/$id/$it.png?size=128" }
+        pendingAvatarUrl = resolvedAvatarUrl
         _state.value = State.AwaitingConfirmation(
             userId = id,
             username = parts.getOrNull(3)?.takeIf { it.isNotBlank() } ?: id,
             discriminator = parts.getOrNull(1)?.takeIf { it.isNotBlank() && it != "0" },
-            avatarUrl = avatarHash?.let { "https://cdn.discordapp.com/avatars/$id/$it.png?size=128" }
+            avatarUrl = resolvedAvatarUrl
         )
     }
 
     private fun onPendingLogin(payload: JSONObject) {
         val ticket = payload.optString("ticket").takeIf { it.isNotBlank() } ?: return
+        val confirmedAvatarUrl = pendingAvatarUrl
         val currentScope = scope ?: return
         currentScope.launch {
             val token = exchangeTicket(ticket)
             if (token == null) {
                 stop(State.Failed("ticket_exchange"))
             } else {
-                stop(State.Success(token))
+                stop(State.Success(token, confirmedAvatarUrl))
             }
+        }
+    }
+
+    /**
+     * Initializes [com.alananasss.kittytune.data.together.Together.discordAvatarUrl] from [prefs],
+     * and if a Discord token is saved without a cached avatar URL, fetches `/users/@me` once on IO.
+     */
+    fun syncDiscordAvatarFromPrefs(
+        prefs: com.alananasss.kittytune.data.local.PlayerPreferences = com.alananasss.kittytune.data.local.PlayerPreferences(),
+    ) {
+        val token = prefs.getDiscordToken()?.trim()?.takeIf { it.isNotEmpty() }
+        if (token == null) {
+            com.alananasss.kittytune.data.together.Together.discordAvatarUrl = null
+            return
+        }
+        val cached = prefs.getDiscordAvatarUrl()
+        if (!cached.isNullOrBlank()) {
+            com.alananasss.kittytune.data.together.Together.discordAvatarUrl = cached
+            return
+        }
+        if (!fetchedAvatarTokens.add(token)) return
+        avatarScope.launch {
+            val fetched = fetchUserAvatarUrl(token)
+            if (prefs.getDiscordToken()?.trim() == token && !fetched.isNullOrBlank()) {
+                prefs.setDiscordAvatarUrl(fetched)
+                com.alananasss.kittytune.data.together.Together.discordAvatarUrl = fetched
+            }
+        }
+    }
+
+    fun onDiscordLoggedOut(
+        prefs: com.alananasss.kittytune.data.local.PlayerPreferences = com.alananasss.kittytune.data.local.PlayerPreferences(),
+    ) {
+        fetchedAvatarTokens.clear()
+        prefs.setDiscordAvatarUrl(null)
+        com.alananasss.kittytune.data.together.Together.discordAvatarUrl = null
+    }
+
+    internal fun parseDiscordUserAvatarUrl(jsonText: String): String? = runCatching {
+        val obj = JSONObject(jsonText)
+        val id = if (obj.isNull("id")) null else obj.optString("id").trim().takeIf { it.isNotEmpty() && it != "null" }
+        val avatar = if (obj.isNull("avatar")) null else obj.optString("avatar").trim().takeIf { it.isNotEmpty() && it != "null" }
+        if (id != null && avatar != null) {
+            "https://cdn.discordapp.com/avatars/$id/$avatar.png?size=128"
+        } else {
+            null
+        }
+    }.getOrNull()
+
+    internal fun fetchUserAvatarUrl(token: String): String? {
+        val httpClient = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
+        val request = Request.Builder()
+            .url(ME_URL)
+            .get()
+            .header("Authorization", token.trim())
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .build()
+        return try {
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body.string()
+                if (!response.isSuccessful || body.isBlank()) null
+                else parseDiscordUserAvatarUrl(body)
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "Discord /users/@me fetch failed: ${e.message}")
+            null
         }
     }
 

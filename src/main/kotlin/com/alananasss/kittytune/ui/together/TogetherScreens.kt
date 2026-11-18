@@ -91,11 +91,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
@@ -129,6 +131,7 @@ fun TogetherHomeScreen(
     val saved by Together.saved.collectAsState()
     val rooms by Together.rooms.collectAsState()
     val activeCode by Together.active.collectAsState()
+    val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
 
     var actionMode by rememberSaveable { mutableStateOf(HomeActionMode.JOIN) }
     var newName by rememberSaveable { mutableStateOf("") }
@@ -189,17 +192,52 @@ fun TogetherHomeScreen(
                         shape = CircleShape,
                         color = cs.secondaryContainer,
                     ) {
+                        var selfAvatarLoaded by remember(myAvatarUrl) { mutableStateOf(false) }
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(
+                                start = if (myAvatarUrl != null) 8.dp else 16.dp,
+                                end = 16.dp,
+                                top = if (myAvatarUrl != null) 7.dp else 10.dp,
+                                bottom = if (myAvatarUrl != null) 7.dp else 10.dp,
+                            ),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Person,
-                                contentDescription = null,
-                                tint = cs.onSecondaryContainer,
-                                modifier = Modifier.size(18.dp),
-                            )
+                            if (myAvatarUrl != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(cs.surfaceContainerHighest),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (!selfAvatarLoaded) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Person,
+                                            contentDescription = null,
+                                            tint = cs.onSecondaryContainer,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                    AsyncImage(
+                                        model = myAvatarUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        onSuccess = { selfAvatarLoaded = true },
+                                        onError = { selfAvatarLoaded = false },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    tint = cs.onSecondaryContainer,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                             Text(
                                 text = myName,
                                 style = MaterialTheme.typography.labelLarge,
@@ -1608,10 +1646,11 @@ private fun RoomExpressiveHeroCard(
                 }
             }
 
-            val allMembers = remember(room.listeners, isHost, isListening, room.hostId) {
+            val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
+            val allMembers = remember(room.listeners, isHost, isListening, room.hostId, myAvatarUrl) {
                 buildList {
                     if (isHost || isListening) {
-                        add(Together.Member(Together.memberId, Together.myName, true, System.currentTimeMillis()))
+                        add(Together.Member(Together.memberId, Together.myName, true, System.currentTimeMillis(), myAvatarUrl))
                     }
                     room.listeners.filterNot { it.id == Together.memberId }.forEach { add(it) }
                 }
@@ -1629,6 +1668,7 @@ private fun RoomExpressiveHeroCard(
                             name = member.name,
                             isHost = member.id == room.hostId || (isHost && member.id == Together.memberId),
                             isMe = member.id == Together.memberId,
+                            avatarUrl = if (member.id == Together.memberId) (myAvatarUrl ?: member.avatarUrl) else member.avatarUrl,
                         )
                     }
                 }

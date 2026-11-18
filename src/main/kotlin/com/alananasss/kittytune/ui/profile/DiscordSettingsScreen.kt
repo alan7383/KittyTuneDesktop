@@ -120,6 +120,7 @@ fun DiscordSettingsScreen(
                             title = str("discord_logout"),
                             onClick = {
                                 prefs.setDiscordToken(null)
+                                DiscordRemoteAuth.onDiscordLoggedOut(prefs)
                                 prefs.setDiscordRpcEnabled(false)
                                 token = null
                                 isEnabled = false
