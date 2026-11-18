@@ -1,4 +1,5 @@
 function Get-KittyTuneVersion([string]$Executable) {
+    if (![IO.File]::Exists($Executable)) { throw 'Installed launcher executable is missing.' }
     $app = Join-Path ([IO.Path]::GetDirectoryName($Executable)) 'app'
     $config = Join-Path $app 'KittyTune.cfg'
     if (!(Test-Path -LiteralPath $config -PathType Leaf)) { throw 'Installed launcher configuration is missing.' }
@@ -21,19 +22,54 @@ function Get-KittyTuneVersionKey([string]$Version) {
     return '{0}.{1}.{2}.{3}' -f $parsed.Major, $parsed.Minor, [Math]::Max(0,$parsed.Build), [Math]::Max(0,$parsed.Revision)
 }
 
-function Get-KittyTuneMsiVersion([string]$Package) {
+function Get-KittyTuneMsiProperty([string]$Package, [string]$Property) {
     $installer = $database = $view = $record = $null
     try {
         $installer = New-Object -ComObject WindowsInstaller.Installer
         $database = $installer.OpenDatabase($Package, 0)
-        $view = $database.OpenView("SELECT Value FROM Property WHERE Property = 'ProductVersion'")
+        $view = $database.OpenView("SELECT Value FROM Property WHERE Property = '$Property'")
         [void]$view.Execute()
         $record = $view.Fetch()
-        if (!$record) { throw 'Installer product version is missing.' }
+        if (!$record) { throw "Installer property $Property is missing." }
         return [string]$record.StringData(1)
     } finally {
         foreach ($item in @($record,$view,$database,$installer)) {
             if ($null -ne $item) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($item) }
+        }
+    }
+}
+
+function Get-KittyTuneMsiVersion([string]$Package) {
+    Get-KittyTuneMsiProperty $Package 'ProductVersion'
+}
+
+function Get-KittyTuneRelatedInstallLocations([string]$Package) {
+    $upgradeCode = Get-KittyTuneMsiProperty $Package 'UpgradeCode'
+    $installer = $products = $null
+    try {
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $products = $installer.RelatedProducts($upgradeCode)
+        for ($i = 0; $i -lt $products.Count; $i++) {
+            $product = $products.Item($i)
+            $location = [string]$installer.ProductInfo($product, 'InstallLocation')
+            if ([string]::IsNullOrWhiteSpace($location) -or ![IO.Path]::IsPathRooted($location)) {
+                throw "Cannot determine the directory of registered KittyTune installation $product."
+            }
+            $location
+        }
+    } finally {
+        foreach ($item in @($products, $installer)) {
+            if ($null -ne $item) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($item) }
+        }
+    }
+}
+
+function Assert-KittyTuneMsiTarget([string]$Package, [string]$InstallDir) {
+    $target = [IO.Path]::GetFullPath($InstallDir).TrimEnd([char[]]'\/')
+    foreach ($location in Get-KittyTuneRelatedInstallLocations $Package) {
+        $registered = [IO.Path]::GetFullPath($location).TrimEnd([char[]]'\/')
+        if (!$target.Equals($registered, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "KittyTune is registered in '$registered', but the running copy is in '$target'. Start the registered copy to update it, or download the portable ZIP for this copy."
         }
     }
 }

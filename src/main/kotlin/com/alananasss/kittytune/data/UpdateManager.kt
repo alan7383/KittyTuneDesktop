@@ -507,12 +507,12 @@ object UpdateManager {
 
     internal fun resolveKittyTuneExe(): File? {
         val jpackagePath = System.getProperty("jpackage.app-path") ?: System.getProperty("jpackage.app.path")
-        val possibleExePaths = mutableListOf<File>()
-        jpackagePath?.let { p ->
-            val f = File(p)
-            if (f.isFile) possibleExePaths.add(f)
-            else if (f.isDirectory) File(f, "KittyTune.exe").let { if (it.exists()) possibleExePaths.add(it) }
+        if (jpackagePath != null) {
+            val path = File(jpackagePath)
+            val launcher = if (path.isDirectory) File(path, "KittyTune.exe") else path
+            return launcher.takeIf { it.isAbsolute && it.isFile && it.name.equals("KittyTune.exe", ignoreCase = true) }
         }
+        val possibleExePaths = mutableListOf<File>()
         possibleExePaths.addAll(listOfNotNull(
             File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
             File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
@@ -606,6 +606,7 @@ object UpdateManager {
                     ${'$'}expectedVersion = Get-KittyTuneMsiVersion '$escapedInstaller'
                     ${'$'}expectedKey = Get-KittyTuneVersionKey ${'$'}expectedVersion
                 }
+                ${if (isMsi) "Assert-KittyTuneMsiTarget '$escapedInstaller' ${'$'}installDir" else ""}
             } catch {
                 Log "Cannot start update: ${'$'}(${'$'}_.Exception.Message)"
                 throw

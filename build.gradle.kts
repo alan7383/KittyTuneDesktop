@@ -1006,14 +1006,14 @@ tasks.register<Test>("headlessTest") {
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
             "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest", "DownloadFilesTest", "LyricsMergePerformanceTest", "*LyricsMatcherTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest", "*FadingEdgeRenderTest",
-            "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
+            "*WindowsUpdateTest", "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest", "*MixQueuePlannerTest", "*MixRenderTest", "*AudioPathRenderTest", "*LyricsSweepRenderTest", "*ShareCardTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
             "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest",
-            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest", "*WindowsUpdateTest"
+            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest"
         ).forEach(::includeTestsMatching)
     }
 }

@@ -15,6 +15,8 @@ class WindowsUpdateTest {
         try {
             System.setProperty("jpackage.app-path", exe.path)
             assertEquals(exe.canonicalFile, UpdateManager.resolveKittyTuneExe()?.canonicalFile)
+            System.setProperty("jpackage.app-path", File(folder, "missing.exe").path)
+            assertNull(UpdateManager.resolveKittyTuneExe())
         } finally {
             if (before == null) System.clearProperty("jpackage.app-path") else System.setProperty("jpackage.app-path", before)
             folder.deleteRecursively()
@@ -25,6 +27,9 @@ class WindowsUpdateTest {
     @Test fun `successful exit with stale files is rejected`() = runInstaller(0, false, false)
     @Test fun `verified update stays in place and writes its version`() = runInstaller(0, true, true)
     @Test fun `missing application jar is rejected`() = runInstaller(0, true, false, missingJar = true)
+    @Test fun `a registered MSI installation in another folder blocks the update`() =
+        runInstaller(0, true, false, conflictingInstall = true)
+    @Test fun `missing installed executable is rejected`() = runInstaller(0, true, false, missingExe = true)
     @Test fun `reboot initiated does not trigger another install`() = runInstaller(1641, true, false, true)
     @Test fun `reboot required is success rather than another install attempt`() = runInstaller(3010, true, false, true)
 
@@ -79,7 +84,9 @@ class WindowsUpdateTest {
         } finally { root.deleteRecursively() }
     }
 
-    private fun runInstaller(exit: Int, replace: Boolean, success: Boolean, reboot: Boolean = false, missingJar: Boolean = false) {
+    private fun runInstaller(exit: Int, replace: Boolean, success: Boolean, reboot: Boolean = false, missingJar: Boolean = false,
+        conflictingInstall: Boolean = false, missingExe: Boolean = false,
+    ) {
         assumeTrue(System.getProperty("os.name").startsWith("Windows"))
         val root = kotlin.io.path.createTempDirectory("kitty update Ω [mix] O'Brien ").toFile()
         val image = File(root, "portable app").apply { mkdirs() }
@@ -95,6 +102,10 @@ class WindowsUpdateTest {
         try {
             UpdateManager.releaseInfo = GithubRelease(tagName="v2.0.0")
             val script = UpdateManager.buildWindowsUpdaterScript(2147483000,installer,exe,File(root, "update.log"),File(root, "msi.log"))
+            // Replace only the Windows Installer query. The real guard and generated script still run.
+            val registered = if (conflictingInstall) File(root, "another installation") else image
+            val query = "function Get-KittyTuneRelatedInstallLocations { '${quote(registered)}' }"
+            val scriptWithFixture = script.replaceFirst("Log \"Starting updater", "$query\nLog \"Starting updater")
             val mocks = """
                 function Get-Process { param(${'$'}Id, ${'$'}Name, ${'$'}ErrorAction) return ${'$'}null }
                 function Start-Sleep { param(${'$'}Seconds, ${'$'}Milliseconds) }
@@ -104,13 +115,14 @@ class WindowsUpdateTest {
                         [IO.File]::AppendAllText('${quote(arguments)}', ((${'$'}ArgumentList -join '|') + "`n"))
                         ${if(replace) "[IO.File]::WriteAllText('${quote(cfg)}', ('app.classpath=${'$'}APPDIR/main.jar' + [Environment]::NewLine + 'java-options=-Djpackage.app-version=2.0.0'))" else ""}
                         ${if (missingJar) "Remove-Item -LiteralPath '${quote(File(app, "main.jar"))}' -ErrorAction SilentlyContinue" else ""}
+                        ${if (missingExe) "Remove-Item -LiteralPath '${quote(exe)}'" else ""}
                         return [pscustomobject]@{ExitCode=$exit}
                     }
                     [IO.File]::WriteAllText('${quote(launched)}', [string]${'$'}FilePath)
                     return [pscustomobject]@{ExitCode=0}
                 }
             """.trimIndent()
-            val file = File(root, "run.ps1").apply { writeBytes(byteArrayOf(0xEF.toByte(),0xBB.toByte(),0xBF.toByte())+(mocks+"\n"+script).toByteArray()) }
+            val file = File(root, "run.ps1").apply { writeBytes(byteArrayOf(0xEF.toByte(),0xBB.toByte(),0xBF.toByte())+(mocks+"\n"+scriptWithFixture).toByteArray()) }
             val outputFile = File(root, "powershell-output.log")
             val process = ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file.path)
                 .redirectErrorStream(true).redirectOutput(outputFile).start()
@@ -121,6 +133,11 @@ class WindowsUpdateTest {
             val output = outputFile.readText()
             assertEquals(success || reboot, process.exitValue() == 0, output)
             assertEquals(success, launched.exists(), output)
+            if (conflictingInstall) {
+                assertFalse(arguments.exists(), "Windows Installer must not be launched for the other copy")
+                assertContains(File(root, "update.log").readText(), "another installation")
+                return
+            }
             val attempts = arguments.readLines()
             attempts.forEach {
                 assertTrue(it.contains("INSTALLDIR=\"${image.path}\""),it)
