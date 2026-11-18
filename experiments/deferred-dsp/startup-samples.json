@@ -1,0 +1,84 @@
+[
+  {
+    "variant": "baseline",
+    "run": "warmup-baseline",
+    "warmup": true,
+    "drawn_visible_ms": 7086.339
+  },
+  {
+    "variant": "candidate",
+    "run": "warmup-candidate",
+    "warmup": true,
+    "drawn_visible_ms": 6167.294
+  },
+  {
+    "variant": "baseline",
+    "run": "pair-0-baseline",
+    "warmup": false,
+    "drawn_visible_ms": 6917.769,
+    "pair": 0
+  },
+  {
+    "variant": "candidate",
+    "run": "pair-0-candidate",
+    "warmup": false,
+    "drawn_visible_ms": 6185.471,
+    "pair": 0
+  },
+  {
+    "variant": "candidate",
+    "run": "pair-1-candidate",
+    "warmup": false,
+    "drawn_visible_ms": 6079.134,
+    "pair": 1
+  },
+  {
+    "variant": "baseline",
+    "run": "pair-1-baseline",
+    "warmup": false,
+    "drawn_visible_ms": 6375.69,
+    "pair": 1
+  },
+  {
+    "variant": "baseline",
+    "run": "pair-2-baseline",
+    "warmup": false,
+    "drawn_visible_ms": 6268.94,
+    "pair": 2
+  },
+  {
+    "variant": "candidate",
+    "run": "pair-2-candidate",
+    "warmup": false,
+    "drawn_visible_ms": 6109.437,
+    "pair": 2
+  },
+  {
+    "variant": "candidate",
+    "run": "pair-3-candidate",
+    "warmup": false,
+    "drawn_visible_ms": 7355.461,
+    "pair": 3
+  },
+  {
+    "variant": "baseline",
+    "run": "pair-3-baseline",
+    "warmup": false,
+    "drawn_visible_ms": 7205.841,
+    "pair": 3
+  },
+  {
+    "variant": "baseline",
+    "run": "pair-4-baseline",
+    "warmup": false,
+    "drawn_visible_ms": 6168.188,
+    "pair": 4
+  },
+  {
+    "variant": "candidate",
+    "run": "pair-4-candidate",
+    "warmup": false,
+    "drawn_visible_ms": 5942.297,
+    "pair": 4
+  }
+]
