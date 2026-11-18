@@ -112,7 +112,28 @@ class AudioEngine(private val isolated: Boolean = false) {
         val nightDrive = NightDriveAudioProcessor()
     }
 
-    private val effectNodes = lazy { EffectNodes() }
+    // Share the lazy initializer lock with track metadata writers so the first block sees their latest values.
+    private val effectStateLock = Any()
+    private var vocalTrackId: Long? = null
+    private var vocalPositionMs = 0L
+    private var trackLoudness: Pair<Float, Float>? = null
+    private val effectNodes = lazy(effectStateLock) {
+        EffectNodes().apply {
+            vocalRemover.setTrack(vocalTrackId)
+            vocalBoost.setTrack(vocalTrackId)
+            vocalRemover.seekToPositionMs(vocalPositionMs)
+            vocalBoost.seekToPositionMs(vocalPositionMs)
+            trackLoudness?.let { (lufs, peak) -> normalization.setTrackLoudness(lufs, peak) }
+        }
+    }
+
+    private fun seekVocalProcessors(positionMs: Long) = synchronized(effectStateLock) {
+        vocalPositionMs = positionMs
+        if (effectNodes.isInitialized()) {
+            vocalRemover.seekToPositionMs(positionMs)
+            vocalBoost.seekToPositionMs(positionMs)
+        }
+    }
     private val fx get() = effectNodes.value.fx
     private val equalizer get() = effectNodes.value.equalizer
     private val reverb get() = effectNodes.value.reverb
@@ -218,11 +239,15 @@ class AudioEngine(private val isolated: Boolean = false) {
     private val limiterState = lazy { PeakLimiter(outputSampleRate, outputChannels) }
     private val limiter get() = limiterState.value
 
-    @Volatile
-    private var effects = AudioEffectsState()
-    private val pendingEffects = AtomicReference<AudioEffectsState?>(effects)
-    private val pendingEqualizer = AtomicReference<EqualizerState?>(null)
-    private val pendingStretch = AtomicReference<Pair<Float, Float>?>(1f to 1f)
+    private data class DspSettings(
+        val effects: AudioEffectsState = AudioEffectsState(),
+        val equalizer: EqualizerState? = null,
+        val speed: Float = 1f,
+        val pitch: Float = 1f,
+    )
+
+    private val dspSettings = AtomicReference(DspSettings())
+    private var appliedDspSettings: DspSettings? = null
 
     @Volatile
     private var volume: Float = 1f
@@ -307,8 +332,14 @@ class AudioEngine(private val isolated: Boolean = false) {
         // mirroring the Android MusicManager resetForNewTrack + resetResult pair.
         aiDetection.resetForNewTrack()
         if (!isolated) com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
-        vocalRemover.setTrack(trackId)
-        vocalBoost.setTrack(trackId)
+        synchronized(effectStateLock) {
+            vocalTrackId = trackId
+            if (effectNodes.isInitialized()) {
+                vocalRemover.setTrack(trackId)
+                vocalBoost.setTrack(trackId)
+            }
+            seekVocalProcessors(startPositionMs.coerceAtLeast(0L))
+        }
         if (trackId != null && !isolated) {
             com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.notifyTrackChanged(trackId)
         }
@@ -320,8 +351,6 @@ class AudioEngine(private val isolated: Boolean = false) {
         seekRequest.set(startPositionMs.takeIf { it > 0L }?.let { SeekRequest(it) })
         if (startPositionMs > 0) {
             aiDetection.notifySeek(startPositionMs)
-            vocalRemover.seekToPositionMs(startPositionMs)
-            vocalBoost.seekToPositionMs(startPositionMs)
         }
         Logger.e("AudioEngine", "setMediaItem called with url: $url")
 
@@ -537,8 +566,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         val coerced = ms.coerceAtLeast(0)
         seekRequest.set(SeekRequest(coerced))
         aiDetection.notifySeek(coerced)
-        vocalRemover.seekToPositionMs(coerced)
-        vocalBoost.seekToPositionMs(coerced)
+        seekVocalProcessors(coerced)
     }
 
     fun setVolume(v: Float) {
@@ -570,21 +598,27 @@ class AudioEngine(private val isolated: Boolean = false) {
         return (positionMs - queuedMs).coerceAtLeast(0L)
     }
 
-    fun setTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
-        normalization.setTrackLoudness(lufs, truePeakDb)
+    fun setTrackLoudness(lufs: Float, truePeakDb: Float = 0f) = synchronized(effectStateLock) {
+        trackLoudness = lufs to truePeakDb
+        if (effectNodes.isInitialized()) normalization.setTrackLoudness(lufs, truePeakDb)
     }
 
     /** For a loudness learnt while the track already plays: glides rather than resets. */
-    fun updateTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
-        normalization.updateTrackLoudness(lufs, truePeakDb)
+    fun updateTrackLoudness(lufs: Float, truePeakDb: Float = 0f) = synchronized(effectStateLock) {
+        trackLoudness = lufs to truePeakDb
+        if (effectNodes.isInitialized()) normalization.updateTrackLoudness(lufs, truePeakDb)
     }
 
-    fun clearTrackLoudness() {
-        normalization.clearTrackLoudness()
+    fun clearTrackLoudness() = synchronized(effectStateLock) {
+        trackLoudness = null
+        if (effectNodes.isInitialized()) normalization.clearTrackLoudness()
     }
 
-    fun getIntegratedLoudness(): Float = normalization.getIntegratedLoudness()
-    fun getMaxTruePeakDb(): Float = normalization.getMaxTruePeakDb()
+    fun getIntegratedLoudness(): Float =
+        if (effectNodes.isInitialized()) normalization.getIntegratedLoudness() else -70f
+
+    fun getMaxTruePeakDb(): Float =
+        if (effectNodes.isInitialized()) normalization.getMaxTruePeakDb() else -120f
 
     @Synchronized
     fun stop() {
@@ -619,24 +653,30 @@ class AudioEngine(private val isolated: Boolean = false) {
     }
 
     fun onKaraokeStemReady(trackId: Long) {
-        val curId = vocalRemover.getCurrentTrackId() ?: vocalBoost.getCurrentTrackId()
-        if (curId == trackId || curId == null) {
-            vocalRemover.setTrack(trackId)
-            vocalBoost.setTrack(trackId)
-            val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-            val isAiMode = prefs.karaokeEngineMode == com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
-            vocalRemover.setKaraokeAiMode(isAiMode)
-            vocalBoost.setKaraokeAiMode(isAiMode)
-            com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.loadStemSync(trackId)
-            vocalRemover.seekToPositionMs(positionMs)
-            vocalBoost.seekToPositionMs(positionMs)
+        synchronized(effectStateLock) {
+            if (released || (vocalTrackId != null && vocalTrackId != trackId)) return
+            vocalTrackId = trackId
+            if (effectNodes.isInitialized()) {
+                vocalRemover.setTrack(trackId)
+                vocalBoost.setTrack(trackId)
+                val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                val isAiMode = prefs.karaokeEngineMode == com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
+                vocalRemover.setKaraokeAiMode(isAiMode)
+                vocalBoost.setKaraokeAiMode(isAiMode)
+            }
+        }
+        com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.loadStemSync(trackId)
+        synchronized(effectStateLock) {
+            if (!released && vocalTrackId == trackId) seekVocalProcessors(positionMs)
         }
     }
 
     fun applyEffects(state: AudioEffectsState) {
-        effects = state
-        pendingEffects.set(state)
-        pendingStretch.set(state.speed to if (state.isPitchEnabled) state.speed else 1f)
+        // Callers can resubmit the same state after changing the separate karaoke preference.
+        val snapshot = state.copy()
+        dspSettings.updateAndGet {
+            it.copy(effects = snapshot, speed = state.speed, pitch = if (state.isPitchEnabled) state.speed else 1f)
+        }
     }
 
     private fun applyEffectsNow(state: AudioEffectsState) {
@@ -762,14 +802,14 @@ class AudioEngine(private val isolated: Boolean = false) {
         limiter.setCeiling(peakLimiterCeilingFor(state))
     }
 
-    @Volatile
-    private var equalizerEnabled = false
 
     /**
      * The engine's processing stages in signal order, each with whether it is acting on the sound right now:
      * the audio-path diagnostics show it live.
      */
     fun dspStages(): List<Pair<String, Boolean>> {
+        val settings = dspSettings.get()
+        val effects = settings.effects
         val mixing = com.alananasss.kittytune.audio.automix.AutomixManager.isAutomixing.value
         val fxOn = effectToggles.any { runCatching { it.invoke(effects) == true }.getOrDefault(false) }
         return listOf(
@@ -780,7 +820,7 @@ class AudioEngine(private val isolated: Boolean = false) {
             "Automix · bass duck" to mixing,
             "Automix · sweep filter" to mixing,
             "Player FX" to fxOn,
-            "Equalizer" to equalizerEnabled,
+            "Equalizer" to (settings.equalizer?.isEnabled == true),
             "LUFS normalization" to effects.isNormalizationEnabled,
             "Time stretch" to (effects.speed != 1f),
             "Peak limiter" to true,
@@ -788,8 +828,8 @@ class AudioEngine(private val isolated: Boolean = false) {
     }
 
     fun applyEqualizer(state: EqualizerState) {
-        equalizerEnabled = state.isEnabled
-        pendingEqualizer.set(state.copy(bandGainsDb = state.bandGainsDb.toList()))
+        val snapshot = state.copy(bandGainsDb = state.bandGainsDb.toList())
+        dspSettings.updateAndGet { it.copy(equalizer = snapshot) }
     }
 
     private fun applyEqualizerNow(state: EqualizerState) {
@@ -820,11 +860,14 @@ class AudioEngine(private val isolated: Boolean = false) {
     }
 
     fun setStretcherRatio(tempoRatio: Float, pitchRatio: Float) {
-        val baseSpeed = effects.speed
-        val basePitch = if (effects.isPitchEnabled) baseSpeed else 1f
-        val adjSpeed = (baseSpeed * tempoRatio).coerceIn(0.5f, 2.0f)
-        val adjPitch = (basePitch * pitchRatio).coerceIn(0.5f, 2.0f)
-        pendingStretch.set(adjSpeed to adjPitch)
+        dspSettings.updateAndGet { settings ->
+            val baseSpeed = settings.effects.speed
+            val basePitch = if (settings.effects.isPitchEnabled) baseSpeed else 1f
+            settings.copy(
+                speed = (baseSpeed * tempoRatio).coerceIn(0.5f, 2.0f),
+                pitch = (basePitch * pitchRatio).coerceIn(0.5f, 2.0f),
+            )
+        }
     }
 
 
@@ -1197,8 +1240,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                     if (!isCurrentSeek()) continue
                     decodedPositionMs = seek
                     aiDetection.notifySeek(seek)
-                    vocalRemover.seekToPositionMs(seek)
-                    vocalBoost.seekToPositionMs(seek)
+                    seekVocalProcessors(seek)
                     if (stretcherState.isInitialized()) stretcher.flush()
                     if (limiterState.isInitialized()) limiter.flush()
                     initializedDsp.get()?.forEach { it.flush() }
@@ -1301,14 +1343,15 @@ class AudioEngine(private val isolated: Boolean = false) {
         val n = decodeToFloat(buffers, frameChannels)
         if (n <= 0) return
 
-        configuredProcessors()
+        // Keep the ceiling and downstream effects on the same settings for the whole PCM block.
+        val processors = configuredProcessors()
         limiter.process(decodeBuffer, n)
 
         if (interleaveBuffer.size < n) interleaveBuffer = ShortArray(n)
         for (i in 0 until n) {
             interleaveBuffer[i] = (decodeBuffer[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
         }
-        pushThroughDsp(interleaveBuffer, n)
+        pushThroughDsp(interleaveBuffer, n, processors)
     }
 
     /**
@@ -1368,13 +1411,21 @@ class AudioEngine(private val isolated: Boolean = false) {
     private fun configuredProcessors(): List<AudioProcessor> {
         if (released) throw InterruptedException("Audio engine released")
         val processors = chain
-        pendingEffects.getAndSet(null)?.let(::applyEffectsNow)
-        pendingEqualizer.getAndSet(null)?.let(::applyEqualizerNow)
-        pendingStretch.getAndSet(null)?.let { (speed, pitch) -> stretcher.setParameters(speed, pitch) }
+        val settings = dspSettings.get()
+        val previous = appliedDspSettings
+        if (settings !== previous) {
+            if (settings.effects !== previous?.effects) applyEffectsNow(settings.effects)
+            if (settings.equalizer !== previous?.equalizer) settings.equalizer?.let(::applyEqualizerNow)
+            if (settings.speed != previous?.speed || settings.pitch != previous?.pitch) {
+                stretcher.setParameters(settings.speed, settings.pitch)
+            }
+            appliedDspSettings = settings
+        }
         return processors
     }
 
-    private fun pushThroughDsp(pcm: ShortArray, length: Int = pcm.size) {
+    private fun pushThroughDsp(pcm: ShortArray, length: Int, processors: List<AudioProcessor>) {
+        if (released) throw InterruptedException("Audio engine released")
         val requiredBytes = length * 2
         var buf = if (dspInputBuffer.capacity() < requiredBytes) {
             dspInputBuffer = ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.LITTLE_ENDIAN)
@@ -1387,7 +1438,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         buf.position(0)
         buf.limit(requiredBytes)
 
-        for (p in configuredProcessors()) {
+        for (p in processors) {
             p.queueInput(buf)
             buf = p.getOutput()
         }
@@ -1405,6 +1456,7 @@ class AudioEngine(private val isolated: Boolean = false) {
     }
 
     private fun drainStretcher(outBuf: ShortArray, localLine: SourceDataLine?) {
+        if (!stretcherState.isInitialized()) return
         while (stretcher.available() >= outputChannels) {
             val n = stretcher.drain(outBuf, outBuf.size)
             if (n <= 0) break

@@ -37,10 +37,18 @@ class LazyAudioEngineTest {
         return (if (value is Lazy<*>) value.value else value) as TimeStretcher
     }
 
-    private fun process(engine: AudioEngine, input: ShortArray): ShortArray {
-        val method = engine.javaClass.getDeclaredMethod("pushThroughDsp", ShortArray::class.java, Int::class.javaPrimitiveType)
+    private fun beginBlock(engine: AudioEngine): List<*> {
+        val method = engine.javaClass.getDeclaredMethod("configuredProcessors")
         method.isAccessible = true
-        method.invoke(engine, input, input.size)
+        return method.invoke(engine) as List<*>
+    }
+
+    private fun process(engine: AudioEngine, input: ShortArray, processors: List<*> = beginBlock(engine)): ShortArray {
+        val method = engine.javaClass.getDeclaredMethod(
+            "pushThroughDsp", ShortArray::class.java, Int::class.javaPrimitiveType, List::class.java,
+        )
+        method.isAccessible = true
+        method.invoke(engine, input, input.size, processors)
         val output = ShortArray(input.size * 8)
         return output.copyOf(stretcher(engine).drain(output, output.size))
     }
@@ -56,6 +64,29 @@ class LazyAudioEngineTest {
             assertTrue(initialized(engine).isEmpty(), "Stopping an idle engine allocated DSP")
         } finally { engine.release() }
         assertTrue(initialized(engine).isEmpty(), "Releasing an idle engine allocated DSP")
+    }
+
+    @Test fun selectingAndSeekingAnUnplayedItemDoesNotBuildTheDspGraph() {
+        val engine = AudioEngine(isolated = true)
+        try {
+            engine.setMediaItem("file:///unused.wav", startPositionMs = 1_000L)
+            engine.seekTo(2_000L)
+            engine.setTrackLoudness(-12f, -1f)
+            assertEquals(-70f, engine.getIntegratedLoudness())
+            assertEquals(-120f, engine.getMaxTruePeakDb())
+            assertTrue(initialized(engine).isEmpty(), "Preparing an unplayed item allocated DSP")
+        } finally { engine.release() }
+    }
+
+    @Test fun settingsPublishedAfterBlockStartWaitForTheNextBlock() {
+        val engine = AudioEngine(isolated = true)
+        try {
+            val input = shortArrayOf(1000, -2000, 3000, 1000)
+            val processors = beginBlock(engine)
+            engine.applyEffects(AudioEffectsState(isMonoEnabled = true))
+            assertContentEquals(input, process(engine, input, processors))
+            assertContentEquals(shortArrayOf(-500, -500, 2000, 2000), process(engine, input))
+        } finally { engine.release() }
     }
 
     @Test fun savedMonoReachesTheFirstPcmBlock() {
