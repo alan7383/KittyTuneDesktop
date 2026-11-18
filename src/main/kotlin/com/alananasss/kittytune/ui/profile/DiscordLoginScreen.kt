@@ -77,10 +77,16 @@ fun DiscordLoginScreen(
         val current = state
         if (current is DiscordRemoteAuth.State.AwaitingConfirmation) preview = current
         if (current is DiscordRemoteAuth.State.Success) {
+            val resolvedAvatarUrl = current.avatarUrl ?: preview?.avatarUrl
             prefs.setDiscordToken(current.token)
+            prefs.setDiscordAvatarUrl(resolvedAvatarUrl)
+            com.alananasss.kittytune.data.together.Together.discordAvatarUrl = resolvedAvatarUrl
+            if (resolvedAvatarUrl.isNullOrBlank()) {
+                DiscordRemoteAuth.syncDiscordAvatarFromPrefs(prefs)
+            }
             prefs.setDiscordRpcEnabled(true)
             playerViewModel?.updateDiscordPresence()
-            onAccountConnected(preview?.username, preview?.avatarUrl)
+            onAccountConnected(preview?.username, resolvedAvatarUrl)
             onLoginSuccess()
         }
     }

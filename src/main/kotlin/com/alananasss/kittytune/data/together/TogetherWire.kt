@@ -24,6 +24,15 @@ internal object TogetherWire {
 
     fun topicFor(code: String): String = "kittytune/together/" + sha256Hex("topic:" + normalizeCode(code)).take(32)
 
+    fun stateSnapshotTopicFor(code: String): String =
+        "kittytune/together/snap/" + sha256Hex("snap:" + normalizeCode(code)).take(32) + "/state"
+
+    fun queueSnapshotTopicFor(code: String): String =
+        "kittytune/together/snap/" + sha256Hex("snap:" + normalizeCode(code)).take(32) + "/queue"
+
+    fun snapshotWildcardTopicFor(code: String): String =
+        "kittytune/together/snap/" + sha256Hex("snap:" + normalizeCode(code)).take(32) + "/#"
+
     fun seal(code: String, message: TogetherMessage): ByteArray {
         val json = gson.toJson(message.toJson()).toByteArray(Charsets.UTF_8)
         val iv = ByteArray(IV_BYTES).also(random::nextBytes)
@@ -101,13 +110,26 @@ data class SharedTrack(
     }
 }
 
+/** An active listener embedded inside [TogetherMessage.State] so newcomers see everyone immediately. */
+data class SharedListener(
+    val id: String,
+    val name: String,
+    val avatarUrl: String? = null,
+)
+
 /** One message between the members of a shared playlist. Every one says who sent it and when. */
 sealed interface TogetherMessage {
     val from: String
     val sentAt: Long
 
     /** "I am here", every few seconds, with whether this member is listening along. */
-    data class Hello(override val from: String, override val sentAt: Long, val name: String, val isListening: Boolean) : TogetherMessage
+    data class Hello(
+        override val from: String,
+        override val sentAt: Long,
+        val name: String,
+        val isListening: Boolean,
+        val avatarUrl: String? = null,
+    ) : TogetherMessage
 
     /** Leaving, so the others need not wait for the presence to time out. */
     data class Bye(override val from: String, override val sentAt: Long) : TogetherMessage
@@ -123,6 +145,8 @@ sealed interface TogetherMessage {
         val queueVersion: Int,
         val hostLocked: Boolean = false,
         val hostName: String? = null,
+        val hostAvatarUrl: String? = null,
+        val listeners: List<SharedListener>? = null,
     ) : TogetherMessage
 
     /** The host's queue from the song playing on, and the playlist's own tracks. */

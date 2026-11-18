@@ -1961,6 +1961,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         applyRepeatMode()
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: repeat mode")
+        com.alananasss.kittytune.data.discord.DiscordRemoteAuth.syncDiscordAvatarFromPrefs(playerPrefs)
         fetchUserProfile()
         observeArtworkColors()
         observeAnimatedCovers()
@@ -2163,6 +2164,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun initDiscordRpc() {
         val token = playerPrefs.getDiscordToken()
         val enabled = playerPrefs.getDiscordRpcEnabled()
+        com.alananasss.kittytune.data.discord.DiscordRemoteAuth.syncDiscordAvatarFromPrefs(playerPrefs)
         if (enabled && !token.isNullOrEmpty()) {
             if (discordRpc == null) {
                 try {
@@ -4128,23 +4130,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         profileJob?.cancel()
         currentUser = null
         currentUserId = 0L
+        com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = null
         SoundCloudTelemetryTracker.updateCurrentUserId(0L)
         fetchUserProfile()
     }
 
     fun fetchUserProfile() {
-        if (tokenManager.isGuestMode() || tokenManager.getAccessToken().isNullOrEmpty()) return
+        if (tokenManager.isGuestMode() || tokenManager.getAccessToken().isNullOrEmpty()) {
+            com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = null
+            return
+        }
+
+        tokenManager.activeAccountAvatarUrl()?.let { savedAvatar ->
+            if (com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl.isNullOrBlank()) {
+                com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = savedAvatar
+            }
+        }
+        val activeId = tokenManager.activeAccountId()
+        if (activeId != 0L) {
+            tokenManager.accounts.value.firstOrNull { it.id == activeId }?.username?.takeIf { it.isNotBlank() }?.let {
+                com.alananasss.kittytune.data.together.Together.defaultName = it
+            }
+        }
 
         val sessionToken = tokenManager.getAccessToken()
         profileJob?.cancel()
         profileJob = viewModelScope.launch {
             try {
                 val me = api.getMe()
-                if (tokenManager.getAccessToken() != sessionToken) return@launch
+                if (tokenManager.isGuestMode() || tokenManager.getAccessToken() != sessionToken) return@launch
                 currentUserId = me.id
                 currentUser = me
                 tokenManager.rememberActiveAccount(me.id, me.username.orEmpty(), me.avatarUrl)
                 me.username?.let { com.alananasss.kittytune.data.together.Together.defaultName = it }
+                com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = me.avatarUrl
                 SoundCloudTelemetryTracker.updateCurrentUserId(me.id)
                 com.alananasss.kittytune.data.RepostRepository.refreshReposts()
             } catch (_: Exception) {

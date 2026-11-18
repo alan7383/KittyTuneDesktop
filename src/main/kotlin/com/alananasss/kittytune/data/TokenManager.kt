@@ -113,6 +113,14 @@ object TokenManager {
     /** The saved account the current session belongs to, or 0 for a guest or a session not identified yet. */
     fun activeAccountId(): Long = getLongValue(KEY_ACTIVE_ACCOUNT_ID, 0L)
 
+    /** Saved avatar URL for the currently signed-in SoundCloud account, or null in guest mode / signed out. */
+    fun activeAccountAvatarUrl(): String? {
+        if (isGuestMode() || !hasAccessToken()) return null
+        val active = activeAccountId()
+        if (active == 0L) return null
+        return _accounts.value.firstOrNull { it.id == active }?.avatarUrl?.takeIf { it.isNotBlank() }
+    }
+
     /**
      * Files the current session under the account it turned out to belong to.
      *
@@ -121,6 +129,9 @@ object TokenManager {
      */
     fun rememberActiveAccount(id: Long, username: String, avatarUrl: String?) {
         if (id == 0L || !hasAccessToken()) return
+        if (!isGuestMode()) {
+            com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = avatarUrl
+        }
         synchronized(lock) {
             val entry = buildJsonObject {
                 put("id", JsonPrimitive(id))
@@ -189,6 +200,8 @@ object TokenManager {
         SESSION_KEYS.forEach { key -> entry[key]?.let { values[key] = it } }
         values[KEY_IS_GUEST_MODE] = JsonPrimitive(false)
         values[KEY_ACTIVE_ACCOUNT_ID] = JsonPrimitive(id)
+        com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl =
+            (entry["avatar_url"] as? JsonPrimitive)?.contentOrNull
         save()
         true
     }
@@ -257,6 +270,9 @@ object TokenManager {
 
     fun setGuestMode(isGuest: Boolean) {
         values[KEY_IS_GUEST_MODE] = JsonPrimitive(isGuest)
+        if (isGuest) {
+            com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = null
+        }
         save()
     }
 
@@ -300,6 +316,7 @@ object TokenManager {
     fun clearTokens() {
         SESSION_KEYS.forEach { values.remove(it) }
         values.remove(KEY_ACTIVE_ACCOUNT_ID)
+        com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl = null
         save()
     }
 

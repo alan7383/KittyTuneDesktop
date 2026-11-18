@@ -91,6 +91,7 @@ fun LiveListenDialog(
     val activeCode by Together.active.collectAsState()
     val rooms by Together.rooms.collectAsState()
     val isHostLocked by Together.isHostLocked.collectAsState()
+    val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
     var discordListenAlong by remember { mutableStateOf(prefs.getDiscordListenAlongEnabled()) }
     var joinInput by remember { mutableStateOf("") }
 
@@ -318,6 +319,28 @@ fun LiveListenDialog(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        val liveMembers = remember(activeRoom?.listeners, isHost, myAvatarUrl) {
+                            buildList {
+                                add(Together.Member(Together.memberId, Together.myName, true, System.currentTimeMillis(), myAvatarUrl))
+                                activeRoom?.listeners?.filterNot { it.id == Together.memberId }?.forEach { add(it) }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            liveMembers.forEach { member ->
+                                TogetherMemberPill(
+                                    name = member.name,
+                                    isHost = member.id == activeRoom?.hostId || (isHost && member.id == Together.memberId),
+                                    isMe = member.id == Together.memberId,
+                                    avatarUrl = if (member.id == Together.memberId) (myAvatarUrl ?: member.avatarUrl) else member.avatarUrl,
+                                )
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -518,6 +541,7 @@ fun TogetherInviteDialog(
 ) {
     val normalized = TogetherWire.normalizeCode(code)
     val rooms by Together.rooms.collectAsState()
+    val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
     val room = rooms[normalized] ?: Together.Room(normalized, "")
     val cs = MaterialTheme.colorScheme
 
@@ -694,6 +718,7 @@ fun TogetherInviteDialog(
                                     name = member.name,
                                     isHost = member.id == room.hostId,
                                     isMe = member.id == Together.memberId,
+                                    avatarUrl = if (member.id == Together.memberId) (myAvatarUrl ?: member.avatarUrl) else member.avatarUrl,
                                 )
                             }
                         }

@@ -53,6 +53,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -478,12 +479,17 @@ internal fun TogetherMemberPill(
     name: String,
     isHost: Boolean,
     isMe: Boolean,
+    avatarUrl: String? = null,
 ) {
     val cs = MaterialTheme.colorScheme
     val container = if (isHost) cs.primaryContainer else cs.surfaceContainerHighest
     val content = if (isHost) cs.onPrimaryContainer else cs.onSurface
     val badgeBg = if (isHost) cs.primary else cs.secondaryContainer
     val badgeFg = if (isHost) cs.onPrimary else cs.onSecondaryContainer
+    val resolvedAvatar = avatarUrl?.trim()?.takeIf {
+        it.isNotEmpty() && it.startsWith("https://") && !it.contains("default_avatar", ignoreCase = true)
+    }
+    var avatarLoaded by remember(resolvedAvatar) { mutableStateOf(false) }
 
     Surface(
         shape = CircleShape,
@@ -500,12 +506,26 @@ internal fun TogetherMemberPill(
                     .background(badgeBg),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = name.trim().take(1).uppercase().ifBlank { "?" },
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = badgeFg,
-                )
+                if (!avatarLoaded) {
+                    Text(
+                        text = name.trim().take(1).uppercase().ifBlank { "?" },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = badgeFg,
+                    )
+                }
+                if (resolvedAvatar != null) {
+                    AsyncImage(
+                        model = resolvedAvatar,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        onSuccess = { avatarLoaded = true },
+                        onError = { avatarLoaded = false },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                    )
+                }
             }
             Spacer(Modifier.width(8.dp))
             Text(
