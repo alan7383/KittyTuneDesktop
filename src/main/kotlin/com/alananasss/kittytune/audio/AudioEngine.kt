@@ -76,39 +76,76 @@ class AudioEngine(private val isolated: Boolean = false) {
     private val outputSampleRate = 44100
     private val outputChannels = 2
 
-    private val fx = FxAudioProcessor()
-    private val equalizer = EqualizerAudioProcessor()
-    private val reverb = ReverbAudioProcessor()
-    private val eightD = EightDAudioProcessor()
-    private val earrape = EarrapeAudioProcessor()
-    private val normalization = NormalizationAudioProcessor()
-    private val mono = MonoAudioProcessor()
-    private val vintageMp3 = VintageMp3AudioProcessor()
-    private val vocalRemover = VocalRemoverAudioProcessor()
-    private val vocalBoost = VocalBoostAudioProcessor()
-    private val flanger = FlangerAudioProcessor()
-    private val partyNextDoor = PartyNextDoorAudioProcessor()
-    private val superWide = SuperWideAudioProcessor()
-    private val vinylLoFi = VinylLoFiAudioProcessor()
-    private val phaser = PhaserAudioProcessor()
-    private val megaphone = MegaphoneRadioAudioProcessor()
-    private val robotVocoder = RobotVocoderAudioProcessor()
-    private val chorus = ChorusAudioProcessor()
-    private val underwater = UnderwaterAudioProcessor()
-    private val tranceGate = TranceGateAudioProcessor()
-    private val pingPongDelay = PingPongDelayAudioProcessor()
-    private val chiptune = ChiptuneAudioProcessor()
-    private val shimmerReverb = ShimmerReverbAudioProcessor()
-    private val rotarySpeaker = RotarySpeakerAudioProcessor()
-    private val tapeSaturation = TapeSaturationAudioProcessor()
-    private val subOctaver = SubOctaverAudioProcessor()
-    private val emptyMall = EmptyMallAudioProcessor()
-    private val gramophone = GramophoneAudioProcessor()
-    private val reverseEcho = ReverseEchoAudioProcessor()
-    private val stadium = StadiumAudioProcessor()
-    private val walkman = CassetteWalkmanAudioProcessor()
-    private val asmrVocal = AsmrVocalAudioProcessor()
-    private val nightDrive = NightDriveAudioProcessor()
+    private class EffectNodes {
+        val fx = FxAudioProcessor()
+        val equalizer = EqualizerAudioProcessor()
+        val reverb = ReverbAudioProcessor()
+        val eightD = EightDAudioProcessor()
+        val earrape = EarrapeAudioProcessor()
+        val normalization = NormalizationAudioProcessor()
+        val mono = MonoAudioProcessor()
+        val vintageMp3 = VintageMp3AudioProcessor()
+        val vocalRemover = VocalRemoverAudioProcessor()
+        val vocalBoost = VocalBoostAudioProcessor()
+        val flanger = FlangerAudioProcessor()
+        val partyNextDoor = PartyNextDoorAudioProcessor()
+        val superWide = SuperWideAudioProcessor()
+        val vinylLoFi = VinylLoFiAudioProcessor()
+        val phaser = PhaserAudioProcessor()
+        val megaphone = MegaphoneRadioAudioProcessor()
+        val robotVocoder = RobotVocoderAudioProcessor()
+        val chorus = ChorusAudioProcessor()
+        val underwater = UnderwaterAudioProcessor()
+        val tranceGate = TranceGateAudioProcessor()
+        val pingPongDelay = PingPongDelayAudioProcessor()
+        val chiptune = ChiptuneAudioProcessor()
+        val shimmerReverb = ShimmerReverbAudioProcessor()
+        val rotarySpeaker = RotarySpeakerAudioProcessor()
+        val tapeSaturation = TapeSaturationAudioProcessor()
+        val subOctaver = SubOctaverAudioProcessor()
+        val emptyMall = EmptyMallAudioProcessor()
+        val gramophone = GramophoneAudioProcessor()
+        val reverseEcho = ReverseEchoAudioProcessor()
+        val stadium = StadiumAudioProcessor()
+        val walkman = CassetteWalkmanAudioProcessor()
+        val asmrVocal = AsmrVocalAudioProcessor()
+        val nightDrive = NightDriveAudioProcessor()
+    }
+
+    private val effectNodes = lazy { EffectNodes() }
+    private val fx get() = effectNodes.value.fx
+    private val equalizer get() = effectNodes.value.equalizer
+    private val reverb get() = effectNodes.value.reverb
+    private val eightD get() = effectNodes.value.eightD
+    private val earrape get() = effectNodes.value.earrape
+    private val normalization get() = effectNodes.value.normalization
+    private val mono get() = effectNodes.value.mono
+    private val vintageMp3 get() = effectNodes.value.vintageMp3
+    private val vocalRemover get() = effectNodes.value.vocalRemover
+    private val vocalBoost get() = effectNodes.value.vocalBoost
+    private val flanger get() = effectNodes.value.flanger
+    private val partyNextDoor get() = effectNodes.value.partyNextDoor
+    private val superWide get() = effectNodes.value.superWide
+    private val vinylLoFi get() = effectNodes.value.vinylLoFi
+    private val phaser get() = effectNodes.value.phaser
+    private val megaphone get() = effectNodes.value.megaphone
+    private val robotVocoder get() = effectNodes.value.robotVocoder
+    private val chorus get() = effectNodes.value.chorus
+    private val underwater get() = effectNodes.value.underwater
+    private val tranceGate get() = effectNodes.value.tranceGate
+    private val pingPongDelay get() = effectNodes.value.pingPongDelay
+    private val chiptune get() = effectNodes.value.chiptune
+    private val shimmerReverb get() = effectNodes.value.shimmerReverb
+    private val rotarySpeaker get() = effectNodes.value.rotarySpeaker
+    private val tapeSaturation get() = effectNodes.value.tapeSaturation
+    private val subOctaver get() = effectNodes.value.subOctaver
+    private val emptyMall get() = effectNodes.value.emptyMall
+    private val gramophone get() = effectNodes.value.gramophone
+    private val reverseEcho get() = effectNodes.value.reverseEcho
+    private val stadium get() = effectNodes.value.stadium
+    private val walkman get() = effectNodes.value.walkman
+    private val asmrVocal get() = effectNodes.value.asmrVocal
+    private val nightDrive get() = effectNodes.value.nightDrive
     val automixDuck = com.alananasss.kittytune.audio.automix.AutomixDuckAudioProcessor()
 
     /** The Mix transitions' sweep filter (RISE high-pass, WAVE band-pass, a Custom seam's filter legs). */
@@ -141,30 +178,51 @@ class AudioEngine(private val isolated: Boolean = false) {
      */
     val silenceSkip = com.alananasss.kittytune.audio.silence.SilenceSkipAudioProcessor()
 
-    private val chain: List<AudioProcessor> = listOfNotNull(
-        aiDetection.takeUnless { isolated },
-        liveBeatTap,
-        silenceSkip,
-        automixDuck,
-        mixSweep,
-        transitionSweep,
-        transitionEffects,
-        fx, equalizer, reverb, eightD, earrape, normalization, mono,
-        vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
-        superWide, vinylLoFi, phaser, megaphone, robotVocoder, chorus,
-        underwater, tranceGate, pingPongDelay, chiptune, shimmerReverb,
-        rotarySpeaker, tapeSaturation, subOctaver, emptyMall, gramophone,
-        reverseEcho, stadium, walkman, asmrVocal, nightDrive
-    )
-    private val stretcher = TimeStretcher(outputSampleRate, outputChannels)
+    // An empty list marks release, including a graph still being configured on the decoder.
+    private val initializedDsp = AtomicReference<List<AudioProcessor>?>(null)
+    private val chain: List<AudioProcessor> by lazy {
+        listOfNotNull(
+            aiDetection.takeUnless { isolated },
+            liveBeatTap,
+            silenceSkip,
+            automixDuck,
+            mixSweep,
+            transitionSweep,
+            transitionEffects,
+            fx, equalizer, reverb, eightD, earrape, normalization, mono,
+            vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
+            superWide, vinylLoFi, phaser, megaphone, robotVocoder, chorus,
+            underwater, tranceGate, pingPongDelay, chiptune, shimmerReverb,
+            rotarySpeaker, tapeSaturation, subOctaver, emptyMall, gramophone,
+            reverseEcho, stadium, walkman, asmrVocal, nightDrive
+        ).also { processors ->
+            try {
+                val format = AudioFormat(outputSampleRate, outputChannels)
+                processors.forEach { it.configure(format) }
+                if (!initializedDsp.compareAndSet(null, processors)) {
+                    throw InterruptedException("Audio engine released while preparing DSP")
+                }
+            } catch (failure: Throwable) {
+                processors.forEach { runCatching { it.reset() } }
+                throw failure
+            }
+        }
+    }
+    private val stretcherState = lazy { TimeStretcher(outputSampleRate, outputChannels) }
+    private val stretcher get() = stretcherState.value
 
     /**
      * Catches the inter-sample overshoot lossy decoders leave above full scale, before
      * the 16-bit conversion turns it into flat-topped crackle. See [PeakLimiter].
      */
-    private val limiter = PeakLimiter(outputSampleRate, outputChannels)
+    private val limiterState = lazy { PeakLimiter(outputSampleRate, outputChannels) }
+    private val limiter get() = limiterState.value
 
+    @Volatile
     private var effects = AudioEffectsState()
+    private val pendingEffects = AtomicReference<AudioEffectsState?>(effects)
+    private val pendingEqualizer = AtomicReference<EqualizerState?>(null)
+    private val pendingStretch = AtomicReference<Pair<Float, Float>?>(1f to 1f)
 
     @Volatile
     private var volume: Float = 1f
@@ -226,8 +284,6 @@ class AudioEngine(private val isolated: Boolean = false) {
     private var sourceAnalysisPending = false
 
     init {
-        val fmt = AudioFormat(outputSampleRate, outputChannels)
-        chain.forEach { it.configure(fmt) }
         aiDetection.setPreferences(PlayerPreferences())
         if (!isolated && !com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelLoaded() &&
             com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() &&
@@ -509,7 +565,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         val l = line ?: return positionMs
         val bytesPerSecond = outputSampleRate * outputChannels * 2
         val queuedBytes = runCatching { (l.bufferSize - l.available()).coerceAtLeast(0) }.getOrDefault(0)
-        val queuedSamples = queuedBytes / 2 + runCatching { stretcher.available() }.getOrDefault(0)
+        val queuedSamples = queuedBytes / 2 + if (stretcherState.isInitialized()) stretcher.available() else 0
         val queuedMs = queuedSamples * 1000L / (bytesPerSecond / 2)
         return (positionMs - queuedMs).coerceAtLeast(0L)
     }
@@ -557,7 +613,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         // chain, which keeps native DSP state (normalisation handle, ebur128 histograms)
         // allocated. Every crossfade releases an engine, so without this reset each
         // played track leaked ~0.4 MB of native memory (issue #66: 500 MB -> 1 GB+).
-        chain.forEach { runCatching { it.reset() } }
+        initializedDsp.getAndSet(emptyList())?.forEach { runCatching { it.reset() } }
         scope.coroutineContext[Job]?.cancel()
         com.alananasss.kittytune.utils.NativeMemoryManager.trim()
     }
@@ -579,6 +635,11 @@ class AudioEngine(private val isolated: Boolean = false) {
 
     fun applyEffects(state: AudioEffectsState) {
         effects = state
+        pendingEffects.set(state)
+        pendingStretch.set(state.speed to if (state.isPitchEnabled) state.speed else 1f)
+    }
+
+    private fun applyEffectsNow(state: AudioEffectsState) {
         fx.setEffects(state.isMuffledEnabled, state.isBassBoostEnabled)
         fx.setBassBoostGain(state.bassBoostIntensity)
         fx.setMuffledCutoff(state.muffledIntensity)
@@ -698,9 +759,6 @@ class AudioEngine(private val isolated: Boolean = false) {
         nightDrive.setCabinWidth(state.nightDriveCabin)
         nightDrive.setRoadRumble(state.nightDriveRoad)
 
-        val pitch = if (state.isPitchEnabled) state.speed else 1f
-        stretcher.setParameters(state.speed, pitch)
-
         limiter.setCeiling(peakLimiterCeilingFor(state))
     }
 
@@ -731,6 +789,10 @@ class AudioEngine(private val isolated: Boolean = false) {
 
     fun applyEqualizer(state: EqualizerState) {
         equalizerEnabled = state.isEnabled
+        pendingEqualizer.set(state.copy(bandGainsDb = state.bandGainsDb.toList()))
+    }
+
+    private fun applyEqualizerNow(state: EqualizerState) {
         equalizer.setParameters(
             enabled = state.isEnabled,
             preampDb = state.preampDb,
@@ -762,7 +824,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         val basePitch = if (effects.isPitchEnabled) baseSpeed else 1f
         val adjSpeed = (baseSpeed * tempoRatio).coerceIn(0.5f, 2.0f)
         val adjPitch = (basePitch * pitchRatio).coerceIn(0.5f, 2.0f)
-        stretcher.setParameters(adjSpeed, adjPitch)
+        pendingStretch.set(adjSpeed to adjPitch)
     }
 
 
@@ -1137,9 +1199,9 @@ class AudioEngine(private val isolated: Boolean = false) {
                     aiDetection.notifySeek(seek)
                     vocalRemover.seekToPositionMs(seek)
                     vocalBoost.seekToPositionMs(seek)
-                    stretcher.flush()
-                    limiter.flush()
-                    chain.forEach { it.flush() }
+                    if (stretcherState.isInitialized()) stretcher.flush()
+                    if (limiterState.isInitialized()) limiter.flush()
+                    initializedDsp.get()?.forEach { it.flush() }
                     liveBeat.onFlush(seek.toDouble())
                     localLine?.flush()
                     if (!seekRequest.compareAndSet(request, null)) continue
@@ -1239,6 +1301,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         val n = decodeToFloat(buffers, frameChannels)
         if (n <= 0) return
 
+        configuredProcessors()
         limiter.process(decodeBuffer, n)
 
         if (interleaveBuffer.size < n) interleaveBuffer = ShortArray(n)
@@ -1302,6 +1365,15 @@ class AudioEngine(private val isolated: Boolean = false) {
     private var dspInputBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.LITTLE_ENDIAN)
     private var processedBuffer = ShortArray(0)
 
+    private fun configuredProcessors(): List<AudioProcessor> {
+        if (released) throw InterruptedException("Audio engine released")
+        val processors = chain
+        pendingEffects.getAndSet(null)?.let(::applyEffectsNow)
+        pendingEqualizer.getAndSet(null)?.let(::applyEqualizerNow)
+        pendingStretch.getAndSet(null)?.let { (speed, pitch) -> stretcher.setParameters(speed, pitch) }
+        return processors
+    }
+
     private fun pushThroughDsp(pcm: ShortArray, length: Int = pcm.size) {
         val requiredBytes = length * 2
         var buf = if (dspInputBuffer.capacity() < requiredBytes) {
@@ -1315,7 +1387,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         buf.position(0)
         buf.limit(requiredBytes)
 
-        for (p in chain) {
+        for (p in configuredProcessors()) {
             p.queueInput(buf)
             buf = p.getOutput()
         }
@@ -1440,9 +1512,9 @@ class AudioEngine(private val isolated: Boolean = false) {
         worker = null
         reapFinishedWorkers()
         silenceAndCloseLater(line)
-        stretcher.flush()
-        limiter.flush()
-        chain.forEach { it.flush() }
+        if (stretcherState.isInitialized()) stretcher.flush()
+        if (limiterState.isInitialized()) limiter.flush()
+        initializedDsp.get()?.forEach { it.flush() }
         setPlaying(false)
     }
 
