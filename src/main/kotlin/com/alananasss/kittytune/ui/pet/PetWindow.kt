@@ -61,8 +61,6 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.awt.SwingWindow
-import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.alananasss.kittytune.core.Prefs
@@ -77,6 +75,7 @@ import com.alananasss.kittytune.ui.common.FloatingMenuWindow
 import com.alananasss.kittytune.ui.player.mini.WindowDragHandler
 import com.alananasss.kittytune.ui.player.mini.dragsWindow
 import com.alananasss.kittytune.core.LinuxWindowHelper
+import com.alananasss.kittytune.ui.common.FloatingComposeWindow
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import com.alananasss.kittytune.ui.theme.withUiScale
 import java.awt.Cursor
@@ -155,12 +154,11 @@ fun PetDesktopWindow(
     // Inside the key: a window built again is set up again before it shows.
     var windowReady by remember { mutableStateOf(false) }
 
-    SwingWindow(
+    FloatingComposeWindow(
         onCloseRequest = { PetWindowState.show(false) },
         state = windowState,
         visible = !isAppFullScreen && windowReady,
         alwaysOnTop = isPinned,
-        decoration = WindowDecoration.Undecorated(),
         transparent = !compat,
         resizable = true,
         title = "KittyTune Kitty pet",

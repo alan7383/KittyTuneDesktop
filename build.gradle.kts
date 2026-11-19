@@ -15,6 +15,14 @@ group = "com.alananasss"
 version = "1.6.0"
 
 val desktopIsWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+val desktopIsLinux = System.getProperty("os.name").startsWith("Linux", ignoreCase = true)
+// 0.157.0 fixes creation of the offscreen OpenGL context used by Linux floating windows.
+val linuxSkikoVersion = "0.157.0"
+val linuxSkikoRuntime = if (System.getProperty("os.arch") == "aarch64") {
+    "skiko-awt-runtime-linux-arm64"
+} else {
+    "skiko-awt-runtime-linux-x64"
+}
 // Keep Windows app images separate by version, including when an older build is running.
 val desktopDistributionDirectory = layout.buildDirectory.dir(
     if (desktopIsWindows) "compose/binaries/${project.version}" else "compose/binaries"
@@ -32,6 +40,14 @@ val packagingJdkHome: String by lazy {
 repositories {
     google()
     mavenCentral()
+    if (desktopIsLinux) {
+        maven("https://packages.jetbrains.team/maven/p/cmp/dev") {
+            content {
+                includeVersion("org.jetbrains.skiko", "skiko-awt", linuxSkikoVersion)
+                includeVersion("org.jetbrains.skiko", linuxSkikoRuntime, linuxSkikoVersion)
+            }
+        }
+    }
     maven("https://central.sonatype.com/repository/maven-snapshots")
     maven("https://oss.sonatype.org/content/repositories/snapshots")
     maven("https://jitpack.io") {
@@ -52,6 +68,10 @@ dependencies {
     implementation("com.github.z-huang.InnerTune:lrclib:0.5.10")
     implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
     implementation(compose.desktop.currentOs)
+    if (desktopIsLinux) {
+        implementation("org.jetbrains.skiko:skiko-awt:$linuxSkikoVersion")
+        runtimeOnly("org.jetbrains.skiko:$linuxSkikoRuntime:$linuxSkikoVersion")
+    }
     implementation("com.mocharealm.accompanist:lyrics-ui:1.0.19") {
         if (!desktopIsWindows) {
             exclude(group = "org.jetbrains.compose.desktop", module = "desktop-jvm-windows-x64")
