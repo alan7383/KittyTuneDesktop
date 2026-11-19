@@ -24,6 +24,26 @@ jobs:
       - name: Test and package portable Windows app
         shell: pwsh
         run: ./scripts/build-windows.ps1 -JavaHome $env:JAVA_HOME
+      - name: Check packaged version file
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = Get-ChildItem release/*-Windows-Portable-x64.zip | Select-Object -First 1
+          $archive = [IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          try {
+            function Read-Entry($name) {
+              $entry = $archive.GetEntry($name)
+              if (!$entry) { throw "Missing archive entry: $name" }
+              $reader = [IO.StreamReader]::new($entry.Open())
+              try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+            }
+            $version = (Read-Entry 'KittyTune/version.txt').Trim()
+            $config = Read-Entry 'KittyTune/app/KittyTune.cfg'
+            $match = [regex]::Match($config, '(?m)^java-options=-Djpackage\.app-version=(.+)')
+            if (!$match.Success -or $version -ne $match.Groups[1].Value.Trim()) {
+              throw 'version.txt does not match the packaged launcher'
+            }
+          } finally { $archive.Dispose() }
       - name: Test transparent window renderer fallback
         shell: pwsh
         run: ./gradlew.bat :test --tests '*TransparentWindowRenderingTest' -PdesktopOnly=true --console=plain

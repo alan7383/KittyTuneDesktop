@@ -21,6 +21,7 @@ kotlin-js-store/
 *.py
 !scripts/check-linux-dbus.py
 *.ps1
+!src/main/resources/updater/*.ps1
 !scripts/build-smtc-bridge.ps1
 !scripts/build-native-windows.ps1
 !scripts/build-windows.ps1
