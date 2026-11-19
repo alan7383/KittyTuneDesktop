@@ -34,17 +34,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.ui.common.FloatingComposeWindow
 import com.alananasss.kittytune.ui.profile.MiniPlayerSettingsList
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import androidx.compose.material3.IconButtonDefaults
@@ -103,25 +99,17 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
     // Opaque where a transparent window froze the app (RTSS); see FloatingWindowCompat.
     val compat = remember { com.alananasss.kittytune.core.FloatingWindowCompat.opaque }
 
-    Window(
+    FloatingComposeWindow(
         onCloseRequest = requestClose,
         state = state,
         visible = windowReady,
-        undecorated = true,
         transparent = !compat,
         // Above its own mini player: that window is TOPMOST while pinned, so a normal
         // settings window could open underneath it and take clicks meant for it.
         alwaysOnTop = true,
         resizable = false,
         title = str("mini_player_settings_title"),
-        onKeyEvent = { event ->
-            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                requestClose()
-                true
-            } else {
-                false
-            }
-        },
+        closeOnEscape = true,
     ) {
         // Pre-map setup while the window is still hidden (visible = false above): the tool-window style
         // lands before the first show, so the shell never sees a regular window to put a taskbar button

@@ -35,15 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
@@ -83,26 +78,14 @@ fun FloatingMenuWindow(
     // Opaque where a transparent window froze the app (RTSS); see FloatingWindowCompat.
     val compat = remember { com.alananasss.kittytune.core.FloatingWindowCompat.opaque }
 
-    Window(
+    FloatingComposeWindow(
         onCloseRequest = onDismiss,
         state = windowState,
-        undecorated = true,
         transparent = !compat,
-        // Never takes focus on Windows. Taking it closed the shell's own hidden-icons flyout the menu was
-        // opened from, the moment the menu appeared. Outside clicks close the menu instead, so it needs
-        // no focus; Linux keeps focus, which is what closes it there.
-        focusable = true,
         alwaysOnTop = true,
         resizable = false,
         title = "KittyTune",
-        onKeyEvent = { event ->
-            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                onDismiss()
-                true
-            } else {
-                false
-            }
-        },
+        closeOnEscape = true,
     ) {
         if (compat) {
             // The card's 16 dp corners, inside the shadow margin, cut by the window's shape.
