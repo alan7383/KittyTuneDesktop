@@ -916,8 +916,24 @@ val enableSegmentHeap = tasks.register<EnableSegmentHeapTask>("enableSegmentHeap
     mustRunAfter(stripForeignNativesDistributable, stripForeignNativesDistributableMain)
 }
 
-tasks.matching { it.name in listOf("createDistributable", "createReleaseDistributable") }.configureEach {
-    if (desktopIsWindows) finalizedBy(enableSegmentHeap)
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (desktopIsWindows && name in listOf("createDistributable", "createReleaseDistributable")) {
+        finalizedBy(enableSegmentHeap)
+        val packagedVersion = project.version.toString()
+        inputs.property("readableVersion", packagedVersion)
+        doLast {
+            destinationDir.get().asFile.resolve("KittyTune/version.txt").writeText("$packagedVersion\n", Charsets.UTF_8)
+        }
+    }
+}
+
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (desktopIsWindows && name in listOf("packageMsi", "packageReleaseMsi")) {
+        val imageName = if (name == "packageReleaseMsi") "createReleaseDistributable" else "createDistributable"
+        val image = tasks.named<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>(imageName)
+        dependsOn(image)
+        appImage.set(image.flatMap { it.destinationDir.dir("KittyTune") })
+    }
 }
 
 tasks.matching { it.name == "zipWindowsPortable" || (it.name.startsWith("package") && it.name.endsWith("Msi")) }.configureEach {
@@ -997,7 +1013,7 @@ tasks.register<Test>("headlessTest") {
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
             "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest", "DownloadFilesTest", "LyricsMergePerformanceTest", "*LyricsMatcherTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest", "*FadingEdgeRenderTest",
-            "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
+            "*WindowsUpdateTest", "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest", "*MixQueuePlannerTest", "*MixRenderTest", "*AudioPathRenderTest", "*LyricsSweepRenderTest", "*ShareCardTest",
