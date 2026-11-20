@@ -4,6 +4,8 @@ import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.data.StreamResolver
+import com.alananasss.kittytune.data.matchesPlayback
+import com.alananasss.kittytune.data.playbackKey
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +15,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 
 /**
  * Tracks that were actually listened to, kept on disk so the next play needs no network.
@@ -82,11 +85,12 @@ object AudioCache {
 
     private val maxBytes: Long get() = maxMegabytes.toLong() * 1024 * 1024
 
-    /** The cached file for [trackId], marked as just used; null when it is not cached or caching is off. */
-    fun lookup(trackId: Long): File? {
+    /** The cached file for [track], marked as just used; null when it is not cached or caching is off. */
+    fun lookup(track: Track): File? {
         if (!isEnabled) return null
         ensureMigrated()
-        val file = dir.listFiles { f -> f.nameWithoutExtension == trackId.toString() && isCompleteCacheFile(f) }
+        val name = track.cacheName()
+        val file = dir.listFiles { f -> f.nameWithoutExtension == name && isCompleteCacheFile(f) }
             ?.firstOrNull() ?: return null
         file.setLastModified(System.currentTimeMillis())
         return file
@@ -104,15 +108,16 @@ object AudioCache {
         dir.listFiles()?.forEach { it.delete() }
     }
 
-    fun evict(trackId: Long) {
-        dir.listFiles { f -> f.nameWithoutExtension == trackId.toString() }?.forEach {
+    fun evict(track: Track) {
+        val name = track.cacheName()
+        dir.listFiles { f -> f.nameWithoutExtension == name }?.forEach {
             runCatching { it.delete() }
         }
     }
 
     private suspend fun store(track: Track) {
-        if (lookup(track.id) != null) return
-        if (DownloadManager.getLocalTrack(track.id)?.localAudioPath?.let { File(it).exists() } == true) return
+        if (lookup(track) != null) return
+        if (DownloadManager.getLocalTrack(track.id)?.takeIf { it.matchesPlayback(track) }?.localAudioPath?.let { File(it).exists() } == true) return
         if (!DownloadManager.hasEnoughFreeStorage(512L * 1024 * 1024)) return
 
         val stream = StreamResolver.resolveStreamWithDrm(track, forDownload = true) ?: return
@@ -125,7 +130,8 @@ object AudioCache {
 
         val isHls = stream.url.contains(".m3u8") || stream.url.contains("hls")
         val ext = if (isHls || stream.url.contains("googlevideo.com")) "m4a" else "mp3"
-        val partial = File(dir, "${track.id}.part")
+        val name = track.cacheName()
+        val partial = File(dir, "$name.part")
         try {
             if (isHls) {
                 if (!licenseToken.isNullOrBlank()) {
@@ -141,7 +147,7 @@ object AudioCache {
             if (partial.length() > 0) {
                 // renameTo returns false on Windows when the target exists, which skipped trim()
                 // and left the track forever uncached; the atomic replace works in both cases.
-                com.alananasss.kittytune.core.AtomicFiles.replace(partial, File(dir, "${track.id}.$ext"))
+                com.alananasss.kittytune.core.AtomicFiles.replace(partial, File(dir, "$name.$ext"))
                 trim()
             }
         } finally {
@@ -174,3 +180,10 @@ object AudioCache {
  */
 internal fun isCompleteCacheFile(file: java.io.File): Boolean =
     file.isFile && file.extension != "part" && file.length() > 0
+
+/** Old ID-only entries cannot establish which catalog supplied the cached audio. */
+private fun Track.cacheName(): String {
+    val key = playbackKey()
+    return MessageDigest.getInstance("SHA-256")
+        .digest("${key.source}:${key.reference}".toByteArray(Charsets.UTF_8)).toHexString()
+}

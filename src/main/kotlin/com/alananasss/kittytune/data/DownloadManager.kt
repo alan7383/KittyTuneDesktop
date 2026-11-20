@@ -1050,7 +1050,9 @@ object DownloadManager {
                     duration = track.durationMs ?: 0L,
                     localAudioPath = audioPath,
                     localArtworkPath = internalArtFile.absolutePath,
-                    downloadedAt = creationTimestamp
+                    downloadedAt = creationTimestamp,
+                    source = track.source,
+                    permalinkUrl = track.permalinkUrl
                 )
                 if (existingTrack == null) dao.insertTrack(localTrack) else dao.updateTrack(localTrack)
 

@@ -5,6 +5,7 @@ import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
+import com.alananasss.kittytune.data.YoutubeAudioResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
@@ -897,6 +898,7 @@ class AudioEngine(private val isolated: Boolean = false) {
     }
 
     private fun createGrabber(workerId: Long, targetUrl: String, headers: Map<String, String>, startPositionMs: Long = 0L): FFmpegFrameGrabber {
+        val streamHeaders = YoutubeAudioResolver.requestHeaders(targetUrl).ifEmpty { headers }
         val isHls = targetUrl.contains(".m3u8")
         if (isHls) {
             val (cached, token) = synchronized(this) {
@@ -906,7 +908,7 @@ class AudioEngine(private val isolated: Boolean = false) {
             var adapter = cached
             if (adapter == null || adapter.playlistUrl != targetUrl) {
                 adapter?.retire()
-                adapter = HlsStreamAdapter(targetUrl, headers, refreshPlaylistUrl = ::reResolveUrl).also {
+                adapter = HlsStreamAdapter(targetUrl, streamHeaders, refreshPlaylistUrl = ::reResolveUrl).also {
                     it.licenseToken = token
                 }
                 val opened = adapter
@@ -920,7 +922,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                     throw e
                 }
             }
-            startSourceAnalysis(workerId, targetUrl, headers, adapter)
+            startSourceAnalysis(workerId, targetUrl, streamHeaders, adapter)
             // A maximum size of 0 reads the fragments in order and nothing else. javacv's default treats the stream as
             // seekable: it keeps every byte read in memory, and FFmpeg asking for the stream's size made it read to
             // the end first, so a track only started once all of it had been downloaded, the longer the slower
@@ -938,10 +940,10 @@ class AudioEngine(private val isolated: Boolean = false) {
                 sampleMode = FrameGrabber.SampleMode.FLOAT
             }
         } else {
-            startSourceAnalysis(workerId, targetUrl, headers, null)
+            startSourceAnalysis(workerId, targetUrl, streamHeaders, null)
             return FFmpegFrameGrabber(targetUrl).apply {
-                if (headers.isNotEmpty()) {
-                    val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
+                if (streamHeaders.isNotEmpty()) {
+                    val headerBlob = streamHeaders.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
                     setOption("headers", headerBlob + "\r\n")
                 }
                 if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
@@ -1118,6 +1120,7 @@ class AudioEngine(private val isolated: Boolean = false) {
             setState(State.READY)
 
             val outBuf = ShortArray(8192)
+            var decodedAudio = false
 
             while (!stopFlag && activeWorkerId == workerId) {
                 if (pendingDeviceSwap) {
@@ -1199,7 +1202,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                         Logger.e("AudioEngine", "Seek reached end of stream at $seek ms (duration=$durationMs ms). Ending track.")
                         drainStretcher(outBuf, localLine)
                         if (seekRequest.get() != null || stopFlag || activeWorkerId != workerId) continue
-                        setStateAsync(State.ENDED)
+                        setStateAsync(State.ENDED, workerId)
                         break
                     }
 
@@ -1214,6 +1217,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                             if (ts >= targetTimestamp - 25_000L || (lastTs != Long.MIN_VALUE && ts <= lastTs)) {
                                 val samples = f.samples
                                 if (samples != null) {
+                                    decodedAudio = true
                                     pushFrame(samples, f.audioChannels)
                                 }
                                 break
@@ -1230,6 +1234,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                             if (droppedCount > 1500) {
                                 val samples = f?.samples
                                 if (samples != null) {
+                                    decodedAudio = true
                                     pushFrame(samples, f.audioChannels)
                                 }
                                 break
@@ -1279,10 +1284,10 @@ class AudioEngine(private val isolated: Boolean = false) {
 
                 if (frame == null) {
                     if (!stopFlag && activeWorkerId == workerId) {
-                        val isNearEnd = (durationMs > 0 && positionMs >= durationMs - 3000L) || (durationMs == 0L)
+                        val isNearEnd = decodedAudio && (durationMs == 0L || positionMs >= durationMs - 3000L)
                         if (isNearEnd) {
                             drainStretcher(outBuf, localLine)
-                            setStateAsync(State.ENDED)
+                            setStateAsync(State.ENDED, workerId)
                             break
                         } else {
                             Logger.e(
@@ -1292,19 +1297,18 @@ class AudioEngine(private val isolated: Boolean = false) {
                             val recovered = recoverStream(
                                 workerId,
                                 grabber, activeUrl, headers, decodedPositionMs,
+                                maxAttempts = INITIAL_OPEN_ATTEMPTS,
                                 shouldRecover = { seekRequest.get() == null && activeWorkerId == workerId },
                             )
                             grabber = recovered.first
                             recovered.second?.let { activeUrl = it }
                             if (seekRequest.get() != null || stopFlag || activeWorkerId != workerId) continue
-                            if (recovered.first != null) {
-                                Logger.e("AudioEngine", "Stream recovery succeeded at $positionMs ms!")
-                                continue
-                            } else {
-                                drainStretcher(outBuf, localLine)
-                                setStateAsync(State.ENDED)
-                                break
+                            if (recovered.first == null) {
+                                throw java.io.IOException("Audio stream ended before the track finished at $positionMs ms")
                             }
+                            decodedAudio = true
+                            Logger.e("AudioEngine", "Stream recovery succeeded at $positionMs ms")
+                            continue
                         }
                     } else {
                         break
@@ -1312,6 +1316,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                 }
 
                 val samples = frame.samples ?: continue
+                decodedAudio = true
                 pushFrame(samples, frame.audioChannels)
                 drainStretcher(outBuf, localLine)
 
@@ -1322,8 +1327,10 @@ class AudioEngine(private val isolated: Boolean = false) {
             }
         } catch (t: Throwable) {
             if (!stopFlag && activeWorkerId == workerId) {
-                setStateAsync(State.IDLE)
-                onError?.invoke(t)
+                setStateAsync(State.IDLE, workerId)
+                scope.launch(Dispatchers.Main) {
+                    if (!stopFlag && activeWorkerId == workerId) onError?.invoke(t)
+                }
             }
         } finally {
             grabber?.releaseUnlockedQuietly()
@@ -1575,9 +1582,11 @@ class AudioEngine(private val isolated: Boolean = false) {
         onStateChanged?.invoke(s)
     }
 
-    private fun setStateAsync(s: State) {
+    private fun setStateAsync(s: State, workerId: Long) {
+        if (stopFlag || activeWorkerId != workerId) return
         state = s
         scope.launch(Dispatchers.Main) {
+            if (stopFlag || activeWorkerId != workerId) return@launch
             onStateChanged?.invoke(s)
             if (s == State.ENDED) {
                 onCompletion?.invoke()

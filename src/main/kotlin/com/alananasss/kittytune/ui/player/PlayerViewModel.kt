@@ -31,6 +31,10 @@ import com.alananasss.kittytune.data.network.LrcLibClient
 import com.alananasss.kittytune.data.ListeningStatsRepository
 import com.alananasss.kittytune.data.network.LrcLibResponse
 import com.alananasss.kittytune.data.network.RetrofitClient
+import com.alananasss.kittytune.data.PlaybackTrackKey
+import com.alananasss.kittytune.data.matchesPlayback
+import com.alananasss.kittytune.data.playbackKey
+import com.alananasss.kittytune.data.spotify.spotifyCatalogTrackId
 import com.alananasss.kittytune.domain.*
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
@@ -1569,7 +1573,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var pendingTogetherInviteCode by mutableStateOf<String?>(null)
     /** Consecutive engine failures on the current track, bounding the retry in onPlayerError. */
     private var consecutivePlayerErrors = 0
-    private var lastPlayerErrorTrackId: Long? = null
+    private var failedPlaybackKey: PlaybackTrackKey? = null
     private var mprisService: com.alananasss.kittytune.data.MprisService? = null
     private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
     private var macNowPlayingService: MacNowPlayingService? = null
@@ -1615,9 +1619,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         private const val PLACEHOLDER_ARTWORK_PREFIX = "https://picsum.photos"
 
         /**
-         * Consecutive retries of one track after an engine error. Past this, the track is
-         * skipped instead of retried: a file that failed to open three times will not open
-         * on the fourth, and each attempt costs a fresh resolve plus several seconds.
+         * Retries for one selection after an engine error, before leaving the track paused.
          */
         private const val MAX_CONSECUTIVE_PLAYER_RETRIES = 3
 
@@ -1700,8 +1702,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             // baseline rather than a jump (issue #33).
             if (isPlayingState) listenSession?.onPlaying(currentPosition) else listenSession?.onPaused()
             if (isPlayingState) {
-                consecutivePlayerErrors = 0
-                lastPlayerErrorTrackId = null
                 if (MusicManager.playWhenReadyRequested) {
                     playWhenReady = true
                     startProgressUpdate()
@@ -1733,6 +1733,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             if (state == Player.STATE_BUFFERING) isLoading = true
 
             if (state == Player.STATE_ENDED) {
+                if (player.currentMediaItem?.track?.playbackKey() != currentTrack?.playbackKey()) return
                 SoundCloudTelemetryTracker.onTrackCompleted()
                 if (com.alananasss.kittytune.core.AppInstance.isShuttingDown) return
 
@@ -1762,52 +1763,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
 
         override fun onPlayerError(error: Throwable) {
-            println("Player error: ${error.message}")
-            MusicManager.cancelCrossfade()
+            val track = currentTrack ?: return
+            val index = currentQueueIndex
+            if (player.currentMediaItem?.track?.playbackKey() != track.playbackKey()) return
+            Logger.w("PlayerViewModel", "Playback error for ${track.id}: ${error.message}")
+            StreamResolver.evictStream(track)
 
-            currentTrack?.let { StreamResolver.evictStream(it.id) }
-
-            // The same dead file retried forever is the "Player error" spam every 2 s: an
-            // undecodable local file never heals, so consecutive failures on one track fall
-            // through to the skip below instead of retrying without end.
-            val failingId = currentTrack?.id
-            consecutivePlayerErrors =
-                if (failingId != null && failingId == lastPlayerErrorTrackId) consecutivePlayerErrors + 1
-                else 1
-            lastPlayerErrorTrackId = failingId
-
-            val msg = (error.message ?: "").lowercase()
-            val isRetryable = msg.contains("403") || msg.contains("401") ||
-                    msg.contains("network") || msg.contains("timeout") ||
-                    msg.contains("connection") || msg.contains("format")
-
-            if (isRetryable && consecutivePlayerErrors <= MAX_CONSECUTIVE_PLAYER_RETRIES) {
-                if (currentQueueIndex >= 0 && currentQueueIndex < _queue.size) {
-                    viewModelScope.launch {
-                        player.playWhenReady = false
-                        isLoading = true
-
-                        if (isActive) {
-                            playRobustly(
-                                index = currentQueueIndex,
-                                autoPlay = true,
-                                startPosition = currentPosition,
-                                allowSkipOnFailure = false
-                            )
-                        } else {
-                            isLoading = false
-                        }
-                    }
-                    return
-                }
-            }
-
-            isLoading = false
-            isPlaying = false
-            if (playJob?.isActive != true) {
-                if (!com.alananasss.kittytune.core.AppInstance.isShuttingDown) {
-                    playNext(manual = false, ignoreRepeatOne = true)
-                }
+            val message = error.message.orEmpty().lowercase()
+            val retryable = error is java.io.IOException || listOf(
+                "403", "401", "network", "timeout", "connection", "format"
+            ).any(message::contains)
+            if (retryable && MusicManager.playWhenReadyRequested &&
+                ++consecutivePlayerErrors <= MAX_CONSECUTIVE_PLAYER_RETRIES &&
+                _queue.getOrNull(index)?.playbackKey() == track.playbackKey()
+            ) {
+                playRobustly(index, startPosition = currentPosition)
+            } else {
+                reportPlaybackFailure(track)
             }
         }
 
@@ -3701,34 +3673,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /** True when the track comes from the Spotify catalog (metadata-only source). */
-    fun isSpotifyTrack(track: Track?): Boolean {
-        if (track == null) return false
-        return track.source == "spotify"
-            || track.user?.urn?.startsWith("spotify") == true
-            || track.permalinkUrl?.contains("open.spotify.com") == true
-    }
+    fun isSpotifyTrack(track: Track?): Boolean = track?.source == "spotify" || track?.spotifyCatalogTrackId() != null
 
-    /**
-     * Best-effort extraction of the Spotify base62 id from any track form:
-     * permalink, share URL or artist URN. Only meaningful for catalog tracks.
-     */
-    fun getSpotifyTrackId(track: Track?): String? {
-        if (!isSpotifyTrack(track)) return null
-        val t = track ?: return null
-
-        // Catalog tracks carry the raw base62 id as permalink.
-        t.permalink?.takeIf { it.isNotBlank() && !it.contains('/') && !it.contains(':') && !it.contains('.') }
-            ?.let { return it }
-
-        t.permalinkUrl?.takeIf { it.contains("/track/") || it.startsWith("spotify") }
-            ?.let { return com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it).ifBlank { null } }
-
-        // Last resort: the synthetic user URN (spotify:artist:<id>).
-        t.user?.urn?.takeIf { it.startsWith("spotify") }
-            ?.let { return com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it).ifBlank { null } }
-
-        return null
-    }
+    fun getSpotifyTrackId(track: Track?): String? = track?.spotifyCatalogTrackId()
 
     /** Resolves the primary Spotify artist id of a catalog track, if any. */
     fun getSpotifyTrackArtistId(track: Track?): String? {
@@ -4464,8 +4411,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         currentQueueIndex = index
         val trackToPlay = _queue[index]
+        consecutivePlayerErrors = 0
+        failedPlaybackKey = null
 
-        val canCrossfade = isCrossfade && MusicManager.isPrebuffered(trackToPlay.id)
+        val canCrossfade = isCrossfade && MusicManager.isPrebuffered(trackToPlay)
         if (!canCrossfade) {
             MusicManager.cancelCrossfade()
             MusicManager.stop()
@@ -4500,13 +4449,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         trackInitJob?.cancel()
         trackInitJob = viewModelScope.launch {
+            val selectedKey = trackToPlay.playbackKey()
             var finalTrack = trackToPlay
-            if (finalTrack.source == "soundcloud" && trackToPlay.id > 0 && (trackToPlay.user?.id == 0L || trackToPlay.media == null || trackToPlay.playbackCount == 0)) {
+            if (selectedKey.source == "soundcloud" && trackToPlay.id > 0 && (trackToPlay.user?.id == 0L || trackToPlay.media == null || trackToPlay.playbackCount == 0)) {
                 try {
                     val fullTrackList = api.getTracksByIds(trackToPlay.id.toString())
-                    if (fullTrackList.isNotEmpty()) {
-                        finalTrack = fullTrackList[0]
-                        val qIndex = _queue.indexOfFirst { it.id == trackToPlay.id }
+                    if (!isActive || currentQueueIndex != index || currentTrack?.playbackKey() != selectedKey) return@launch
+                    val fetched = fullTrackList.firstOrNull { it.id == trackToPlay.id }
+                    if (fetched != null) {
+                        finalTrack = fetched
+                        val qIndex = _queue.indexOfFirst { it.playbackKey() == trackToPlay.playbackKey() }
                         if (qIndex != -1) _queue[qIndex] = finalTrack
                     }
                 } catch (e: Exception) {
@@ -4525,10 +4477,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         permalink = firstArtist.id
                     )
                     finalTrack = finalTrack.copy(user = updatedUser)
-                    val qIndex = _queue.indexOfFirst { it.id == trackToPlay.id }
+                    val qIndex = _queue.indexOfFirst { it.playbackKey() == selectedKey }
                     if (qIndex != -1) _queue[qIndex] = finalTrack
                 }
             }
+            if (!isActive || currentQueueIndex != index || currentTrack?.playbackKey() != selectedKey) return@launch
             currentTrack = finalTrack
             MusicManager.currentTrack = finalTrack
             val effectiveDuration = finalTrack.effectiveFullDurationMs ?: finalTrack.durationMs ?: 0L
@@ -4699,7 +4652,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     artworkUrl = it.thumbnails.firstOrNull()?.url,
                     durationMs = it.duration * 1000,
                     permalinkUrl = it.url,
-                    source = "youtube"
+                    source = if (lastTrack.source == "youtube_music") "youtube_music" else "youtube"
                 )
             }
 
@@ -5219,6 +5172,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         } else {
             playWhenReady = true
             MusicManager.playWhenReadyRequested = true
+            if (failedPlaybackKey != null && currentTrack?.playbackKey() == failedPlaybackKey &&
+                _queue.getOrNull(currentQueueIndex)?.playbackKey() == failedPlaybackKey
+            ) {
+                consecutivePlayerErrors = 0
+                playRobustly(currentQueueIndex, startPosition = currentPosition)
+                return
+            }
             try {
                 player.playWhenReady = true
             } catch (_: Exception) {}
@@ -5805,9 +5765,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             }
             viewModelScope.launch(Dispatchers.IO) {
                 // 1. Check local cache and download first (instant, offline, zero latency)
-                var url: String? = com.alananasss.kittytune.data.cache.AudioCache.lookup(track.id)?.absolutePath
+                var url: String? = com.alananasss.kittytune.data.cache.AudioCache.lookup(track)?.absolutePath
                 if (url == null) {
-                    url = com.alananasss.kittytune.data.DownloadManager.getLocalTrack(track.id)?.localAudioPath?.takeIf { java.io.File(it).exists() }
+                    url = com.alananasss.kittytune.data.DownloadManager.getLocalTrack(track.id)?.takeIf { it.matchesPlayback(track) }?.localAudioPath?.takeIf { java.io.File(it).exists() }
                 }
                 if (url == null) {
                     val mediaItem = MusicManager.player.currentMediaItem
@@ -5821,7 +5781,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     }
                 }
                 if (url == null) {
-                    url = com.alananasss.kittytune.data.StreamResolver.cachedStreamUrl(track.id)
+                    url = com.alananasss.kittytune.data.StreamResolver.cachedStreamUrl(track)
                         ?: com.alananasss.kittytune.data.StreamResolver.resolveStream(track)
                 }
                 if (!url.isNullOrEmpty()) {
@@ -6537,7 +6497,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var prebufferJob: Job? = null
 
     private fun triggerPrebuffer(nextTrack: Track, plan: com.alananasss.kittytune.audio.automix.AutomixPlan?) {
-        if (MusicManager.isPrebuffered(nextTrack.id)) return
+        if (MusicManager.isPrebuffered(nextTrack)) return
         prebufferJob?.cancel()
         prebufferJob = viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -6545,7 +6505,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 var offlineKeySetId: ByteArray? = null
 
                 val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-                val localTrack = db.getTrack(nextTrack.id)
+                val localTrack = db.getTrack(nextTrack.id)?.takeIf { it.matchesPlayback(nextTrack) }
                 if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
                     if (localTrack.localAudioPath.startsWith("exo_cache://")) {
                         val parts = localTrack.localAudioPath.removePrefix("exo_cache://").split("::", limit = 3)
@@ -6688,7 +6648,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                                 }
 
                                 if (automixEnabled) {
-                                    if (nextTrack != null && remainingToTrigger in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack.id)) {
+                                    if (nextTrack != null && remainingToTrigger in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack)) {
                                         triggerPrebuffer(nextTrack, plan)
                                     }
 
@@ -6702,7 +6662,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                                     }
                                 } else if (!isGaplessAlbum && crossfadeEnabled) {
                                     val remainingToCrossfade = (dur - crossfadeMs) - currentPosition
-                                    if (nextTrack != null && remainingToCrossfade in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack.id)) {
+                                    if (nextTrack != null && remainingToCrossfade in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack)) {
                                         triggerPrebuffer(nextTrack, null)
                                     }
                                     if (currentPosition >= (dur - crossfadeMs) && !MusicManager.player.isCrossfadingOut) {
@@ -6713,7 +6673,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                                 }
                             } else if (!isGaplessAlbum && crossfadeEnabled && dur > 0L) {
                                 val remainingToCrossfade = (dur - crossfadeMs) - currentPosition
-                                if (nextTrack != null && remainingToCrossfade in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack.id)) {
+                                if (nextTrack != null && remainingToCrossfade in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack)) {
                                     triggerPrebuffer(nextTrack, null)
                                 }
                                 if (currentPosition >= (dur - crossfadeMs) && !MusicManager.player.isCrossfadingOut) {
@@ -6726,7 +6686,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                             }
                         } else if (!isGaplessAlbum && crossfadeEnabled && dur > 0L) {
                             val remainingToCrossfade = (dur - crossfadeMs) - currentPosition
-                            if (nextTrack != null && remainingToCrossfade in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack.id)) {
+                            if (nextTrack != null && remainingToCrossfade in 1000L..12000L && !MusicManager.player.isCrossfadingOut && !MusicManager.isPrebuffered(nextTrack)) {
                                 triggerPrebuffer(nextTrack, null)
                             }
                             if (currentPosition >= (dur - crossfadeMs) && !MusicManager.player.isCrossfadingOut) {
@@ -7253,24 +7213,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         index: Int,
         autoPlay: Boolean = true,
         startPosition: Long = 0L,
-        allowSkipOnFailure: Boolean = true,
         isCrossfade: Boolean = false
     ) {
         if (index !in _queue.indices) return
 
         val trackToPlay = _queue[index]
+        val selectedKey = trackToPlay.playbackKey()
+        failedPlaybackKey = null
+        MusicManager.isLoadingTrack = true
+        isLoading = true
         currentStreamSource = trackToPlay.source
 
-        if (isCrossfade && MusicManager.isPrebuffered(trackToPlay.id)) {
+        if (isCrossfade && MusicManager.isPrebuffered(trackToPlay)) {
             val emptyItem = com.alananasss.kittytune.media.MediaItem.Builder()
                 .setMediaId(trackToPlay.id.toString())
                 .setTrack(trackToPlay)
                 .build()
-            viewModelScope.launch(Dispatchers.Main) {
+            playJob?.cancel()
+            playJob = viewModelScope.launch(Dispatchers.Main) {
                 try {
                     // A skip may have replaced this load while it was resolving. The newer
                     // selection owns the player now; starting this one would play two tracks.
-                    if (currentQueueIndex != index || currentTrack?.id != trackToPlay.id) return@launch
+                    if (currentQueueIndex != index || currentTrack?.playbackKey() != selectedKey) return@launch
                     val shouldPlay = autoPlay && MusicManager.playWhenReadyRequested && playWhenReady
                     if (shouldPlay) {
                         isLoading = false
@@ -7295,12 +7259,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         progressUpdateJob?.cancel()
                     }
                     MusicManager.isLoadingTrack = false
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    MusicManager.cancelCrossfade()
-                    isLoading = false
-                    isPlaying = false
-                    MusicManager.isLoadingTrack = false
+                    Logger.w("PlayerViewModel", "Could not start transition: ${e.message}")
+                    reportPlaybackFailure(trackToPlay)
                 }
             }
             return
@@ -7321,7 +7284,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
             try {
                 val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-                val localTrack = db.getTrack(trackToPlay.id)
+                val localTrack = db.getTrack(trackToPlay.id)?.takeIf { it.matchesPlayback(trackToPlay) }
                 if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
                     if (localTrack.localAudioPath.startsWith("exo_cache://")) {
                         val parts = localTrack.localAudioPath.removePrefix("exo_cache://").split("::", limit = 3)
@@ -7363,6 +7326,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         MusicManager.putDrmToken(trackToPlay.id, resolved.licenseAuthToken)
                         println("DRM token pre-cached for track ${trackToPlay.id}")
                     }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     Logger.e("PlayerViewModel", "Failed to resolve stream for track ${trackToPlay.id}: ${e.message}")
                 }
@@ -7376,27 +7341,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
             if (resolvedUrl == null) {
                 withContext(Dispatchers.Main) {
-                    MusicManager.cancelCrossfade()
-                    MusicManager.stop()
-                    currentStreamSource = trackToPlay.source
-                    MusicManager.isLoadingTrack = false
-                    if (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
-                        isLoading = true
-                        isPlaying = false
-                        viewModelScope.launch(Dispatchers.IO) {
-                            while (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
-                                delay(2000)
-                            }
-                            withContext(Dispatchers.Main) {
-                                if (currentQueueIndex == index) {
-                                    playRobustly(index, autoPlay, startPosition, allowSkipOnFailure, isCrossfade)
-                                }
-                            }
-                        }
-                    } else {
-                        isLoading = false
-                        isPlaying = false
-                        if (allowSkipOnFailure) playNext(manual = false, ignoreRepeatOne = true, autoPlay = autoPlay)
+                    if (currentQueueIndex == index && currentTrack?.playbackKey() == selectedKey) {
+                        reportPlaybackFailure(trackToPlay)
                     }
                 }
                 return@launch
@@ -7408,10 +7354,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 try {
                     // The resolution above can outlive a quick skip. Never let a stale result
                     // overwrite the track that is selected now.
-                    if (currentQueueIndex != index || currentTrack?.id != trackToPlay.id) {
-                        MusicManager.cancelCrossfade()
-                        return@withContext
-                    }
+                    if (currentQueueIndex != index || currentTrack?.playbackKey() != selectedKey) return@withContext
                     currentStreamSource = finalStreamSource
                     queueChunkingJob?.cancel()
 
@@ -7439,16 +7382,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
                     MusicManager.applyEffects(effectsState)
                     preloadNextTrack(index + 1)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    MusicManager.cancelCrossfade()
-                    MusicManager.stop()
-                    isLoading = false
-                    isPlaying = false
-                    MusicManager.isLoadingTrack = false
+                    Logger.w("PlayerViewModel", "Could not prepare ${trackToPlay.id}: ${e.message}")
+                    reportPlaybackFailure(trackToPlay)
                 }
             }
         }
+    }
+
+    private fun reportPlaybackFailure(track: Track) {
+        if (currentTrack?.playbackKey() != track.playbackKey() ||
+            com.alananasss.kittytune.core.AppInstance.isShuttingDown
+        ) return
+        failedPlaybackKey = track.playbackKey()
+        playWhenReady = false
+        MusicManager.playWhenReadyRequested = false
+        player.playWhenReady = false
+        MusicManager.stop()
+        MusicManager.isLoadingTrack = false
+        isLoading = false
+        isPlaying = false
+        currentStreamSource = track.source
+        emitUiEvent(str("track_playback_unavailable"))
+        updateMprisMedia()
     }
 
     private fun preloadNextTrack(nextIndex: Int) {
@@ -7481,7 +7439,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 var offlineKeySetId: ByteArray? = null
 
                 val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-                val localTrack = db.getTrack(nextTrack.id)
+                val localTrack = db.getTrack(nextTrack.id)?.takeIf { it.matchesPlayback(nextTrack) }
                 if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
                     if (localTrack.localAudioPath.startsWith("exo_cache://")) {
                         val parts = localTrack.localAudioPath.removePrefix("exo_cache://").split("::", limit = 3)

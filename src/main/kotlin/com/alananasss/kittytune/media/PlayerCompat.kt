@@ -4,6 +4,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import com.alananasss.kittytune.audio.AudioEngine
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.StreamResolver
+import com.alananasss.kittytune.data.PlaybackTrackKey
+import com.alananasss.kittytune.data.playbackKey
 import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.domain.Track
@@ -199,10 +201,10 @@ class Player {
         lastEqualizerState?.let { applyEqualizer(it) }
     }
 
-    data class PrebufferedTransition(
+    private data class PrebufferedTransition(
         val engine: AudioEngine,
         val item: MediaItem,
-        val trackId: Long,
+        val trackKey: PlaybackTrackKey,
         val plan: AutomixPlan?,
         val url: String,
         val headers: Map<String, String>,
@@ -233,7 +235,7 @@ class Player {
         }
     }
 
-    fun isPrebuffered(trackId: Long): Boolean {
+    fun isPrebuffered(track: Track): Boolean {
         val pb = prebufferedTransition ?: return false
         // TTL check: a prebuffer older than PREBUFFER_TTL_MS is stale (the user didn't skip to it)
         // — release it and report not-prebuffered so the caller re-resolves if needed.
@@ -241,7 +243,7 @@ class Player {
             releasePrebuffered()
             return false
         }
-        return pb.trackId == trackId && pb.engine.state != AudioEngine.State.IDLE
+        return pb.trackKey == track.playbackKey() && pb.engine.state != AudioEngine.State.IDLE
     }
 
     fun releasePrebuffered() {
@@ -261,7 +263,7 @@ class Player {
         // DSP handle, which GC can't free — see issue #33 RAM drift).
         synchronized(this) {
             if (isCrossfadingOut) return
-            if (isPrebuffered(nextTrack.id)) return
+            if (isPrebuffered(nextTrack)) return
             // Mark the slot as in-flight so a concurrent prebufferTransition for a different track
             // doesn't try to start a second engine alongside this one.
             if (prebufferInFlight) return
@@ -313,7 +315,7 @@ class Player {
                         runCatching { engine.stop(); engine.release() }
                         return@launch
                     }
-                    prebufferedTransition = PrebufferedTransition(engine, item, nextTrack.id, automixPlan, url, headers)
+                    prebufferedTransition = PrebufferedTransition(engine, item, nextTrack.playbackKey(), automixPlan, url, headers)
                 }
             } catch (_: Exception) {
                 synchronized(this) { prebufferInFlight = false }
@@ -341,6 +343,7 @@ class Player {
     var repeatMode: Int = REPEAT_MODE_OFF
 
     val isPlaying: Boolean get() = activeEngine.isPlaying
+    internal val isReadyForPlayback: Boolean get() = activeEngine.state == AudioEngine.State.READY
     val currentPosition: Long get() = activeEngine.positionMs
 
     /** Live beat grid of the track being heard (the Kitty pet dances on it). */
@@ -394,7 +397,8 @@ class Player {
             com.alananasss.kittytune.audio.silence.SkipSilence.onLongSilence(silenceTarget, eng.silenceSkip)
         }
         eng.onPlayingChanged = { playing -> listeners.forEach { it.onIsPlayingChanged(playing) } }
-        eng.onStateChanged = { st ->
+        eng.onStateChanged = stateChanged@{ st ->
+            if (eng !== activeEngine) return@stateChanged
             val mapped = when (st) {
                 AudioEngine.State.BUFFERING -> STATE_BUFFERING
                 AudioEngine.State.READY -> STATE_READY
@@ -403,9 +407,11 @@ class Player {
             }
             listeners.forEach { it.onPlaybackStateChanged(mapped) }
         }
-        eng.onError = { err -> 
-            onError?.invoke(err)
-            listeners.forEach { it.onPlayerError(err) } 
+        eng.onError = { err ->
+            if (eng === activeEngine) {
+                onError?.invoke(err)
+                listeners.forEach { it.onPlayerError(err) }
+            }
         }
         eng.onCompletion = {
             val trackId = currentMediaItem?.track?.id ?: com.alananasss.kittytune.data.MusicManager.currentTrack?.id
@@ -425,8 +431,8 @@ class Player {
                 // Otherwise the queue's prefetch has already refreshed it and can answer without
                 // a round-trip — which is the difference between a seek resuming now and a seek
                 // waiting on two SoundCloud requests.
-                if (StreamResolver.cachedStreamUrl(t.id) == failedUrl) {
-                    StreamResolver.evictStream(t.id)
+                if (StreamResolver.cachedStreamUrl(t) == failedUrl) {
+                    StreamResolver.evictStream(t)
                 }
                 withContext(Dispatchers.IO) {
                     StreamResolver.resolveStream(t)
@@ -571,8 +577,8 @@ class Player {
             oldEngine = activeEngine
             unbindEngine(oldEngine)
 
-            val targetTrackId = item.track?.id
-            pre = prebufferedTransition?.takeIf { it.trackId == targetTrackId }
+            val targetTrackKey = item.track?.playbackKey()
+            pre = prebufferedTransition?.takeIf { it.trackKey == targetTrackKey }
             isAdopted = pre != null
             if (!isAdopted) {
                 // Skip during crossfade: the prebuffered engine was warmed up for a
