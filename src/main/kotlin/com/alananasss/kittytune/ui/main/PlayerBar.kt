@@ -636,6 +636,9 @@ fun PlayerBar(
                         }
                     }
                 }
+                if (!isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER_REACTIONS in visibleButtons) {
+                    com.alananasss.kittytune.ui.together.TogetherReactionButton()
+                }
                 AnimatedVisibility(
                     visible = !isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_DEVICES in visibleButtons,
                     enter = barButtonEnter,

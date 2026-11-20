@@ -763,7 +763,7 @@ fun LibraryPanel(
 }
 
 /**
- * The three fixed library tiles — Liked, Downloads, Local files — as the settings want them
+ * The fixed library tiles as configured in settings
  * (issue #33).
  *
  * Hidden ones are dropped, and one with an imported icon carries its path instead of a vector.
@@ -790,6 +790,8 @@ private fun rememberFixedLibraryTiles(): List<LibEntry> {
         .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_LIKES))
     val downloadsIcon by prefs.libraryTileIconFlow(PlayerPreferences.LIBRARY_TILE_DOWNLOADS)
         .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_DOWNLOADS))
+    val togetherIcon by prefs.libraryTileIconFlow(PlayerPreferences.LIBRARY_TILE_TOGETHER)
+        .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_TOGETHER))
     val localIcon by prefs.libraryTileIconFlow(PlayerPreferences.LIBRARY_TILE_LOCAL)
         .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_LOCAL))
 
@@ -827,23 +829,26 @@ private fun rememberFixedLibraryTiles(): List<LibEntry> {
                 )
             )
         }
-        // Listening together lives in the library as a playlist would, with a room's cover, not as a button of its own.
-        val rooms by com.alananasss.kittytune.data.together.Together.saved.collectAsState()
-        val roomCover = rooms.firstOrNull()?.tracks?.firstOrNull()?.artworkUrl
-        add(
-            LibEntry(
-                key = "pin_together",
-                title = str("together_title"),
-                subtitle = str("together_library_subtitle"),
-                artworkUrl = roomCover,
-                icon = if (roomCover == null) Icons.Rounded.Groups else null,
-                gradient = if (themed || roomCover != null) null else listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)),
-                flatColor = if (themed && roomCover == null) scheme.tertiaryContainer else null,
-                iconTint = if (themed) scheme.onTertiaryContainer else Color.White,
-                destination = "together",
-                isPinned = true,
+        if (PlayerPreferences.LIBRARY_TILE_TOGETHER !in hidden) {
+            val rooms by com.alananasss.kittytune.data.together.Together.saved.collectAsState()
+            val importedIcon = togetherIcon?.takeIf { java.io.File(it).isFile }
+            val roomCover = if (importedIcon == null) rooms.firstOrNull()?.tracks?.firstOrNull()?.artworkUrl else null
+            add(
+                LibEntry(
+                    key = "pin_together",
+                    title = str("together_title"),
+                    subtitle = str("together_library_subtitle"),
+                    artworkUrl = roomCover,
+                    icon = if (roomCover == null) Icons.Rounded.Groups else null,
+                    iconPath = importedIcon,
+                    gradient = if (themed || roomCover != null) null else listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)),
+                    flatColor = if (themed && roomCover == null) scheme.tertiaryContainer else null,
+                    iconTint = if (themed) scheme.onTertiaryContainer else Color.White,
+                    destination = "together",
+                    isPinned = true,
+                )
             )
-        )
+        }
         if (PlayerPreferences.LIBRARY_TILE_LOCAL !in hidden) {
             add(
                 LibEntry(

@@ -693,7 +693,8 @@ fun LibraryPlaylistOptionsDialog(
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
-    val gridItems = remember(playlist, tracks, isItemPinned, isInsideFolder, primaryColor, errorColor, isPlaylistLiked, isFullyDownloaded, isPlaylistDownloading) {
+    val togetherCode by com.alananasss.kittytune.data.together.Together.active.collectAsState()
+    val gridItems = remember(playlist, tracks, isItemPinned, isInsideFolder, primaryColor, errorColor, isPlaylistLiked, isFullyDownloaded, isPlaylistDownloading, togetherCode, isLoadingTracks) {
         mutableListOf<LibraryPlaylistActionItem>().apply {
             if (offerTrackActions) {
                 add(LibraryPlaylistActionItem(Icons.Rounded.PlayArrow, str("btn_play")) {
@@ -708,6 +709,14 @@ fun LibraryPlaylistOptionsDialog(
                 add(LibraryPlaylistActionItem(Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
                     withTracks { playerViewModel.addToQueue(it); onDismiss() }
                 })
+                togetherCode?.let { code ->
+                    add(LibraryPlaylistActionItem(Icons.Rounded.Groups, str("together_propose_playlist")) {
+                        withTracks {
+                            com.alananasss.kittytune.data.together.Together.proposePlaylist(code, it)
+                            onDismiss()
+                        }
+                    })
+                }
                 add(LibraryPlaylistActionItem(Icons.Default.Add, str("menu_add_playlist")) {
                     withTracks { onDismiss(); playerViewModel.prepareBulkAdd(it) }
                 })

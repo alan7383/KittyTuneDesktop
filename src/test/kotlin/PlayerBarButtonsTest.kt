@@ -1,5 +1,7 @@
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import kotlinx.serialization.json.JsonElement
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,13 +11,20 @@ import org.junit.Test
 class PlayerBarButtonsTest {
 
     private val prefs = PlayerPreferences()
+    private lateinit var previousPrefs: Map<String, JsonElement>
 
     @Before
     fun setUp() {
+        previousPrefs = Prefs.snapshot()
         Prefs.remove("player_bar_buttons")
         Prefs.remove("player_bar_devices_migrated")
         Prefs.remove("player_bar_pet_migrated")
+        Prefs.remove("player_bar_together_migrated")
+        Prefs.remove("player_bar_together_reactions_migrated")
     }
+
+    @After
+    fun restorePrefs() = Prefs.restore(previousPrefs)
 
     @Test
     fun testDevicesConstant() {
@@ -77,6 +86,8 @@ class PlayerBarButtonsTest {
     fun testPetMigrationPreservesHiddenPlayerDesignButtons() {
         Prefs.putString("player_bar_buttons", "")
         Prefs.putBoolean("player_bar_devices_migrated", true)
+        Prefs.putBoolean("player_bar_together_migrated", true)
+        Prefs.putBoolean("player_bar_together_reactions_migrated", true)
 
         assertEquals(setOf(PlayerPreferences.PLAYER_BAR_BUTTON_PET), prefs.getPlayerBarButtons())
     }

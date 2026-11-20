@@ -6,13 +6,9 @@
 package com.alananasss.kittytune.ui.together
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -82,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.together.Together
+import com.alananasss.kittytune.ui.common.rememberAmbientLoop
 import java.awt.Cursor
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -161,16 +158,7 @@ internal fun ExpressiveCookieBadge(
         animationSpec = tween(280),
         label = "cookieBg",
     )
-    val infiniteTransition = rememberInfiniteTransition(label = "cookieSpin")
-    val spinningAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 16000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "cookieAngle",
-    )
+    val spinningAngle = if (isActive) rememberAmbientLoop(periodMs = 16_000, to = 360f) else null
     val settledAngle by animateFloatAsState(
         targetValue = if (isActive) 24f else 0f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 180f),
@@ -183,7 +171,7 @@ internal fun ExpressiveCookieBadge(
             .expressiveCookieBackground(
                 color = bgColor,
                 spec = spec,
-                rotationDegrees = { if (isActive) spinningAngle else settledAngle },
+                rotationDegrees = { spinningAngle?.value ?: settledAngle },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -555,21 +543,15 @@ internal fun ListeningBars(
     modifier: Modifier = Modifier,
     color: Color = Color.White,
 ) {
-    val transition = rememberInfiniteTransition(label = "listening")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (isPlaying) 1f else 0f,
-        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Restart),
-        label = "phase",
-    )
+    val phase = if (isPlaying) rememberAmbientLoop(periodMs = 650, easing = FastOutSlowInEasing) else null
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         listOf(0f, 0.33f, 0.66f).forEach { offset ->
-            val h = if (isPlaying) {
-                0.35f + 0.65f * (0.5f + 0.5f * sin((phase + offset) * 2f * PI.toFloat()))
+            val h = if (phase != null) {
+                0.35f + 0.65f * (0.5f + 0.5f * sin((phase.value + offset) * 2f * PI.toFloat()))
             } else {
                 0.35f
             }
@@ -608,16 +590,7 @@ internal fun TogetherLiveProgressBar(
     val inactiveColor = MaterialTheme.colorScheme.surfaceContainerHighest
     val density = LocalDensity.current
 
-    val infiniteTransition = rememberInfiniteTransition(label = "liveWave")
-    val wavePhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "liveWavePhase",
-    )
+    val wavePhase = if (room.isPlaying) rememberAmbientLoop(periodMs = 1_800, to = 2f * PI.toFloat()) else null
     val ampFraction by animateFloatAsState(
         targetValue = if (room.isPlaying) 1f else 0f,
         animationSpec = tween(260),
@@ -652,11 +625,12 @@ internal fun TogetherLiveProgressBar(
 
             if (splitX > 1f) {
                 if (ampPx > 0.2f) {
+                    val phase = wavePhase?.value ?: 0f
                     val steps = (splitX / 2.5f).toInt().coerceIn(8, 260)
                     val path = Path().apply {
                         for (i in 0..steps) {
                             val x = splitX * (i.toFloat() / steps)
-                            val theta = (x / waveLenPx) * (2f * PI.toFloat()) + wavePhase
+                            val theta = (x / waveLenPx) * (2f * PI.toFloat()) + phase
                             val y = cy + ampPx * sin(theta)
                             if (i == 0) moveTo(x, y) else lineTo(x, y)
                         }

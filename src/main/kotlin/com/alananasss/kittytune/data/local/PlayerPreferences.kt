@@ -355,6 +355,8 @@ class PlayerPreferences {
         private const val KEY_PLAYER_BAR_PET_MIGRATED = "player_bar_pet_migrated"
         const val PLAYER_BAR_BUTTON_TOGETHER = "together"
         private const val KEY_PLAYER_BAR_TOGETHER_MIGRATED = "player_bar_together_migrated"
+        const val PLAYER_BAR_BUTTON_TOGETHER_REACTIONS = "together_reactions"
+        private const val KEY_PLAYER_BAR_TOGETHER_REACTIONS_MIGRATED = "player_bar_together_reactions_migrated"
         private const val KEY_DISCORD_LISTEN_ALONG = "discord_listen_along_enabled"
         private const val KEY_DISCORD_AUTO_LIVE = "discord_auto_live_enabled"
 
@@ -365,6 +367,7 @@ class PlayerPreferences {
                 PLAYER_BAR_BUTTON_QUEUE,
                 PLAYER_BAR_BUTTON_DEVICES,
                 PLAYER_BAR_BUTTON_TOGETHER,
+                PLAYER_BAR_BUTTON_TOGETHER_REACTIONS,
                 PLAYER_BAR_BUTTON_LYRICS,
                 PLAYER_BAR_BUTTON_MINIPLAYER,
                 PLAYER_BAR_BUTTON_SHUFFLE,
@@ -412,11 +415,12 @@ class PlayerPreferences {
 
         const val LIBRARY_TILE_LIKES = "likes"
         const val LIBRARY_TILE_DOWNLOADS = "downloads"
+        const val LIBRARY_TILE_TOGETHER = "together"
         const val LIBRARY_TILE_LOCAL = "local"
 
         /** In the order they appear in the library, which is the order the settings list them in. */
         val LIBRARY_TILES =
-            listOf(LIBRARY_TILE_LIKES, LIBRARY_TILE_DOWNLOADS, LIBRARY_TILE_LOCAL)
+            listOf(LIBRARY_TILE_LIKES, LIBRARY_TILE_DOWNLOADS, LIBRARY_TILE_TOGETHER, LIBRARY_TILE_LOCAL)
 
         private const val KEY_SIDEBAR_NAV_HIDDEN = "sidebar_nav_hidden"
 
@@ -1603,6 +1607,7 @@ class PlayerPreferences {
         val migrateDevices = !Prefs.getBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, false)
         val migratePet = !Prefs.getBoolean(KEY_PLAYER_BAR_PET_MIGRATED, false)
         val migrateTogether = !Prefs.getBoolean(KEY_PLAYER_BAR_TOGETHER_MIGRATED, false)
+        val migrateTogetherReactions = !Prefs.getBoolean(KEY_PLAYER_BAR_TOGETHER_REACTIONS_MIGRATED, false)
 
         if (migrateDevices) {
             // The Devices migration also saves the Player Design defaults for older profiles.
@@ -1623,7 +1628,10 @@ class PlayerPreferences {
         if (migrateTogether) {
             saved = saved + PLAYER_BAR_BUTTON_TOGETHER
         }
-        if (migrateDevices || migratePet || migrateTogether) {
+        if (migrateTogetherReactions) {
+            saved = saved + PLAYER_BAR_BUTTON_TOGETHER_REACTIONS
+        }
+        if (migrateDevices || migratePet || migrateTogether || migrateTogetherReactions) {
             setPlayerBarButtons(saved)
         }
         return saved
@@ -1633,6 +1641,7 @@ class PlayerPreferences {
         Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
         Prefs.putBoolean(KEY_PLAYER_BAR_PET_MIGRATED, true)
         Prefs.putBoolean(KEY_PLAYER_BAR_TOGETHER_MIGRATED, true)
+        Prefs.putBoolean(KEY_PLAYER_BAR_TOGETHER_REACTIONS_MIGRATED, true)
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
     }
 
