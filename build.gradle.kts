@@ -115,7 +115,7 @@ dependencies {
 
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.mpatric:mp3agic:0.9.1")
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.2")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.27.1")
 
     val javacvVersion = "1.5.10"
     implementation("org.bytedeco:javacv:$javacvVersion") {

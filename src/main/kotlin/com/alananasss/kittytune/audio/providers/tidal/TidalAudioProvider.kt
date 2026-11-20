@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio.providers.tidal
 
+import com.alananasss.kittytune.data.YoutubeFallbackMatcher
 import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.utils.Logger
 import okhttp3.HttpUrl
@@ -92,6 +93,7 @@ object TidalAudioProvider {
         val album: String?,
         val isrc: String?,
         val durationMs: Long?,
+        val recording: YoutubeFallbackMatcher.Recording? = null,
     )
 
     data class Resolved(
@@ -591,7 +593,9 @@ object TidalAudioProvider {
                 ?.let { return listOf(it.track) }
         }
         resolveSongLinkTidalTrackId(query)?.let { tidalId ->
-            val track = resolveTrackById(tidalId) ?: query.toDirectMatchedTrack(tidalId)
+            val track = resolveTrackById(tidalId)
+                ?: if (query.recording == null) query.toDirectMatchedTrack(tidalId) else return@let
+            if (!query.matchesRecording(track)) return@let
             val score = scoreTrack(track, wantedTitle, wantedArtists, wantedAlbum, wantedIsrc, wantedDurationMs)
             if (score >= MIN_MATCH_SCORE) {
                 if (track.losslessRank() > 0) {
@@ -740,6 +744,7 @@ object TidalAudioProvider {
             val obj = results.optJSONObject(index) ?: continue
             val track = obj.toMatchedTrack() ?: continue
             if (exactIsrcOnly && normalizeIsrc(track.isrc) != wantedIsrc) continue
+            if (!query.matchesRecording(track)) continue
             val score = scoreTrack(track, wantedTitle, wantedArtists, wantedAlbum, wantedIsrc, wantedDurationMs)
             if (score >= MIN_MATCH_SCORE) {
                 candidates += ScoredTrack(track, score)
@@ -747,6 +752,12 @@ object TidalAudioProvider {
         }
         return candidates.losslessFirst()
     }
+
+    private fun Query.matchesRecording(track: MatchedTrack): Boolean =
+        YoutubeFallbackMatcher.matches(
+            recording, track.title, track.artistNames, track.durationMs, track.album,
+            exactIsrc = normalizeIsrc(isrc)?.let { it == normalizeIsrc(track.isrc) } == true,
+        )
 
     private fun List<ScoredTrack>.losslessFirst(): List<ScoredTrack> =
         sortedWith(
