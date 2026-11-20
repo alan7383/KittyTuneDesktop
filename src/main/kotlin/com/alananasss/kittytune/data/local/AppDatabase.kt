@@ -18,7 +18,7 @@ import java.sql.ResultSet
 object AppDatabase {
 
     private val dbFile = File(AppDirs.dataDir, "soundtune_db.sqlite")
-    private lateinit var conn: Connection
+    @Volatile private lateinit var conn: Connection
 
     /**
      * One thread for the one shared connection. Every statement and transaction below
@@ -50,26 +50,34 @@ object AppDatabase {
     val likeDao: LikeDao by lazy { LikeDao(this) }
     val queueHistoryDao: QueueHistoryDao by lazy { QueueHistoryDao(this) }
 
+    @Synchronized
     fun init() {
+        if (::conn.isInitialized) return
         Class.forName("org.sqlite.JDBC")
         com.alananasss.kittytune.utils.StartupTimeline.mark("db: driver loaded")
-        conn = DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}")
-        conn.autoCommit = true
-        com.alananasss.kittytune.utils.StartupTimeline.mark("db: connected")
-        conn.createStatement().use { st ->
-            st.execute("PRAGMA journal_mode=WAL")
-            st.execute("PRAGMA foreign_keys=ON")
-            st.execute("PRAGMA synchronous=NORMAL")
-            st.execute("PRAGMA busy_timeout=5000")
-            st.execute("PRAGMA cache_size=-1000")
-            st.execute("PRAGMA mmap_size=0")
+        val connection = DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}")
+        try {
+            connection.autoCommit = true
+            com.alananasss.kittytune.utils.StartupTimeline.mark("db: connected")
+            connection.createStatement().use { st ->
+                st.execute("PRAGMA busy_timeout=5000")
+                st.execute("PRAGMA journal_mode=WAL")
+                st.execute("PRAGMA foreign_keys=ON")
+                st.execute("PRAGMA synchronous=NORMAL")
+                st.execute("PRAGMA cache_size=-1000")
+                st.execute("PRAGMA mmap_size=0")
+            }
+            com.alananasss.kittytune.utils.StartupTimeline.mark("db: pragmas")
+            createSchema(connection)
+            com.alananasss.kittytune.utils.StartupTimeline.mark("db: schema")
+        } catch (e: Exception) {
+            runCatching { connection.close() }
+            throw e
         }
-        com.alananasss.kittytune.utils.StartupTimeline.mark("db: pragmas")
-        createSchema()
-        com.alananasss.kittytune.utils.StartupTimeline.mark("db: schema")
+        conn = connection
     }
 
-    private fun createSchema() {
+    private fun createSchema(connection: Connection) {
         val ddl = listOf(
             """CREATE TABLE IF NOT EXISTS downloaded_tracks (
                 id INTEGER PRIMARY KEY NOT NULL, title TEXT NOT NULL, artist TEXT NOT NULL,
@@ -156,7 +164,7 @@ object AppDatabase {
                 contextJson TEXT, firstTrackArtworkUrl TEXT, firstTrackTitle TEXT,
                 firstTrackArtist TEXT, savedAt INTEGER NOT NULL)""",
         )
-        conn.createStatement().use { st ->
+        connection.createStatement().use { st ->
             ddl.forEach { st.execute(it) }
             try {
                 st.execute("ALTER TABLE downloaded_playlists ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")

@@ -28,7 +28,7 @@ class LikeDaoTest {
 
     @Before
     fun setUp() {
-        runCatching { AppDatabase.init() }
+        AppDatabase.init()
     }
 
     @Test
