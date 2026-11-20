@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio.providers.qobuz
 
+import com.alananasss.kittytune.data.YoutubeFallbackMatcher
 import com.alananasss.kittytune.core.BoundedCache
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
@@ -40,6 +41,7 @@ object QobuzAudioProvider {
         val countryCode: String = "US",
         val qualityCode: Int = 27,
         val customInstances: String? = null,
+        val recording: YoutubeFallbackMatcher.Recording? = null,
     )
 
     data class Resolved(
@@ -328,6 +330,20 @@ object QobuzAudioProvider {
             val candidateIsrc = obj.stringOrNull("isrc")?.trim()?.uppercase(Locale.US).orEmpty()
             val candidateDuration = obj.intOrNull("duration")
             val candidateArtists = collectArtistNames(obj).map { it.normalized() }.filter { it.isNotBlank() }
+            val reportedTitle = obj.stringOrNull("title").orEmpty()
+            val version = obj.stringOrNull("version")
+            val title = if (version.isNullOrBlank() || reportedTitle.contains(version, ignoreCase = true)) {
+                reportedTitle
+            } else {
+                "$reportedTitle ($version)"
+            }
+            if (!YoutubeFallbackMatcher.matches(
+                    query.recording, title, collectArtistNames(obj), candidateDuration?.toLong()?.times(1000L),
+                    obj.optJSONObject("album")?.stringOrNull("title"),
+                    exactIsrc = wantedIsrc.isNotBlank() && candidateIsrc == wantedIsrc,
+                )
+            ) continue
+
             val hires = obj.optBoolean("hires", false)
             val bitDepth = obj.intOrNull("maximum_bit_depth")
             val samplingRate = obj.doubleOrNull("maximum_sampling_rate")
