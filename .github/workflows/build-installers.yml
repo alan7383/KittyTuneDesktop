@@ -587,9 +587,7 @@ jobs:
     name: Update Nix package
     needs: release
     permissions:
-      actions: write
       contents: write
-      pull-requests: write
     uses: ./.github/workflows/nix-release-update.yml
     with:
       tag: ${{ github.ref_name }}
