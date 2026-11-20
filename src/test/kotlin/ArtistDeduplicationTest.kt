@@ -6,7 +6,7 @@ import com.alananasss.kittytune.data.spotify.SpotifyAlbum
 import com.alananasss.kittytune.data.spotify.SpotifyTrack
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
-import com.alananasss.kittytune.ui.main.mergeCreditArtists
+import com.alananasss.kittytune.data.spotify.mergeCreditArtists
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -88,7 +88,7 @@ class ArtistDeduplicationTest {
             )
         )
 
-        val merged = credits.mergeCreditArtists()
+        val merged = mergeCreditArtists(credits)
         assertEquals(2, merged.size)
 
         val weeknd = merged.first { it.id == "art1" }
@@ -118,7 +118,7 @@ class ArtistDeduplicationTest {
             )
         )
 
-        val merged = writers.mergeCreditArtists()
+        val merged = mergeCreditArtists(writers)
         assertEquals(1, merged.size)
         assertEquals("Max Martin", merged[0].name)
         assertEquals(listOf("Composer", "Lyricist"), merged[0].subroles)

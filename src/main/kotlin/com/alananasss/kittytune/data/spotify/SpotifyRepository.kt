@@ -408,8 +408,7 @@ object SpotifyRepository {
      * it, and the cache keeps it to once per artist.
      */
     suspend fun getArtistAvatar(artistId: String): String? {
-        val cleanId = extractId(artistId)
-        if (cleanId.isBlank()) return null
+        val cleanId = spotifyEntityId(artistId, "artist") ?: return null
         artistAvatarCache[cleanId]?.let { return it }
         val avatar = getArtist(cleanId)?.avatarUrl?.takeIf { it.isNotBlank() } ?: return null
         artistAvatarCache[cleanId] = avatar
@@ -473,6 +472,8 @@ object SpotifyRepository {
         return try {
             val artistUnion = fetchPathfinderData(SpotifyPathfinderApi.buildArtistUrl(cleanId))
                 ?.optJSONObject("artistUnion") ?: return null
+            val uri = artistUnion.optString("uri")
+            if (uri.isNotBlank() && spotifyEntityId(uri, "artist") != cleanId) return null
 
             val profile = artistUnion.optJSONObject("profile")
             val name = profile?.optString("name") ?: "Unknown Artist"
@@ -963,92 +964,17 @@ object SpotifyRepository {
     }
 
     suspend fun getCredits(trackId: String): SpotifyCredits? {
-        val cleanId = extractId(trackId)
-        if (cleanId.isBlank()) return null
+        val cleanId = spotifyEntityId(trackId, "track") ?: return null
         val url = "https://spclient.wg.spotify.com/track-credits-view/v0/experimental/$cleanId/credits"
-
         try {
-            val json = fetchJsonObject(url) ?: return null
-            val trackTitle = json.optString("trackTitle")
-            val trackUri = json.optString("trackUri")
-
-            val sourceNames = mutableListOf<String>()
-            val sourcesArr = json.optJSONArray("sourceNames")
-            if (sourcesArr != null) {
-                for (i in 0 until sourcesArr.length()) {
-                    val s = sourcesArr.optString(i)
-                    if (s.isNotBlank()) sourceNames.add(s)
-                }
-            }
-
-            val roles = mutableListOf<SpotifyCreditRole>()
-            val roleCreditsArr = json.optJSONArray("roleCredits")
-            if (roleCreditsArr != null) {
-                for (i in 0 until roleCreditsArr.length()) {
-                    val roleObj = roleCreditsArr.optJSONObject(i) ?: continue
-                    val roleTitle = roleObj.optString("roleTitle")
-                    val artistsList = mutableListOf<SpotifyCreditArtist>()
-                    val artistsArr = roleObj.optJSONArray("artists")
-                    if (artistsArr != null) {
-                        for (j in 0 until artistsArr.length()) {
-                            val artObj = artistsArr.optJSONObject(j) ?: continue
-                            val name = artObj.optString("name")
-                            val uri = artObj.optString("uri")
-                            val id = extractId(uri)
-                            val img = artObj.optStringOrNull("imageUri")?.let { spotifyImageUrl(it) }
-                            val subroles = mutableListOf<String>()
-                            val subArr = artObj.optJSONArray("subroles")
-                            if (subArr != null) {
-                                for (k in 0 until subArr.length()) {
-                                    val sub = subArr.optString(k)
-                                    if (sub.isNotBlank()) subroles.add(sub)
-                                }
-                            }
-                            if (name.isNotBlank()) {
-                                artistsList.add(
-                                    SpotifyCreditArtist(
-                                        id = id,
-                                        name = name,
-                                        uri = uri,
-                                        imageUri = img,
-                                        subroles = subroles
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    val mergedArtists = mutableListOf<SpotifyCreditArtist>()
-                    for (art in artistsList) {
-                        val existingIdx = mergedArtists.indexOfFirst {
-                            (it.id.isNotBlank() && it.id == art.id) ||
-                            (it.name.isNotBlank() && it.name.equals(art.name, ignoreCase = true))
-                        }
-                        if (existingIdx >= 0) {
-                            val existing = mergedArtists[existingIdx]
-                            mergedArtists[existingIdx] = existing.copy(
-                                subroles = (existing.subroles + art.subroles).distinct(),
-                                imageUri = existing.imageUri ?: art.imageUri
-                            )
-                        } else {
-                            mergedArtists.add(art)
-                        }
-                    }
-                    roles.add(SpotifyCreditRole(roleTitle = roleTitle, artists = mergedArtists))
-                }
-            }
-
-            return SpotifyCredits(
-                trackTitle = trackTitle,
-                trackUri = trackUri,
-                roles = roles,
-                sourceNames = sourceNames
-            )
+            fetchJsonObject(url)?.let { parseSpotifyCredits(cleanId, it) }?.let { return it }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to fetch Spotify credits for $trackId: ${e.message}")
         }
 
-        // Fallback: derive minimal credits from the track itself.
-        val track = getTrack(cleanId) ?: return null
+        val track = getTrack(cleanId)?.takeIf { it.id == cleanId } ?: return null
         val fallbackRoles = mutableListOf<SpotifyCreditRole>()
         if (track.artists.isNotEmpty()) {
             val perfArtists = track.artists.mapIndexed { idx, art ->
@@ -1263,15 +1189,3 @@ object SpotifyRepository {
  */
 private fun org.json.JSONObject.optStringOrNull(key: String): String? =
     optString(key).takeIf { it.isNotBlank() && it != "null" }
-
-/**
- * The credits endpoint returns performer images as `spotify:image:<hash>` URNs, not URLs, so an
- * image loader given one straight has nothing to fetch — which is why the Performers list showed
- * placeholder silhouettes while the names loaded fine. Turns whatever form arrives into a URL.
- */
-private fun spotifyImageUrl(raw: String): String? = when {
-    raw.startsWith("http", ignoreCase = true) -> raw
-    raw.startsWith("spotify:image:") -> "https://i.scdn.co/image/" + raw.removePrefix("spotify:image:")
-    raw.matches(Regex("[0-9a-fA-F]{16,}")) -> "https://i.scdn.co/image/$raw"
-    else -> null
-}
