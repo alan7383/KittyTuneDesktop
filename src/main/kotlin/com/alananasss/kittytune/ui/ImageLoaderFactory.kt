@@ -4,8 +4,11 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.disk.DiskCache
 import coil3.disk.directory
+import coil3.intercept.Interceptor
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.SuccessResult
+import coil3.size.pxOrElse
 import com.alananasss.kittytune.core.AppDirs
 
 import okio.Path.Companion.toOkioPath
@@ -19,6 +22,19 @@ object ImageLoaderFactory {
         return ImageLoader.Builder(PlatformContext.INSTANCE)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { okHttp }))
+                add(Interceptor { chain ->
+                    val request = chain.request
+                    val url = request.data as? String ?: return@Interceptor chain.proceed()
+                    val displayPixels = minOf(
+                        chain.size.width.pxOrElse { 0 },
+                        chain.size.height.pxOrElse { 0 }
+                    )
+                    for (candidate in youtubeArtworkUpgrades(url, displayPixels)) {
+                        val upgraded = chain.withRequest(request.newBuilder().data(candidate).build()).proceed()
+                        if (upgraded is SuccessResult) return@Interceptor upgraded
+                    }
+                    chain.proceed()
+                })
             }
             // Decoded bitmaps are Skia memory, outside the Java heap and invisible to -Xmx, and the
             // GPU keeps its own texture copy of whatever is on screen. 32 MB still holds a couple of
