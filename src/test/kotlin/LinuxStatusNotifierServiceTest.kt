@@ -4,6 +4,7 @@ import com.alananasss.kittytune.core.StatusNotifierItemInterface
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder
 import org.freedesktop.dbus.types.UInt32
 import org.freedesktop.dbus.types.Variant
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -19,6 +20,9 @@ class LinuxStatusNotifierServiceTest {
         @JvmStatic @org.junit.BeforeClass
         fun startWatcher() {
             // A private dbus-run-session makes registration deterministic, without the user's shell.
+            assumeTrue("Run on Linux under dbus-run-session",
+                System.getProperty("os.name").startsWith("Linux", ignoreCase = true) &&
+                    !System.getenv("DBUS_SESSION_BUS_ADDRESS").isNullOrBlank())
             watcher = DBusConnectionBuilder.forSessionBus().withShared(false).build()
             watcher.exportObject("/StatusNotifierWatcher", object : com.alananasss.kittytune.core.StatusNotifierWatcherInterface {
                 override fun getObjectPath() = "/StatusNotifierWatcher"
@@ -28,7 +32,9 @@ class LinuxStatusNotifierServiceTest {
         }
 
         @JvmStatic @org.junit.AfterClass
-        fun stopWatcher() { watcher.disconnect() }
+        fun stopWatcher() {
+            if (::watcher.isInitialized) watcher.disconnect()
+        }
     }
 
 

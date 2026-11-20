@@ -8,9 +8,11 @@ import com.alananasss.kittytune.ui.setup.SetupScreen
 import com.alananasss.kittytune.ui.setup.SetupStep
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import org.jetbrains.skia.EncodedImageFormat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.junit.Test
 import java.io.File
+import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SetupOnboardingTest {
@@ -359,7 +361,7 @@ class SetupOnboardingTest {
         } finally { Prefs.restore(saved) }
     }
 
-    @Test fun `finishing saves completion and skips extras without installing them`() {
+    @Test fun `finishing saves completion and skips extras without installing them`() = SwingUtilities.invokeAndWait {
         val saved = Prefs.flow.value
         val wasGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
         try {
@@ -367,7 +369,7 @@ class SetupOnboardingTest {
             prefs.setHasCompletedSetup(false)
             var completed = 0
             val before = Prefs.flow.value
-            val scene = ImageComposeScene(width = 1280, height = 900) {
+            val scene = ImageComposeScene(width = 1280, height = 900, coroutineContext = Dispatchers.Main.immediate) {
                 KittyTuneTheme { SetupScreen(onSetupComplete = { completed++ }) }
             }
             var frame = 0L

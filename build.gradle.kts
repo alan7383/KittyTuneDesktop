@@ -185,6 +185,14 @@ dependencies {
 // `-PuiScale=1.5` runs the tests as on a display scaled to 150%. AWT reads the property once at start-up,
 // which is why it is a JVM argument of the test task and not something a test could set for itself.
 tasks.withType<Test>().configureEach {
+    val profileName = if (name == "headlessTest") "test-profile" else "test-profile-$name"
+    val profile = layout.buildDirectory.dir(profileName).get().asFile
+    systemProperty("user.home", File(profile, "home").absolutePath)
+    environment("APPDATA", File(profile, "roaming").absolutePath)
+    environment("LOCALAPPDATA", File(profile, "local").absolutePath)
+    systemProperty("java.io.tmpdir", File(profile, "tmp").absolutePath)
+    doFirst { listOf("home", "roaming", "local", "tmp").forEach { File(profile, it).mkdirs() } }
+
     // Private session buses change between runs; do not reuse a cached, dead bus address
     // or a previous skipped test result from another bus/configuration.
     providers.environmentVariable("ALSA_CONFIG_PATH").orNull?.let {
@@ -193,6 +201,14 @@ tasks.withType<Test>().configureEach {
     }
     inputs.property("liveLinuxAudioTest", providers.environmentVariable("KITTYTUNE_LINUX_AUDIO_TEST").orElse(""))
     providers.environmentVariable("KITTYTUNE_LINUX_AUDIO_TEST").orNull?.let { environment("KITTYTUNE_LINUX_AUDIO_TEST", it) }
+    val liveServices = providers.environmentVariable("KITTYTUNE_TEST_LIVE_SERVICES").orElse("")
+    inputs.property("liveServiceTests", liveServices)
+    environment("KITTYTUNE_TEST_LIVE_SERVICES", liveServices.get())
+    providers.environmentVariable("KITTYTUNE_AI_FIXTURES").orNull?.let {
+        val fixtures = file(it)
+        inputs.dir(fixtures).withPropertyName("aiTestFixtures")
+        environment("KITTYTUNE_AI_FIXTURES", fixtures.absolutePath)
+    }
     inputs.property("mprisSessionBus", providers.environmentVariable("DBUS_SESSION_BUS_ADDRESS").orElse(""))
     inputs.property("mprisIiConfig", providers.environmentVariable("KITTYTUNE_II_CONFIG").orElse(""))
     providers.environmentVariable("DBUS_SESSION_BUS_ADDRESS").orNull?.let { environment("DBUS_SESSION_BUS_ADDRESS", it) }
@@ -1017,15 +1033,11 @@ tasks.register<JavaExec>("runProtectedTracksDemo") {
 tasks.register<Test>("headlessTest") {
     description = "Runs deterministic desktop regressions without windows or audio output."
     group = "verification"
+    // Both suites can render previews to build/previews.
+    mustRunAfter(tasks.named("test"))
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     systemProperty("java.awt.headless", "true")
-    val profile = layout.buildDirectory.dir("test-profile").get().asFile
-    systemProperty("user.home", File(profile, "home").absolutePath)
-    environment("APPDATA", File(profile, "roaming").absolutePath)
-    environment("LOCALAPPDATA", File(profile, "local").absolutePath)
-    systemProperty("java.io.tmpdir", File(profile, "tmp").absolutePath)
-    doFirst { listOf("home", "roaming", "local", "tmp").forEach { File(profile, it).mkdirs() } }
     maxHeapSize = "768m"
     maxParallelForks = 1
     filter {

@@ -23,15 +23,17 @@ class ProtectedTracksNoticeTest {
         "protected_announced_version", "protected_hint_version",
     )
 
-
-    /** These read and write preferences: only ever against headlessTest's throwaway profile, never a real one. */
-    private fun requireTestProfile() =
-        assumeTrue("run through headlessTest (isolated profile)", System.getenv("APPDATA")?.contains("test-profile") == true)
+    private val isolatedProfile = System.getenv("APPDATA")?.contains("test-profile") == true
 
     @Before
+    fun prepare() {
+        assumeTrue("requires an isolated test profile", isolatedProfile)
+        clean()
+    }
+
     @After
     fun clean() {
-        requireTestProfile()
+        if (!isolatedProfile) return
         keys.forEach(Prefs::remove)
         ProtectedTracksNotice.dismiss()
     }
