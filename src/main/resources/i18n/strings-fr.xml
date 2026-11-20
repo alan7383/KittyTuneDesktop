@@ -3212,6 +3212,7 @@
     <string name="pref_drm_windows_test_failed">Test échoué, consulte le journal ci-dessous</string>
     <string name="drm_unavailable_toast_windows">🔒 Piste protégée : indisponible ici. Voir Réglages, Divers, Titres protégés</string>
     <string name="drm_download_failed">Piste protégée : le téléchargement a échoué. Vérifie le CDM dans Réglages, Divers</string>
+    <string name="track_playback_unavailable">Impossible de lire ce morceau. Appuyez sur Lecture pour réessayer.</string>
     <string name="download_offline_source_unavailable">Aucune source disponible pour télécharger cette piste hors ligne.</string>
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
@@ -3521,4 +3522,17 @@
     <string name="discord_auto_live_title">Toujours diffuser en direct sur Discord</string>
     <string name="discord_auto_live_desc">Lancer automatiquement une session en écoute seule dès que la musique joue pour que tout le monde puisse écouter sur Discord</string>
     <string name="discord_rpc_btn_listen_along">Écouter ensemble</string>
+    <string name="together_listener_joined">%1$s a rejoint votre session Together</string>
+    <string name="together_reactions">Réactions en direct</string>
+    <string name="player_button_together_reactions_desc">Afficher le bouton de réactions dans la barre du lecteur pendant une session Together</string>
+    <string name="together_sync_synced">Synchronisé</string>
+    <string name="together_sync_syncing">Synchronisation…</string>
+    <string name="together_sync_waiting">En attente de l’hôte</string>
+    <string name="together_sync_connecting">Connexion…</string>
+    <string name="together_propose_session">Proposer à la session Together</string>
+    <string name="together_propose_playlist">Proposer la playlist à Together</string>
+    <string name="together_local_not_shareable">Morceau local non diffusable</string>
+    <string name="together_invite_qr">QR code d’invitation Together</string>
+    <string name="together_copy_code">Copier le code de session</string>
+    <string name="together_invite_qr_instructions">Scanne le code avec ton appareil photo, puis touche Rejoindre dans KittyTune.</string>
 </resources>

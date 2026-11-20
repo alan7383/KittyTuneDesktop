@@ -3279,6 +3279,7 @@
     <string name="pref_drm_windows_test_failed">Kiểm tra thất bại, xem nhật ký bên dưới</string>
     <string name="drm_unavailable_toast_windows">🔒 Nhạc được bảo vệ: không khả dụng ở đây. Xem Cài đặt, Khác, Nhạc được bảo vệ</string>
     <string name="drm_download_failed">Nhạc được bảo vệ: tải xuống thất bại. Kiểm tra CDM trong Cài đặt, Khác</string>
+    <string name="track_playback_unavailable">Không thể phát bài hát này. Nhấn Phát để thử lại.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
     <!-- Desktop compatibility and declarative updates -->
     <string name="floating_compat_title">Chế độ tương thích</string>
@@ -3603,4 +3604,17 @@
     <string name="discord_auto_live_title">Luôn phát trực tiếp trên Discord</string>
     <string name="discord_auto_live_desc">Tự động mở phiên chỉ nghe khi phát nhạc để mọi người trên Discord có thể nghe cùng</string>
     <string name="discord_rpc_btn_listen_along">Nghe cùng</string>
+    <string name="player_button_together_reactions_desc">Hiện nút cảm xúc trên thanh phát nhạc trong phiên Together</string>
+    <string name="together_copy_code">Sao chép mã phiên</string>
+    <string name="together_invite_qr">Mã QR mời tham gia Together</string>
+    <string name="together_invite_qr_instructions">Quét mã bằng máy ảnh, rồi nhấn Tham gia trong KittyTune.</string>
+    <string name="together_listener_joined">%1$s đã tham gia phiên Together của bạn</string>
+    <string name="together_local_not_shareable">Không thể chia sẻ bài hát trên thiết bị</string>
+    <string name="together_propose_playlist">Đề xuất danh sách phát trong Together</string>
+    <string name="together_propose_session">Đề xuất cho phiên Together</string>
+    <string name="together_reactions">Cảm xúc trực tiếp</string>
+    <string name="together_sync_connecting">Đang kết nối…</string>
+    <string name="together_sync_synced">Đã đồng bộ</string>
+    <string name="together_sync_syncing">Đang đồng bộ…</string>
+    <string name="together_sync_waiting">Đang chờ chủ phòng</string>
 </resources>

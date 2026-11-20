@@ -3198,6 +3198,7 @@
     <string name="pref_drm_windows_test_failed">Проверка не пройдена, смотрите журнал ниже</string>
     <string name="drm_unavailable_toast_windows">🔒 Защищённый трек: здесь недоступен. См. Настройки, Разное, Защищённые треки</string>
     <string name="drm_download_failed">Защищённый трек: не удалось скачать. Проверьте CDM в Настройки, Разное</string>
+    <string name="track_playback_unavailable">Не удалось воспроизвести трек. Нажмите «Воспроизвести», чтобы повторить попытку.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
     <!-- Desktop compatibility and declarative updates -->
     <string name="floating_compat_title">Режим совместимости</string>
@@ -3522,4 +3523,17 @@
     <string name="discord_auto_live_title">Всегда транслировать эфир в Discord</string>
     <string name="discord_auto_live_desc">Автоматически запускать эфир только для прослушивания во время воспроизведения музыки</string>
     <string name="discord_rpc_btn_listen_along">Слушать вместе</string>
+    <string name="player_button_together_reactions_desc">Показывать кнопку реакций на панели плеера во время сеанса Together</string>
+    <string name="together_copy_code">Скопировать код сеанса</string>
+    <string name="together_invite_qr">QR-код приглашения в Together</string>
+    <string name="together_invite_qr_instructions">Отсканируйте код камерой, затем нажмите «Присоединиться» в KittyTune.</string>
+    <string name="together_listener_joined">%1$s теперь в вашем сеансе Together</string>
+    <string name="together_local_not_shareable">Локальным треком нельзя поделиться</string>
+    <string name="together_propose_playlist">Предложить плейлист в Together</string>
+    <string name="together_propose_session">Предложить для сеанса Together</string>
+    <string name="together_reactions">Реакции в реальном времени</string>
+    <string name="together_sync_connecting">Подключение…</string>
+    <string name="together_sync_synced">Синхронизировано</string>
+    <string name="together_sync_syncing">Синхронизация…</string>
+    <string name="together_sync_waiting">Ожидание ведущего</string>
 </resources>

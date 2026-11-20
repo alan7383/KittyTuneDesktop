@@ -3211,6 +3211,7 @@
     <string name="pref_drm_windows_test_failed">O teste falhou. Consulte o registro abaixo</string>
     <string name="drm_unavailable_toast_windows">🔒 Faixa protegida indisponível aqui. Veja Configurações → Outros → Faixas protegidas</string>
     <string name="drm_download_failed">Falha ao baixar a faixa protegida. Verifique o CDM em Configurações → Outros</string>
+    <string name="track_playback_unavailable">Não foi possível reproduzir esta faixa. Toque em Reproduzir para tentar novamente.</string>
     <string name="download_offline_source_unavailable">Nenhuma fonte disponível para baixar esta faixa para reprodução offline.</string>
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
@@ -3520,4 +3521,17 @@
     <string name="discord_auto_live_title">Sempre transmitir ao vivo no Discord</string>
     <string name="discord_auto_live_desc">Inicia automaticamente uma sessão somente audição ao tocar música para ouvirem pelo Discord</string>
     <string name="discord_rpc_btn_listen_along">Ouvir junto</string>
+    <string name="player_button_together_reactions_desc">Mostrar o botão de reações na barra do player durante uma sessão Together</string>
+    <string name="together_copy_code">Copiar código da sessão</string>
+    <string name="together_invite_qr">Código QR do convite para o Together</string>
+    <string name="together_invite_qr_instructions">Escaneie o código com a câmera e toque em Entrar no KittyTune.</string>
+    <string name="together_listener_joined">%1$s entrou na sua sessão Together</string>
+    <string name="together_local_not_shareable">Faixas locais não podem ser compartilhadas</string>
+    <string name="together_propose_playlist">Sugerir playlist no Together</string>
+    <string name="together_propose_session">Sugerir para a sessão Together</string>
+    <string name="together_reactions">Reações ao vivo</string>
+    <string name="together_sync_connecting">Conectando…</string>
+    <string name="together_sync_synced">Sincronizado</string>
+    <string name="together_sync_syncing">Sincronizando…</string>
+    <string name="together_sync_waiting">Aguardando o anfitrião</string>
 </resources>

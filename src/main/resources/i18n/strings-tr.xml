@@ -3199,6 +3199,7 @@
     <string name="pref_drm_windows_test_failed">Test başarısız, aşağıdaki günlüğe bak</string>
     <string name="drm_unavailable_toast_windows">🔒 Korumalı parça: burada kullanılamıyor. Ayarlar, Diğer, Korumalı parçalar bölümüne bak</string>
     <string name="drm_download_failed">Korumalı parça: indirme başarısız. CDM'i Ayarlar, Diğer bölümünden kontrol et</string>
+    <string name="track_playback_unavailable">Bu parça çalınamadı. Yeniden denemek için Oynat düğmesine dokunun.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
     <!-- Desktop compatibility and declarative updates -->
     <string name="floating_compat_title">Uyumluluk modu</string>
@@ -3523,4 +3524,17 @@
     <string name="discord_auto_live_title">Discord üzerinde her zaman canlı yayınla</string>
     <string name="discord_auto_live_desc">Müzik çalarken Discord üzerinden herkesin dinleyebilmesi için otomatik olarak yalnızca dinleme oturumu başlat</string>
     <string name="discord_rpc_btn_listen_along">Birlikte Dinle</string>
+    <string name="player_button_together_reactions_desc">Together oturumu sırasında oynatıcı çubuğunda tepki düğmesini göster</string>
+    <string name="together_copy_code">Oturum kodunu kopyala</string>
+    <string name="together_invite_qr">Together davet QR kodu</string>
+    <string name="together_invite_qr_instructions">Kodu kameranla tara, ardından KittyTune’da Katıl’a dokun.</string>
+    <string name="together_listener_joined">%1$s Together oturumuna katıldı</string>
+    <string name="together_local_not_shareable">Yerel parçalar paylaşılamaz</string>
+    <string name="together_propose_playlist">Together’da çalma listesi öner</string>
+    <string name="together_propose_session">Together oturumuna öner</string>
+    <string name="together_reactions">Canlı tepkiler</string>
+    <string name="together_sync_connecting">Bağlanılıyor…</string>
+    <string name="together_sync_synced">Eşitlendi</string>
+    <string name="together_sync_syncing">Eşitleniyor…</string>
+    <string name="together_sync_waiting">Oturum sahibi bekleniyor</string>
 </resources>

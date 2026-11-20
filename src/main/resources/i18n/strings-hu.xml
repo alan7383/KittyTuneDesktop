@@ -3197,6 +3197,7 @@
     <string name="pref_drm_windows_test_failed">A teszt sikertelen, lásd a lenti naplót</string>
     <string name="drm_unavailable_toast_windows">🔒 Védett szám: itt nem érhető el. Lásd: Beállítások, Egyéb, Védett számok</string>
     <string name="drm_download_failed">Védett szám: a letöltés nem sikerült. Ellenőrizd a CDM-et a Beállítások, Egyéb alatt</string>
+    <string name="track_playback_unavailable">Ez a szám nem játszható le. Az újrapróbálkozáshoz koppints a Lejátszás gombra.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
     <!-- Desktop compatibility and declarative updates -->
     <string name="floating_compat_title">Kompatibilitási mód</string>
@@ -3521,4 +3522,17 @@
     <string name="discord_auto_live_title">Mindig élő megosztás Discordon</string>
     <string name="discord_auto_live_desc">Zenelejátszáskor automatikusan elindít egy csak hallgatás munkamenetet a Discordhoz</string>
     <string name="discord_rpc_btn_listen_along">Hallgasd velem</string>
+    <string name="player_button_together_reactions_desc">A reakciógomb megjelenítése a lejátszósávon Together-munkamenet közben</string>
+    <string name="together_copy_code">Munkamenetkód másolása</string>
+    <string name="together_invite_qr">Together-meghívó QR-kódja</string>
+    <string name="together_invite_qr_instructions">Olvasd be a kódot a kamerával, majd koppints a Csatlakozás gombra a KittyTune-ban.</string>
+    <string name="together_listener_joined">%1$s csatlakozott a Together-munkamenetedhez</string>
+    <string name="together_local_not_shareable">A helyi szám nem osztható meg</string>
+    <string name="together_propose_playlist">Lejátszási lista ajánlása a Togetherben</string>
+    <string name="together_propose_session">Ajánlás a Together-munkamenethez</string>
+    <string name="together_reactions">Élő reakciók</string>
+    <string name="together_sync_connecting">Csatlakozás…</string>
+    <string name="together_sync_synced">Szinkronizálva</string>
+    <string name="together_sync_syncing">Szinkronizálás…</string>
+    <string name="together_sync_waiting">Várakozás a házigazdára</string>
 </resources>
