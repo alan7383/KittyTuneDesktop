@@ -24,7 +24,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +43,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.spotify.SpotifyCreditArtist
 import com.alananasss.kittytune.data.spotify.SpotifyCredits
 import com.alananasss.kittytune.data.spotify.SpotifyRepository
+import com.alananasss.kittytune.data.spotify.mergeCreditArtists
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.utils.makeTimeString
@@ -57,11 +63,13 @@ internal fun LazyListScope.spotifyCreditsSection(
     val performers = performerArtists(track, credits)
     if (performers.isNotEmpty()) item(key = "credits_performers") {
         CreditsCard(str("spotify_credits_performers")) {
-            performers.forEach { CreditArtistRow(it, vm) }
+            performers.forEach { artist ->
+                key(artist.id.ifBlank { artist.name }) { CreditArtistRow(artist, vm) }
+            }
         }
     }
 
-    val writers = credits?.roles?.firstOrNull { it.roleTitle.isWritersRole() }?.artists.orEmpty().mergeCreditArtists()
+    val writers = credits?.roles?.firstOrNull { it.roleTitle.isWritersRole() }?.artists.orEmpty().let(::mergeCreditArtists)
     val composer = track.publisherMetadata?.composer?.takeIf { it.isNotBlank() }
     if (writers.isNotEmpty()) item(key = "credits_writers") {
         CreditsCard(str("spotify_credits_writers")) {
@@ -74,7 +82,7 @@ internal fun LazyListScope.spotifyCreditsSection(
     val producers = credits?.roles
         ?.filter { it.roleTitle.contains("Producer", true) || it.roleTitle.contains("Production", true) }
         ?.flatMap { it.artists }
-        ?.mergeCreditArtists()
+        ?.let(::mergeCreditArtists)
         .orEmpty()
     if (producers.isNotEmpty()) item(key = "credits_producers") {
         CreditsCard(str("spotify_credits_producers")) {
@@ -103,7 +111,7 @@ private fun performerArtists(track: Track, credits: SpotifyCredits?): List<Spoti
     val role = credits?.roles?.firstOrNull { role ->
         role.roleTitle.contains("Performer", true) || role.roleTitle.contains("Artist", true)
     }
-    role?.artists?.takeIf { it.isNotEmpty() }?.let { return it.mergeCreditArtists() }
+    role?.artists?.takeIf { it.isNotEmpty() }?.let { return mergeCreditArtists(it) }
 
     val refs = track.artists.orEmpty().distinctBy { it.id.ifBlank { it.name } }
     return refs.map { ref ->
@@ -115,27 +123,6 @@ private fun performerArtists(track: Track, credits: SpotifyCredits?): List<Spoti
             subroles = listOf(if (refs.size > 1 && ref !== refs.first()) "Featured Artist" else "Main Artist")
         )
     }
-}
-
-internal fun List<SpotifyCreditArtist>.mergeCreditArtists(): List<SpotifyCreditArtist> {
-    val merged = mutableListOf<SpotifyCreditArtist>()
-    for (art in this) {
-        val existingIndex = merged.indexOfFirst {
-            (it.id.isNotBlank() && it.id == art.id) ||
-            (it.name.isNotBlank() && it.name.equals(art.name, ignoreCase = true))
-        }
-        if (existingIndex >= 0) {
-            val existing = merged[existingIndex]
-            val combinedSubroles = (existing.subroles + art.subroles).distinct()
-            merged[existingIndex] = existing.copy(
-                subroles = combinedSubroles,
-                imageUri = existing.imageUri ?: art.imageUri
-            )
-        } else {
-            merged.add(art)
-        }
-    }
-    return merged
 }
 
 private fun String.isWritersRole(): Boolean =
@@ -238,9 +225,10 @@ private fun DetailInfoRow(label: String, value: String) {
 private fun CreditArtistRow(artist: SpotifyCreditArtist, vm: PlayerViewModel) {
     // The credits payload only sometimes carries an image; fetch the missing ones so the section shows
     // faces instead of a column of silhouettes.
-    val avatar by produceState(artist.imageUri, artist.id) {
-        if (value.isNullOrBlank() && artist.id.isNotBlank()) {
-            value = runCatching { SpotifyRepository.getArtistAvatar(artist.id) }.getOrNull()
+    var avatar by remember(artist.id, artist.imageUri) { mutableStateOf(artist.imageUri) }
+    LaunchedEffect(artist.id, artist.imageUri) {
+        if (artist.imageUri.isNullOrBlank() && artist.id.isNotBlank()) {
+            avatar = SpotifyRepository.getArtistAvatar(artist.id)
         }
     }
 
