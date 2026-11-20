@@ -149,11 +149,15 @@ class BannerRenderTest {
             }
         }
 
-        val image = scene.render()
-        val data = image.encodeToData(EncodedImageFormat.PNG)
-        checkNotNull(data) { "Failed to encode image to PNG" }
-        File("scratch/banner_real_kittytune_font.png").writeBytes(data.bytes)
-        File("images/banner.png").writeBytes(data.bytes)
-        println("Generated real KittyTune rounded font banner: images/banner.png")
+        try {
+            scene.render().use { image ->
+                val data = checkNotNull(image.encodeToData(EncodedImageFormat.PNG)) { "Failed to encode image to PNG" }
+                data.use {
+                    File("build/previews/banner.png").apply { parentFile.mkdirs() }.writeBytes(it.bytes)
+                }
+            }
+        } finally {
+            scene.close()
+        }
     }
 }
