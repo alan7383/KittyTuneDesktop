@@ -1156,6 +1156,8 @@
     <string name="pref_persist_queue_sub">Yeniden başlatmanın ardından çalmayı sürdür</string>
     <string name="pref_queue_preserve_upcoming">Atlama sırasında yaklaşan sırayı koru</string>
     <string name="pref_queue_preserve_upcoming_sub">Aradaki parçaları atlamak yerine tıklanan parçayı sıradaki konuma taşır</string>
+    <string name="pref_keep_played_tracks_visible">Çalınan parçaları görünür tut</string>
+    <string name="pref_keep_played_tracks_visible_sub">Bölüm daraltıldığında çalınan tüm parçaları kompakt satırlarda gösterir.</string>
     <string name="pref_precise_speed">Hassas Hız</string>
     <string name="pref_precise_speed_sub">0.1x yerine 0.05x adımlar</string>
     <string name="pref_privacy_subtitle">Dinleme istatistiklerini ve geçmişini yönet</string>
