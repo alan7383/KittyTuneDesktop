@@ -1181,7 +1181,6 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                         }
                         composable("together_home") {
                             com.alananasss.kittytune.ui.together.TogetherHomeScreen(
-                                onBack = { navController.popBackStack() },
                                 onOpen = { code -> navController.navigate("together/$code") },
                                 playerViewModel = playerViewModel,
                             )
@@ -1507,6 +1506,8 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
         )
         }
     }
+
+    com.alananasss.kittytune.ui.together.TogetherReactionOverlay()
 
     AiDetectionOverlays(playerViewModel, navController)
 

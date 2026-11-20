@@ -681,6 +681,13 @@ private fun PlayerButtonsSection(
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER in visibleButtons
         ),
         ButtonConfigItem(
+            key = PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER_REACTIONS,
+            label = str("together_reactions"),
+            desc = str("player_button_together_reactions_desc"),
+            mark = rememberVectorPainter(Icons.Rounded.AddReaction),
+            enabled = PlayerPreferences.PLAYER_BAR_BUTTON_TOGETHER_REACTIONS in visibleButtons
+        ),
+        ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
             label = str("player_button_shuffle"),
             desc = str("player_button_shuffle_desc"),
@@ -1191,6 +1198,9 @@ private fun menuTileIcon(id: String): ImageVector = when (id) {
     "trim" -> Icons.Rounded.ContentCut
     "download" -> Icons.Rounded.Download
     "play" -> Icons.Rounded.PlayArrow
+    "together_live" -> Icons.Rounded.Podcasts
+    "together_next", "together_suggest" -> Icons.Rounded.Groups
+    "share_card" -> Icons.Rounded.PhotoLibrary
     else -> Icons.Rounded.Apps
 }
 

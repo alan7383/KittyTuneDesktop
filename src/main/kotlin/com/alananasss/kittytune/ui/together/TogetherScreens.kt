@@ -123,7 +123,6 @@ private enum class RoomSectionTab { QUEUE, PLAYLIST, SUGGESTIONS, ADD }
 
 @Composable
 fun TogetherHomeScreen(
-    onBack: () -> Unit,
     onOpen: (String) -> Unit,
     playerViewModel: PlayerViewModel? = null,
 ) {
@@ -164,28 +163,13 @@ fun TogetherHomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = onBack,
-                            shapes = IconButtonDefaults.shapes(),
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = cs.surfaceContainerHigh,
-                                contentColor = cs.onSurface,
-                            ),
-                        ) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, str("btn_back"))
-                        }
-                        Text(
-                            text = str("together_title"),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.5).sp,
-                            color = cs.onSurface,
-                        )
-                    }
+                    Text(
+                        text = str("together_title"),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp,
+                        color = cs.onSurface,
+                    )
 
                     Surface(
                         onClick = { showNameDialog = true },
@@ -997,15 +981,17 @@ fun TogetherScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.weight(1f),
                 ) {
-                    FilledTonalIconButton(
-                        onClick = onBack,
-                        shapes = IconButtonDefaults.shapes(),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = cs.surfaceContainerHigh,
-                            contentColor = cs.onSurface,
-                        ),
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, str("btn_back"))
+                    if (!com.alananasss.kittytune.ui.common.LocalMainNavigationVisible.current) {
+                        FilledTonalIconButton(
+                            onClick = onBack,
+                            shapes = IconButtonDefaults.shapes(),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = cs.surfaceContainerHigh,
+                                contentColor = cs.onSurface,
+                            ),
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, str("btn_back"))
+                        }
                     }
                     Text(
                         text = room.name.ifBlank { str("together_title") },
@@ -1593,11 +1579,19 @@ private fun RoomExpressiveHeroCard(
                         )
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = null,
+                            contentDescription = str("together_copy_code"),
                             tint = cs.onSecondaryContainer,
                             modifier = Modifier.size(15.dp),
                         )
                     }
+                }
+                TogetherInviteQrButton(room.code)
+            }
+
+            if (isListening) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TogetherReactionButton(roomCode = room.code)
+                    TogetherSyncBadge(roomCode = room.code)
                 }
             }
 

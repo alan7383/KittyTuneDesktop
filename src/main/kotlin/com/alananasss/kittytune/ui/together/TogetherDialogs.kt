@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material.icons.rounded.Refresh
@@ -288,29 +287,35 @@ fun LiveListenDialog(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Surface(
-                            onClick = { TogetherLinks.copyCode(code) },
-                            shape = CircleShape,
-                            color = cs.primaryContainer,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            Surface(
+                                onClick = { TogetherLinks.copyCode(code) },
+                                shape = CircleShape,
+                                color = cs.primaryContainer,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Link,
-                                    contentDescription = null,
-                                    tint = cs.onPrimaryContainer,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Text(
-                                    text = TogetherWire.displayCode(code),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = cs.onPrimaryContainer,
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ContentCopy,
+                                        contentDescription = str("together_copy_code"),
+                                        tint = cs.onPrimaryContainer,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Text(
+                                        text = TogetherWire.displayCode(code),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = cs.onPrimaryContainer,
+                                    )
+                                }
                             }
+                            TogetherInviteQrButton(code)
                         }
                         Text(
                             text = inviteUrl,

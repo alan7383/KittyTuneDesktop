@@ -382,6 +382,8 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            com.alananasss.kittytune.ui.together.TogetherSyncBadge()
+            com.alananasss.kittytune.ui.together.TogetherReactionButton(tint = palette.dim)
             // Lit only while what they open is open, and never left lit by keyboard focus after a click: the
             // one pressed last used to stay highlighted until the player was closed (issue #66).
             QuietButton(

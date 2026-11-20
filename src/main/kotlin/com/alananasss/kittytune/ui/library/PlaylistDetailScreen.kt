@@ -1817,6 +1817,17 @@ fun PlaylistDetailScreen(
                                     Icon(Icons.Default.MoreVert, str("btn_options"))
                                 }
                                 DropdownMenu(expanded = showOptionsMenu, onDismissRequest = { showOptionsMenu = false }) {
+                                    val togetherCode by com.alananasss.kittytune.data.together.Together.active.collectAsState()
+                                    togetherCode?.takeIf { tracksToDisplay.isNotEmpty() }?.let { code ->
+                                        DropdownMenuItem(
+                                            text = { Text(str("together_propose_playlist")) },
+                                            leadingIcon = { Icon(Icons.Rounded.Groups, null) },
+                                            onClick = {
+                                                com.alananasss.kittytune.data.together.Together.proposePlaylist(code, tracksToDisplay.toList())
+                                                showOptionsMenu = false
+                                            },
+                                        )
+                                    }
                                     if (!isYoutubeRadio) {
                                         DropdownMenuItem(
                                             text = { Text(str("menu_play_next")) },

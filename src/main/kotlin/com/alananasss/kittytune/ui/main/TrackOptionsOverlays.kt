@@ -539,14 +539,16 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             }
             if (togetherCode != null) {
                 val shared = com.alananasss.kittytune.data.together.SharedTrack.of(track)
-                add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_play_next")) {
-                    com.alananasss.kittytune.data.together.Together.playNext(shared)
-                    viewModel.showMenuSheet = false
-                })
-                add(MenuOptionItem("together_suggest", Icons.Rounded.Groups, str("together_suggest")) {
-                    com.alananasss.kittytune.data.together.Together.suggest(togetherCode, shared)
-                    viewModel.showMenuSheet = false
-                })
+                if (!shared.isLocalOnly) {
+                    add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_propose_session")) {
+                        com.alananasss.kittytune.data.together.Together.playNext(shared, togetherCode)
+                        viewModel.showMenuSheet = false
+                    })
+                    add(MenuOptionItem("together_suggest", Icons.Rounded.Groups, str("together_suggest")) {
+                        com.alananasss.kittytune.data.together.Together.suggest(togetherCode, shared)
+                        viewModel.showMenuSheet = false
+                    })
+                }
             }
             if (track.source != "youtube" && !isSpotify && !isLocalFile) {
                 add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
@@ -986,6 +988,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
 @Composable
 private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
     val playlist = viewModel.playlistForMenu ?: return
+    val togetherCode by com.alananasss.kittytune.data.together.Together.active.collectAsState()
     val isLocal = playlist.id < 0
     val permalink = playlist.permalinkUrl ?: ""
     val isStation = permalink.contains("artist-stations") || permalink.contains("track-stations")
@@ -1165,6 +1168,14 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
                     withTracks { viewModel.addToQueue(it); viewModel.showPlaylistMenuSheet = false }
                 })
+                togetherCode?.let { code ->
+                    add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_propose_playlist")) {
+                        withTracks {
+                            com.alananasss.kittytune.data.together.Together.proposePlaylist(code, it)
+                            viewModel.showPlaylistMenuSheet = false
+                        }
+                    })
+                }
                 add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) {
                     withTracks {
                         viewModel.showPlaylistMenuSheet = false

@@ -179,6 +179,8 @@ private fun LibraryTilesEditor(prefs: PlayerPreferences) {
             listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)), scheme.primaryContainer, scheme.onPrimaryContainer),
         LibraryTileLook(PlayerPreferences.LIBRARY_TILE_DOWNLOADS, "lib_downloads", Icons.Rounded.DownloadForOffline,
             listOf(Color(0xFF00C853), Color(0xFF69F0AE)), scheme.secondaryContainer, scheme.onSecondaryContainer),
+        LibraryTileLook(PlayerPreferences.LIBRARY_TILE_TOGETHER, "together_title", Icons.Rounded.Groups,
+            listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)), scheme.tertiaryContainer, scheme.onTertiaryContainer),
         LibraryTileLook(PlayerPreferences.LIBRARY_TILE_LOCAL, "lib_local_media", Icons.Rounded.FolderOpen,
             listOf(Color(0xFF0091EA), Color(0xFF40C4FF)), scheme.tertiaryContainer, scheme.onTertiaryContainer),
     )
