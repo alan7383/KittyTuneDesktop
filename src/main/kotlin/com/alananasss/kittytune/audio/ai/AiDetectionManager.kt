@@ -24,11 +24,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.bytedeco.javacpp.FloatPointer
+import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.FrameGrabber
 import com.alananasss.kittytune.audio.HlsStreamAdapter
 import org.bytedeco.tensorflowlite.BuiltinOpResolver
 import org.bytedeco.tensorflowlite.BuiltinOpResolverWithXNNPACK
+import org.bytedeco.tensorflowlite.BuiltinOpResolverWithoutDefaultDelegates
 import org.bytedeco.tensorflowlite.FlatBufferModel
 import org.bytedeco.tensorflowlite.Interpreter
 import org.bytedeco.tensorflowlite.InterpreterBuilder
@@ -102,6 +104,7 @@ object AiDetectionManager {
 
     // TFLite engine
     @Volatile private var tfliteModel: FlatBufferModel? = null
+    private var tfliteResolver: BuiltinOpResolver? = null
     @Volatile private var tfliteInterpreter: Interpreter? = null
 
     // ONNX Runtime engine
@@ -131,7 +134,11 @@ object AiDetectionManager {
     private var customModelsDir: File? = null
 
     internal fun setCustomModelsDirForTesting(dir: File?) {
-        customModelsDir = dir
+        resetResult()
+        synchronized(engineLock) {
+            closeEngines()
+            customModelsDir = dir
+        }
     }
 
     private fun getModelsDir(): File =
@@ -312,10 +319,13 @@ object AiDetectionManager {
         // LiteRT / CPU fallback
         if (tfliteFile.exists() && tfliteFile.length() > 15_000_000L) {
             initTflite()
-            if (hasGpuTarget) {
-                _activeAccelerationProvider.value = "LiteRT CPU (XNNPACK) · GPU: ${targetGpu.name} fallback"
+            if (tfliteInterpreter != null) {
+                if (hasGpuTarget) {
+                    _activeAccelerationProvider.value += " · GPU: ${targetGpu.name} fallback"
+                }
+                return
             }
-            return
+            if (!onnxFile.isFile) return
         }
 
         if (onnxFile.exists() && onnxFile.length() > 100L) {
@@ -347,8 +357,8 @@ object AiDetectionManager {
                 setDownloadError(AiModelType.ARTIFACTNET, "Failed to parse ArtifactNet model file")
                 return
             }
-            val built: Interpreter? = tryBuildTflite(loaded, useXnnpack = true)
-                ?: tryBuildTflite(loaded, useXnnpack = false)
+            val accelerated = tryBuildTflite(loaded, useXnnpack = true)
+            val built = accelerated ?: tryBuildTflite(loaded, useXnnpack = false)
             if (built == null) {
                 runCatching { loaded.close() }
                 setDownloadError(AiModelType.ARTIFACTNET, "Failed to initialize LiteRT interpreter")
@@ -357,34 +367,41 @@ object AiDetectionManager {
             synchronized(engineLock) {
                 closeEngines()
                 tfliteModel = loaded
-                tfliteInterpreter = built
+                tfliteResolver = built.second
+                tfliteInterpreter = built.first
             }
-            _activeAccelerationProvider.value = "LiteRT CPU (XNNPACK)"
+            _activeAccelerationProvider.value = if (accelerated != null) "LiteRT CPU (XNNPACK)" else "LiteRT CPU"
             setDownloadReady(AiModelType.ARTIFACTNET)
         } catch (e: Throwable) {
             setDownloadError(AiModelType.ARTIFACTNET, e.message ?: "Failed to initialize interpreter")
         }
     }
 
-    private fun tryBuildTflite(loaded: FlatBufferModel, useXnnpack: Boolean): Interpreter? {
+    private fun tryBuildTflite(
+        loaded: FlatBufferModel,
+        useXnnpack: Boolean,
+    ): Pair<Interpreter, BuiltinOpResolver>? {
         return try {
             val resolver: BuiltinOpResolver = if (useXnnpack) {
                 BuiltinOpResolverWithXNNPACK()
             } else {
-                BuiltinOpResolver()
+                BuiltinOpResolverWithoutDefaultDelegates()
             }
-            val interp = Interpreter()
-            val builder = InterpreterBuilder(loaded, resolver)
-            builder.SetNumThreads(2)
-            if (builder.apply(interp) != 0) {
-                runCatching { interp.close() }
-                return null
+            // InterpreterBuilder fills a unique_ptr out parameter.
+            val interp = Interpreter(null as Pointer?)
+            var initialized = false
+            try {
+                initialized = InterpreterBuilder(loaded, resolver).use { builder ->
+                    builder.SetNumThreads(2)
+                    builder.apply(interp) == 0 && !interp.isNull && interp.AllocateTensors() == 0
+                }
+                if (initialized) interp to resolver else null
+            } finally {
+                if (!initialized) {
+                    runCatching { interp.close() }
+                    runCatching { resolver.close() }
+                }
             }
-            if (interp.AllocateTensors() != 0) {
-                runCatching { interp.close() }
-                return null
-            }
-            interp
         } catch (_: Throwable) {
             null
         }
@@ -696,11 +713,13 @@ object AiDetectionManager {
                 tfliteInterpreter?.close()
             } catch (_: Throwable) {
             }
+            runCatching { tfliteResolver?.close() }
             try {
                 tfliteModel?.close()
             } catch (_: Throwable) {
             }
             tfliteInterpreter = null
+            tfliteResolver = null
             tfliteModel = null
         }
     }
