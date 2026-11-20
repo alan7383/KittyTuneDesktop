@@ -9,7 +9,10 @@ import com.alananasss.kittytune.data.together.TogetherWire
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
 import com.google.gson.JsonObject
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,6 +64,7 @@ class TogetherEngineTest {
     fun testAllTogetherMessagesRoundTripJson() {
         val messages = listOf(
             TogetherMessage.Hello("user1", 1000L, "Alice", isListening = true),
+            TogetherMessage.Hello("user2", 1001L, "Bob", isListening = true, isJoining = true),
             TogetherMessage.Bye("user1", 1005L),
             TogetherMessage.State("host1", 1010L, sampleTrack, 45_000L, isPlaying = true, automix = false, queueVersion = 3),
             TogetherMessage.Queue("host1", 1015L, 3, listOf(sampleTrack2), listOf(sampleTrack, sampleTrack2), "Chill Party"),
@@ -88,6 +92,40 @@ class TogetherEngineTest {
     }
 
     // ─── 2. SharedTrack Data Mapping ─────────────────────────────────────────────
+
+    @Test
+    fun listenerJoinAlertsOnlyForActiveRoomAndIgnoresHeartbeats() = runBlocking {
+        val code = Together.create("Live").code
+        val otherCode = Together.create("Other").code
+        val now = System.currentTimeMillis()
+        Together.handle(code, TogetherMessage.ClaimHost("host", now))
+        Together.startListening(code)
+
+        val received = mutableListOf<String>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+            Together.listenerJoined.collect { received.add(it) }
+        }
+        try {
+            val join = TogetherMessage.Hello("friend", now, "Foxywolf", isListening = true, isJoining = true)
+            Together.handle(otherCode, join)
+            Together.handle(code, join, isSnapshot = true)
+            Together.handle(code, join.copy(from = Together.memberId))
+            Together.handle(code, join.copy(isJoining = false))
+            Together.handle(code, join)
+            Together.handle(code, join.copy(isJoining = false))
+
+            // A host can still recognize arrivals from clients without the join flag.
+            Together.claimHost(code)
+            val legacy = TogetherMessage.Hello("legacy", now, "Alice", isListening = true)
+            Together.handle(code, legacy)
+            Together.handle(code, legacy.copy(sentAt = now + 1))
+
+            yield()
+            assertEquals(listOf("Foxywolf", "Alice"), received)
+        } finally {
+            collector.cancel()
+        }
+    }
 
     @Test
     fun testSharedTrackConversion() {

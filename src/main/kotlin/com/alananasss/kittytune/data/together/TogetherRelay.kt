@@ -81,7 +81,10 @@ internal class TogetherRelay(private val clientId: String) {
                 runCatching { existing?.close() }
                 continue
             }
-            if (!ensureConnected()) continue
+            // Reactions are transient. Drop them when disconnected or delayed in the queue.
+            if (work is Pending.Publish && work.message is TogetherMessage.Reaction) {
+                if (client?.isConnected != true || System.currentTimeMillis() - work.message.sentAt > 3_000L) continue
+            } else if (!ensureConnected()) continue
             when (work) {
                 is Pending.Publish -> runCatching {
                     val mqttMessage = MqttMessage(TogetherWire.seal(work.code, work.message)).apply {

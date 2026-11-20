@@ -25,6 +25,8 @@
         val applicationId: String? = null,
         @SerialName("url")
         val url: String? = null,
+        @SerialName("party")
+        val party: ActivityParty? = null,
     )
     
 

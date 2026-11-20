@@ -377,7 +377,6 @@ class TogetherLiveLinksAndProtocolTest {
                         typography = com.alananasss.kittytune.ui.theme.getDynamicTypography(true, 400, 100f, 0f, 0f, 0f, 14f),
                     ) {
                         com.alananasss.kittytune.ui.together.TogetherHomeScreen(
-                            onBack = {},
                             onOpen = {},
                         )
                     }

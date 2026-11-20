@@ -23,6 +23,11 @@ import com.alananasss.kittytune.data.local.LyricsAlignment
 import com.alananasss.kittytune.data.local.RadioEligibility
 import com.alananasss.kittytune.data.local.LyricsDisplayStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.together.TOGETHER_SYNC_TOLERANCE_MS
+import com.alananasss.kittytune.data.together.TogetherSyncPlayback
+import com.alananasss.kittytune.data.together.Together
+import com.alananasss.kittytune.data.together.TogetherLinks
+import com.alananasss.kittytune.data.together.togetherDiscordParty
 import com.alananasss.kittytune.data.audio.AutoEqProfileData
 import com.alananasss.kittytune.data.audio.ConnectedHeadphone
 import com.alananasss.kittytune.data.audio.HeadphoneDetector
@@ -1584,7 +1589,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         const val TOGETHER_NAV_PREFIX = "together:"
 
         /** A listener further than this from the host's position is moved to it. */
-        private const val TOGETHER_MAX_DRIFT_MS = 2_000L
 
         private const val TRAILER_SONGS = 10
         private const val TRAILER_SNIPPET_MS = 20_000L
@@ -1943,9 +1947,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: observers")
         com.alananasss.kittytune.data.together.Together.start(this)
         viewModelScope.launch {
-            com.alananasss.kittytune.data.together.Together.active.drop(1).collect {
-                updateDiscordPresence()
-            }
+            combine(Together.active, Together.rooms) { code, rooms ->
+                val party = code?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
+                    ?.let { togetherDiscordParty(it, rooms[it], Together.memberId) }
+                code to party
+            }.distinctUntilChanged().drop(1).collect { updateDiscordPresence() }
         }
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: together")
 
@@ -2283,14 +2289,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             val playing = isPlaying
             val pos = currentPosition
             val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: track.durationMs ?: 0L
-            val liveInviteUrl = com.alananasss.kittytune.data.together.Together.active.value
+            val liveCode = Together.active.value
                 ?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
-                ?.let(com.alananasss.kittytune.data.together.TogetherLinks::inviteUrl)
+            val liveInviteUrl = liveCode?.let(TogetherLinks::inviteUrl)
+            val party = liveCode?.let { togetherDiscordParty(it, Together.rooms.value[it], Together.memberId) }
             discordJob?.cancel()
             discordJob = viewModelScope.launch(Dispatchers.IO) {
                 delay(500.milliseconds)
                 try {
-                    discordRpc?.updatePresence(track, contextText, playing, pos, effectiveDuration, liveInviteUrl)
+                    discordRpc?.updatePresence(track, contextText, playing, pos, effectiveDuration, liveInviteUrl, party)
                 } catch (e: Exception) {
                     if (e !is kotlinx.coroutines.CancellationException) {
                         e.printStackTrace()
@@ -5205,7 +5212,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
      * the start of the track instead of where it was aimed, which is the whole of "playback starts
      * from the very beginning" for anyone whose track came in without a duration (issue #33).
      */
-    fun seekTo(position: Long) {
+    fun seekTo(position: Long) = seekTo(position, fromTogetherSync = false)
+
+    private fun seekTo(position: Long, fromTogetherSync: Boolean) {
         scrubPreview = null
         if (routeRemote("seek", position)) return
         SyncPlayback.claimLocal()
@@ -5221,7 +5230,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         // If seeking to the very end of the track (within 500ms of duration or at duration),
         // cleanly advance to the next track in the queue or loop instead of freezing (issue #33).
-        if (known != null && target >= known - 500L) {
+        if (!fromTogetherSync && known != null && target >= known - 500L) {
             listenSession?.onSeek(target)
             SoundCloudTelemetryTracker.onTrackSeeked(target)
             saveStateAsync(savePositionOnly = true)
@@ -5379,6 +5388,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     override fun sharedCurrent() = currentTrack?.let { com.alananasss.kittytune.data.together.SharedTrack.of(it) }
     override fun sharedPositionMs() = currentPosition
     override fun sharedIsPlaying() = isPlaying
+    override fun sharedPlaybackForSync(): TogetherSyncPlayback? {
+        val track = currentTrack ?: return null
+        val engine = player
+        if (isRemotePlayback || !engine.isReadyForPlayback || isLoading) return null
+        val playingId = engine.currentMediaItem?.mediaId?.removePrefix("yt_")
+        if (playingId != track.id.toString()) return null
+        return TogetherSyncPlayback(track.id, track.source, engine.currentPosition, engine.isPlaying)
+    }
     override fun sharedUpcoming() = _queue.drop(currentQueueIndex + 1).map { com.alananasss.kittytune.data.together.SharedTrack.of(it) }
     override fun sharedAutomix() = playerPrefs.getAutomixEnabled()
 
@@ -5395,8 +5412,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             // any newer one, whether it pauses (l.4674 applies it immediately) or resumes (the
             // stale pause must not fire after it).
             val generation = ++togetherFollowGeneration
+            if (track.isLocalOnly) {
+                if (player.playWhenReady) pause()
+                return
+            }
             if (playerPrefs.getAutomixEnabled() != automix) playerPrefs.setAutomixEnabled(automix)
-            if (currentTrack?.id != track.id) {
+            if (currentTrack?.id != track.id || currentTrack?.source != track.source) {
                 pendingSeekPosition = positionMs
                 val tracks = listOf(track) + upcoming.orEmpty().filter { it.id != track.id }
                 playPlaylist(tracks.map { it.toTrack() }, 0, togetherContext(), maintainPlayerState = true, respectShuffle = false)
@@ -5416,7 +5437,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 }
                 return
             }
-            if (kotlin.math.abs(currentPosition - positionMs) > TOGETHER_MAX_DRIFT_MS) seekTo(positionMs)
+            if (kotlin.math.abs(player.currentPosition - positionMs) > TOGETHER_SYNC_TOLERANCE_MS) {
+                seekTo(positionMs, fromTogetherSync = true)
+            }
             if (isPlaying != this.isPlaying) togglePlayPause()
             if (upcoming != null) {
                 val mine = _queue.drop(currentQueueIndex + 1).map { it.id }
@@ -5446,12 +5469,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         com.alananasss.kittytune.data.together.Together.onHostPlaybackChanged()
     }
 
-    override fun hostPlayNext(track: com.alananasss.kittytune.data.together.SharedTrack) {
+    override fun hostPlayNext(track: com.alananasss.kittytune.data.together.SharedTrack) = hostPlayNext(listOf(track))
+
+    override fun hostPlayNext(tracks: List<com.alananasss.kittytune.data.together.SharedTrack>) {
+        if (tracks.isEmpty()) return
         val at = (currentQueueIndex + 1 + togetherNextOffset).coerceIn(0, _queue.size)
-        val item = track.toTrack()
-        _queue.add(at, item)
-        _originalQueue.add(item)
-        togetherNextOffset++
+        val items = tracks.map { it.toTrack() }
+        _queue.addAll(at, items)
+        _originalQueue.addAll(items)
+        togetherNextOffset += items.size
         updateQueueState()
         if (MusicManager.player.mediaItemCount > 1) runCatching { MusicManager.player.removeMediaItem(1) }
         preloadNextTrack(currentQueueIndex + 1)
