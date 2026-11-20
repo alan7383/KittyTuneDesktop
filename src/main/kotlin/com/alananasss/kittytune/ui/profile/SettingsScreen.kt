@@ -478,6 +478,8 @@ internal data class SettingsSearchItem(
 @Composable
 private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<SettingsSearchItem> {
     val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    val keepPlayedTracksVisible by remember(prefs) { prefs.keepPlayedTracksVisibleFlow() }
+        .collectAsState(initial = prefs.getKeepPlayedTracksVisible())
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
@@ -986,6 +988,18 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             switchState = playerViewModel.isQueueAutoArchiveEnabled,
             onSwitchChange = { playerViewModel.toggleQueueAutoArchive(it) },
             highlightKey = "pref_queue_auto_archive",
+        ),
+        SettingsSearchItem(
+            title = str("pref_keep_played_tracks_visible"),
+            subtitle = str("pref_keep_played_tracks_visible_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_PLAYBACK)),
+            icon = Icons.Rounded.History,
+            keywords = listOf("queue", "played", "compact", "file d'attente", "historique", "déjà joué"),
+            hasSwitch = true,
+            switchState = keepPlayedTracksVisible,
+            onSwitchChange = prefs::setKeepPlayedTracksVisible,
+            highlightKey = "pref_keep_played_tracks_visible",
         ),
         SettingsSearchItem(
             title = str("pref_save_position"),

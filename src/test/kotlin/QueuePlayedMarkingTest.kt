@@ -1,5 +1,24 @@
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.ui.main.QueueListItem
+import com.alananasss.kittytune.ui.main.panelQueueItems
+import com.alananasss.kittytune.ui.player.AnchorCurrentQueueItem
+import com.alananasss.kittytune.ui.player.queuePastIndices
+import kotlinx.coroutines.Dispatchers
 import org.junit.Test
+import javax.swing.SwingUtilities
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Which queue rows count as already played (issue #33).
@@ -13,9 +32,10 @@ import kotlin.test.assertEquals
  */
 class QueuePlayedMarkingTest {
 
-    /** The rule the queue draws with: heard, and far enough back that it is not the previous track. */
+    private fun track(id: Long) = Track(id, "Track $id", null, 1000L, null)
+
     private fun compacted(queue: List<Long>, currentIndex: Int, played: Set<Long>): List<Long> =
-        queue.filterIndexed { index, id -> index < currentIndex - 1 && id in played }
+        queuePastIndices(queue.map(::track), currentIndex, played, preserveUpcoming = true).map { queue[it] }
 
     private val queue = listOf(10L, 11L, 12L, 13L, 14L, 15L, 16L)
 
@@ -68,32 +88,76 @@ class QueuePlayedMarkingTest {
 
     @Test
     fun `collapsed queue hides past tracks but preserves previous and current tracks`() {
-        val played = queue.toSet()
-        val currentIndex = 6
-        val pastIndices = queue.indices.filter { it < currentIndex - 1 && queue[it] in played }
-        val isExpanded = false
-        val displayedIndices = if (isExpanded) {
-            queue.indices.toList()
-        } else {
-            queue.indices.filter { it !in pastIndices }
-        }
-
-        assertEquals(listOf(5, 6), displayedIndices)
-        assertEquals(listOf(15L, 16L), displayedIndices.map { queue[it] })
+        val items = panelQueueItems(queue.map(::track), 6, (0..4).toSet(), false, false)
+        assertEquals(QueueListItem.PastHeader(5, false), items.first())
+        val rows = items.filterIsInstance<QueueListItem.TrackItem>()
+        assertEquals(listOf(5, 6), rows.map { it.queueIndex })
+        assertTrue(rows.none { it.isCompact })
     }
 
     @Test
     fun `expanded queue shows all tracks completely`() {
-        val played = queue.toSet()
-        val currentIndex = 6
-        val isExpanded = true
-        val displayedIndices = if (isExpanded) {
-            queue.indices.toList()
-        } else {
-            val pastIndices = queue.indices.filter { it < currentIndex - 1 && queue[it] in played }
-            queue.indices.filter { it !in pastIndices }
+        for (keepPlayedTracksVisible in listOf(false, true)) {
+            val items = panelQueueItems(queue.map(::track), 5, setOf(0, 2, 3), true, keepPlayedTracksVisible)
+            val rows = items.filterIsInstance<QueueListItem.TrackItem>()
+            assertEquals(queue.indices.toList(), rows.map { it.queueIndex })
+            assertTrue(rows.none { it.isCompact })
         }
+    }
 
-        assertEquals(queue.indices.toList(), displayedIndices)
+    @Test
+    fun `opt in keeps every row visible and compacts only played rows`() {
+        val past = setOf(0, 2, 3)
+        val items = panelQueueItems(queue.map(::track), 5, past, false, true)
+        val rows = items.filterIsInstance<QueueListItem.TrackItem>()
+        assertEquals(QueueListItem.PastHeader(3, false), items.first())
+        assertEquals(QueueListItem.UpNextHeader(1), items[7])
+        assertEquals(queue.indices.toList(), rows.map { it.queueIndex })
+        assertEquals(past, rows.filter { it.isCompact }.map { it.queueIndex }.toSet())
+    }
+
+    @Test
+    fun `expanding played rows leaves the viewport in place but changing track anchors it`() = SwingUtilities.invokeAndWait {
+        val tracks = (0L..35L).map(::track)
+        val expanded = mutableStateOf(false)
+        val playing = mutableStateOf(20)
+        lateinit var listState: LazyListState
+        val scene = ImageComposeScene(width = 320, height = 100, coroutineContext = Dispatchers.Main.immediate) {
+            listState = rememberLazyListState()
+            val current = playing.value
+            val rows = panelQueueItems(tracks, current, (1..18).toSet(), expanded.value, false)
+            val target = rows.indexOfFirst { it is QueueListItem.TrackItem && it.queueIndex == current - 1 }
+            AnchorCurrentQueueItem(listState, current, tracks[current].id, currentKey = current, targetIndex = target)
+            LazyColumn(state = listState) {
+                items(rows, key = {
+                    when (it) {
+                        is QueueListItem.PastHeader -> "played"
+                        is QueueListItem.UpNextHeader -> "upcoming"
+                        is QueueListItem.TrackItem -> it.queueIndex
+                    }
+                }) { Box(Modifier.height(40.dp)) }
+            }
+        }
+        try {
+            var frame = 0L
+            fun settle() = repeat(30) { scene.render(frame++ * 16_000_000L).close() }
+            settle()
+            listState.requestScrollToItem(0)
+            settle()
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.key == "played" })
+            assertFalse(listState.layoutInfo.visibleItemsInfo.any { it.key == 20 })
+
+            expanded.value = true
+            settle()
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.key == "played" })
+            assertFalse(listState.layoutInfo.visibleItemsInfo.any { it.key == 20 })
+
+            playing.value = 34
+            settle()
+            assertTrue(listState.layoutInfo.visibleItemsInfo.any { it.key == 34 })
+        } finally {
+            scene.close()
+        }
     }
 }

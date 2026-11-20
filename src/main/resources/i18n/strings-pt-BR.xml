@@ -1162,6 +1162,8 @@
     <string name="pref_persist_queue_sub">Restaure a reprodução ao reiniciar</string>
     <string name="pref_queue_preserve_upcoming">Preservar próximas faixas ao saltar</string>
     <string name="pref_queue_preserve_upcoming_sub">Coloque a faixa escolhida logo a seguir e mantenha as faixas intermediárias na fila</string>
+    <string name="pref_keep_played_tracks_visible">Manter faixas já tocadas visíveis</string>
+    <string name="pref_keep_played_tracks_visible_sub">Mostra todas as faixas já tocadas em linhas compactas quando a seção está recolhida.</string>
     <string name="pref_precise_speed">Controle preciso de velocidade</string>
     <string name="pref_precise_speed_sub">Incrementos de 0,05× em vez de 0,1×</string>
     <string name="pref_privacy_subtitle">Gerencie as estatísticas e o histórico de reprodução</string>

@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.Tip
@@ -82,31 +84,51 @@ import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 /**
  * The queue, as the panel shows it (issue #33).
  *
- * Nothing is hidden and nothing is trimmed. What was already played stays in the list, because
- * [PlayerViewModel.smartPrevious] walks this very list backwards and [PlayerViewModel.toggleShuffle]
- * rebuilds it from the untouched original — deleting the past would cost the Previous button and the
- * way back out of shuffle. Instead the rows before the previous one are compacted: small artwork, no
- * artist line, dimmed, under an expandable "Already played" heading, with the track just played left at
- * full size because that is the one worth recognising. Past [PAST_COLLAPSE_THRESHOLD] of them they start
- * collapsed.
+ * The played section changes the rows shown in the panel while keeping the playback queue intact
+ * for Previous and shuffle. Expanded rows are full size and collapsed rows can stay visible in
+ * compact form when the listener enables that preference.
  *
  * The rows are quiet until pointed at: the track playing sits in a tinted card with moving bars on its
  * cover, the others are bare and show their length. Hovering a row lights it and swaps the length for the
  * remove and drag controls, so a long queue is not a column of crosses and handles.
  */
-private sealed interface QueueListItem {
+internal sealed interface QueueListItem {
     data class PastHeader(val count: Int, val isExpanded: Boolean) : QueueListItem
     data class UpNextHeader(val count: Int) : QueueListItem
-    data class TrackItem(val queueIndex: Int, val track: Track) : QueueListItem
+    data class TrackItem(val queueIndex: Int, val track: Track, val isCompact: Boolean) : QueueListItem
 }
 
 /** Beyond this many heard tracks, they collapse under an arrow so the queue stays tidy (issue #33). */
 private const val PAST_COLLAPSE_THRESHOLD = 3
 
+internal fun panelQueueItems(
+    queue: List<Track>,
+    currentIndex: Int,
+    pastIndices: Set<Int>,
+    pastExpanded: Boolean,
+    keepPlayedTracksVisible: Boolean,
+): List<QueueListItem> = buildList {
+    val firstPast = pastIndices.minOrNull()
+    val upNextCount = (queue.size - currentIndex - 1).coerceAtLeast(0)
+    for (index in queue.indices) {
+        if (index == firstPast) add(QueueListItem.PastHeader(pastIndices.size, pastExpanded))
+        if (currentIndex >= 0 && index == currentIndex + 1 && upNextCount > 0) {
+            add(QueueListItem.UpNextHeader(upNextCount))
+        }
+        val isPast = index in pastIndices
+        if (!isPast || pastExpanded || keepPlayedTracksVisible) {
+            add(QueueListItem.TrackItem(index, queue[index], isCompact = isPast && !pastExpanded))
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun QueueList(vm: PlayerViewModel) {
     val listState = rememberLazyListState()
+    val prefs = remember { PlayerPreferences() }
+    val keepPlayedTracksVisible by remember(prefs) { prefs.keepPlayedTracksVisibleFlow() }
+        .collectAsState(initial = prefs.getKeepPlayedTracksVisible())
     val queue = vm.uiQueueState
     val currentIndex = vm.uiCurrentQueueIndex
     val keys = remember(queue) { queueItemKeys(queue) }
@@ -114,27 +136,16 @@ internal fun QueueList(vm: PlayerViewModel) {
     val played = vm.playedTrackIds
     val preserveUpcoming = vm.isQueuePreserveUpcomingEnabled
     val pastIndices = remember(queue, currentIndex, played, preserveUpcoming) {
-        queuePastIndices(queue, currentIndex, played, preserveUpcoming)
+        queuePastIndices(queue, currentIndex, played, preserveUpcoming).toSet()
     }
-    val pastCount = pastIndices.size
-    val firstPast = pastIndices.firstOrNull()
 
     var pastExpandedByUser by remember { mutableStateOf<Boolean?>(null) }
-    val isPastExpanded = pastExpandedByUser ?: (pastCount <= PAST_COLLAPSE_THRESHOLD)
+    val isPastExpanded = pastExpandedByUser ?: (!keepPlayedTracksVisible && pastIndices.size <= PAST_COLLAPSE_THRESHOLD)
 
     val upNextCount = (queue.size - currentIndex - 1).coerceAtLeast(0)
 
-    val listItems = remember(queue, currentIndex, pastIndices, isPastExpanded, upNextCount) {
-        buildList {
-            for (index in queue.indices) {
-                if (index == firstPast) add(QueueListItem.PastHeader(count = pastCount, isExpanded = isPastExpanded))
-                if (currentIndex >= 0 && index == currentIndex + 1 && upNextCount > 0) {
-                    add(QueueListItem.UpNextHeader(count = upNextCount))
-                }
-                val isPast = index in pastIndices
-                if (!isPast || isPastExpanded) add(QueueListItem.TrackItem(queueIndex = index, track = queue[index]))
-            }
-        }
+    val listItems = remember(queue, currentIndex, pastIndices, isPastExpanded, keepPlayedTracksVisible) {
+        panelQueueItems(queue, currentIndex, pastIndices, isPastExpanded, keepPlayedTracksVisible)
     }
 
     val reorderableState = rememberReorderableLazyListState(
@@ -200,7 +211,7 @@ internal fun QueueList(vm: PlayerViewModel) {
                             track = item.track,
                             index = index,
                             isCurrent = index == currentIndex,
-                            isPast = index in pastIndices,
+                            isCompact = item.isCompact,
                             isDragging = isDragging,
                         )
                     }
@@ -337,7 +348,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
     track: Track,
     index: Int,
     isCurrent: Boolean,
-    isPast: Boolean,
+    isCompact: Boolean,
     isDragging: Boolean,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -370,18 +381,18 @@ private fun ReorderableCollectionItemScope.QueueRow(
                 onClick = { vm.showTrackOptions(track, fromPlayer = true, queueIndex = index) }
             )
             .clickable(interactionSource = interactionSource, indication = null) { vm.skipToQueueItem(index) }
-            .padding(horizontal = 8.dp, vertical = if (isPast) 4.dp else 6.dp)
+            .padding(horizontal = 8.dp, vertical = if (isCompact) 4.dp else 6.dp)
             // Only where there is something to fade: the modifier forces its own layer, which is not
             // worth paying for on every upcoming row.
-            .then(if (isPast && !isHovered) Modifier.alpha(PAST_ROW_ALPHA) else Modifier),
+            .then(if (isCompact && !isHovered) Modifier.alpha(PAST_ROW_ALPHA) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        QueueCover(track, size = if (isPast) 28.dp else 44.dp, isCurrent = isCurrent, isPlaying = vm.uiIsPlaying)
+        QueueCover(track, size = if (isCompact) 28.dp else 44.dp, isCurrent = isCurrent, isPlaying = vm.uiIsPlaying)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title ?: "",
-                style = if (isPast) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                style = if (isCompact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                 color = if (isCurrent) scheme.onSecondaryContainer else scheme.onSurface,
                 maxLines = 1,
@@ -389,7 +400,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
             )
             // The artist line is there to help *choose* a track. Something already played is only there
             // to be recognised, so it goes.
-            if (!isPast) {
+            if (!isCompact) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ArtistLinkText(
                         track = track,
@@ -410,7 +421,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
         // drag has to be able to start from it the moment the row is hovered.
         Box(contentAlignment = Alignment.CenterEnd) {
             val duration = (vm.clipLengthOf(track) ?: track.durationMs)?.takeIf { it > 0 }
-            if (duration != null && !isPast) {
+            if (duration != null && !isCompact) {
                 Text(
                     text = makeTimeString(duration),
                     style = MaterialTheme.typography.labelMedium,

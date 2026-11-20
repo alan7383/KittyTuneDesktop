@@ -1155,6 +1155,8 @@
     <string name="pref_persist_queue_sub">Восстановление воспроизведения после перезапуска</string>
     <string name="pref_queue_preserve_upcoming">Сохранять очередь при выборе</string>
     <string name="pref_queue_preserve_upcoming_sub">Перемещает выбранный трек на следующее место без пропуска промежуточных треков</string>
+    <string name="pref_keep_played_tracks_visible">Показывать уже сыгранные треки</string>
+    <string name="pref_keep_played_tracks_visible_sub">В свёрнутом разделе все сыгранные треки отображаются компактными строками.</string>
     <string name="pref_precise_speed">Точная скорость</string>
     <string name="pref_precise_speed_sub">Шаг 0.05x вместо 0.1x</string>
     <string name="pref_privacy_subtitle">Управление статистикой и историей прослушивания</string>

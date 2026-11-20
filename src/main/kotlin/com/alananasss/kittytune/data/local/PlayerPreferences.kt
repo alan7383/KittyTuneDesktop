@@ -277,6 +277,7 @@ class PlayerPreferences {
         private const val KEY_AUDIO_QUALITY = "audio_quality_pref"
         private const val KEY_PERSISTENT_QUEUE = "persistent_queue_enabled"
         private const val KEY_QUEUE_PRESERVE_UPCOMING_ON_JUMP = "queue_preserve_upcoming_on_jump"
+        private const val KEY_KEEP_PLAYED_TRACKS_VISIBLE = "keep_played_tracks_visible"
         private const val KEY_QUEUE_AUTO_ARCHIVE = "queue_auto_archive"
         private const val KEY_MIX_DISLIKED_TRACK_IDS = "mix_disliked_track_ids"
         private const val KEY_MIX_PRIORITIZE_TRUSTED = "mix_prioritize_trusted"
@@ -1215,6 +1216,10 @@ class PlayerPreferences {
     fun setQueuePreserveUpcomingOnJump(enabled: Boolean) = Prefs.putBoolean(KEY_QUEUE_PRESERVE_UPCOMING_ON_JUMP, enabled)
     fun getQueueAutoArchiveEnabled(): Boolean = Prefs.getBoolean(KEY_QUEUE_AUTO_ARCHIVE, false)
     fun setQueueAutoArchiveEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_QUEUE_AUTO_ARCHIVE, enabled)
+
+    fun getKeepPlayedTracksVisible(): Boolean = Prefs.getBoolean(KEY_KEEP_PLAYED_TRACKS_VISIBLE, false)
+    fun setKeepPlayedTracksVisible(enabled: Boolean) = Prefs.putBoolean(KEY_KEEP_PLAYED_TRACKS_VISIBLE, enabled)
+    fun keepPlayedTracksVisibleFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_KEEP_PLAYED_TRACKS_VISIBLE, false)
     fun getMixDislikedTrackIds(): Set<Long> {
         val json = Prefs.getString(KEY_MIX_DISLIKED_TRACK_IDS, null) ?: return emptySet()
         return try {

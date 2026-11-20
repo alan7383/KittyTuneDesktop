@@ -1162,6 +1162,8 @@
     <string name="pref_persist_queue_sub">Restaurer la lecture après redémarrage</string>
     <string name="pref_queue_preserve_upcoming">Préserver la file à venir lors d\'un saut</string>
     <string name="pref_queue_preserve_upcoming_sub">Place le morceau sélectionné à la suite sans perdre les pistes intermédiaires</string>
+    <string name="pref_keep_played_tracks_visible">Garder les titres déjà joués visibles</string>
+    <string name="pref_keep_played_tracks_visible_sub">Affiche tous les titres déjà joués en format compact quand la section est repliée.</string>
     <string name="pref_precise_speed">Vitesse précise</string>
     <string name="pref_precise_speed_sub">Pas de 0.05x au lieu de 0.1x</string>
     <string name="pref_privacy_subtitle">Gérez vos statistiques d\'écoute et votre historique</string>
