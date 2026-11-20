@@ -313,11 +313,14 @@ fun PlayerBar(
                                         modifier = Modifier.padding(start = 6.dp),
                                     )
                                 }
-                                CodecBadge(
-                                    viewModel = vm,
-                                    textColor = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(top = 2.dp),
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CodecBadge(
+                                        viewModel = vm,
+                                        textColor = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                    com.alananasss.kittytune.ui.together.TogetherSyncBadge(Modifier.padding(start = 4.dp, top = 2.dp))
+                                }
                             }
                         }
                         if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {

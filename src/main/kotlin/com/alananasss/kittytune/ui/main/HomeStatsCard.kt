@@ -32,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +56,7 @@ import java.time.format.TextStyle
  *
  * Statistics were recorded and had a screen, but nothing led to it. The card is what listening this week adds up
  * to at a glance: the time as the big figure, a bar for each of the last seven days, how many songs and artists
- * it was, and the artist at the top, on a wash of the theme's own colours like My Wave above it. Absent until there
+ * it was, and the artist at the top, on a tonal surface from the theme. Absent until there
  * is something to show: a card reading zero minutes on a fresh install is noise.
  */
 private val STATS_CARD_PLACEHOLDER_HEIGHT = 170.dp
@@ -96,65 +95,61 @@ internal fun StatsCardContent(stats: HomeStatsSummary, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(28.dp),
-        color = scheme.surfaceContainer,
+        color = scheme.surfaceContainerHigh,
+        contentColor = scheme.onSurface,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(Modifier.background(Brush.linearGradient(listOf(scheme.primaryContainer.copy(alpha = 0.85f), scheme.tertiaryContainer.copy(alpha = 0.55f))))) {
-            Column(Modifier.padding(horizontal = 22.dp, vertical = 18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.BarChart, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+        Column(Modifier.padding(horizontal = 22.dp, vertical = 18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.BarChart, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    str("listening_stats_title"),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        str("listening_stats_title"),
+                        listenedLabel(stats.listenedMs),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                    )
+                    Text(
+                        str("listening_stats_period_week"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                DayBars(stats.days, scheme.primary, Modifier.width(DAY_BARS_WIDTH).height(DAY_BARS_HEIGHT))
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FigurePill(stats.uniqueTracks.toString(), str("listening_stats_unique_tracks"))
+                FigurePill(stats.uniqueArtists.toString(), str("listening_stats_unique_artists"))
+                stats.topArtist?.let { artist ->
+                    Spacer(Modifier.weight(1f))
+                    AsyncImage(
+                        model = artist.artworkUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(26.dp).clip(CircleShape).background(scheme.surfaceVariant),
+                    )
+                    Text(
+                        artist.artistName,
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = scheme.onPrimaryContainer,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(max = 160.dp),
                     )
-                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = scheme.onPrimaryContainer.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            listenedLabel(stats.listenedMs),
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Black,
-                            color = scheme.onPrimaryContainer,
-                            maxLines = 1,
-                        )
-                        Text(
-                            str("listening_stats_period_week"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onPrimaryContainer.copy(alpha = 0.75f),
-                        )
-                    }
-                    DayBars(stats.days, scheme.onPrimaryContainer, Modifier.width(DAY_BARS_WIDTH).height(DAY_BARS_HEIGHT))
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FigurePill(stats.uniqueTracks.toString(), str("listening_stats_unique_tracks"))
-                    FigurePill(stats.uniqueArtists.toString(), str("listening_stats_unique_artists"))
-                    stats.topArtist?.let { artist ->
-                        Spacer(Modifier.weight(1f))
-                        AsyncImage(
-                            model = artist.artworkUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(26.dp).clip(CircleShape).background(scheme.surfaceVariant),
-                        )
-                        Text(
-                            artist.artistName,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = scheme.onPrimaryContainer,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 160.dp),
-                        )
-                    }
                 }
             }
         }
@@ -164,11 +159,12 @@ internal fun StatsCardContent(stats: HomeStatsSummary, onClick: () -> Unit) {
 /** A number and what it counts, in one small pill. */
 @Composable
 private fun FigurePill(value: String, label: String) {
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(shape = CircleShape, color = scheme.surfaceContainerHighest, contentColor = scheme.onSurface) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1)
         }
     }
 }
