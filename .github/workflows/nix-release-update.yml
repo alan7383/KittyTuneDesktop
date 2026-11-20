@@ -24,14 +24,11 @@ jobs:
     concurrency:
       group: nix-release-update
     permissions:
-      actions: write
       contents: write
-      pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       BASE_BRANCH: ${{ github.event.repository.default_branch }}
-      UPDATE_BRANCH: automation/nix-release
       RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
 
     steps:
@@ -40,8 +37,8 @@ jobs:
         with:
           ref: ${{ env.BASE_BRANCH }}
 
-      - name: Update version and hashes from the published release
-        id: package
+      - name: Check that the tag is the latest stable release
+        id: release
         shell: bash
         run: |
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -49,49 +46,79 @@ jobs:
             exit 0
           fi
 
-          release=$(gh api "repos/$GH_REPO/releases/latest")
-          latest_tag=$(jq -er '.tag_name' <<< "$release")
+          latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
           if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
             echo "Skipping $RELEASE_TAG because the latest release is $latest_tag"
             exit 0
           fi
+          echo 'eligible=true' >> "$GITHUB_OUTPUT"
 
-          python3 nix/update-release.py <<< "$release"
-          if ! git diff --quiet -- nix/package.nix; then
-            echo 'changed=true' >> "$GITHUB_OUTPUT"
-          else
-            echo "The Nix package already matches $RELEASE_TAG"
-          fi
+      - name: Install Nix
+        if: steps.release.outputs.eligible == 'true'
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-      - name: Publish the update branch and open a pull request
-        if: steps.package.outputs.changed == 'true'
+      - name: Verify and publish the Nix package update
+        if: steps.release.outputs.eligible == 'true'
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          update_ref="refs/heads/$UPDATE_BRANCH"
-          remote_sha=$(git ls-remote origin "$update_ref" | cut -f1)
-          if [[ -n "$remote_sha" ]]; then
-            git fetch --no-tags origin "$update_ref"
-            remote_sha=$(git rev-parse FETCH_HEAD)
-          fi
+          base_ref="refs/heads/$BASE_BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-          if [[ -z "$remote_sha" ]] || ! git diff --quiet "$remote_sha" --; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add -- nix/package.nix
-            git commit -m "chore(nix): update KittyTune to $RELEASE_TAG"
-            git push --force-with-lease="$update_ref:$remote_sha" origin "HEAD:$update_ref"
-          fi
+          for attempt in 1 2 3; do
+            git fetch --no-tags origin "$base_ref"
+            base_commit=$(git rev-parse FETCH_HEAD)
+            git checkout --detach "$base_commit"
 
-          existing_pr=$(gh api --method GET "repos/$GH_REPO/pulls" -f state=open \
-            -f "head=${GH_REPO%/*}:$UPDATE_BRANCH" -f "base=$BASE_BRANCH" \
-            --jq '.[0].number // empty')
-          if [[ -z "$existing_pr" ]]; then
-            gh pr create --head "$UPDATE_BRANCH" --base "$BASE_BRANCH" \
-              --title 'chore(nix): update KittyTune package' \
-              --body 'Update the Nix version and SHA-256 hashes from the latest published KittyTune release.'
-          fi
+            release=$(gh api "repos/$GH_REPO/releases/latest")
+            latest_tag=$(jq -er '.tag_name' <<< "$release")
+            if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
+              echo "Skipping $RELEASE_TAG because the latest release is $latest_tag"
+              exit 0
+            fi
+            python3 nix/update-release.py <<< "$release"
 
-      - name: Run the Nix check on the update branch
-        if: steps.package.outputs.changed == 'true'
-        # GITHUB_TOKEN pull request events can require manual approval.
-        run: gh workflow run nix-check.yml --ref "$UPDATE_BRANCH"
+            changed=false
+            if ! git diff --quiet -- nix/package.nix; then
+              changed=true
+              git add -- nix/package.nix
+              git commit -m "chore(nix): update KittyTune to $RELEASE_TAG"
+            else
+              echo "The Nix package already matches $RELEASE_TAG"
+              if [[ "$EVENT_NAME" != workflow_dispatch ]]; then
+                exit 0
+              fi
+            fi
+
+            nix flake check --no-write-lock-file
+            package_output=$(nix build .#default --no-write-lock-file --no-link --print-out-paths --print-build-logs)
+            test -x "$package_output/bin/kitty-tune"
+            test -x "$package_output/bin/KittyTune"
+
+            if [[ "$changed" == false ]]; then
+              exit 0
+            fi
+            latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)
+            if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
+              echo "A newer release ($latest_tag) is available. Skipping $RELEASE_TAG."
+              exit 0
+            fi
+            if git push origin "HEAD:$base_ref"; then
+              exit 0
+            fi
+
+            remote_commit=$(git ls-remote --exit-code origin "$base_ref" | cut -f1)
+            if [[ "$remote_commit" == "$base_commit" ]]; then
+              echo "Push failed without a concurrent change to $BASE_BRANCH."
+              exit 1
+            fi
+            echo "$BASE_BRANCH advanced during attempt $attempt. Trying again from the new tip."
+          done
+
+          echo "Could not publish the tested update after three attempts."
+          exit 1
