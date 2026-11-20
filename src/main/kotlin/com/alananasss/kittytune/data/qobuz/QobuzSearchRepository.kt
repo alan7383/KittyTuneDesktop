@@ -53,27 +53,41 @@ object QobuzSearchRepository {
         return (customList + DEFAULT_BASE).distinct()
     }
 
-    suspend fun search(query: String, limit: Int = 50): QobuzSearchResult = withContext(Dispatchers.IO) {
+    suspend fun search(query: String, limit: Int = 50): QobuzSearchResult =
+        search(query, limit, CATALOG_API_BASE, getBaseUrls())
+
+    internal suspend fun search(
+        query: String,
+        limit: Int,
+        catalogBase: String,
+        resolverBases: List<String>,
+    ): QobuzSearchResult = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext QobuzSearchResult()
-        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
-        val baseUrls = getBaseUrls()
-
-        for (base in baseUrls) {
-            val url = "$base/api/get-music?q=$encodedQuery&offset=0"
-            val root = fetchJson(url) ?: continue
-            if (!root.optBoolean("success", false)) continue
-            val data = root.optJSONObject("data") ?: continue
-
+        val encodedQuery = query.trim().urlEncoded()
+        fun mapResults(data: JSONObject): QobuzSearchResult {
             val tracks = data.optJSONObject("tracks")?.optJSONArray("items")?.mapObjects { it.toQobuzTrack() } ?: emptyList()
             val albums = data.optJSONObject("albums")?.optJSONArray("items")?.mapObjects { it.toQobuzAlbum() } ?: emptyList()
             val artists = data.optJSONObject("artists")?.optJSONArray("items")?.mapObjects { it.toQobuzArtist() } ?: emptyList()
-
-            return@withContext QobuzSearchResult(
+            return QobuzSearchResult(
                 tracks = ProviderSearchRanker.rankTracks(query, tracks),
                 albums = albums,
-                playlists = emptyList(), // Qobuz public resolver does not support fetching playlist tracks
-                artists = artists
+                artists = artists,
             )
+        }
+
+        val catalogUrl = "$catalogBase/catalog/search?query=$encodedQuery&limit=${limit.coerceIn(1, 100)}&offset=0&app_id=$CATALOG_APP_ID"
+        fetchJson(catalogUrl)?.let { root ->
+            val result = mapResults(root.optJSONObject("data") ?: root)
+            if (result.tracks.isNotEmpty() || result.albums.isNotEmpty() || result.artists.isNotEmpty()) {
+                return@withContext result
+            }
+        }
+
+        for (base in resolverBases) {
+            val root = fetchJson("$base/api/get-music?q=$encodedQuery&offset=0") ?: continue
+            if (!root.optBoolean("success", false)) continue
+            val data = root.optJSONObject("data") ?: continue
+            return@withContext mapResults(data)
         }
 
         QobuzSearchResult()

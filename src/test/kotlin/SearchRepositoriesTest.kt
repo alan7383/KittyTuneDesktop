@@ -1,9 +1,17 @@
 package com.alananasss.kittytune
 
+import com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider
+import com.alananasss.kittytune.data.qobuz.QobuzSearchRepository
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.net.InetSocketAddress
 
 class SearchRepositoriesTest {
 
@@ -88,115 +96,149 @@ class SearchRepositoriesTest {
     }
 
     @Test
-    fun testQobuzSearchParsing() {
-        val qobuzJsonStr = """
-        {
-            "status": "success",
-            "data": {
-                "tracks": {
-                    "items": [
-                        {
-                            "id": 999888,
-                            "title": "Around The World",
-                            "duration": 429,
-                            "performer": {
-                                "id": 27,
-                                "name": "Daft Punk"
-                            },
-                            "album": {
-                                "id": 111222,
-                                "title": "Homework",
-                                "image": {
-                                    "large": "https://static.qobuz.com/images/covers/large.jpg"
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-        }
-        """.trimIndent()
-
-        val json = JSONObject(qobuzJsonStr)
-        val data = json.getJSONObject("data")
-        val tracks = data.getJSONObject("tracks").getJSONArray("items")
-        assertEquals(1, tracks.length())
-        val track = tracks.getJSONObject(0)
-        assertEquals(999888L, track.getLong("id"))
-        assertEquals("Around The World", track.getString("title"))
-        assertEquals("Daft Punk", track.getJSONObject("performer").getString("name"))
+    fun testQobuzCatalogueSearch() = withQobuzServer { server, base ->
+        server.createContext("/catalog/search") { it.respond(200, catalogue) }
+        val result = runBlocking { QobuzSearchRepository.search("Test Artist", 5, base, emptyList()) }
+        assertEquals("qobuz:track:999888", result.tracks.single().permalink)
+        assertEquals("Test Song", result.tracks.single().title)
+        assertEquals(238_000L, result.tracks.single().durationMs)
+        assertEquals("Test Album", result.albums.single().title)
+        assertEquals("Test Artist", result.artists.single().username)
+        assertTrue(result.playlists.isEmpty())
     }
 
     @Test
-    fun testQobuzResolutionWithRealInstance() {
-        val query = com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.Query(
-            mediaId = "test_media_1",
+    fun testQobuzSearchFallsBackWhenCatalogueIsUnavailable() = withQobuzServer { server, base ->
+        server.createContext("/catalog/search") { it.respond(503, "{}") }
+        server.createContext("/api/get-music") { it.respond(200, """{"success":true,"data":$catalogue}""") }
+        val result = runBlocking { QobuzSearchRepository.search("Test Artist", 5, base, listOf(base)) }
+        assertEquals("Test Song", result.tracks.single().title)
+        assertEquals("Test Album", result.albums.single().title)
+        assertEquals("Test Artist", result.artists.single().username)
+    }
+
+    @Test
+    fun testQobuzResolutionMatchesByMetadata() = withQobuzServer { server, base ->
+        server.createContext("/api/get-music") { it.respond(200, """{"success":true,"data":$catalogue}""") }
+        server.createContext("/api/download-music") {
+            if (it.requestURI.query.contains("track_id=999888")) {
+                it.respond(200, streamResponse(base))
+            } else {
+                it.respond(404, "{}")
+            }
+        }
+        val resolved = QobuzAudioProvider.resolve(testQuery("metadata", base))
+        assertEquals("999888", resolved.trackId)
+        assertEquals("$base/track.flac", resolved.mediaUri)
+        assertEquals("audio/flac", resolved.mimeType)
+        assertEquals(96_000, resolved.sampleRate)
+    }
+
+    @Test
+    fun testQobuzDirectTrackResolutionFallsBackInQuality() = withQobuzServer { server, base ->
+        // There is no search endpoint. A direct track link can be resolved using its ID alone.
+        val requestedQualities = java.util.concurrent.ConcurrentLinkedQueue<String>()
+        server.createContext("/api/download-music") {
+            val parameters = it.requestURI.query.split('&').map { part -> part.split('=', limit = 2) }
+                .associate { (key, value) -> key to value }
+            val quality = parameters.getValue("quality")
+            requestedQualities.add(quality)
+            if (parameters["track_id"] == "999888" && quality == "7") {
+                it.respond(200, streamResponse(base))
+            } else {
+                it.respond(200, """{"success":false,"error":"Format unavailable"}""")
+            }
+        }
+        val resolved = QobuzAudioProvider.resolve(testQuery("qobuz:track:999888", base))
+        assertEquals("999888", resolved.trackId)
+        assertEquals("$base/track.flac", resolved.mediaUri)
+        assertEquals(listOf("27", "7"), requestedQualities.toList())
+    }
+
+    @Test
+    fun testQobuzLiveCatalogue() = runBlocking {
+        requireLiveServices()
+        val searchResult = QobuzSearchRepository.search("Daft Punk")
+        assertTrue(searchResult.tracks.isNotEmpty())
+        assertTrue(searchResult.albums.isNotEmpty())
+        assertTrue(searchResult.artists.isNotEmpty())
+
+        val album = QobuzSearchRepository.getAlbum("0886443927087")
+        assertNotNull(album)
+        assertEquals("Random Access Memories", album?.title)
+        assertTrue(album?.tracks?.isNotEmpty() == true)
+
+        for ((id, name) in listOf("36819" to "Daft Punk", "11170794" to "snorunt")) {
+            val artist = QobuzSearchRepository.getArtist(id)
+            assertEquals(name, artist?.title)
+            assertTrue(artist?.artworkUrl?.startsWith("https://static.qobuz.com") == true)
+            assertTrue(artist?.tracks?.isNotEmpty() == true)
+        }
+    }
+
+    @Test
+    fun testQobuzLiveResolver() {
+        requireLiveServices()
+        val query = QobuzAudioProvider.Query(
+            mediaId = "qobuz:track:33933680",
             title = "Creep",
             artists = listOf("Radiohead"),
             album = "Pablo Honey",
             isrc = null,
             durationMs = 238_000L,
-            countryCode = "US",
-            qualityCode = 27,
-            customInstances = "https://qobuz-dll.vercel.app/"
         )
-        val resolved = com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.resolve(query)
-        println("Resolved: mediaUri=${resolved.mediaUri}, label=${resolved.label}, bitrate=${resolved.bitrate}")
-        assertNotNull(resolved)
-        assertNotNull(resolved.mediaUri)
-        org.junit.Assert.assertTrue(resolved.mediaUri.startsWith("http"))
+        assertTrue(QobuzAudioProvider.resolve(query).mediaUri.startsWith("http"))
+        assertTrue(QobuzAudioProvider.resolve(query.copy(mediaId = "live-qobuz-metadata")).mediaUri.startsWith("http"))
     }
 
-    @Test
-    fun testQobuzDirectTrackResolution() {
-        val query = com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.Query(
-            mediaId = "qobuz:track:33933680",
-            title = "Creep",
-            artists = listOf("Radiohead"),
-            album = null,
-            isrc = null,
-            durationMs = 238_000L,
-            countryCode = "US",
-            qualityCode = 27,
-            customInstances = "https://qobuz-dll.vercel.app/"
-        )
-        val resolved = com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.resolve(query)
-        println("Direct resolved: mediaUri=${resolved.mediaUri}, label=${resolved.label}")
-        assertNotNull(resolved)
-        assertNotNull(resolved.mediaUri)
-        org.junit.Assert.assertTrue(resolved.mediaUri.startsWith("http"))
+    private fun requireLiveServices() = assumeTrue(
+        "Set KITTYTUNE_TEST_LIVE_SERVICES=1 to check live endpoints",
+        System.getenv("KITTYTUNE_TEST_LIVE_SERVICES") == "1",
+    )
+
+    private fun testQuery(mediaId: String, base: String) = QobuzAudioProvider.Query(
+        mediaId = mediaId,
+        title = "Test Song",
+        artists = listOf("Test Artist"),
+        album = "Test Album",
+        isrc = null,
+        durationMs = 238_000L,
+        customInstances = base,
+    )
+
+    private fun withQobuzServer(test: (HttpServer, String) -> Unit) {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.start()
+        try {
+            test(server, "http://127.0.0.1:${server.address.port}")
+        } finally {
+            server.stop(0)
+        }
     }
 
-    @Test
-    fun testQobuzSearchRepository() = kotlinx.coroutines.runBlocking {
-        val searchResult = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.search("Daft Punk")
-        assertNotNull(searchResult)
-        org.junit.Assert.assertTrue(searchResult.tracks.isNotEmpty())
-        org.junit.Assert.assertTrue(searchResult.albums.isNotEmpty())
-        org.junit.Assert.assertTrue(searchResult.artists.isNotEmpty())
-        org.junit.Assert.assertTrue(searchResult.playlists.isEmpty())
-        println("Qobuz search: found ${searchResult.tracks.size} tracks, ${searchResult.albums.size} albums, ${searchResult.artists.size} artists, playlists=${searchResult.playlists.size}")
-
-        val album = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getAlbum("0886443927087")
-        assertNotNull(album)
-        assertEquals("Random Access Memories", album?.title)
-        org.junit.Assert.assertTrue((album?.tracks?.size ?: 0) > 0)
-        println("Qobuz album: ${album?.title} by ${album?.user?.username}, tracks=${album?.tracks?.size}")
-
-        val artist = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getArtist("36819")
-        assertNotNull(artist)
-        assertEquals("Daft Punk", artist?.title)
-        assertNotNull(artist?.artworkUrl)
-        org.junit.Assert.assertTrue(artist?.artworkUrl?.startsWith("https://static.qobuz.com") == true)
-        org.junit.Assert.assertTrue((artist?.tracks?.size ?: 0) > 0)
-        println("Qobuz artist Daft Punk: ${artist?.title}, avatar=${artist?.artworkUrl}, top tracks=${artist?.tracks?.size}")
-
-        val snorunt = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getArtist("11170794")
-        assertNotNull(snorunt)
-        assertEquals("snorunt", snorunt?.title)
-        assertNotNull(snorunt?.artworkUrl)
-        org.junit.Assert.assertTrue(snorunt?.artworkUrl?.startsWith("https://static.qobuz.com") == true)
-        org.junit.Assert.assertTrue((snorunt?.tracks?.size ?: 0) > 0)
-        println("Qobuz artist snorunt: ${snorunt?.title}, avatar=${snorunt?.artworkUrl}, top tracks=${snorunt?.tracks?.size}")
+    private fun HttpExchange.respond(status: Int, body: String) {
+        val bytes = body.toByteArray()
+        responseHeaders.set("Content-Type", "application/json")
+        sendResponseHeaders(status, bytes.size.toLong())
+        responseBody.use { it.write(bytes) }
     }
+
+    private fun streamResponse(base: String) = """
+        {"success": true, "data": {
+            "url": "$base/track.flac", "format_id": 7,
+            "bit_depth": 24, "sampling_rate": 96, "mime_type": "audio/flac"
+        }}
+    """.trimIndent()
+
+    private val catalogue = """
+        {
+            "tracks": {"items": [{
+                "id": 999888, "title": "Test Song", "duration": 238, "streamable": true,
+                "performer": {"id": 27, "name": "Test Artist"},
+                "album": {"id": "111222", "title": "Test Album"}
+            }]},
+            "albums": {"items": [{"id": "111222", "title": "Test Album", "artist": {"id": 27, "name": "Test Artist"}}]},
+            "artists": {"items": [{"id": 27, "name": "Test Artist"}]}
+        }
+    """.trimIndent()
 }
