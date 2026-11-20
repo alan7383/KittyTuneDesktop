@@ -26,7 +26,7 @@ class BlockManagerTest {
 
     @Before
     fun setUp() {
-        runCatching { AppDatabase.init() }
+        AppDatabase.init()
         BlockManager.init()
         runBlocking {
             runCatching { AppDatabase.blockedContentDao.unblockTrack(1001L) }
