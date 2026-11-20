@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -155,29 +156,25 @@ fun RecognitionScreen(
             }
         }
 
-        FilledTonalIconButton(
-            onClick = {
-                if (isSearching) {
-                    viewModel.cancelRecognition()
-                } else {
-                    onBackClick()
-                }
-            },
-            shapes = IconButtonDefaults.shapes(),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(8.dp)
-                .zIndex(2f)
-        ) {
-            Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = str("btn_back")
-            )
+        if (isSearching || !com.alananasss.kittytune.ui.common.LocalMainNavigationVisible.current) {
+            FilledTonalIconButton(
+                onClick = { if (isSearching) viewModel.cancelRecognition() else onBackClick() },
+                shapes = IconButtonDefaults.shapes(),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .zIndex(2f)
+            ) {
+                Icon(
+                    if (isSearching) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = str(if (isSearching) "btn_cancel" else "btn_back"),
+                )
+            }
         }
 
         FilledTonalIconButton(

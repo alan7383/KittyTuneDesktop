@@ -738,6 +738,9 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                         onClose = { playerViewModel.showLyricsSheet = false }
                     )
                 } else branchStateHolder.SaveableStateProvider("main_content") {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        com.alananasss.kittytune.ui.common.LocalMainNavigationVisible provides true,
+                    ) {
                     Column(Modifier.fillMaxSize()) {
                         MainTopBar(
                             navController = navController,
@@ -1310,6 +1313,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                 }
                 }
                 }
+            }
             }
             } // end if (!isLibraryFullScreen)
 

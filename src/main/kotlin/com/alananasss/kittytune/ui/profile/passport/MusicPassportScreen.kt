@@ -327,17 +327,19 @@ private fun PassportTopBar(
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilledTonalIconButton(
-            onClick = onBackClick,
-            shapes = IconButtonDefaults.shapes(),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+        if (!com.alananasss.kittytune.ui.common.LocalMainNavigationVisible.current) {
+            FilledTonalIconButton(
+                onClick = onBackClick,
+                shapes = IconButtonDefaults.shapes(),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+            }
+            Spacer(Modifier.width(14.dp))
         }
-        Spacer(Modifier.width(14.dp))
         Box(
             Modifier
                 .size(40.dp)
