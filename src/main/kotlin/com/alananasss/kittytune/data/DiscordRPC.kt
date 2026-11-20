@@ -2,6 +2,7 @@ package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.domain.Track
 import com.my.kizzy.rpc.KizzyRPC
+import com.my.kizzy.gateway.entities.presence.ActivityParty
 import com.my.kizzy.rpc.RpcImage
 import kotlinx.coroutines.CancellationException
 import com.alananasss.kittytune.data.local.DiscordStatusDisplay
@@ -21,6 +22,7 @@ class DiscordRPC(
         position: Long,
         durationOverride: Long = 0L,
         liveInviteUrl: String? = null,
+        party: ActivityParty? = null,
     ) {
         val duration = if (durationOverride > 0L) {
             durationOverride
@@ -52,6 +54,7 @@ class DiscordRPC(
                 startTime = startTime,
                 endTime = endTime,
                 liveInviteUrl = liveInviteUrl,
+                party = party,
             )
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -66,6 +69,7 @@ class DiscordRPC(
         startTime: Long?,
         endTime: Long?,
         liveInviteUrl: String? = null,
+        party: ActivityParty? = null,
     ) {
         val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { "Unknown Artist" }
         val trackTitle = track.title ?: "Unknown Title"
@@ -122,6 +126,7 @@ class DiscordRPC(
             smallImage = null,
             smallText = null,
             buttons = rpcButtons.takeIf { it.isNotEmpty() },
+            party = party,
             type = Type.LISTENING,
             startTime = startTime,
             endTime = endTime

@@ -14,6 +14,7 @@
     
     import com.my.kizzy.gateway.DiscordWebSocket
     import com.my.kizzy.gateway.entities.presence.Activity
+    import com.my.kizzy.gateway.entities.presence.ActivityParty
     import com.my.kizzy.gateway.entities.presence.Assets
     import com.my.kizzy.gateway.entities.presence.Metadata
     import com.my.kizzy.gateway.entities.presence.Presence
@@ -56,6 +57,7 @@
         applicationId: String? = null,
         status: String? = "online",
         since: Long? = null,
+        party: ActivityParty? = null,
     ) {
         if (!isRpcRunning()) {
             discordWebSocket.connect()
@@ -81,7 +83,8 @@
                     metadata = Metadata(buttonUrls = buttons?.map { it.second }),
                     // MAJOR FIX: Send applicationId regardless
                     applicationId = applicationId, 
-                    url = streamUrl
+                    url = streamUrl,
+                    party = party,
                 )
             ),
             afk = true,

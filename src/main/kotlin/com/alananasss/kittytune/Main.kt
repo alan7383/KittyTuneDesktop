@@ -33,8 +33,10 @@ import com.alananasss.kittytune.core.DesktopBackDispatcher
 import com.alananasss.kittytune.core.MAC_STATUS_MENU_ANCHOR
 import com.alananasss.kittytune.core.MacStatusMenu
 import com.alananasss.kittytune.core.MacStatusMenuItem
+import com.alananasss.kittytune.core.TogetherJoinNotification
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.TokenManager
+import com.alananasss.kittytune.data.together.Together
 import com.alananasss.kittytune.ui.ImageLoaderFactory
 import com.alananasss.kittytune.ui.main.MainScreen
 import com.alananasss.kittytune.ui.setup.SetupScreen
@@ -203,6 +205,12 @@ fun main(args: Array<String>) {
         val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
         val isWindowsHost = remember { osName.contains("win") }
         val isMacHost = remember { osName.contains("mac") }
+
+        LaunchedEffect(Unit) {
+            Together.listenerJoined.collect { name ->
+                TogetherJoinNotification.show(osName, str("together_listener_joined", name))
+            }
+        }
 
         fun showMainWindow() {
             isWindowVisible = true
