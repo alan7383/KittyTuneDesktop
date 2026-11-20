@@ -32,6 +32,7 @@ import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsSwitch
 import com.alananasss.kittytune.ui.common.getSettingsShape
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.main.SidebarDestinations
 import sh.calvin.reorderable.ReorderableColumn
 import androidx.compose.material3.IconButtonDefaults
@@ -103,7 +104,7 @@ private fun SidebarLayoutEditor(prefs: PlayerPreferences) {
     }
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        SettingsGroupTitle(str("settings_group_sidebar_items"))
+        SettingsGroupTitle(str("settings_group_sidebar_items"), Modifier.settingHighlight("settings_group_sidebar_items"))
         Text(
             str("sidebar_items_hint"),
             style = MaterialTheme.typography.bodyMedium,
@@ -187,10 +188,15 @@ private fun LibraryTilesEditor(prefs: PlayerPreferences) {
 
     SettingsGroup(
         title = str("pref_library_tiles"),
+        titleHighlightKey = "pref_library_tiles",
         items = tiles.map { look ->
             { shape ->
                 val shown = look.key !in hidden
-                Surface(shape = shape, color = scheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = shape,
+                    color = scheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth().settingHighlight(look.labelKey, shape),
+                ) {
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -321,6 +327,7 @@ fun RightPanelSettingsPage() {
 
     SettingsGroup(
         title = str("panel_tabs_title"),
+        titleHighlightKey = "panel_tabs_title",
         items = allTabs.map { (key, labelKey, icon) ->
             { shape ->
                 val shown = key !in hiddenTabs
@@ -343,6 +350,7 @@ fun RightPanelSettingsPage() {
 
     SettingsGroup(
         title = str("panel_track_stats_title"),
+        titleHighlightKey = "panel_track_stats_title",
         items = listOf(
             Triple(PlayerPreferences.PANEL_STAT_PLAYS, "detail_stats_plays", Icons.Rounded.PlayArrow),
             Triple(PlayerPreferences.PANEL_STAT_LIKES, "detail_stats_likes", Icons.Rounded.Favorite),
