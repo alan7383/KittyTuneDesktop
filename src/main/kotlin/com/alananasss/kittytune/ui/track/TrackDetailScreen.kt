@@ -8,6 +8,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.onClick
+import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -414,8 +417,14 @@ fun TrackList(
 
 /** The track as the head of its page: cover over a blur of itself, the title, the artist and its numbers. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun TrackDetailHeader(track: Track, playerViewModel: PlayerViewModel) {
-    Box(Modifier.fillMaxWidth().height(220.dp)) {
+    Box(
+        Modifier.fillMaxWidth().height(220.dp).onClick(
+            matcher = PointerMatcher.mouse(PointerButton.Secondary),
+            onClick = { playerViewModel.showTrackOptions(track) },
+        ),
+    ) {
         AsyncImage(
             model = track.fullResArtwork,
             contentDescription = null,

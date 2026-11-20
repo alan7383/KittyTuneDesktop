@@ -1273,6 +1273,7 @@ fun LibraryScreen(
     }
 
     @Composable
+    @OptIn(ExperimentalFoundationApi::class)
     fun UploadTrackGridCard(
         track: Track,
         onClick: () -> Unit,
@@ -1289,6 +1290,7 @@ fun LibraryScreen(
                 .clip(RoundedCornerShape(12.dp))
                 .background(hoverBg)
                 .hoverable(interaction)
+                .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary), onClick = onOptionClick)
                 .clickable(onClick = onClick)
                 .padding(8.dp)
                 .fillMaxWidth()
@@ -1361,6 +1363,7 @@ fun LibraryScreen(
     }
 
     @Composable
+    @OptIn(ExperimentalFoundationApi::class)
     fun UploadTrackListCard(
         track: Track,
         onClick: () -> Unit,
@@ -1379,6 +1382,7 @@ fun LibraryScreen(
                 .clip(RoundedCornerShape(12.dp))
                 .background(hoverBg)
                 .hoverable(interaction)
+                .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary), onClick = onOptionClick)
                 .clickable(onClick = onClick)
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
