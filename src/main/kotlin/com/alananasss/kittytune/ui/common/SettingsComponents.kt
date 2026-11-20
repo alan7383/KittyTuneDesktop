@@ -348,7 +348,7 @@ fun SettingsScaffold(
                 }
             },
             navigationIcon = {
-                if (onBackClick != null) {
+                if (onBackClick != null && !LocalMainNavigationVisible.current) {
                     IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick) {
                         Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
                     }

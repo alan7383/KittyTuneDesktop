@@ -340,17 +340,19 @@ fun RecapsScreen(onBackClick: () -> Unit, onOpenRecap: (String) -> Unit) {
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp, top = 16.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilledTonalIconButton(
-                onClick = onBackClick,
-                shapes = IconButtonDefaults.shapes(),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_close"))
+            if (!com.alananasss.kittytune.ui.common.LocalMainNavigationVisible.current) {
+                FilledTonalIconButton(
+                    onClick = onBackClick,
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_close"))
+                }
+                Spacer(Modifier.width(16.dp))
             }
-            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(str("recaps_title"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(

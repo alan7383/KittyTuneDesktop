@@ -1363,8 +1363,10 @@ internal fun FullListScreen(
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+                    if (!com.alananasss.kittytune.ui.common.LocalMainNavigationVisible.current) {
+                        IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
