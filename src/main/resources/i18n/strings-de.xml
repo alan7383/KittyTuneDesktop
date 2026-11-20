@@ -3418,6 +3418,7 @@
     <string name="pref_drm_windows_test_failed">Test fehlgeschlagen, siehe Protokoll unten</string>
     <string name="drm_unavailable_toast_windows">🔒 Geschützter Titel: hier nicht verfügbar. Siehe Einstellungen, Sonstiges, Geschützte Titel</string>
     <string name="drm_download_failed">Geschützter Titel: der Download ist fehlgeschlagen. Prüfe das CDM unter Einstellungen, Sonstiges</string>
+    <string name="track_playback_unavailable">Dieser Titel konnte nicht abgespielt werden. Tippe auf Wiedergabe, um es erneut zu versuchen.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
     <!-- Desktop compatibility and declarative updates -->
     <string name="floating_compat_title">Kompatibilitätsmodus</string>
@@ -3742,4 +3743,17 @@
     <string name="discord_auto_live_title">Immer live über Discord teilen</string>
     <string name="discord_auto_live_desc">Startet bei Musikwiedergabe automatisch eine Nur-Zuhören-Sitzung für Discord-Nutzer</string>
     <string name="discord_rpc_btn_listen_along">Live mithören</string>
+    <string name="player_button_together_reactions_desc">Schaltfläche für Reaktionen während einer Together-Sitzung in der Wiedergabeleiste anzeigen</string>
+    <string name="together_copy_code">Sitzungscode kopieren</string>
+    <string name="together_invite_qr">QR-Code für die Together-Einladung</string>
+    <string name="together_invite_qr_instructions">Scanne den Code mit deiner Kamera und tippe dann in KittyTune auf Beitreten.</string>
+    <string name="together_listener_joined">%1$s ist deiner Together-Sitzung beigetreten</string>
+    <string name="together_local_not_shareable">Lokale Titel können nicht geteilt werden</string>
+    <string name="together_propose_playlist">Playlist für Together vorschlagen</string>
+    <string name="together_propose_session">Für die Together-Sitzung vorschlagen</string>
+    <string name="together_reactions">Live-Reaktionen</string>
+    <string name="together_sync_connecting">Verbindung wird hergestellt…</string>
+    <string name="together_sync_synced">Synchronisiert</string>
+    <string name="together_sync_syncing">Wird synchronisiert…</string>
+    <string name="together_sync_waiting">Warten auf den Host</string>
 </resources>

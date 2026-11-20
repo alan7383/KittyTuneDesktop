@@ -3211,6 +3211,7 @@
     <string name="pref_drm_windows_test_failed">Test failed, see the log below</string>
     <string name="drm_unavailable_toast_windows">🔒 Protected track: unavailable here. See Settings, Misc, Protected tracks</string>
     <string name="drm_download_failed">Protected track: the download failed. Check the CDM in Settings, Misc</string>
+    <string name="track_playback_unavailable">This track could not be played. Press Play to try again.</string>
     <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
     <!-- DRM: removing the WSL method -->
     <!-- DRM: protected tracks announcement and notices -->
@@ -3520,4 +3521,17 @@
     <string name="discord_auto_live_title">Always broadcast live on Discord</string>
     <string name="discord_auto_live_desc">Automatically start a listen-only live session whenever playing music so anyone on Discord can listen along</string>
     <string name="discord_rpc_btn_listen_along">Listen Along</string>
+    <string name="together_listener_joined">%1$s joined your Together session</string>
+    <string name="together_reactions">Live reactions</string>
+    <string name="player_button_together_reactions_desc">Show the reactions button in the player bar during a Together session</string>
+    <string name="together_sync_synced">Synced</string>
+    <string name="together_sync_syncing">Syncing…</string>
+    <string name="together_sync_waiting">Waiting for the host</string>
+    <string name="together_sync_connecting">Connecting…</string>
+    <string name="together_propose_session">Suggest to Together session</string>
+    <string name="together_propose_playlist">Suggest playlist to Together</string>
+    <string name="together_local_not_shareable">Local track can’t be shared</string>
+    <string name="together_invite_qr">Together invite QR code</string>
+    <string name="together_copy_code">Copy session code</string>
+    <string name="together_invite_qr_instructions">Scan with your camera, then tap Join in KittyTune.</string>
 </resources>
