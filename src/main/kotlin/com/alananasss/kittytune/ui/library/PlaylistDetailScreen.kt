@@ -2025,7 +2025,7 @@ fun PlaylistDetailScreen(
                     ) {
                         for (playlist in chunkedPlaylists[index]) {
                             Box(modifier = Modifier.weight(1f)) {
-                                PlaylistSquareCard(playlist = playlist) {
+                                PlaylistSquareCard(playlist, onOptions = { playerViewModel.showPlaylistOptions(playlist) }) {
                                     val id = if (playlist.id < 0) "local_playlist:${playlist.id}" else playlist.id.toString()
                                     onNavigate("downloaded_section:$id")
                                 }
@@ -2277,11 +2277,13 @@ fun PlaylistDetailScreen(
 }
 
 @Composable
-fun PlaylistSquareCard(playlist: Playlist, onClick: () -> Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+fun PlaylistSquareCard(playlist: Playlist, onOptions: () -> Unit, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
+            .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary), onClick = onOptions)
             .clickable { onClick() }
     ) {
         AsyncImage(
