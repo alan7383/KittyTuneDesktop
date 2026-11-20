@@ -1,7 +1,7 @@
 package com.alananasss.kittytune.audio.ai
 
 import com.alananasss.kittytune.audio.AudioFormat
-import com.alananasss.kittytune.core.AppDirs
+import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.data.local.AiModelType
 import com.alananasss.kittytune.data.local.PlayerPreferences
@@ -9,10 +9,13 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonElement
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.AfterClass
@@ -22,6 +25,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
 import java.util.Base64
+import javax.sound.sampled.AudioFileFormat
+import javax.sound.sampled.AudioInputStream
+import javax.sound.sampled.AudioSystem
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.FrameGrabber
 
@@ -37,54 +43,76 @@ class AiDetectionManagerTest {
     companion object {
         // Self-contained synthetic ONNX model conforming to audio_input -> [1, 176400] -> ai_score
         private const val SYNTHETIC_ONNX_BASE64 =
-            "CAoSCWtpdHR5dHVuZTq3AQobCgthdWRpb19pbnB1dBIHYWJzX3ZhbCIDQWJzCjAKB2Fic192YWwSCG1lYW5fdmFsIgpSZWR1Y2VNZWFuKg8KCGtlZXBkaW1zGACgAQIKHQoIbWVhbl92YWwSCGFpX3Njb3JlIgdTaWdtb2lkEg5hdWRpb19kZXRlY3RvclofCgthdWRpb19pbnB1dBIQCg4IARIKCgIIAQoECJDiCmIWCghhaV9zY29yZRIKCggIARIECgIIAUIECgAQDQ=="
+            "CAoSCWtpdHR5dHVuZTqzAQobCgthdWRpb19pbnB1dBIHYWJzX3ZhbCIDQWJzCjAKB2Fic192YWwSCG1lYW5fdmFsIgpSZWR1Y2VNZWFuKg8KCGtlZXBkaW1zGACgAQIKHQoIbWVhbl92YWwSCGFpX3Njb3JlIgdTaWdtb2lkEg5hdWRpb19kZXRlY3RvclofCgthdWRpb19pbnB1dBIQCg4IARIKCgIIAQoECJDiCmISCghhaV9zY29yZRIGCgQIARIAQgQKABAN"
 
         private lateinit var tempTestDir: File
-        private var savedUserSelectedModel: AiModelType? = null
+        private val testModelFile get() = File(tempTestDir, "synthetic.onnx")
+        private val artifactNetFile get() = File(tempTestDir, AiDetectionManager.ARTIFACTNET_ONNX)
 
         @BeforeClass
         @JvmStatic
         fun beforeAll() {
             tempTestDir = Files.createTempDirectory("kittytune_ai_test").toFile()
+            val bytes = Base64.getDecoder().decode(SYNTHETIC_ONNX_BASE64)
+            // ONNX ignores this unknown protobuf field. Its payload meets the model import size check.
+            val padding = byteArrayOf(0xc2.toByte(), 0x3e, 0x80.toByte(), 0x80.toByte(), 0x40) + ByteArray(1_048_576)
+            testModelFile.writeBytes(bytes + padding)
+            testModelFile.copyTo(artifactNetFile)
             AiDetectionManager.setCustomModelsDirForTesting(tempTestDir)
-            savedUserSelectedModel = PlayerPreferences().aiSelectedModel
         }
 
         @AfterClass
         @JvmStatic
         fun afterAll() {
             AiDetectionManager.setCustomModelsDirForTesting(null)
-            savedUserSelectedModel?.let {
-                PlayerPreferences().aiSelectedModel = it
-            }
-            tempTestDir.deleteRecursively()
+            if (::tempTestDir.isInitialized) tempTestDir.deleteRecursively()
         }
     }
 
-    private val testModelFile = File("/tmp/test_audio_model.onnx")
+    private lateinit var previousPrefs: Map<String, JsonElement>
+    private var usingSampleModel = false
 
     @Before
     fun setup() {
-        AiDetectionManager.resetResult()
-        if (!testModelFile.exists() || testModelFile.length() < 1_000_000L) {
-            val bytes = Base64.getDecoder().decode(SYNTHETIC_ONNX_BASE64)
-            val padding = byteArrayOf(0xc2.toByte(), 0x3e.toByte(), 0x80.toByte(), 0x80.toByte(), 0x40.toByte()) + ByteArray(1048576)
-            testModelFile.writeBytes(bytes + padding)
-        }
-        val targetArtifactNet = File(tempTestDir, "artifactnet_v94_full.onnx")
-        if (!targetArtifactNet.exists() || targetArtifactNet.length() < 1_000_000L) {
-            val liveModel = File(File(AppDirs.dataDir, "models"), "artifactnet_v94_full.onnx")
-            val src = File("/home/alan/.gemini/antigravity-ide/brain/3230fab3-2007-4726-8c4f-3045e267c99e/scratch/model/artifactnet_v94_full.onnx")
-            if (liveModel.exists() && liveModel.length() > 1_000_000L) {
-                liveModel.copyTo(targetArtifactNet, overwrite = true)
-            } else if (src.exists()) {
-                src.copyTo(targetArtifactNet, overwrite = true)
-            } else {
-                testModelFile.copyTo(targetArtifactNet, overwrite = true)
-            }
-        }
+        previousPrefs = Prefs.snapshot()
+        val prefs = PlayerPreferences()
+        prefs.aiSelectedModel = AiModelType.ARTIFACTNET
+        prefs.aiGpuAccelerationEnabled = false
+        prefs.aiSelectedGpuId = GpuDevice.ID_CPU
+        prefs.aiScoreThreshold = 0.70f
         AiDetectionManager.selectModel(AiModelType.ARTIFACTNET)
         AiDetectionManager.init()
+    }
+
+    @After
+    fun tearDown() {
+        try {
+            if (usingSampleModel) AiDetectionManager.deleteModel()
+            if (!artifactNetFile.isFile) {
+                AiDetectionManager.importModelFile(AiModelType.ARTIFACTNET, testModelFile).getOrThrow()
+            }
+        } finally {
+            AiDetectionManager.resetResult()
+            Prefs.restore(previousPrefs)
+        }
+    }
+
+    private fun fixture(name: String): File {
+        val fixtureLocation = System.getenv("KITTYTUNE_AI_FIXTURES")
+        assumeTrue("Set KITTYTUNE_AI_FIXTURES to the directory containing the real model and audio samples",
+            !fixtureLocation.isNullOrBlank())
+        return File(checkNotNull(fixtureLocation), name).also {
+            assertTrue("Missing AI fixture: $name", it.isFile)
+        }
+    }
+
+    private fun sampleTrack(name: String): File {
+        val track = fixture(name)
+        val model = fixture(AiDetectionManager.ARTIFACTNET_ONNX)
+        usingSampleModel = true
+        AiDetectionManager.importModelFile(AiModelType.ARTIFACTNET, model).getOrThrow()
+        assertTrue("ArtifactNet fixture must load", AiDetectionManager.isModelLoaded())
+        return track
     }
 
     private fun sine440(sr: Int = 44100, durationSec: Int = 4): ByteArray {
@@ -117,9 +145,10 @@ class AiDetectionManagerTest {
         }
         println("P(AI) sine440 = ${result.score}")
         assertTrue("score in range", result.score in 0f..1f)
-        // Reference from LiteRT Python on the same int16-quantized signal: 0.2789
-        // (XNNPACK multithreading adds run-to-run jitter, hence the wide tolerance).
-        assertEquals(0.2789f, result.score, 0.20f)
+        // The synthetic model computes sigmoid(mean(abs(samples))). A sine of amplitude 0.5
+        // has a mean absolute value of 1 / pi before 16-bit quantization.
+        val expected = (1.0 / (1.0 + kotlin.math.exp(-1.0 / Math.PI))).toFloat()
+        assertEquals(expected, result.score, 0.0001f)
     }
 
     @Test
@@ -137,57 +166,30 @@ class AiDetectionManagerTest {
 
 
     @Test
-    fun testAiDetectionManagerInitWithRealModel() {
+    fun testAiDetectionManagerInitWithOnnxModel() {
         AiDetectionManager.init()
-        println("Model loaded: ${AiDetectionManager.isModelLoaded()}")
-        println("Active acceleration: ${AiDetectionManager.activeAccelerationProvider.value}")
-        assertNotNull(AiDetectionManager.activeAccelerationProvider.value)
+        assertTrue(AiDetectionManager.isModelLoaded())
+        assertTrue(AiDetectionManager.activeAccelerationProvider.value.contains("CPU"))
     }
 
     @Test
     fun testCompareTfliteAndOnnx() {
-        val tfliteFile = File(tempTestDir, "artifactnet_v94_full.tflite")
-        val onnxFile = File(tempTestDir, "artifactnet_v94_full.onnx")
-        if (!tfliteFile.exists() || !onnxFile.exists()) return
-
-        // 1. Run TFLite
-        val loaded = org.bytedeco.tensorflowlite.FlatBufferModel.BuildFromFile(tfliteFile.absolutePath)
-        val resolver = org.bytedeco.tensorflowlite.BuiltinOpResolverWithXNNPACK()
-        val interp = org.bytedeco.tensorflowlite.Interpreter()
-        val builder = org.bytedeco.tensorflowlite.InterpreterBuilder(loaded, resolver)
-        builder.SetNumThreads(2)
-        builder.apply(interp)
-        interp.AllocateTensors()
-
+        val tfliteFile = fixture(AiDetectionManager.ARTIFACTNET_TFLITE)
+        val onnxFile = fixture(AiDetectionManager.ARTIFACTNET_ONNX)
+        usingSampleModel = true
         val pcm = sine440()
-        val numFrames = pcm.size / 4
-        val buf = java.nio.ByteBuffer.wrap(pcm).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-        val mono = FloatArray(numFrames)
-        for (i in 0 until numFrames) {
-            mono[i] = (buf.short.toFloat() / 32768f + buf.short.toFloat() / 32768f) * 0.5f
-        }
-        val chunk = mono.copyOfRange(0, 176400)
 
-        val inputPtr = interp.typed_input_tensor_float(0)
-        inputPtr.put(chunk, 0, chunk.size)
-        interp.Invoke()
-        val tfliteScore = interp.typed_output_tensor_float(0).get(0)
-        println("Direct TFLite score for sine440: $tfliteScore")
-        interp.close()
-        loaded.close()
+        AiDetectionManager.importModelFile(AiModelType.ARTIFACTNET, tfliteFile).getOrThrow()
+        assertTrue(AiDetectionManager.activeAccelerationProvider.value.startsWith("LiteRT"))
+        val tfliteScore = checkNotNull(AiDetectionManager.analyzePcm(pcm))
 
-        // 2. Run ONNX
-        val env = ai.onnxruntime.OrtEnvironment.getEnvironment()
-        val opts = ai.onnxruntime.OrtSession.SessionOptions()
-        val sess = env.createSession(onnxFile.absolutePath, opts)
-        val tensor = ai.onnxruntime.OnnxTensor.createTensor(env, Array(1) { chunk })
-        val res = sess.run(mapOf("audio" to tensor))
-        val onnxScore = (res[0].value as FloatArray)[0]
-        println("Direct ONNX score for sine440: $onnxScore")
-        res.close()
-        tensor.close()
-        sess.close()
-        opts.close()
+        AiDetectionManager.deleteModel()
+        AiDetectionManager.importModelFile(AiModelType.ARTIFACTNET, onnxFile).getOrThrow()
+        assertTrue(AiDetectionManager.isModelLoaded())
+        val onnxScore = checkNotNull(AiDetectionManager.analyzePcm(pcm))
+
+        assertTrue("Both model scores must be probabilities", tfliteScore in 0f..1f && onnxScore in 0f..1f)
+        assertEquals("The two ArtifactNet runtimes should give similar scores", tfliteScore, onnxScore, 0.03f)
     }
 
     @Test
@@ -251,6 +253,7 @@ class AiDetectionManagerTest {
         assertTrue("score in [0, 1]", result44k.score in 0f..1f)
 
         // Run inference with 48 kHz audio to verify resampling pipeline
+        AiDetectionManager.resetResult()
         AiDetectionManager.analyzeAsync(sine440(48000), 48000, 2)
         val result48k = runBlocking {
             withTimeout(10_000) {
@@ -268,26 +271,11 @@ class AiDetectionManagerTest {
 
     @Test
     fun testImportModelFile() {
-        val tempImport = File("/tmp/test_import_model.onnx")
-        testModelFile.copyTo(tempImport, overwrite = true)
-        val target = File(tempTestDir, AiDetectionManager.ARTIFACTNET_ONNX)
-        val backup = File(tempTestDir, "artifactnet_backup.onnx")
-        val hadTarget = target.exists()
-        if (hadTarget) {
-            target.copyTo(backup, overwrite = true)
-        }
-        try {
-            val result = AiDetectionManager.importModelFile(AiModelType.ARTIFACTNET, tempImport)
-            assertTrue("import must succeed", result.isSuccess)
-            assertTrue("artifactnet ready after import", AiDetectionManager.isModelReady(AiModelType.ARTIFACTNET))
-        } finally {
-            if (hadTarget && backup.exists()) {
-                backup.copyTo(target, overwrite = true)
-                backup.delete()
-            }
-            runCatching { tempImport.delete() }
-            AiDetectionManager.init()
-        }
+        AiDetectionManager.deleteModel()
+        assertFalse("model starts uninstalled", AiDetectionManager.isModelReady())
+        AiDetectionManager.importModelFile(AiModelType.ARTIFACTNET, testModelFile).getOrThrow()
+        assertTrue("artifactnet ready after import", AiDetectionManager.isModelReady())
+        assertTrue("artifactnet loaded after import", AiDetectionManager.isModelLoaded())
     }
 
     @Test
@@ -434,6 +422,8 @@ class AiDetectionManagerTest {
 
     @Test
     fun testAllModelUrlsAccessible() {
+        assumeTrue("Set KITTYTUNE_TEST_LIVE_SERVICES=1 to check model downloads",
+            System.getenv("KITTYTUNE_TEST_LIVE_SERVICES") == "1")
         for (model in AiModelType.entries) {
             val allUrls = listOf(model.downloadUrl) + model.fallbackUrls
             for (urlStr in allUrls) {
@@ -509,7 +499,7 @@ class AiDetectionManagerTest {
             }
         }
         println("Checkpoint 0 result: score=${result0.score}, isAi=${result0.isAi}")
-        assertTrue("Sine score < threshold (approx 0.28)", result0.score < 0.70f)
+        assertTrue("Synthetic sine score is below the threshold", result0.score < 0.70f)
         assertFalse(AiDetectionManager.isAiConfirmed())
 
         // Push 4 seconds (4s to 8s) -> gap between checkpoints, direct pass-through
@@ -621,8 +611,7 @@ class AiDetectionManagerTest {
 
     @Test
     fun testOllyRodwellAirForcesHumanTrackCleanDetection() {
-        val testMp3 = File("/home/alan/Music/KittyTune/Olly Rodwell, DJ Love - air forces.mp3")
-        if (!testMp3.exists()) return
+        val testMp3 = sampleTrack("Olly Rodwell, DJ Love - air forces.mp3")
 
         AiDetectionManager.selectModel(AiModelType.ARTIFACTNET)
         AiDetectionManager.resetResult()
@@ -656,8 +645,7 @@ class AiDetectionManagerTest {
 
     @Test
     fun testJustinAllevatoAiTrackDetection() {
-        val testMp3 = File("/home/alan/Music/KittyTune/Justin Allevato - ME VUELVES LOCO.mp3")
-        if (!testMp3.exists()) return
+        val testMp3 = sampleTrack("Justin Allevato - ME VUELVES LOCO.mp3")
 
         AiDetectionManager.selectModel(AiModelType.ARTIFACTNET)
         AiDetectionManager.resetResult()
@@ -693,8 +681,7 @@ class AiDetectionManagerTest {
 
     @Test
     fun testKaspiyskiyGruzHumanTrackCleanDetection() {
-        val testMp3 = File("/home/alan/Music/KittyTune/Каспийский Груз - Детство (п.у. L из IzReal).mp3")
-        if (!testMp3.exists()) return
+        val testMp3 = sampleTrack("Каспийский Груз - Детство (п.у. L из IzReal).mp3")
 
         AiDetectionManager.selectModel(AiModelType.ARTIFACTNET)
         AiDetectionManager.resetResult()
@@ -731,8 +718,7 @@ class AiDetectionManagerTest {
 
     @Test
     fun testMejiAcousticIntroHumanDetection() {
-        val testMp3 = File("/home/alan/Music/KittyTune/Meji - des id33s n0ires!! ˙◠˙ + kysmelo [lostsoundwtf].mp3")
-        if (!testMp3.exists()) return
+        val testMp3 = sampleTrack("Meji - des id33s n0ires!! ˙◠˙ + kysmelo [lostsoundwtf].mp3")
 
         AiDetectionManager.selectModel(AiModelType.ARTIFACTNET)
         AiDetectionManager.resetResult()
@@ -814,7 +800,8 @@ class AiDetectionManagerTest {
 
     @Test
     fun testInitAsyncDoesNotBlock() {
-        AiDetectionManager.selectModel(AiModelType.ARTIFACTNET)
+        AiDetectionManager.setCustomModelsDirForTesting(tempTestDir)
+        assertFalse(AiDetectionManager.isModelLoaded())
         AiDetectionManager.initAsync()
         val loaded = runBlocking {
             withTimeout(15_000) {
@@ -901,48 +888,36 @@ class AiDetectionManagerTest {
         AiDetectionManager.resetResult()
         assertFalse(AiDetectionManager.isVerdictFinal())
 
-        // 1. Upfront scan or consensus locks the verdict
-        val upfrontVerdict = AiDetectionManager.calculateVerdictFromScores(listOf(0.08f, 0.04f, 0.09f, 0.05f), 0.70f)
-        assertFalse(upfrontVerdict.isAi)
-        assertEquals(AiDetectionManager.Status.DONE, upfrontVerdict.status)
-
-        // Simulate upfront scan locking verdict with a real human track
-        val file = File("/home/alan/Music/KittyTune/Halsey - Without Me.m4a")
-        if (file.exists()) {
-            AiDetectionManager.init()
-            AiDetectionManager.resetResult()
-            AiDetectionManager.analyzeTrackUpfront(file.absolutePath)
-            val res = runBlocking {
-                withTimeout(15_000) {
-                    AiDetectionManager.result.filterNotNull().first { it.status == AiDetectionManager.Status.DONE }
-                }
-            }
-            assertTrue("Verdict must be locked as final", AiDetectionManager.isVerdictFinal())
-            assertFalse("Halsey must be Human", res.isAi)
-            val lockedScore = res.score
-
-            // Subsequent chunk with a glitch (0.85): MUST BE IGNORED because isVerdictFinal is true!
-            AiDetectionManager.recordCheckpointScore(0.85f)
-            assertEquals("Score must NEVER fluctuate once finalized!", lockedScore, AiDetectionManager.result.value!!.score)
-            assertFalse("Verdict must remain Human and not flip!", AiDetectionManager.result.value!!.isAi)
+        val wav = File(tempTestDir, "sine440.wav")
+        val pcm = sine440(durationSec = 12)
+        val format = javax.sound.sampled.AudioFormat(44_100f, 16, 2, true, false)
+        AudioInputStream(pcm.inputStream(), format, (pcm.size / format.frameSize).toLong()).use {
+            AudioSystem.write(it, AudioFileFormat.Type.WAVE, wav)
         }
+        AiDetectionManager.analyzeTrackUpfront(wav.absolutePath)
+        val locked = runBlocking {
+            withTimeout(15_000) {
+                AiDetectionManager.result.filterNotNull().first { it.status == AiDetectionManager.Status.DONE }
+            }
+        }
+        assertTrue("Verdict must be locked as final", AiDetectionManager.isVerdictFinal())
+        assertFalse("Synthetic sine is below the classification threshold", locked.isAi)
+
+        AiDetectionManager.recordCheckpointScore(0.99f)
+        assertEquals("A later checkpoint must preserve the final verdict", locked, AiDetectionManager.result.value)
     }
 
     @Test
     fun testHalseyTrackHumanNotAi() {
-        val file = File("/home/alan/Music/KittyTune/Halsey - Without Me.m4a")
-        if (file.exists()) {
-            AiDetectionManager.init()
-            AiDetectionManager.resetResult()
-            AiDetectionManager.analyzeTrackUpfront(file.absolutePath)
-            val res = runBlocking {
-                withTimeout(20_000) {
-                    AiDetectionManager.result.filterNotNull().first { it.status == AiDetectionManager.Status.DONE }
-                }
+        val file = sampleTrack("Halsey - Without Me.m4a")
+        AiDetectionManager.analyzeTrackUpfront(file.absolutePath)
+        val res = runBlocking {
+            withTimeout(20_000) {
+                AiDetectionManager.result.filterNotNull().first { it.status == AiDetectionManager.Status.DONE }
             }
-            assertFalse("Halsey - Without Me must be classified as Human", res.isAi)
-            assertTrue("Score must be low (< 0.20), was ${res.score}", res.score < 0.20f)
         }
+        assertFalse("Halsey - Without Me must be classified as Human", res.isAi)
+        assertTrue("Score must be low (< 0.20), was ${res.score}", res.score < 0.20f)
     }
 }
 
