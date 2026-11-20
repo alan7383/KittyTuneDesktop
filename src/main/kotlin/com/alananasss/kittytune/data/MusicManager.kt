@@ -219,7 +219,7 @@ object MusicManager {
 
     val isCrossfadingOut: Boolean get() = player.isCrossfadingOut
 
-    fun isPrebuffered(trackId: Long): Boolean = player.isPrebuffered(trackId)
+    fun isPrebuffered(track: Track): Boolean = player.isPrebuffered(track)
 
     fun releasePrebuffered() = player.releasePrebuffered()
 

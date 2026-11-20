@@ -16,6 +16,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import com.alananasss.kittytune.data.playbackKey
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -82,35 +83,35 @@ fun TrackInfoTab(vm: PlayerViewModel) {
     val currentTrack = vm.uiCurrentTrack ?: return
     val trackId = currentTrack.id
 
-    val isSpotifyTrack = remember(trackId) { vm.isSpotifyTrack(currentTrack) }
-    var fullTrack by remember(trackId) { mutableStateOf<Track?>(null) }
-    var isLoading by remember(trackId) { mutableStateOf(!isSpotifyTrack) }
-    var spotifyCredits by remember(trackId) {
+    val isSpotifyTrack = vm.isSpotifyTrack(currentTrack)
+    val spotifyId = vm.getSpotifyTrackId(currentTrack)
+    val trackKey = currentTrack.playbackKey()
+    var fullTrack by remember(trackKey) { mutableStateOf<Track?>(null) }
+    var isLoading by remember(trackKey) { mutableStateOf(trackKey.source == "soundcloud") }
+    var spotifyCredits by remember(spotifyId) {
         mutableStateOf<com.alananasss.kittytune.data.spotify.SpotifyCredits?>(null)
     }
 
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(trackId) {
+    LaunchedEffect(trackId, trackKey, isSpotifyTrack, spotifyId) {
         if (trackId == 0L) return@LaunchedEffect
         if (isSpotifyTrack) {
             // Catalog tracks have no SoundCloud entity: fetch credits instead.
-            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                val spotifyId = vm.getSpotifyTrackId(currentTrack)
-                spotifyCredits = spotifyId?.let {
-                    com.alananasss.kittytune.data.spotify.SpotifyRepository.getCredits(it)
+            spotifyCredits = spotifyId?.let { id ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.alananasss.kittytune.data.spotify.SpotifyRepository.getCredits(id)
                 }
             }
             return@LaunchedEffect
         }
+        if (trackKey.source != "soundcloud") return@LaunchedEffect
         isLoading = true
         scope.launch {
             try {
                 val api = RetrofitClient.create()
                 val tracks = api.getTracksByIds(trackId.toString())
-                if (tracks.isNotEmpty()) {
-                    fullTrack = tracks.first()
-                }
+                fullTrack = tracks.firstOrNull { it.id == trackId }
             } catch (e: Exception) { e.printStackTrace() }
             finally {
                 isLoading = false

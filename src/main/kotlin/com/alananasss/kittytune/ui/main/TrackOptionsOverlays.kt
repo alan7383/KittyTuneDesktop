@@ -1233,6 +1233,8 @@ internal suspend fun loadPlaylistTracksForMenu(
                 durationMs = local.duration,
                 user = com.alananasss.kittytune.domain.User(0, local.artist, null),
                 likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
+                source = local.source,
+                permalinkUrl = local.permalinkUrl,
             )
         }
     }

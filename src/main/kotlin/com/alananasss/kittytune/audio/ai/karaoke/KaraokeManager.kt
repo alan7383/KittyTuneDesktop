@@ -10,6 +10,7 @@ import com.alananasss.kittytune.data.local.KaraokeEngineMode
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.audio.HlsStreamAdapter
 import com.alananasss.kittytune.data.cache.AudioCache
+import com.alananasss.kittytune.data.matchesPlayback
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
@@ -1166,8 +1167,8 @@ object KaraokeManager {
             var hlsAdapter: HlsStreamAdapter? = null
             try {
                 // 1. Prioritize local cached or downloaded file first (offline, instantaneous, zero network failures)
-                val localFile = AudioCache.lookup(trackId)
-                    ?: DownloadManager.getLocalTrack(trackId)?.localAudioPath?.let { File(it) }?.takeIf { it.exists() }
+                val localFile = AudioCache.lookup(track)
+                    ?: DownloadManager.getLocalTrack(trackId)?.takeIf { it.matchesPlayback(track) }?.localAudioPath?.let { File(it) }?.takeIf { it.exists() }
                     ?: (if (audioSourceUrl.startsWith("file:") || File(audioSourceUrl).exists()) {
                         File(audioSourceUrl.removePrefix("file://"))
                     } else null)
