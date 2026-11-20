@@ -63,13 +63,13 @@ fun getSettingsShape(groupSize: Int, index: Int): Shape {
 }
 
 @Composable
-fun SettingsGroupTitle(title: String) {
+fun SettingsGroupTitle(title: String, modifier: Modifier = Modifier) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 8.dp, bottom = 12.dp, top = 24.dp)
+        modifier = modifier.padding(start = 8.dp, bottom = 12.dp, top = 24.dp)
     )
 }
 
@@ -77,7 +77,8 @@ fun SettingsGroupTitle(title: String) {
 fun SettingsGroup(
     title: String? = null,
     items: List<@Composable (Shape) -> Unit>,
-    horizontalPadding: androidx.compose.ui.unit.Dp = 16.dp
+    horizontalPadding: androidx.compose.ui.unit.Dp = 16.dp,
+    titleHighlightKey: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -85,7 +86,7 @@ fun SettingsGroup(
             .padding(horizontal = horizontalPadding, vertical = 8.dp)
     ) {
         if (title != null) {
-            SettingsGroupTitle(title)
+            SettingsGroupTitle(title, Modifier.settingHighlight(titleHighlightKey))
         }
 
         Column(

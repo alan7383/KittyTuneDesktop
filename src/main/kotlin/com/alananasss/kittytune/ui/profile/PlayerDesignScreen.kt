@@ -715,6 +715,7 @@ private fun PlayerButtonsSection(
             Column {
                 Text(
                     text = str("player_buttons_title"),
+                    modifier = Modifier.settingHighlight("player_buttons_title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -737,6 +738,7 @@ private fun PlayerButtonsSection(
                         hasSwitch = true,
                         switchState = item.enabled,
                         onSwitchChange = { onToggle(item.key, it) },
+                        highlightKey = "player_button_${item.key}",
                     )
                 }
             }
@@ -1229,7 +1231,12 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        title,
+                        modifier = Modifier.settingHighlight(if (menu == PlayerPreferences.MENU_TRACK) "menu_tiles_track" else "menu_tiles_playlist"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
                     Text(str("menu_tiles_desc"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 TextButton(shapes = ButtonDefaults.shapes(), onClick = {
