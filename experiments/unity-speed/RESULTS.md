@@ -29,7 +29,7 @@ Pitch/stretch show process-to-process variation; no general speedup is claimed f
 
 ## Verification
 
-11 focused tests pass. Ten original-output golden hashes cover unity, mono, pitch, stretch, mode changes, flush, ring growth, wrap, near-unity parameters and partial stereo frames. An additional regression failed before the fix because unity playback/flush allocated four stretch workspaces; it passes afterwards. A focused review found no important issues. The affected component compiles locally; full project integration and packaging are delegated to CI. The tests are selected by Windows headless CI and Linux x64/arm64 CI, alongside the existing lazy-audio-engine tests.
+Ten original-output golden hashes cover unity, mono, pitch, stretch, mode changes, flush, ring growth, wrap, near-unity parameters and partial stereo frames. Two tests verify that neutral playback and flush leave stretch workspaces unallocated and that ring growth preserves unread samples across a wrap. The tests run in Windows headless CI and Linux x64 and arm64 CI.
 
 ## Reproduce
 

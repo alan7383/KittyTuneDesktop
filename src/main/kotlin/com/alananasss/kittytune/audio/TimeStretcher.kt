@@ -424,9 +424,11 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
         fun drainTo(out: ShortArray, max: Int): Int {
             val n = minOf(max, out.size, size)
             if (n > 0) {
-                val first = minOf(n, buf.size - head)
-                buf.copyInto(out, 0, head, head + first)
-                buf.copyInto(out, first, 0, n - first)
+                val src = buf
+                val start = head
+                val first = minOf(n, src.size - start)
+                src.copyInto(out, 0, start, start + first)
+                src.copyInto(out, first, 0, n - first)
             }
             head = (head + n) and mask
             size -= n
@@ -439,13 +441,15 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
         }
 
         private fun grow(extra: Int = 1) {
-            var cap = (mask + 1) shl 1
-            while (cap < size + extra) cap = cap shl 1
             val src = buf
+            val start = head
+            val length = size
+            var cap = src.size shl 1
+            while (cap < length + extra) cap = cap shl 1
             val dst = ShortArray(cap)
-            val first = minOf(size, src.size - head)
-            src.copyInto(dst, 0, head, head + first)
-            src.copyInto(dst, first, 0, size - first)
+            val first = minOf(length, src.size - start)
+            src.copyInto(dst, 0, start, start + first)
+            src.copyInto(dst, first, 0, length - first)
             buf = dst
             mask = cap - 1
             head = 0

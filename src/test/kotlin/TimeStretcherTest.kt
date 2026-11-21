@@ -72,6 +72,27 @@ class TimeStretcherTest {
     @Test fun nearUnityMatchesOriginalPcm() = assertEquals("98400:f8af54a26930317066b5b80e6e62d1503967340645d9e7ff11572349ad3771fb", render("near-unity"))
     @Test fun partialFrameMatchesOriginalPcm() = assertEquals("98400:1cb6dc80974705051486fd06f1369a45762a16e1c47da2d6197e8770beed6fec", render("partial-frame"))
 
+    @Test fun growingWrappedOutputPreservesUnreadSamples() {
+        val stretcher = TimeStretcher(44100, 2)
+        val input = ShortArray(48000) { (it * 173).toShort() }
+        stretcher.queue(input, 24000)
+        val prefix = ShortArray(16000)
+        assertEquals(prefix.size, stretcher.drain(prefix, prefix.size))
+        assertArrayEquals(input.copyOfRange(0, prefix.size), prefix)
+
+        val wrapped = input.copyOfRange(24000, 40000)
+        stretcher.queue(wrapped, wrapped.size)
+        val tail = ShortArray(2000) { Short.MIN_VALUE }
+        val extra = input.copyOfRange(40000, input.size) + tail
+        stretcher.queue(extra, extra.size)
+
+        val expected = input.copyOfRange(prefix.size, input.size) + tail
+        val output = ShortArray(expected.size)
+        assertEquals(expected.size, stretcher.drain(output, output.size))
+        assertArrayEquals(expected, output)
+        assertEquals(0, stretcher.available())
+    }
+
     @Test fun neutralPlaybackAndFlushDoNotCreateStretchWorkspaces() {
         val stretcher = TimeStretcher(44100, 2)
         stretcher.flush()
