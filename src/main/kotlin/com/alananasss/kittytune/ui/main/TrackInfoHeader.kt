@@ -139,10 +139,9 @@ private fun TitleAndArtist(
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // navigateToTrackArtist routes both sources, and opens the picker when several artists are credited.
             ArtistLinkText(
                 track = track,
-                onArtistClick = { vm.navigateToTrackArtist(it) },
+                onArtistClick = vm::navigateToTrackArtist,
                 // The track's own credit, not the account that posted it, which can be shared by two artists.
                 text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                 style = if (isLarge) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,

@@ -54,6 +54,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.ui.common.rememberFilteredTracks
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.ScrollableLazyRow
@@ -204,7 +205,7 @@ internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewMode
                 ),
             )
         },
-        onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+        onArtistClick = playerViewModel::navigateToTrackArtist,
         onSeeAll = onOpenCharts,
         )
 }
@@ -531,7 +532,7 @@ internal fun ChartPreviewSection(
     currentTrack: Track?,
     onKindChange: (ChartKind) -> Unit,
     onPlayFrom: (Int) -> Unit,
-    onArtistClick: (Track) -> Unit,
+    onArtistClick: TrackArtistClick,
     onSeeAll: () -> Unit,
 ) {
     // One card on the page's own inset, like My Wave and the statistics around it, with the title as the way in,

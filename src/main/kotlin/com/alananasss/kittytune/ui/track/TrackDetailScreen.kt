@@ -400,7 +400,7 @@ fun TrackList(
                     downloadProgress = progress ?: 0,
                     onClick = { playerViewModel.playPlaylist(visibleTracks, index) },
                     onOptionClick = { playerViewModel.showTrackOptions(track) },
-                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+                    onArtistClick = playerViewModel::navigateToTrackArtist
                 )
             }
             if (isLoadingMore) {
@@ -458,7 +458,7 @@ private fun TrackDetailHeader(track: Track, playerViewModel: PlayerViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ArtistLinkText(
                         track = track,
-                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                        onArtistClick = playerViewModel::navigateToTrackArtist,
                         text = track.displayArtist.ifBlank { track.user?.username ?: "" }
                     )
                     if (track.user?.verified == true) {

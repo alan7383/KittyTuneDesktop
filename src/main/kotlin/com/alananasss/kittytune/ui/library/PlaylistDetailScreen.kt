@@ -20,6 +20,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import androidx.compose.ui.platform.LocalFocusManager
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.ui.common.escapeDismisses
@@ -2198,7 +2199,7 @@ fun PlaylistDetailScreen(
                                         playerViewModel.showTrackOptions(track, contextId)
                                     },
                                     onAlbumClick = { onNavigate(it) },
-                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                                    onArtistClick = playerViewModel::navigateToTrackArtist,
                                     showAlbum = !isAlbum,
                                     showDate = showDateColumn,
                                     dragHandleModifier = dragHandleModifier,
@@ -2222,7 +2223,7 @@ fun PlaylistDetailScreen(
                                         playerViewModel.showTrackOptions(track, contextId)
                                     },
                                     onAlbumClick = { onNavigate(it) },
-                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                                    onArtistClick = playerViewModel::navigateToTrackArtist,
                                     showAlbum = !isAlbum,
                                     showDate = showDateColumn,
                                     useReleaseDate = useReleaseDate,
@@ -2329,7 +2330,7 @@ fun TrackListItem(
     showLikeIndicator: Boolean = true,
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
-    onArtistClick: ((Track) -> Unit)? = null
+    onArtistClick: TrackArtistClick? = null
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -2553,7 +2554,7 @@ fun TrackTableItem(
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: ((Track) -> Unit)? = null,
+    onArtistClick: TrackArtistClick? = null,
     showAlbum: Boolean = true,
     showDate: Boolean = true,
     useReleaseDate: Boolean = false,
@@ -2910,7 +2911,7 @@ fun TrackCompactItem(
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: ((Track) -> Unit)? = null,
+    onArtistClick: TrackArtistClick? = null,
     showAlbum: Boolean = true,
     showDate: Boolean = true,
     dragHandleModifier: Modifier = Modifier,

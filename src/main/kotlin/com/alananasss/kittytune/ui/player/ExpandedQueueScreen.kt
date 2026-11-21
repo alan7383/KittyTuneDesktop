@@ -232,7 +232,7 @@ fun ExpandedQueueScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     ArtistLinkText(
                                         track = track,
-                                        onArtistClick = { viewModel.navigateToTrackArtist(it) },
+                                        onArtistClick = viewModel::navigateToTrackArtist,
                                         modifier = Modifier.weight(1f, fill = false)
                                     )
                                     if (track.user?.verified == true) {

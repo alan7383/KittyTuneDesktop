@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.lazy.LazyRow
@@ -193,7 +194,7 @@ fun NewReleasesScreen(
                                             currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
                                             onClick = { playerViewModel.playPlaylist(popularTracks, absoluteIndex) },
                                             onOptionClick = { playerViewModel.showTrackOptions(track) },
-                                            onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+                                            onArtistClick = playerViewModel::navigateToTrackArtist
                                         )
                                     }
                                 }
@@ -214,7 +215,7 @@ fun PopularTrackRow(
     currentlyPlayingTrack: Track?,
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
-    onArtistClick: ((Track) -> Unit)? = null
+    onArtistClick: TrackArtistClick? = null
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface

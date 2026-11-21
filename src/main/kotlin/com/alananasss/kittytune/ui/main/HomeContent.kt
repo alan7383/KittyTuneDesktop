@@ -2008,7 +2008,7 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel, onOpe
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ArtistLinkText(
                     track = track,
-                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                    onArtistClick = playerViewModel::navigateToTrackArtist,
                     text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f, fill = false)

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -193,7 +194,7 @@ fun ChartTrackRow(
     currentlyPlayingTrack: Track?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onArtistClick: ((Track) -> Unit)? = null,
+    onArtistClick: TrackArtistClick? = null,
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val onPodium = rank <= 3
