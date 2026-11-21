@@ -3758,4 +3758,26 @@
     <string name="together_sync_synced">Synchronisiert</string>
     <string name="together_sync_syncing">Wird synchronisiert…</string>
     <string name="together_sync_waiting">Warten auf den Host</string>
+    <string name="game_eat_playlist">Diese Playlist fressen</string>
+    <string name="game_wave_title">Die Welle fressen</string>
+    <string name="game_score">Gefressen: %1$d</string>
+    <string name="game_best">Bestwert: %1$d</string>
+    <string name="game_of_total">von %1$d</string>
+    <string name="game_idle">Spiel starten</string>
+    <string name="game_wave_idle">Lust auf etwas Neues?</string>
+    <string name="game_eat_hint">Friss ein Cover, um den Titel abzuspielen.</string>
+    <string name="game_paused">Pausiert</string>
+    <string name="game_over">Spiel vorbei</string>
+    <string name="game_finished_title">Playlist aufgefressen!</string>
+    <string name="game_wave_finished">Die Welle ist aufgefressen!</string>
+    <string name="game_finished_text">Gefressene Songs: %1$d</string>
+    <string name="game_restart">Nochmal spielen</string>
+    <string name="game_now_playing">Läuft gerade</string>
+    <string name="game_loading">Die leckeren Titel werden vorbereitet…</string>
+    <string name="game_empty">Hier gibt es noch nichts zu fressen</string>
+    <string name="game_up">Hoch</string>
+    <string name="game_down">Runter</string>
+    <string name="game_left">Links</string>
+    <string name="game_right">Rechts</string>
+    <string name="game_hint">Mit den Pfeiltasten steuern · Leertaste zum Pausieren</string>
 </resources>

@@ -3619,4 +3619,26 @@
     <string name="together_sync_synced">Đã đồng bộ</string>
     <string name="together_sync_syncing">Đang đồng bộ…</string>
     <string name="together_sync_waiting">Đang chờ chủ phòng</string>
+    <string name="game_eat_playlist">Ăn danh sách phát này</string>
+    <string name="game_wave_title">Ăn làn sóng</string>
+    <string name="game_score">Đã ăn: %1$d</string>
+    <string name="game_best">Cao nhất: %1$d</string>
+    <string name="game_of_total">/ %1$d</string>
+    <string name="game_idle">Bắt đầu chơi</string>
+    <string name="game_wave_idle">Thèm thứ gì mới không?</string>
+    <string name="game_eat_hint">Ăn ảnh bìa để phát bài hát.</string>
+    <string name="game_paused">Đã tạm dừng</string>
+    <string name="game_over">Hết game</string>
+    <string name="game_finished_title">Đã ăn hết danh sách phát!</string>
+    <string name="game_wave_finished">Đã ăn hết làn sóng!</string>
+    <string name="game_finished_text">Số bài đã ăn: %1$d</string>
+    <string name="game_restart">Chơi lại</string>
+    <string name="game_now_playing">Đang phát</string>
+    <string name="game_loading">Đang chuẩn bị những bài ngon…</string>
+    <string name="game_empty">Ở đây chưa có gì để ăn</string>
+    <string name="game_up">Lên</string>
+    <string name="game_down">Xuống</string>
+    <string name="game_left">Trái</string>
+    <string name="game_right">Phải</string>
+    <string name="game_hint">Phím mũi tên để di chuyển · Phím cách để tạm dừng</string>
 </resources>

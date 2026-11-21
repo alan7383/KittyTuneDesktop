@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Favorite
@@ -31,6 +32,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,6 +49,10 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.wave.WaveMode
+import com.alananasss.kittytune.ui.game.SnakeGameLauncher
+import com.alananasss.kittytune.ui.game.SnakeGameMode
+import com.alananasss.kittytune.ui.game.SnakeGameRequest
+import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 /**
@@ -89,6 +95,20 @@ internal fun MyWaveCard(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 Spacer(Modifier.width(16.dp))
+                FilledTonalIconButton(
+                    onClick = {
+                        val title = str("wave_title")
+                        SnakeGameLauncher.launch(
+                            SnakeGameRequest(
+                                title = title,
+                                mode = SnakeGameMode.WAVE,
+                                playbackContext = PlaybackContext(title, PlayerViewModel.MY_WAVE_NAV_ID),
+                            )
+                        )
+                    },
+                ) {
+                    Icon(Icons.Rounded.SportsEsports, contentDescription = str("game_wave_title"))
+                }
                 WavePlayButton(vm, isPlayingWave)
             }
 

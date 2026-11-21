@@ -1441,6 +1441,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
 
     TrackOptionsOverlays(playerViewModel)
     com.alananasss.kittytune.ui.library.LikeAllPromptHost()
+    com.alananasss.kittytune.ui.game.SnakeGameHost(playerViewModel)
 
     CoverViewerOverlay()
     com.alananasss.kittytune.ui.profile.passport.PassportViewerOverlay()

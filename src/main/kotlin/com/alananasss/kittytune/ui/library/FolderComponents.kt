@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.ui.game.SnakeGameLauncher
+import com.alananasss.kittytune.ui.game.SnakeGameMode
+import com.alananasss.kittytune.ui.game.SnakeGameRequest
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
@@ -739,6 +743,14 @@ fun LibraryPlaylistOptionsDialog(
                 add(LibraryPlaylistActionItem(Icons.Rounded.Info, str("menu_playlist_details")) {
                     onDismiss()
                     onShowDetails(playlist)
+                })
+            }
+            if (offerTrackActions) {
+                add(LibraryPlaylistActionItem(Icons.Rounded.SportsEsports, str("game_eat_playlist")) {
+                    withTracks { list ->
+                        onDismiss()
+                        SnakeGameLauncher.launch(SnakeGameRequest(playlist.title.orEmpty(), SnakeGameMode.PLAYLIST, list))
+                    }
                 })
             }
             if (playlist.isRealAlbum && offerTrackActions) {

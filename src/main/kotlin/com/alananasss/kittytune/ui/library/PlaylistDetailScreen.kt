@@ -19,6 +19,9 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import com.alananasss.kittytune.ui.game.SnakeGameLauncher
+import com.alananasss.kittytune.ui.game.SnakeGameMode
+import com.alananasss.kittytune.ui.game.SnakeGameRequest
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.TrackArtistClick
 import androidx.compose.ui.platform.LocalFocusManager
@@ -47,6 +50,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -1844,6 +1848,18 @@ fun PlaylistDetailScreen(
                                             text = { Text(str("menu_add_playlist")) },
                                             leadingIcon = { Icon(Icons.Default.Add, null) },
                                             onClick = { playerViewModel.prepareBulkAdd(tracksToDisplay.toList()); showOptionsMenu = false }
+                                        )
+                                    }
+                                    if (tracksToDisplay.isNotEmpty()) {
+                                        DropdownMenuItem(
+                                            text = { Text(str("game_eat_playlist")) },
+                                            leadingIcon = { Icon(Icons.Rounded.SportsEsports, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                SnakeGameLauncher.launch(
+                                                    SnakeGameRequest(playlistTitle, SnakeGameMode.PLAYLIST, tracksToDisplay.toList(), playbackContext)
+                                                )
+                                            },
                                         )
                                     }
                                     if (isAlbum && tracksToDisplay.isNotEmpty() && !isYoutubeRadio) {

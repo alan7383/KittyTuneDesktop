@@ -3539,4 +3539,26 @@
     <string name="together_sync_synced">Eşitlendi</string>
     <string name="together_sync_syncing">Eşitleniyor…</string>
     <string name="together_sync_waiting">Oturum sahibi bekleniyor</string>
+    <string name="game_eat_playlist">Bu çalma listesini ye</string>
+    <string name="game_wave_title">Dalgayı ye</string>
+    <string name="game_score">Yenen: %1$d</string>
+    <string name="game_best">En iyi: %1$d</string>
+    <string name="game_of_total">/ %1$d</string>
+    <string name="game_idle">Oyunu başlat</string>
+    <string name="game_wave_idle">Yeni bir şeye aç mısın?</string>
+    <string name="game_eat_hint">Şarkıyı çalmak için kapağını ye.</string>
+    <string name="game_paused">Duraklatıldı</string>
+    <string name="game_over">Oyun bitti</string>
+    <string name="game_finished_title">Çalma listesi bitti!</string>
+    <string name="game_wave_finished">Dalga bitti!</string>
+    <string name="game_finished_text">Yenen şarkılar: %1$d</string>
+    <string name="game_restart">Tekrar oyna</string>
+    <string name="game_now_playing">Şimdi çalıyor</string>
+    <string name="game_loading">Lezzetli parçalar hazırlanıyor…</string>
+    <string name="game_empty">Burada henüz yiyecek bir şey yok</string>
+    <string name="game_up">Yukarı</string>
+    <string name="game_down">Aşağı</string>
+    <string name="game_left">Sol</string>
+    <string name="game_right">Sağ</string>
+    <string name="game_hint">Ok tuşlarıyla yönlendir · Boşluk tuşuyla duraklat</string>
 </resources>
