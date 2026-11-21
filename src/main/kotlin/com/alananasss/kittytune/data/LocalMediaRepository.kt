@@ -7,7 +7,10 @@ import com.alananasss.kittytune.data.local.LocalTrack
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
@@ -44,17 +47,15 @@ object LocalMediaRepository {
     private val dao get() = AppDatabase.downloadDao
 
     suspend fun scanLocalMedia() {
-        if (_isScanning.value) return
-        _isScanning.value = true
-        _scanProgress.value = str("pref_local_scan_status_prep")
+        if (!_isScanning.compareAndSet(false, true)) return
 
-        withContext(Dispatchers.IO) {
-            try {
+        try {
+            _scanProgress.value = str("pref_local_scan_status_prep")
+            withContext(Dispatchers.IO) {
                 val uriSet = prefs.getLocalMediaUris()
 
                 if (uriSet.isEmpty()) {
                     _scanProgress.value = str("pref_local_scan_status_no_folder")
-                    _isScanning.value = false
                     return@withContext
                 }
 
@@ -74,22 +75,24 @@ object LocalMediaRepository {
 
                 if (foundFiles.isEmpty()) {
                     _scanProgress.value = str("pref_local_scan_status_no_files")
-                    _isScanning.value = false
                     return@withContext
                 }
 
                 _scanProgress.value = str("pref_local_scan_status_found", foundFiles.size)
 
                 val tracksToInsert = mutableListOf<LocalTrack>()
+                val existingTracks = dao.getAllTracksList().associateBy { it.localAudioPath }
+                val index = LocalMediaScanIndex(File(AppDirs.cacheDir, "local-scan-index.bin"))
                 var processed = 0
 
                 foundFiles.forEach { file ->
+                    currentCoroutineContext().ensureActive()
                     processed++
                     if (processed % 10 == 0) {
                         _scanProgress.value = str("pref_local_scan_status_analyzing", processed, foundFiles.size)
                     }
                     try {
-                        processFile(file)?.let { tracksToInsert.add(it) }
+                        index.scan(file, existingTracks[file.absolutePath], ::processFile)?.let { tracksToInsert.add(it) }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -100,14 +103,17 @@ object LocalMediaRepository {
                 // 500 files previously issued 500 separate INSERTs — 500 transactions, 500
                 // fsyncs, 500 invalidations waking every observer of the tracks table (issue #5-DB).
                 dao.insertTracks(tracksToInsert)
+                try { index.save() } catch (_: Exception) { /* A missing index just makes the next scan read tags again. */ }
 
                 _scanProgress.value = str("pref_local_scan_status_done")
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _scanProgress.value = str("pref_local_scan_status_error", e.message ?: "")
-            } finally {
-                _isScanning.value = false
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _scanProgress.value = str("pref_local_scan_status_error", e.message ?: "")
+        } finally {
+            _isScanning.value = false
         }
     }
 
