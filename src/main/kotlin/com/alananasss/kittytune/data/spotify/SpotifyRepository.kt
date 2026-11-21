@@ -167,14 +167,18 @@ object SpotifyRepository {
     internal fun extractRadioPlaylistId(body: String): String? =
         Regex("spotify:playlist:(37i9dQZF[a-zA-Z0-9]+)").find(body)?.groupValues?.get(1)
 
-    /**
-     * Picks Spotify's own editorial radio playlists out of search results, best first.
-     * User playlists named "<x> Radio" are ignored: they used to win and starve the mix.
-     */
-    internal fun officialRadioCandidates(playlists: List<SpotifyPlaylist>, requiredName: String?): List<SpotifyPlaylist> {
-        val wanted = requiredName?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
-        val official = playlists.filter { it.ownerName == "Spotify" && it.id.startsWith("37i9dQZF") }
-        return official.filter { wanted == null || it.name.lowercase().contains(wanted) }.ifEmpty { official }
+    internal fun officialRadioCandidates(playlists: List<SpotifyPlaylist>, requiredName: String): List<SpotifyPlaylist> {
+        val wanted = requiredName.trim()
+        if (wanted.isEmpty()) return emptyList()
+        return playlists.filter { playlist ->
+            playlist.ownerName == "Spotify" &&
+                playlist.id.startsWith("37i9dQZF") &&
+                playlist.name.contains(wanted, ignoreCase = true) &&
+                !playlist.name.startsWith("This Is ", ignoreCase = true) &&
+                (playlist.id.startsWith("37i9dQZF1E8") ||
+                    playlist.id.startsWith("37i9dQZF1E4") ||
+                    playlist.name.trimEnd().endsWith(" Radio", ignoreCase = true))
+        }
     }
 
     /**
@@ -183,7 +187,7 @@ object SpotifyRepository {
      * seed_to_playlist is invisible to the anonymous web-player token, while the public
      * editorial radios of the same name do load.
      */
-    private suspend fun findOfficialRadioPlaylist(query: String, requiredName: String? = null): SpotifyPlaylist? {
+    private suspend fun findOfficialRadioPlaylist(query: String, requiredName: String): SpotifyPlaylist? {
         val results = runCatching { search(query, limit = 20) }.getOrNull() ?: return null
         // Up to three candidates: the first one occasionally resolves to a regional variant.
         for (candidate in officialRadioCandidates(results.playlists, requiredName).take(3)) {
@@ -859,20 +863,10 @@ object SpotifyRepository {
 
         if (isArtist) {
             val artist = getArtist(cleanId) ?: return null
-            if (artist.discoveredOn.isNotEmpty()) {
-                // Official editorial radios only: discoveredOn lists any playlist the artist
-                // appears in, and a user's "… Radio (90's hits)" compilation used to win.
-                val radioFromArtist = artist.discoveredOn.firstOrNull {
-                    it.id.startsWith("37i9dQZF1E4")
-                } ?: artist.discoveredOn.firstOrNull {
-                    it.ownerName == "Spotify" && it.name.contains("Radio", ignoreCase = true) &&
-                        !it.name.contains("This Is", ignoreCase = true)
-                } ?: artist.discoveredOn.firstOrNull { it.id.startsWith("37i9dQZF") }
-
-                if (radioFromArtist != null) {
-                    val fullPlaylist = getPlaylist(radioFromArtist.id)
-                    if (fullPlaylist != null && fullPlaylist.tracks.isNotEmpty()) return fullPlaylist
-                }
+            val radioFromArtist = officialRadioCandidates(artist.discoveredOn, artist.name).firstOrNull()
+            if (radioFromArtist != null) {
+                val fullPlaylist = getPlaylist(radioFromArtist.id)
+                if (fullPlaylist != null && fullPlaylist.tracks.isNotEmpty()) return fullPlaylist
             }
 
             // "Artist Radio" and "This Is ..." editorial playlists, searched concurrently.
@@ -883,17 +877,13 @@ object SpotifyRepository {
                 ).awaitAll().flatMap { it.playlists }
             }
 
-            // Spotify-owned first: a user playlist named "<artist> Radio" could win otherwise.
-            val radioCandidate = candidates.firstOrNull {
-                it.ownerName == "Spotify" && it.id.startsWith("37i9dQZF1E4")
-            } ?: candidates.firstOrNull {
-                it.id.startsWith("37i9dQZF1E4") || (it.name.contains("Radio", ignoreCase = true)
-                    && it.name.contains(artist.name, ignoreCase = true))
-            } ?: candidates.firstOrNull { it.name.contains("This Is", ignoreCase = true) }
-                ?: candidates.firstOrNull { it.name.contains("Radio", ignoreCase = true) || it.id.startsWith("37i9dQZF") }
-
-            if (radioCandidate != null) {
-                val fullPlaylist = getPlaylist(radioCandidate.id)
+            val radioCandidate = officialRadioCandidates(candidates, artist.name).firstOrNull()
+            val thisIsCandidate = candidates.firstOrNull {
+                it.ownerName == "Spotify" && it.id.startsWith("37i9dQZF") &&
+                    it.name.equals("This Is ${artist.name}", ignoreCase = true)
+            }
+            for (candidate in listOfNotNull(radioCandidate, thisIsCandidate)) {
+                val fullPlaylist = getPlaylist(candidate.id)
                 if (fullPlaylist != null && fullPlaylist.tracks.isNotEmpty()) return fullPlaylist
             }
 
