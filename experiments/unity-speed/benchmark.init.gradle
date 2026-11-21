@@ -1,0 +1,10 @@
+gradle.projectsEvaluated {
+    def project = gradle.rootProject
+    project.kotlin.sourceSets.named('test').get().kotlin.srcDir(project.file('experiments/unity-speed'))
+    project.tasks.register('writeTimeStretcherBenchmarkClasspath') {
+        dependsOn project.tasks.named('testClasses')
+        doLast {
+            project.file('build/time-stretcher-benchmark-classpath.txt').text = project.sourceSets.test.runtimeClasspath.asPath
+        }
+    }
+}
