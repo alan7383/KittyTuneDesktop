@@ -17,6 +17,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppDirs
+import com.alananasss.kittytune.data.isUserLocalMedia
+import com.alananasss.kittytune.data.WaveformRepository
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.BackupManager
@@ -61,6 +63,7 @@ fun StorageCachePage() {
     val scope = rememberCoroutineScope()
     var cacheEnabled by remember { mutableStateOf(AudioCache.isEnabled) }
     var cacheLimitMb by remember { mutableIntStateOf(AudioCache.maxMegabytes) }
+    var analysisCacheBytes by remember { mutableLongStateOf(0L) }
     var audioCacheBytes by remember { mutableLongStateOf(0L) }
     var imageCacheBytes by remember { mutableLongStateOf(0L) }
     var showLimitDialog by remember { mutableStateOf(false) }
@@ -69,6 +72,7 @@ fun StorageCachePage() {
         scope.launch {
             withContext(Dispatchers.IO) {
                 audioCacheBytes = AudioCache.sizeBytes()
+                analysisCacheBytes = WaveformRepository.cacheSizeBytes()
                 imageCacheBytes = AppDirs.sizeOf(AppDirs.imageCacheDir)
             }
         }
@@ -116,9 +120,12 @@ fun StorageCachePage() {
                 )
             }
             add { shape ->
-                CleanableRow(shape, str("storage_cache_audio_size"), formatBytes(audioCacheBytes), Icons.Rounded.GraphicEq) {
+                CleanableRow(shape, str("storage_cache_audio_size"), formatBytes(audioCacheBytes + analysisCacheBytes), Icons.Rounded.GraphicEq) {
                     scope.launch {
-                        withContext(Dispatchers.IO) { AudioCache.clear() }
+                        withContext(Dispatchers.IO) {
+                            AudioCache.clear()
+                            WaveformRepository.clearCache()
+                        }
                         refreshSizes()
                     }
                 }
@@ -147,7 +154,7 @@ fun StorageDownloadsPage() {
     val scope = rememberCoroutineScope()
     var downloadsBytes by remember { mutableLongStateOf(0L) }
     val downloads by AppDatabase.downloadDao.getAllTracks().collectAsState(initial = emptyList())
-    val downloaded = downloads.filter { it.localAudioPath.isNotEmpty() }
+    val downloaded = downloads.filter { it.localAudioPath.isNotEmpty() && !it.isUserLocalMedia }
     var downloadLocation by remember { mutableStateOf(prefs.getDownloadLocation() ?: AppDirs.defaultDownloadDir.absolutePath) }
 
     var showDownloadsDialog by remember { mutableStateOf(false) }
@@ -156,11 +163,11 @@ fun StorageDownloadsPage() {
     fun refreshSizes() {
         scope.launch {
             withContext(Dispatchers.IO) {
-                downloadsBytes = AppDirs.sizeOf(File(downloadLocation))
+                downloadsBytes = downloaded.map { it.localAudioPath }.distinct().sumOf { File(it).length() }
             }
         }
     }
-    LaunchedEffect(downloadLocation, downloads.size) { refreshSizes() }
+    LaunchedEffect(downloaded) { refreshSizes() }
 
     if (showDownloadsDialog) DownloadsDialog(downloaded) { showDownloadsDialog = false }
     if (confirmDeleteAll) {
@@ -173,8 +180,7 @@ fun StorageDownloadsPage() {
                     confirmDeleteAll = false
                     scope.launch {
                         withContext(Dispatchers.IO) {
-                            AppDatabase.downloadDao.deleteAll()
-                            File(downloadLocation).listFiles()?.forEach { it.deleteRecursively() }
+                            DownloadManager.removeAllContent(includeAudio = true, includeImages = true)
                         }
                         refreshSizes()
                     }
