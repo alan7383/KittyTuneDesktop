@@ -88,7 +88,7 @@ internal class TogetherRelay(private val clientId: String) {
             when (work) {
                 is Pending.Publish -> runCatching {
                     val mqttMessage = MqttMessage(TogetherWire.seal(work.code, work.message)).apply {
-                        qos = 0
+                        qos = work.message.deliveryQos
                         isRetained = work.isRetained
                     }
                     client?.publish(work.topic, mqttMessage)
@@ -96,14 +96,14 @@ internal class TogetherRelay(private val clientId: String) {
                 is Pending.ClearSnapshots -> work.topics.forEach { topic ->
                     runCatching {
                         val clearMessage = MqttMessage(ByteArray(0)).apply {
-                            qos = 0
+                            qos = 1
                             isRetained = true
                         }
                         client?.publish(topic, clearMessage)
                     }.onFailure { Logger.w("TogetherRelay", "Clear snapshot failed: ${it.message}") }
                 }
                 is Pending.Subscribe -> runCatching {
-                    client?.subscribe(work.topics, IntArray(work.topics.size) { 0 })?.waitForCompletion(SUBSCRIBE_TIMEOUT_MS)
+                    client?.subscribe(work.topics, IntArray(work.topics.size) { 1 })?.waitForCompletion(SUBSCRIBE_TIMEOUT_MS)
                 }.onFailure { Logger.w("TogetherRelay", "Subscribe failed: ${it.message}") }
                 is Pending.Unsubscribe -> runCatching {
                     client?.unsubscribe(work.topics)
@@ -125,7 +125,8 @@ internal class TogetherRelay(private val clientId: String) {
         val now = System.currentTimeMillis()
         if (now - lastConnectAttemptAt < RETRY_COOLDOWN_MS) return false
         lastConnectAttemptAt = now
-        for (broker in BROKERS) {
+        val brokers = System.getProperty("kittytune.together.testBroker")?.let(::listOf) ?: BROKERS
+        for (broker in brokers) {
             val attempt = runCatching { connect(broker) }
             if (attempt.isSuccess && client?.isConnected == true) return true
             Logger.w("TogetherRelay", "Could not reach $broker: ${attempt.exceptionOrNull()?.message}")
@@ -144,7 +145,7 @@ internal class TogetherRelay(private val clientId: String) {
                         TogetherWire.topicFor(code),
                         TogetherWire.snapshotWildcardTopicFor(code),
                     )
-                    runCatching { mqtt.subscribe(topics, intArrayOf(0, 0)) }
+                    runCatching { mqtt.subscribe(topics, intArrayOf(1, 1)) }
                 }
             }
 
