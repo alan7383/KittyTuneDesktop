@@ -441,6 +441,8 @@ fun MiniPlayerSettingsPage() {
                 )
             },
             toggle(str("mini_player_show_cover"), str("mini_player_show_cover_desc"), remember(snapshot) { prefs.getMiniPlayerShowCover() }) { prefs.setMiniPlayerShowCover(it) },
+            toggle(str("mini_player_cover_as_background"), str("mini_player_cover_as_background_desc"), remember(snapshot) { prefs.getMiniPlayerCoverAsBackground() }) { prefs.setMiniPlayerCoverAsBackground(it) },
+            toggle(str("mini_player_progress_fill"), str("mini_player_progress_fill_desc"), remember(snapshot) { prefs.getMiniPlayerProgressFill() }) { prefs.setMiniPlayerProgressFill(it) },
             toggle(str("mini_player_show_playback_controls"), str("mini_player_show_playback_controls_desc"), remember(snapshot) { prefs.getMiniPlayerShowPlaybackControls() }) { prefs.setMiniPlayerShowPlaybackControls(it) },
             toggle(str("mini_player_show_additional_controls"), str("mini_player_show_additional_controls_desc"), remember(snapshot) { prefs.getMiniPlayerShowAdditionalControls() }) { prefs.setMiniPlayerShowAdditionalControls(it) },
             toggle(str("mini_player_show_progress"), str("mini_player_show_progress_desc"), remember(snapshot) { prefs.getMiniPlayerShowProgress() }) { prefs.setMiniPlayerShowProgress(it) },
@@ -481,6 +483,8 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
     val controlsOnHover = remember(prefsSnapshot) { prefs.getMiniPlayerControlsOnHover() }
     val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
     val hoverIllumination = remember(prefsSnapshot) { prefs.getMiniPlayerHoverIllumination() }
+    val coverAsBackground = remember(prefsSnapshot) { prefs.getMiniPlayerCoverAsBackground() }
+    val progressFill = remember(prefsSnapshot) { prefs.getMiniPlayerProgressFill() }
     val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
     val contentMode = remember(prefsSnapshot) { prefs.getMiniPlayerContentMode() }
     var showContentModeDialog by remember { mutableStateOf(false) }
@@ -519,6 +523,12 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
         )
         SwitchRow(str("mini_player_show_cover"), showCover, str("mini_player_show_cover_desc")) {
             prefs.setMiniPlayerShowCover(!showCover)
+        }
+        SwitchRow(str("mini_player_cover_as_background"), coverAsBackground, str("mini_player_cover_as_background_desc")) {
+            prefs.setMiniPlayerCoverAsBackground(!coverAsBackground)
+        }
+        SwitchRow(str("mini_player_progress_fill"), progressFill, str("mini_player_progress_fill_desc")) {
+            prefs.setMiniPlayerProgressFill(!progressFill)
         }
         SwitchRow(str("mini_player_show_playback_controls"), showPlayback, str("mini_player_show_playback_controls_desc")) {
             prefs.setMiniPlayerShowPlaybackControls(!showPlayback)

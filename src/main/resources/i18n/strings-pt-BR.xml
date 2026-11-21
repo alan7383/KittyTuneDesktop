@@ -3558,4 +3558,8 @@
     <string name="game_left">Esquerda</string>
     <string name="game_right">Direita</string>
     <string name="game_hint">Use as setas para mover · Espaço para pausar</string>
+    <string name="mini_player_cover_as_background">Capa como fundo</string>
+    <string name="mini_player_cover_as_background_desc">Mostra a capa do álbum atrás dos controles do miniplayer</string>
+    <string name="mini_player_progress_fill">Preenchimento do progresso</string>
+    <string name="mini_player_progress_fill_desc">Preenche o miniplayer conforme a faixa avança, em vez de exibir uma linha fina</string>
 </resources>

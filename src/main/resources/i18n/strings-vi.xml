@@ -3641,4 +3641,8 @@
     <string name="game_left">Trái</string>
     <string name="game_right">Phải</string>
     <string name="game_hint">Phím mũi tên để di chuyển · Phím cách để tạm dừng</string>
+    <string name="mini_player_cover_as_background">Dùng ảnh bìa làm nền</string>
+    <string name="mini_player_cover_as_background_desc">Hiện ảnh bìa album phía sau các nút điều khiển</string>
+    <string name="mini_player_progress_fill">Tô đầy theo tiến độ</string>
+    <string name="mini_player_progress_fill_desc">Tô đầy trình phát mini theo tiến độ bài hát thay cho vạch mảnh</string>
 </resources>

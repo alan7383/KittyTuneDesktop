@@ -80,6 +80,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.alananasss.kittytune.core.Prefs
 import androidx.compose.material3.Text
+import androidx.compose.runtime.State
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -568,6 +569,8 @@ fun MiniLyricsPlayerWindow(
                 val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
                 val hoverIllumination = remember(prefsSnapshot) { prefs.getMiniPlayerHoverIllumination() }
                 val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
+                val coverAsBackground = remember(prefsSnapshot) { prefs.getMiniPlayerCoverAsBackground() }
+                val progressFill = remember(prefsSnapshot) { prefs.getMiniPlayerProgressFill() }
 
                 val windowInteractionSource = remember { MutableInteractionSource() }
                 val isWindowHovered by windowInteractionSource.collectIsHoveredAsState()
@@ -653,32 +656,46 @@ fun MiniLyricsPlayerWindow(
                                     }
                                 }
                         ) {
-                            if (isElongated) {
-                                MiniLyricsElongatedContent(
-                                    viewModel = viewModel,
-                                    windowHeight = windowState.size.height,
-                                    contentMode = contentMode,
-                                    showCover = showCover,
-                                    showPlayback = showPlayback,
-                                    showAdditional = showAdditional,
-                                    controlsOnHover = controlsOnHover,
-                                    showProgress = showProgress,
-                                    transparentBg = transparentBg,
-                                    isDragging = isDragging,
-                                )
-                            } else {
-                                MiniLyricsContent(
-                                    viewModel = viewModel,
-                                    windowHeight = windowState.size.height,
-                                    contentMode = contentMode,
-                                    showCover = showCover,
-                                    showPlayback = showPlayback,
-                                    showAdditional = showAdditional,
-                                    controlsOnHover = controlsOnHover,
-                                    showProgress = showProgress,
-                                    transparentBg = transparentBg,
-                                    isDragging = isDragging,
-                                )
+                            val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
+                                positionMs = { viewModel.uiCurrentPosition },
+                                isPlaying = viewModel.uiIsPlaying,
+                                speed = 1.0f,
+                            )
+                            MiniPlayerAppearance(
+                                artwork = viewModel.uiCurrentTrack?.fullResArtwork,
+                                coverAsBackground = coverAsBackground,
+                                progressFill = progressFill && viewModel.uiDuration > 0,
+                                progress = { viewModel.progressOf(smoothPosition.value) },
+                            ) {
+                                if (isElongated) {
+                                    MiniLyricsElongatedContent(
+                                        viewModel = viewModel,
+                                        windowHeight = windowState.size.height,
+                                        contentMode = contentMode,
+                                        showCover = showCover,
+                                        showPlayback = showPlayback,
+                                        showAdditional = showAdditional,
+                                        controlsOnHover = controlsOnHover,
+                                        showProgress = showProgress && !progressFill,
+                                        smoothPosition = smoothPosition,
+                                        transparentBg = transparentBg,
+                                        isDragging = isDragging,
+                                    )
+                                } else {
+                                    MiniLyricsContent(
+                                        viewModel = viewModel,
+                                        windowHeight = windowState.size.height,
+                                        contentMode = contentMode,
+                                        showCover = showCover,
+                                        showPlayback = showPlayback,
+                                        showAdditional = showAdditional,
+                                        controlsOnHover = controlsOnHover,
+                                        showProgress = showProgress && !progressFill,
+                                        smoothPosition = smoothPosition,
+                                        transparentBg = transparentBg,
+                                        isDragging = isDragging,
+                                    )
+                                }
                             }
 
                             // Its own window at the pointer: a DropdownMenu is drawn inside the mini player,
@@ -808,20 +825,13 @@ private fun MiniLyricsContent(
     showAdditional: Boolean = true,
     controlsOnHover: Boolean = true,
     showProgress: Boolean = true,
+    smoothPosition: State<Float>,
     transparentBg: Boolean = false,
     isDragging: Boolean = false,
 ) {
     val track = viewModel.uiCurrentTrack
     val isPlaying = viewModel.uiIsPlaying
     val lyrics = viewModel.lyricsLines
-    // positionMs is a lambda so this composable doesn't recompose on every position tick (4–5×/sec).
-    // The smooth position is read via State<Float> in the draw phase only (audit Phase 3 CPU gain).
-    val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
-        positionMs = { viewModel.uiCurrentPosition },
-        isPlaying = isPlaying,
-        speed = 1.0f,
-    )
-
     // Derived: the frame-clock position is recomputed every frame but observed only when the
     // active line index actually changes. Computing the index from a per-frame value — as the
     // `remember(adjustedPosition, lyrics)` this replaces did — recomposed the whole mini-player
@@ -1061,7 +1071,7 @@ private fun MiniLyricsContent(
             LinearProgressIndicator(
                 // Read inside the indicator's draw phase: the per-frame interpolated position
                 // redraws the hairline without recomposing the mini-player around it.
-                progress = { viewModel.progressOf(smoothPosition.value + viewModel.lyricsOffset) },
+                progress = { viewModel.progressOf(smoothPosition.value) },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
@@ -1094,20 +1104,13 @@ private fun MiniLyricsElongatedContent(
     showAdditional: Boolean = true,
     controlsOnHover: Boolean = true,
     showProgress: Boolean = true,
+    smoothPosition: State<Float>,
     transparentBg: Boolean = false,
     isDragging: Boolean = false,
 ) {
     val track = viewModel.uiCurrentTrack
     val isPlaying = viewModel.uiIsPlaying
     val lyrics = viewModel.lyricsLines
-    // positionMs is a lambda so this composable doesn't recompose on every position tick (4–5×/sec).
-    // The smooth position is read via State<Float> in the draw phase only (audit Phase 3 CPU gain).
-    val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
-        positionMs = { viewModel.uiCurrentPosition },
-        isPlaying = isPlaying,
-        speed = 1.0f,
-    )
-
     // Derived: the frame-clock position is recomputed every frame but observed only when the
     // active line index actually changes. Computing the index from a per-frame value — as the
     // `remember(adjustedPosition, lyrics)` this replaces did — recomposed the whole mini-player
@@ -1350,7 +1353,7 @@ private fun MiniLyricsElongatedContent(
             LinearProgressIndicator(
                 // Read inside the indicator's draw phase: the per-frame interpolated position
                 // redraws the hairline without recomposing the mini-player around it.
-                progress = { viewModel.progressOf(smoothPosition.value + viewModel.lyricsOffset) },
+                progress = { viewModel.progressOf(smoothPosition.value) },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()

@@ -3559,4 +3559,8 @@
     <string name="game_left">Balra</string>
     <string name="game_right">Jobbra</string>
     <string name="game_hint">Irányítás a nyilakkal · Szünet a szóközzel</string>
+    <string name="mini_player_cover_as_background">Borító háttérként</string>
+    <string name="mini_player_cover_as_background_desc">A borító megjelenítése a minilejátszó vezérlői mögött</string>
+    <string name="mini_player_progress_fill">Haladás kitöltéssel</string>
+    <string name="mini_player_progress_fill_desc">A minilejátszó kitöltése a lejátszás során a vékony vonal helyett</string>
 </resources>
