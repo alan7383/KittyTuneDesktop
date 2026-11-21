@@ -35,15 +35,15 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     private val seekWindow = (sampleRate * 0.015).toInt().coerceAtLeast(64)    // ±15 ms search
 
     /** Rising half-Hann crossfade ramp, [overlap] long: 0 at the start, 1 at the end. */
-    private val ramp by lazy(LazyThreadSafetyMode.NONE) {
+    private val ramp by lazy {
         FloatArray(overlap) {
             (0.5 - 0.5 * cos(PI * it / (overlap - 1).coerceAtLeast(1))).toFloat()
         }
     }
 
-    private val inputState = lazy(LazyThreadSafetyMode.NONE) { FloatRing(channels, 1 shl 14) }
+    private val inputState = lazy { FloatRing(channels, 1 shl 14) }
     private val input get() = inputState.value
-    private val midState = lazy(LazyThreadSafetyMode.NONE) { FloatRing(channels, 1 shl 14) }
+    private val midState = lazy { FloatRing(channels, 1 shl 14) }
     private val mid get() = midState.value
     private val output = ShortRing(1 shl 15)
 
@@ -61,7 +61,7 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     /** Q32.32 accumulator for stage 1's analysis hop, so a fractional hop averages out exactly. */
     private var hopPhase = 0L
 
-    private val kernel by lazy(LazyThreadSafetyMode.NONE) { PolyphaseSinc(KERNEL_TAPS, KERNEL_PHASES) }
+    private val kernel by lazy { PolyphaseSinc(KERNEL_TAPS, KERNEL_PHASES) }
     private val coefficients = FloatArray(KERNEL_TAPS)
 
     private val frame = FloatArray(channels)
