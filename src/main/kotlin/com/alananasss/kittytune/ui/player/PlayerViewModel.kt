@@ -3733,12 +3733,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
      * catalog artist it navigates directly, with several ones it opens the
      * selection dialog (same behavior as the Android player).
      */
-    fun navigateToTrackArtist(track: Track?) {
+    fun navigateToTrackArtist(
+        track: Track?,
+        artist: com.alananasss.kittytune.data.spotify.SpotifyArtistRef? = null
+    ) {
         if (track == null) return
+        if (artist != null) {
+            navigateToCreditedArtist(artist)
+            return
+        }
         val artists = navigableArtists(track.artists)
         when {
             artists.size > 1 -> openSelectArtistDialog(artists, track)
-            artists.size == 1 -> navigateToSpotifyArtist(artists.first().id)
+            artists.size == 1 -> navigateToCreditedArtist(artists.first())
             isSpotifyTrack(track) -> {
                 val fallbackId = getSpotifyTrackArtistId(track)
                 if (!fallbackId.isNullOrBlank()) navigateToSpotifyArtist(fallbackId)
@@ -3760,7 +3767,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         val navigable = navigableArtists(artists)
         when {
             navigable.size > 1 -> openSelectArtistDialog(navigable, null)
-            navigable.size == 1 -> navigateToSpotifyArtist(navigable.first().id)
+            navigable.size == 1 -> navigateToCreditedArtist(navigable.first())
             else -> fallbackUserId?.takeIf { it > 0 }?.let { navigateToArtist(it) }
         }
     }
@@ -3782,7 +3789,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun navigableArtists(
         artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>?
     ): List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef> =
-        artists.orEmpty().filter { it.id.isNotBlank() }.distinctBy { it.id.ifBlank { it.name } }
+        artists.orEmpty()
+            .filter { it.id.isNotBlank() || !it.uri.isNullOrBlank() }
+            .distinctBy { it.id.ifBlank { it.uri.orEmpty() } }
+
+    fun navigateToCreditedArtist(artist: com.alananasss.kittytune.data.spotify.SpotifyArtistRef) {
+        val id = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(artist.id.ifBlank { artist.uri.orEmpty() })
+        navigateToSpotifyArtist(id)
+    }
 
     fun dismissSelectArtistDialog() {
         showSelectArtistDialog = false

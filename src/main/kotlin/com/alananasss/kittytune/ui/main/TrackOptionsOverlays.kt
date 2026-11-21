@@ -349,10 +349,7 @@ private fun ArtistPickerRow(
             .pointerHoverIcon(PointerIcon.Hand)
             .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
                 viewModel.dismissSelectArtistDialog()
-                val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(
-                    artist.id.ifBlank { artist.uri ?: "" }
-                )
-                if (cleanId.isNotBlank()) viewModel.navigateToSpotifyArtist(cleanId)
+                viewModel.navigateToCreditedArtist(artist)
             }
             .padding(8.dp)
     ) {
@@ -471,7 +468,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     com.alananasss.kittytune.ui.common.ArtistLinkText(
                         track = track,
-                        onArtistClick = { viewModel.navigateToTrackArtist(it) }
+                        onArtistClick = viewModel::navigateToTrackArtist
                     )
                     if (track.user?.verified == true) {
                         Spacer(Modifier.width(4.dp))

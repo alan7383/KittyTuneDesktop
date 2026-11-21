@@ -35,6 +35,7 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.ui.common.escapeDismisses
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import androidx.compose.ui.platform.LocalFocusManager
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
@@ -562,7 +563,7 @@ fun LibraryScreen(
                                     onOptionClick = {
                                         playerViewModel.showTrackOptions(track)
                                     },
-                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+                                    onArtistClick = playerViewModel::navigateToTrackArtist
                                 )
                             } else {
                                 UploadTrackListCard(
@@ -573,7 +574,7 @@ fun LibraryScreen(
                                     onOptionClick = {
                                         playerViewModel.showTrackOptions(track)
                                     },
-                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+                                    onArtistClick = playerViewModel::navigateToTrackArtist
                                 )
                             }
                         }
@@ -1278,7 +1279,7 @@ fun LibraryScreen(
         track: Track,
         onClick: () -> Unit,
         onOptionClick: () -> Unit,
-        onArtistClick: ((Track) -> Unit)? = null
+        onArtistClick: TrackArtistClick? = null
     ) {
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
@@ -1368,7 +1369,7 @@ fun LibraryScreen(
         track: Track,
         onClick: () -> Unit,
         onOptionClick: () -> Unit,
-        onArtistClick: ((Track) -> Unit)? = null
+        onArtistClick: TrackArtistClick? = null
     ) {
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()

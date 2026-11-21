@@ -188,7 +188,7 @@ import kotlin.math.roundToInt
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 ArtistLinkText(
                                                     track = currentTrack,
-                                                    onArtistClick = { viewModel.navigateToTrackArtist(it) },
+                                                    onArtistClick = viewModel::navigateToTrackArtist,
                                                     text = currentTrack.displayArtist.ifBlank { currentTrack.user?.username.orEmpty() },
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,

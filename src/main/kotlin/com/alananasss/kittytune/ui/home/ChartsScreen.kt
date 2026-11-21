@@ -166,7 +166,7 @@ fun ChartsScreen(
                                 ),
                             )
                         },
-                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                        onArtistClick = playerViewModel::navigateToTrackArtist,
                     )
                 }
             }

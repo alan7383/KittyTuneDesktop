@@ -1488,7 +1488,7 @@ internal fun FullListScreen(
                         },
                         onOptionClick = { playerViewModel.showTrackOptions(track) },
                         onAlbumClick = { albumId -> playerViewModel.navigateToPlaylistId = albumId },
-                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+                        onArtistClick = playerViewModel::navigateToTrackArtist
                     )
                 }
 
@@ -1551,7 +1551,7 @@ fun ProfileTrackItem(
         },
         onOptionClick = { playerViewModel.showTrackOptions(track) },
         onAlbumClick = {},
-        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+        onArtistClick = playerViewModel::navigateToTrackArtist
     )
 }
 

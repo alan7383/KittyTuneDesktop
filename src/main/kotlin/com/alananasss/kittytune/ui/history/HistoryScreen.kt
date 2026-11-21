@@ -10,6 +10,7 @@ import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -410,7 +411,7 @@ fun HistoryScreen(
                                         onMoreClick = {
                                             playerViewModel.showTrackOptions(historyTrack.track)
                                         },
-                                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
+                                        onArtistClick = playerViewModel::navigateToTrackArtist
                                     )
                                 }
                             }
@@ -513,7 +514,7 @@ fun HistoryTrackRow(
     isPlaying: Boolean,
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
-    onArtistClick: ((Track) -> Unit)? = null
+    onArtistClick: TrackArtistClick? = null
 ) {
     val track = item.track
     val timeStr = remember(item.playedAt) {

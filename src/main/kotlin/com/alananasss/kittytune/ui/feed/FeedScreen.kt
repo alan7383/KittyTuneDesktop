@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import com.alananasss.kittytune.ui.common.pressScale
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -177,9 +178,7 @@ private fun FeedItem(
             hovered = hovered,
             interactionSource = interactionSource,
             onClick = { playerViewModel.playPlaylist(listOf(track), 0) },
-            onArtistClick = {
-                playerViewModel.navigateToTrackArtist(track)
-            },
+            onArtistClick = playerViewModel::navigateToTrackArtist,
             onReposterClick = {
                 reposter?.id?.let { uid ->
                     navController.navigate("profile/$uid")
@@ -234,7 +233,7 @@ private fun TrackFeedItem(
     hovered: Boolean,
     interactionSource: MutableInteractionSource,
     onClick: () -> Unit,
-    onArtistClick: () -> Unit,
+    onArtistClick: TrackArtistClick,
     onReposterClick: () -> Unit,
     onRightClick: () -> Unit,
 ) {
@@ -284,7 +283,7 @@ private fun TrackFeedItem(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ArtistLinkText(
                             track = track,
-                            onArtistClick = { onArtistClick() },
+                            onArtistClick = onArtistClick,
                             text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,

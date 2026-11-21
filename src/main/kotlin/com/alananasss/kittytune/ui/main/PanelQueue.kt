@@ -404,7 +404,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ArtistLinkText(
                         track = track,
-                        onArtistClick = { vm.navigateToTrackArtist(it) },
+                        onArtistClick = vm::navigateToTrackArtist,
                         text = track.displayArtist.ifBlank { track.user?.username ?: "" },
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f, fill = false)
