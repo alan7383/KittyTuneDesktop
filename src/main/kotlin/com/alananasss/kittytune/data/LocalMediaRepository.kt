@@ -81,7 +81,7 @@ object LocalMediaRepository {
                 _scanProgress.value = str("pref_local_scan_status_found", foundFiles.size)
 
                 val tracksToInsert = mutableListOf<LocalTrack>()
-                val existingTracks = dao.getAllTracksList().associateBy { it.localAudioPath }
+                val existingTracks = dao.getAllTracksList().associateBy { it.id }
                 val index = LocalMediaScanIndex(File(AppDirs.cacheDir, "local-scan-index.bin"))
                 var processed = 0
 
@@ -92,7 +92,7 @@ object LocalMediaRepository {
                         _scanProgress.value = str("pref_local_scan_status_analyzing", processed, foundFiles.size)
                     }
                     try {
-                        index.scan(file, existingTracks[file.absolutePath], ::processFile)?.let { tracksToInsert.add(it) }
+                        index.scan(file, existingTracks, ::processFile)?.let { tracksToInsert.add(it) }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -157,12 +157,8 @@ object LocalMediaRepository {
                 }
             }
 
-            var id = file.absolutePath.hashCode().toLong()
-            if (id > 0) id *= -1
-            if (id == 0L) id = -1L
-
             LocalTrack(
-                id = id,
+                id = localMediaTrackId(file.absolutePath),
                 title = title,
                 artist = artist,
                 artworkUrl = artworkPath,
@@ -199,3 +195,6 @@ object LocalMediaRepository {
         description = str("description_local_file", localAudioPath),
     )
 }
+
+internal fun localMediaTrackId(path: String): Long =
+    -kotlin.math.abs(path.hashCode().toLong()).coerceAtLeast(1L)

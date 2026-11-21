@@ -14,8 +14,9 @@ internal class LocalMediaScanIndex(private val indexFile: File) {
     private val previous = load()
     private val scanned = HashMap<String, Stamp>()
 
-    fun scan(file: File, existing: LocalTrack?, read: (File) -> LocalTrack?): LocalTrack? {
+    fun scan(file: File, tracksById: Map<Long, LocalTrack>, read: (File) -> LocalTrack?): LocalTrack? {
         val path = file.absolutePath
+        val existing = tracksById[localMediaTrackId(path)]
         val before = stamp(file)
         if (before != null && previous[path] == before && existing?.localAudioPath == path &&
             (existing.localArtworkPath.isEmpty() || File(existing.localArtworkPath).isFile)

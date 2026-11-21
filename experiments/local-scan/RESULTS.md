@@ -24,7 +24,7 @@ Raw samples are in `samples.json`. CPU time is process-wide and has Windows time
 
 ## Regression coverage
 
-Eleven focused tests passed: restart reuse, size/mtime changes independently, missing database rows/artwork, path collisions, failed reads, files changing during parsing, unsaved scans, corrupt index and pruning. The reuse test failed with the original always-read behavior before implementation. A fresh review found no important issues. Affected production sources compiled locally; the full Gradle suite was not run locally. Tests are selected by Windows headless CI and Linux x64/arm64 CI.
+Twelve focused tests cover restart reuse, independent size and timestamp changes, missing database rows and artwork, a real path hash collision, a downloaded track at the same path, failed reads, files changing during parsing, unsaved scans, corrupt indexes and pruning. Windows headless CI and Linux x64 and arm64 CI include these tests.
 
 ## Reproduce
 
