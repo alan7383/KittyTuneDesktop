@@ -174,6 +174,14 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
             MenuSheetContent(viewModel)
         }
     }
+    if (viewModel.showTrackActionOfflineDialog) {
+        val dismiss = { viewModel.showTrackActionOfflineDialog = false }
+        EscapableAlertDialog(
+            onDismissRequest = dismiss,
+            title = { Text(str("lib_offline_mode")) },
+            confirmButton = { TextButton(onClick = dismiss) { Text(str("btn_ok")) } },
+        )
+    }
     if (viewModel.showCommentsSheet) {
         BackHandler(onBack = { viewModel.showCommentsSheet = false })
         Dialog(onDismissRequest = { viewModel.showCommentsSheet = false }) {
@@ -184,6 +192,23 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
             ) {
                 CommentsSheetContent(viewModel)
             }
+        }
+    }
+    if (viewModel.showDetailsSheet) {
+        viewModel.selectedTrackForSheet?.let { track ->
+            val dismiss = { viewModel.showDetailsSheet = false }
+            EscapableAlertDialog(
+                onDismissRequest = dismiss,
+                title = { Text(track.title ?: str("untitled_track")) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(track.displayArtist.ifBlank { str("unknown_artist") })
+                        val duration = com.alananasss.kittytune.utils.makeTimeString(track.durationMs ?: 0L)
+                        Text("${str("detail_duration")} · $duration")
+                    }
+                },
+                confirmButton = { TextButton(onClick = dismiss) { Text(str("btn_ok")) } },
+            )
         }
     }
     if (viewModel.showAddToPlaylistSheet) {
@@ -393,11 +418,15 @@ private fun ArtistPickerRow(
 @Composable
 private fun MenuSheetContent(viewModel: PlayerViewModel) {
     val track = viewModel.trackForMenu ?: viewModel.uiCurrentTrack ?: return
+    fun withInternet(action: () -> Unit) {
+        if (com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) action()
+        else viewModel.showTrackActionOfflineDialog = true
+    }
     val downloadProgress by DownloadManager.downloadProgress.collectAsState()
     val storageTrigger by DownloadManager.storageTrigger.collectAsState()
     val likedTracks by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
     val isTrackLiked = remember(track.id, likedTracks) { com.alananasss.kittytune.data.LikeRepository.isTrackLiked(track.id) }
-    val isLocalFile = track.id < 0 && track.source != "youtube"
+    val isLocalFile = track.source == "local" || (track.id < 0 && track.source != "youtube")
     val isSpotify = viewModel.isSpotifyTrack(track)
 
     val isReposted = viewModel.isTrackReposted(track.id) || track.userReposted
@@ -468,7 +497,9 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     com.alananasss.kittytune.ui.common.ArtistLinkText(
                         track = track,
-                        onArtistClick = viewModel::navigateToTrackArtist
+                        onArtistClick = { selectedTrack, artist ->
+                            withInternet { viewModel.navigateToTrackArtist(selectedTrack, artist) }
+                        }
                     )
                     if (track.user?.verified == true) {
                         Spacer(Modifier.width(4.dp))
@@ -548,19 +579,25 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 }
             }
             if (track.source != "youtube" && !isSpotify && !isLocalFile) {
-                add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
+                add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) {
+                    withInternet { viewModel.openComments(track) }
+                })
                 if (isReposted) {
                     add(
                         MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_reposted"), tint = activeColor) {
-                            showDeleteRepostConfirm = true
+                            withInternet { showDeleteRepostConfirm = true }
                         }
                     )
                 } else {
-                    add(MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_repost")) { showRepostDialog = true })
+                    add(MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_repost")) {
+                        withInternet { showRepostDialog = true }
+                    })
                 }
             }
             if (track.source != "youtube" && !isSpotify) {
-                add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
+                add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) {
+                    viewModel.openTrackDetails(track)
+                })
             }
             add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track) })
             val isDuetBlacklisted = viewModel.isTrackDuetBlacklisted(track.id)
@@ -580,32 +617,37 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
             if (!isLocalFile && albumId != null && (isSpotify || albumId.length == 22)) {
                 add(MenuOptionItem("go_album", Icons.Rounded.Album, str("menu_go_album")) {
-                    viewModel.showMenuSheet = false
-                    viewModel.navigateToAlbum(albumId)
+                    withInternet {
+                        viewModel.showMenuSheet = false
+                        viewModel.navigateToAlbum(albumId)
+                    }
                 })
             }
             if (track.source != "youtube" && !isLocalFile) {
                 add(
                     MenuOptionItem("go_artist", Icons.Rounded.Person, str("menu_go_artist")) {
-                        if (isSpotify) {
-                            viewModel.navigateToTrackArtist(track)
-                            viewModel.showMenuSheet = false
-                        } else {
-                            track.user?.id?.let { viewModel.navigateToArtist(it) }
-                        }
+                        withInternet { viewModel.navigateToTrackArtist(track) }
                     }
                 )
                 val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
                 if (isOwnTrack) {
                     add(MenuOptionItem("edit_track", Icons.Rounded.Edit, str("menu_edit_track")) {
-                        viewModel.showMenuSheet = false
-                        viewModel.navigateToEditTrack(track.id)
+                        withInternet {
+                            viewModel.showMenuSheet = false
+                            viewModel.navigateToEditTrack(track.id)
+                        }
                     })
                 }
             }
             if (!isLocalFile && RadioEligibility.canStartRadio(track)) {
                 add(MenuOptionItem("track_radio", Icons.Rounded.Radio, str("menu_track_radio")) {
-                    if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) viewModel.startYoutubeRadio(track) else viewModel.startRadioFromTrack(track)
+                    withInternet {
+                        if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) {
+                            viewModel.startYoutubeRadio(track)
+                        } else {
+                            viewModel.startRadioFromTrack(track)
+                        }
+                    }
                 })
                 add(MenuOptionItem("share", Icons.Outlined.Link, str("cover_copy_link")) { viewModel.shareTrack(track) })
                 add(MenuOptionItem("share_card", Icons.Outlined.PhotoLibrary, str("share_card_title")) { viewModel.openShareCard(track) })

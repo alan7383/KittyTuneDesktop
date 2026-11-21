@@ -680,10 +680,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var playlistForMenu by mutableStateOf<Playlist?>(null)
 
     var selectedTrackForSheet by mutableStateOf<Track?>(null)
-    var isLocalDetailsMode by mutableStateOf(false)
-    var localFilePathForDetails by mutableStateOf<String?>(null)
 
     var showDetailsSheet by mutableStateOf(false)
+    var showTrackActionOfflineDialog by mutableStateOf(false)
 
     var showCommentsSheet by mutableStateOf(false)
     val commentsList = mutableStateListOf<Comment>()
@@ -3538,65 +3537,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         showMenuSheet = false
     }
 
-    fun openTrackDetails(targetTrack: Track? = null) {
-        val target = targetTrack ?: selectedTrackForSheet ?: trackForMenu ?: currentTrack ?: return
-        selectedTrackForSheet = target
-
-        if (target.id < 0) {
-            activateLocalDetailsMode(target)
-            return
-        }
-
+    fun openTrackDetails(target: Track) {
         viewModelScope.launch {
-            val localTrack = DownloadManager.getLocalTrack(target.id)
-            val isDownloaded = localTrack != null && localTrack.localAudioPath.isNotEmpty()
-
-            if (isDownloaded) {
-                activateLocalDetailsMode(target)
-            } else {
-                var isContextLocal = false
-                if (menuContextPlaylistId != null) {
-                    if (menuContextPlaylistId == -2L) {
-                        isContextLocal = true
-                    }
-                } else if (target.id == currentTrack?.id) {
-                    val navId = currentContext?.navigationId
-                    if (navId == "downloads" || navId?.startsWith("local_playlist:") == true) {
-                        isContextLocal = true
-                    }
-                }
-
-                if (isContextLocal) {
-                    activateLocalDetailsMode(target)
-                } else {
-                    isLocalDetailsMode = false
-                    localFilePathForDetails = null
-                    showMenuSheet = false
-                    showDetailsSheet = false
-                    navigateToTrackDetails(target.id)
-
-                    if (target.source == "soundcloud" && target.id > 0 && (target.user?.id == 0L || target.playbackCount == 0)) {
-                        try {
-                            val fullTracks = api.getTracksByIds(target.id.toString())
-                            val fullTrack = fullTracks.firstOrNull()
-                            if (fullTrack != null) {
-                                selectedTrackForSheet = fullTrack
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
-                }
+            val isLocalFile = target.source == "local" || target.id < 0
+            val isOnline = com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()
+            if (!isLocalFile && isOnline) {
+                navigateToTrackDetails(target.id)
+                return@launch
             }
-        }
-    }
+            if (!isLocalFile && DownloadManager.getLocalTrack(target.id)?.localAudioPath.isNullOrEmpty()) {
+                showTrackActionOfflineDialog = true
+                return@launch
+            }
 
-    private fun activateLocalDetailsMode(target: Track) {
-        isLocalDetailsMode = true
-        viewModelScope.launch {
-            val localTrack = DownloadManager.getLocalTrack(target.id)
-            val prefix = str("prefix_local_file_marker")
-            localFilePathForDetails = localTrack?.localAudioPath ?: target.description?.removePrefix(prefix)
+            selectedTrackForSheet = target
             showMenuSheet = false
             showDetailsSheet = true
         }
@@ -3751,7 +3705,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 if (!fallbackId.isNullOrBlank()) navigateToSpotifyArtist(fallbackId)
                 else track.user?.id?.takeIf { it > 0 }?.let { navigateToArtist(it) }
             }
-            else -> track.user?.id?.takeIf { it > 0 }?.let { navigateToArtist(it) }
+            else -> {
+                val userId = track.user?.id
+                if (userId != null && userId > 0) {
+                    navigateToArtist(userId)
+                } else if (track.displayArtist.isNotBlank()) {
+                    resolveAndNavigateToArtist(track.displayArtist)
+                }
+            }
         }
     }
 
