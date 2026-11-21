@@ -1,5 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.io.FileOutputStream
+import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -1077,4 +1078,20 @@ tasks.register<JavaExec>("connectBenchmark") {
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("ConnectBenchmark")
     systemProperty("java.awt.headless", "true")
+}
+
+tasks.register<JavaExec>("runTogetherInterop") {
+    description = "Runs a Together MQTT peer with --args=\"host CODE\" or --args=\"listener CODE\"."
+    group = "verification"
+    dependsOn("testClasses")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.alananasss.kittytune.data.together.TogetherInteropKt")
+    providers.gradleProperty("togetherTestBroker").orNull?.let {
+        systemProperty("kittytune.together.testBroker", it)
+    }
+    doFirst {
+        val profile = Files.createTempDirectory("kittytune-together-").toFile()
+        environment("APPDATA", profile)
+        environment("LOCALAPPDATA", profile)
+    }
 }
