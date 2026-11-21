@@ -3561,4 +3561,8 @@
     <string name="game_left">Sol</string>
     <string name="game_right">Sağ</string>
     <string name="game_hint">Ok tuşlarıyla yönlendir · Boşluk tuşuyla duraklat</string>
+    <string name="mini_player_cover_as_background">Arka planda kapak</string>
+    <string name="mini_player_cover_as_background_desc">Albüm kapağını mini oynatıcı kontrollerinin arkasında gösterir</string>
+    <string name="mini_player_progress_fill">İlerleme dolgusu</string>
+    <string name="mini_player_progress_fill_desc">İnce bir çizgi yerine parça çaldıkça mini oynatıcıyı doldurur</string>
 </resources>

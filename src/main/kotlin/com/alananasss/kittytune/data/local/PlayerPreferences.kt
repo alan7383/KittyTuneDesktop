@@ -296,6 +296,8 @@ class PlayerPreferences {
         private const val KEY_MINI_PLAYER_CONTROLS_ON_HOVER = "mini_player_controls_on_hover"
         private const val KEY_MINI_PLAYER_HOVER_EFFECT = "mini_player_hover_effect"
         private const val KEY_MINI_PLAYER_HOVER_ILLUMINATION = "mini_player_hover_illumination"
+        private const val KEY_MINI_PLAYER_COVER_AS_BACKGROUND = "mini_player_cover_as_background"
+        private const val KEY_MINI_PLAYER_PROGRESS_FILL = "mini_player_progress_fill"
         private const val KEY_MINI_PLAYER_SHOW_PROGRESS = "mini_player_show_progress"
         private const val KEY_MINI_PLAYER_CONTENT_MODE = "mini_player_content_mode"
         const val DEFAULT_MINI_PLAYER_CONTENT_MODE = "AUTO"
@@ -1285,6 +1287,12 @@ class PlayerPreferences {
     fun getMiniPlayerHoverIllumination(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_HOVER_ILLUMINATION, true)
     fun setMiniPlayerHoverIllumination(enabled: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_HOVER_ILLUMINATION, enabled)
     fun miniPlayerHoverIlluminationFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_HOVER_ILLUMINATION, true)
+
+    fun getMiniPlayerCoverAsBackground(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_COVER_AS_BACKGROUND, false)
+    fun setMiniPlayerCoverAsBackground(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_COVER_AS_BACKGROUND, show)
+
+    fun getMiniPlayerProgressFill(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_PROGRESS_FILL, false)
+    fun setMiniPlayerProgressFill(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_PROGRESS_FILL, show)
 
     fun getMiniPlayerShowProgress(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
     fun setMiniPlayerShowProgress(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, show)

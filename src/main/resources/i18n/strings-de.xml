@@ -3780,4 +3780,8 @@
     <string name="game_left">Links</string>
     <string name="game_right">Rechts</string>
     <string name="game_hint">Mit den Pfeiltasten steuern · Leertaste zum Pausieren</string>
+    <string name="mini_player_cover_as_background">Cover als Hintergrund</string>
+    <string name="mini_player_cover_as_background_desc">Zeigt das Albumcover hinter den Bedienelementen</string>
+    <string name="mini_player_progress_fill">Fortschrittsfüllung</string>
+    <string name="mini_player_progress_fill_desc">Füllt den Mini-Player mit dem Wiedergabefortschritt statt einer dünnen Linie</string>
 </resources>

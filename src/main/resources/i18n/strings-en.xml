@@ -3558,4 +3558,8 @@
     <string name="game_left">Left</string>
     <string name="game_right">Right</string>
     <string name="game_hint">Arrow keys to steer · Space to pause</string>
+    <string name="mini_player_cover_as_background">Cover as background</string>
+    <string name="mini_player_cover_as_background_desc">Show the album cover behind the mini player controls</string>
+    <string name="mini_player_progress_fill">Progress fill</string>
+    <string name="mini_player_progress_fill_desc">Fill the mini player as the track plays instead of showing a thin line</string>
 </resources>

@@ -3559,4 +3559,8 @@
     <string name="game_left">Gauche</string>
     <string name="game_right">Droite</string>
     <string name="game_hint">Flèches pour diriger · Espace pour mettre en pause</string>
+    <string name="mini_player_cover_as_background">Pochette en arrière-plan</string>
+    <string name="mini_player_cover_as_background_desc">Affiche la pochette derrière les commandes du mini-lecteur</string>
+    <string name="mini_player_progress_fill">Remplissage de la progression</string>
+    <string name="mini_player_progress_fill_desc">Remplit le mini-lecteur au fil du morceau à la place de la fine barre</string>
 </resources>
