@@ -59,14 +59,15 @@ object LocalMediaRepository {
                     return@withContext
                 }
 
-                val foundFiles = mutableListOf<File>()
+                val foundFiles = linkedMapOf<String, File>()
+                val visitedFolders = hashSetOf<String>()
                 _scanProgress.value = str("pref_local_scan_status_searching")
 
                 uriSet.forEach { pathStr ->
                     try {
                         val rootDir = File(pathStr)
                         if (rootDir.exists() && rootDir.isDirectory) {
-                            collectAudioFiles(rootDir, foundFiles)
+                            collectAudioFiles(rootDir, foundFiles, visitedFolders)
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
@@ -81,18 +82,37 @@ object LocalMediaRepository {
                 _scanProgress.value = str("pref_local_scan_status_found", foundFiles.size)
 
                 val tracksToInsert = mutableListOf<LocalTrack>()
-                val existingTracks = dao.getAllTracksList().associateBy { it.id }
+                val stored = dao.getAllStoredTracksList()
+                val existingTracks = stored.associateBy { it.id }
+                val downloads = stored.filterNot { it.isUserLocalMedia }.mapNotNullTo(hashSetOf()) {
+                    canonicalMediaPath(it.localAudioPath)
+                }
+                val localByFile = stored.filter { it.isUserLocalMedia }.sortedByDescending { it.id }
+                    .mapNotNull { track -> canonicalMediaPath(track.localAudioPath)?.let { it to track } }.toMap()
+                val usedIds = existingTracks.keys.toMutableSet()
                 val index = LocalMediaScanIndex(File(AppDirs.cacheDir, "local-scan-index.bin"))
                 var processed = 0
 
-                foundFiles.forEach { file ->
+                foundFiles.forEach { (key, file) ->
+                    if (key in downloads) return@forEach
                     currentCoroutineContext().ensureActive()
                     processed++
                     if (processed % 10 == 0) {
                         _scanProgress.value = str("pref_local_scan_status_analyzing", processed, foundFiles.size)
                     }
                     try {
-                        index.scan(file, existingTracks, ::processFile)?.let { tracksToInsert.add(it) }
+                        val existing = localByFile[key]
+                        val indexedFile = existing?.let { File(it.localAudioPath) }?.takeIf { it.isFile } ?: file
+                        index.scan(indexedFile, existingTracks) { target ->
+                            val track = processFile(target) ?: return@scan null
+                            if (existing != null) {
+                                track.copy(id = existing.id, downloadedAt = existing.downloadedAt)
+                            } else {
+                                var id = track.id
+                                while (!usedIds.add(id)) id--
+                                track.copy(id = id)
+                            }
+                        }?.let { tracksToInsert.add(it) }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -117,13 +137,14 @@ object LocalMediaRepository {
         }
     }
 
-    private fun collectAudioFiles(dir: File, list: MutableList<File>) {
+    private fun collectAudioFiles(dir: File, files: MutableMap<String, File>, visited: MutableSet<String>) {
+        val path = canonicalMediaPath(dir.path) ?: return
+        if (!visited.add(path)) return
         dir.listFiles()?.forEach { file ->
             if (file.isDirectory) {
-                collectAudioFiles(file, list)
-            } else {
-                val ext = file.extension.lowercase()
-                if (ext in AUDIO_EXTS) list.add(file)
+                collectAudioFiles(file, files, visited)
+            } else if (file.extension.lowercase() in AUDIO_EXTS) {
+                canonicalMediaPath(file.path)?.let { files.putIfAbsent(it, file) }
             }
         }
     }
@@ -164,6 +185,7 @@ object LocalMediaRepository {
                 artworkUrl = artworkPath,
                 duration = duration,
                 localAudioPath = file.absolutePath,
+                source = "local",
                 localArtworkPath = artworkPath,
             )
         } catch (e: Exception) {
@@ -198,3 +220,10 @@ object LocalMediaRepository {
 
 internal fun localMediaTrackId(path: String): Long =
     -kotlin.math.abs(path.hashCode().toLong()).coerceAtLeast(1L)
+
+/** Legacy desktop scans used a negative 32-bit path hash and omitted the source. */
+internal val LocalTrack.isUserLocalMedia: Boolean
+    get() = source == "local" || (source == null && id in Int.MIN_VALUE.toLong()..-1L && localAudioPath.isNotBlank())
+
+internal fun canonicalMediaPath(path: String): String? =
+    if (path.isBlank()) null else runCatching { File(path).canonicalPath }.getOrNull()

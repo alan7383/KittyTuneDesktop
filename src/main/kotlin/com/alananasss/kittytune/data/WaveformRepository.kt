@@ -2,6 +2,7 @@ package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.audio.automix.FullTrackWaveformDecoder
 import com.alananasss.kittytune.core.AppDirs
+import com.alananasss.kittytune.core.AtomicFiles
 import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Track
@@ -32,6 +33,12 @@ import kotlin.math.pow
 object WaveformRepository {
 
     private const val TAG = "WaveformRepository"
+
+    private const val MAX_DISK_BYTES = 128L * 1024 * 1024
+    private val diskLock = Any()
+    private val diskDirectory by lazy {
+        File(AppDirs.cacheDir, "waveforms").also { pruneWaveformFiles(it, MAX_DISK_BYTES) }
+    }
 
     private val decodedCache = BoundedCache<Long, FullTrackWaveformDecoder.DecodedWaveform>(12)
     private val inFlightDecodes = ConcurrentHashMap<Long, Boolean>()
@@ -86,6 +93,7 @@ object WaveformRepository {
         if (diskFile.exists() && diskFile.length() > 0) {
             val decoded = withContext(Dispatchers.IO) { runCatching { readDecoded(diskFile) }.getOrNull() }
             if (decoded != null && decoded.peaks.isNotEmpty()) {
+                synchronized(diskLock) { diskFile.setLastModified(System.currentTimeMillis()) }
                 decodedCache[trackId] = decoded
                 return decoded
             }
@@ -141,7 +149,7 @@ object WaveformRepository {
             // Only a complete pass may become the track's waveform.
             if (best != null && best.complete) {
                 decodedCache[track.id] = best
-                runCatching { saveDecoded(decodedCacheFile(track.id), best) }
+                runCatching { storeOnDisk(track.id, best) }
             }
             best
         } catch (e: Exception) {
@@ -182,8 +190,28 @@ object WaveformRepository {
         }
     }
 
-    private fun decodedCacheFile(trackId: Long): File =
-        File(File(AppDirs.cacheDir, "waveforms").apply { mkdirs() }, "wfdec_$trackId.bin")
+    private fun decodedCacheFile(trackId: Long): File = File(diskDirectory, "wfdec_$trackId.bin")
+
+    fun cacheSizeBytes(): Long = synchronized(diskLock) {
+        waveformCacheFiles(diskDirectory).sumOf(File::length)
+    }
+
+    fun clearCache() = synchronized(diskLock) {
+        waveformCacheFiles(diskDirectory).forEach { it.delete() }
+        decodedCache.clear()
+    }
+
+    private fun storeOnDisk(trackId: Long, decoded: FullTrackWaveformDecoder.DecodedWaveform) = synchronized(diskLock) {
+        diskDirectory.mkdirs()
+        val temp = File.createTempFile("wfdec-", ".tmp", diskDirectory)
+        try {
+            saveDecoded(temp, decoded)
+            AtomicFiles.replace(temp, decodedCacheFile(trackId))
+            pruneWaveformFiles(diskDirectory, MAX_DISK_BYTES)
+        } finally {
+            temp.delete()
+        }
+    }
 
     internal fun saveDecoded(file: File, decoded: FullTrackWaveformDecoder.DecodedWaveform) {
         DataOutputStream(file.outputStream().buffered()).use { out ->
@@ -205,4 +233,19 @@ object WaveformRepository {
             val peaks = FloatArray(count) { input.readFloat() }
             FullTrackWaveformDecoder.DecodedWaveform(peaks, durationMs, pps, complete = true)
         }
+}
+
+private val waveformFileName = Regex("""wfdec_-?\d+\.bin""")
+
+private fun waveformCacheFiles(directory: File): List<File> =
+    directory.listFiles().orEmpty().filter { it.isFile && waveformFileName.matches(it.name) }
+
+internal fun pruneWaveformFiles(directory: File, maxBytes: Long) {
+    val cached = waveformCacheFiles(directory)
+    var bytes = cached.sumOf(File::length)
+    for (file in cached.sortedWith(compareBy(File::lastModified, File::getName))) {
+        if (bytes <= maxBytes) break
+        val length = file.length()
+        if (file.delete()) bytes -= length
+    }
 }
