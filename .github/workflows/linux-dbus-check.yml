@@ -36,7 +36,7 @@ jobs:
         run: bash gradlew :test --tests 'TimeStretcherTest' -PdesktopOnly=true --console=plain
       - name: Test D-Bus services and build release package
         run: |
-          dbus-run-session -- bash gradlew :test --tests '*MprisServiceTest*' --tests '*LinuxStatusNotifierServiceTest*' --tests '*LazyAudioEngineTest*' -PdesktopOnly=true --console=plain
+          dbus-run-session -- bash gradlew :test --tests '*MprisServiceTest*' --tests '*LinuxStatusNotifierServiceTest*' --tests '*LazyAudioEngineTest*' --tests '*LocalMediaScanIndexTest*' -PdesktopOnly=true --console=plain
           bash gradlew packageReleaseDeb -PdesktopOnly=true --console=plain
       - name: Exercise final Debian package with its embedded runtime
         run: |
