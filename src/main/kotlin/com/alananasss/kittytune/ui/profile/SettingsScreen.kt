@@ -482,6 +482,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         .collectAsState(initial = prefs.getKeepPlayedTracksVisible())
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
+    val feedVideoSamples by prefs.feedVideoSamplesFlow().collectAsState(initial = prefs.getFeedVideoSamplesEnabled())
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
     var followsCover by remember { mutableStateOf(prefs.getTrackDynamicTheme()) }
@@ -591,6 +592,18 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 prefs.setAnimatedCoversFadeUiEnabled(it)
             },
             highlightKey = "pref_animated_covers_fade_ui",
+        ),
+        SettingsSearchItem(
+            title = str("pref_feed_video_samples"),
+            subtitle = str("pref_feed_video_samples_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.PlayCircle,
+            keywords = listOf("feed", "youtube", "video", "samples", "extraits"),
+            hasSwitch = true,
+            switchState = feedVideoSamples,
+            onSwitchChange = { prefs.setFeedVideoSamplesEnabled(it) },
+            highlightKey = "pref_feed_video_samples",
         ),
         SettingsSearchItem(
             title = str("pref_theme_pure_black"),

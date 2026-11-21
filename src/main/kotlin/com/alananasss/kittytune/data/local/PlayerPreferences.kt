@@ -1090,6 +1090,14 @@ class PlayerPreferences {
     fun getTrackDynamicTheme(): Boolean = Prefs.getBoolean(KEY_TRACK_DYNAMIC_THEME, false)
     fun setTrackDynamicTheme(enabled: Boolean) = Prefs.putBoolean(KEY_TRACK_DYNAMIC_THEME, enabled)
 
+    fun getFeedOfficialOnlyEnabled(): Boolean = Prefs.getBoolean("feed_official_only_enabled", false)
+    fun setFeedOfficialOnlyEnabled(enabled: Boolean) = Prefs.putBoolean("feed_official_only_enabled", enabled)
+    fun getFeedVideoSamplesEnabled(): Boolean = Prefs.getBoolean("feed_video_samples_enabled", false)
+    fun feedVideoSamplesFlow(): Flow<Boolean> = Prefs.booleanFlow("feed_video_samples_enabled", false)
+    fun setFeedVideoSamplesEnabled(enabled: Boolean) = Prefs.putBoolean("feed_video_samples_enabled", enabled)
+    fun getClipMaxHeight(): Int = Prefs.getInt("clip_max_height", 720)
+    fun setClipMaxHeight(height: Int) = Prefs.putInt("clip_max_height", height)
+
     fun getAnimatedCoversEnabled(): Boolean = Prefs.getBoolean(KEY_ANIMATED_COVERS, true)
     fun setAnimatedCoversEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ANIMATED_COVERS, enabled)
     fun animatedCoversFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_ANIMATED_COVERS, true)

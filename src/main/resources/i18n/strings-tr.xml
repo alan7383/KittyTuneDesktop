@@ -3565,4 +3565,27 @@
     <string name="mini_player_cover_as_background_desc">Albüm kapağını mini oynatıcı kontrollerinin arkasında gösterir</string>
     <string name="mini_player_progress_fill">İlerleme dolgusu</string>
     <string name="mini_player_progress_fill_desc">İnce bir çizgi yerine parça çaldıkça mini oynatıcıyı doldurur</string>
+    <string name="feed_tab_discover">Keşfet</string>
+    <string name="feed_tab_following">Takip edilenler</string>
+    <string name="feed_sign_in_hint">Takip ettiğin sanatçıların gönderilerini görmek için giriş yap</string>
+    <string name="feed_empty_discover">Şu anda keşfedilecek bir şey yok</string>
+    <string name="pref_feed_official_only">Yalnızca resmî sanatçılar</string>
+    <string name="pref_feed_official_only_desc">Doğrulanmış veya Pro hesapların parçalarını ve ISRC kodlu yayınları göster</string>
+    <string name="feed_reposted_by">%1$s yeniden paylaştı</string>
+    <string name="feed_follow">Takip et</string>
+    <string name="feed_unfollow">Takip ediliyor</string>
+    <string name="feed_like">Beğen</string>
+    <string name="feed_dislike">Beğenme</string>
+    <string name="feed_comments">Yorumlar</string>
+    <string name="feed_add_to_playlist">Çalma listesine ekle</string>
+    <string name="track_info_sheet_title">Parça bilgileri</string>
+    <string name="pref_feed_video_samples">YouTube video kesitleri</string>
+    <string name="pref_feed_video_samples_desc">Hareketli kapak yoksa müzik videosundan sessiz kesitler kullan</string>
+    <string name="artist_clip_resolution">%1$dp</string>
+    <string name="mix_vibe_official">Resmî miks</string>
+    <string name="mix_vibe_official_sub">Yalnızca resmî sanatçıların parçaları</string>
+    <string name="feed_previews">Önizlemeler</string>
+    <string name="feed_previous_preview">Önceki önizleme</string>
+    <string name="feed_next_preview">Sonraki önizleme</string>
+    <string name="feed_more">Daha fazla yükle</string>
 </resources>

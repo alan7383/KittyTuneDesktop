@@ -4,6 +4,7 @@ import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.lyrics.GeniusVoices
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -73,7 +74,6 @@ object ArtistClips {
     }
 
     /** Highest muxed resolution asked for; YouTube rarely offers more than 360p with sound in one file. */
-    private const val MAX_HEIGHT = 720
 
     private val cache = object : LinkedHashMap<String, List<Clip>>(CACHE_SIZE, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Clip>>) = size > CACHE_SIZE
@@ -134,19 +134,40 @@ object ArtistClips {
         }
     }
 
-    /** A playable address for [clip]: one file with picture and sound together. Expires after a few hours. */
-    suspend fun streamUrl(clip: Clip): String? = withContext(Dispatchers.IO) {
-        runCatching {
+    internal data class ClipStream(val videoUrl: String, val height: Int, val audioUrl: String? = null)
+
+    internal fun playbackOrder(streams: List<ClipStream>, maxHeight: Int): List<ClipStream> =
+        streams.filter { it.height in 1..maxHeight }
+            .distinctBy { it.videoUrl to it.audioUrl }
+            .sortedWith(compareByDescending<ClipStream> { it.height }.thenBy { it.audioUrl != null })
+
+    /** Resolves fresh URLs each time the dialog is opened, or when the user retries. */
+    internal suspend fun streams(clip: Clip): List<ClipStream> = withContext(Dispatchers.IO) {
+        try {
             StreamResolver.init()
             val extractor = ServiceList.YouTube.getStreamExtractor(clip.url)
             extractor.fetchPage()
-            extractor.videoStreams
-                .filter { it.url != null && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
-                .map { it to (it.resolution.substringBefore('p').toIntOrNull() ?: 0) }
-                .filter { (_, height) -> height <= MAX_HEIGHT }
-                .maxByOrNull { (_, height) -> height }
-                ?.first?.url
-        }.onFailure { Logger.w("ArtistClips", "No stream for ${clip.url}: ${it.message}") }.getOrNull()
+            val audio = extractor.audioStreams
+                .filter { it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && it.isUrl }
+                .sortedWith(compareByDescending<org.schabi.newpipe.extractor.stream.AudioStream> {
+                    it.format?.mimeType == "audio/mp4"
+                }.thenByDescending { it.averageBitrate })
+                .firstNotNullOfOrNull { it.content.takeIf { url -> url.startsWith("https://") } }
+            val video = extractor.videoStreams + if (audio == null) emptyList() else extractor.videoOnlyStreams
+            val candidates = video.mapNotNull { stream ->
+                val height = stream.resolution.substringBefore('p').toIntOrNull() ?: return@mapNotNull null
+                if (stream.deliveryMethod != DeliveryMethod.PROGRESSIVE_HTTP ||
+                    !stream.isUrl || !stream.content.startsWith("https://")
+                ) return@mapNotNull null
+                ClipStream(stream.content, height, if (stream.isVideoOnly) audio else null)
+            }
+            playbackOrder(candidates, 2160)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.w("ArtistClips", "Could not resolve a clip: ${e.javaClass.simpleName}")
+            emptyList()
+        }
     }
 
     /**

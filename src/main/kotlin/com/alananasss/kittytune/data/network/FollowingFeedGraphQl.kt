@@ -219,6 +219,7 @@ data class FollowingFeedItem(
     val item: FollowingFeedEntity?,
     val reposter: FollowingFeedUser?,
     val promoter: FollowingFeedUser?,
+    val caption: String? = null,
 ) {
     fun toStreamItem(): StreamItem? {
         val track = item?.toTrack()
@@ -239,6 +240,7 @@ data class FollowingFeedItem(
             playlist = playlist,
             user = if (isRepost) reposter?.toUser() else promoter?.toUser(),
             createdAt = createdAt,
+            caption = caption,
         )
     }
 }

@@ -42,6 +42,9 @@
             @Query("linked_partitioning") linkedPartitioning: Int = 1
         ): ChartsResponse
     
+        @GET
+        suspend fun getChartsNextPage(@Url url: String): ChartsResponse
+
         // User's subscription feed
         @GET("stream")
         suspend fun getMyStream(

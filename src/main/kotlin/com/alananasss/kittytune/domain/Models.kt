@@ -19,7 +19,8 @@
         val track: Track?,
         val playlist: Playlist?,
         val user: User?,
-        @SerializedName("created_at") val createdAt: String?
+        @SerializedName("created_at") val createdAt: String?,
+        val caption: String? = null,
     )
     
     // comments

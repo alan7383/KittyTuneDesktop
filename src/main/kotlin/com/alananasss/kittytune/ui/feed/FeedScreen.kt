@@ -22,6 +22,9 @@ import androidx.compose.material3.*
 import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.TrackArtistClick
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.alananasss.kittytune.core.Prefs
+import com.alananasss.kittytune.data.mix.MixRanking
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +60,94 @@ fun FeedScreen(
     navController: NavController,
     feedViewModel: FeedViewModel = viewModel { FeedViewModel(AppInstance.application) },
 ) {
+    var following by rememberSaveable { mutableStateOf(false) }
+    var followingPreviews by rememberSaveable { mutableStateOf(false) }
+    val preferences = playerViewModel.playerPrefs
+    val prefsState by Prefs.flow.collectAsState()
+    val officialOnly = remember(prefsState) { preferences.getFeedOfficialOnlyEnabled() }
+    val videoSamples = remember(prefsState) { preferences.getFeedVideoSamplesEnabled() }
+    LaunchedEffect(officialOnly) { feedViewModel.applyOfficialOnly(officialOnly) }
+    LaunchedEffect(following) { if (following) feedViewModel.ensureFollowing() }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterChip(selected = !following, onClick = { following = false }, label = { Text(str("feed_tab_discover")) })
+            FilterChip(selected = following, onClick = { following = true }, label = { Text(str("feed_tab_following")) })
+            Spacer(Modifier.weight(1f))
+            FilterChip(
+                selected = officialOnly,
+                onClick = { preferences.setFeedOfficialOnlyEnabled(!officialOnly) },
+                label = { Text(str("pref_feed_official_only")) },
+            )
+            if (following && feedViewModel.isLoggedIn) {
+                FilterChip(
+                    selected = followingPreviews,
+                    onClick = { followingPreviews = !followingPreviews },
+                    label = { Text(str("feed_previews")) },
+                )
+            }
+            IconButton(onClick = { if (following) feedViewModel.refresh() else feedViewModel.resetDiscover() }) {
+                Icon(Icons.Rounded.Refresh, contentDescription = str("feed_refresh"))
+            }
+        }
+
+        if (following && !feedViewModel.isLoggedIn) {
+            FeedMessage(str("feed_sign_in_hint"))
+        } else if (following && !followingPreviews) {
+            FollowingFeedList(playerViewModel, navController, feedViewModel, officialOnly)
+        } else {
+            val posts = if (following) {
+                val tracks = feedViewModel.feedItems.mapNotNull { it.track }
+                val visibleIds = rememberFilteredTracks(tracks).map { it.id }.toSet()
+                feedViewModel.feedItems.mapNotNull { post ->
+                    val track = post.track ?: return@mapNotNull null
+                    if (track.id !in visibleIds || officialOnly && !MixRanking.isOfficialArtist(track)) return@mapNotNull null
+                    PreviewPost(track, post.user, post.caption, post.type == "track-repost")
+                }
+            } else {
+                rememberFilteredTracks(feedViewModel.discover.toList()).map { PreviewPost(it, it.user) }
+            }
+            val loading = if (following) feedViewModel.isLoading || feedViewModel.isLoadingMore else feedViewModel.discoverLoading
+            val requestMore = if (following) feedViewModel::loadMore else feedViewModel::loadDiscover
+            val failed = if (following) feedViewModel.error else feedViewModel.discoverFailed
+            if (posts.isEmpty()) {
+                when {
+                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularWavyProgressIndicator() }
+                    failed -> FeedMessage(str("error_generic"), if (following) feedViewModel::refresh else requestMore)
+                    following -> FeedMessage(str("feed_empty"), if (feedViewModel.hasMore) requestMore else null, "feed_more")
+                    else -> FeedMessage(str("feed_empty_discover"), requestMore)
+                }
+            } else {
+                key(following, officialOnly) {
+                    FeedPreviewPager(posts, playerViewModel, feedViewModel, videoSamples, requestMore)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun FeedMessage(message: String, onAction: (() -> Unit)? = null, actionLabel: String = "btn_retry") {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (onAction != null) Button(onClick = onAction) { Text(str(actionLabel)) }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FollowingFeedList(
+    playerViewModel: PlayerViewModel,
+    navController: NavController,
+    feedViewModel: FeedViewModel,
+    officialOnly: Boolean,
+) {
     val listState = rememberLazyListState()
 
     // Detect end of list for load-more
@@ -67,7 +158,7 @@ fun FeedScreen(
             lastVisible >= totalItems - 5 && totalItems > 0 && feedViewModel.hasMore
         }
     }
-    LaunchedEffect(shouldLoadMore) {
+    LaunchedEffect(shouldLoadMore, feedViewModel.feedItems.size) {
         if (shouldLoadMore && !feedViewModel.isLoadingMore) {
             feedViewModel.loadMore()
         }
@@ -75,37 +166,22 @@ fun FeedScreen(
 
     // Hide blocked tracks/artists (issue #41); playlists are never filtered.
     val visibleTracks = rememberFilteredTracks(feedViewModel.feedItems.mapNotNull { it.track })
-    val feedItems = remember(feedViewModel.feedItems, visibleTracks) {
+    val feedItems = remember(feedViewModel.feedItems.toList(), visibleTracks, officialOnly) {
         val visibleIds = visibleTracks.map { it.id }.toSet()
-        feedViewModel.feedItems.filter { it.track == null || it.track.id in visibleIds }
+        feedViewModel.feedItems.filter {
+            val track = it.track
+            track == null || track.id in visibleIds && (!officialOnly || MixRanking.isOfficialArtist(track))
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = str("nav_feed"),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { feedViewModel.refresh() }) {
-                Icon(Icons.Rounded.Refresh, contentDescription = str("feed_refresh"))
-            }
-        }
-
         when {
             feedViewModel.isLoading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularWavyProgressIndicator()
                 }
             }
-            feedViewModel.error != null && feedViewModel.feedItems.isEmpty() -> {
+            feedViewModel.error && feedViewModel.feedItems.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.CloudOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -121,6 +197,7 @@ fun FeedScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.DynamicFeed, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(str("feed_empty"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (feedViewModel.hasMore) TextButton(onClick = feedViewModel::loadMore) { Text(str("feed_more")) }
                     }
                 }
             }

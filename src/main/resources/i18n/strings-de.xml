@@ -3784,4 +3784,27 @@
     <string name="mini_player_cover_as_background_desc">Zeigt das Albumcover hinter den Bedienelementen</string>
     <string name="mini_player_progress_fill">Fortschrittsfüllung</string>
     <string name="mini_player_progress_fill_desc">Füllt den Mini-Player mit dem Wiedergabefortschritt statt einer dünnen Linie</string>
+    <string name="feed_tab_discover">Entdecken</string>
+    <string name="feed_tab_following">Abonniert</string>
+    <string name="feed_sign_in_hint">Melde dich an, um Beiträge abonnierter Künstler zu sehen</string>
+    <string name="feed_empty_discover">Gerade gibt es nichts zu entdecken</string>
+    <string name="pref_feed_official_only">Nur offizielle Künstler</string>
+    <string name="pref_feed_official_only_desc">Titel von verifizierten oder Pro-Konten und Veröffentlichungen mit ISRC anzeigen</string>
+    <string name="feed_reposted_by">Repost von %1$s</string>
+    <string name="feed_follow">Folgen</string>
+    <string name="feed_unfollow">Abonniert</string>
+    <string name="feed_like">Gefällt mir</string>
+    <string name="feed_dislike">Gefällt mir nicht</string>
+    <string name="feed_comments">Kommentare</string>
+    <string name="feed_add_to_playlist">Zur Playlist hinzufügen</string>
+    <string name="track_info_sheet_title">Titelinformationen</string>
+    <string name="pref_feed_video_samples">YouTube-Videoausschnitte</string>
+    <string name="pref_feed_video_samples_desc">Stumme Musikvideoausschnitte anzeigen, wenn kein animiertes Cover verfügbar ist</string>
+    <string name="artist_clip_resolution">%1$dp</string>
+    <string name="mix_vibe_official">Offizieller Mix</string>
+    <string name="mix_vibe_official_sub">Nur Titel offizieller Künstler</string>
+    <string name="feed_previews">Vorschauen</string>
+    <string name="feed_previous_preview">Vorherige Vorschau</string>
+    <string name="feed_next_preview">Nächste Vorschau</string>
+    <string name="feed_more">Mehr laden</string>
 </resources>

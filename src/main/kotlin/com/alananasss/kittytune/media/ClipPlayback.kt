@@ -10,7 +10,10 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.alananasss.kittytune.audio.VolumeCurve
 import com.alananasss.kittytune.audio.openPlaybackLine
 import com.alananasss.kittytune.data.MusicManager
+import com.alananasss.kittytune.data.YoutubeAudioResolver
+import com.alananasss.kittytune.data.artist.ArtistClips.ClipStream
 import com.alananasss.kittytune.utils.Logger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,7 +21,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.jetbrains.skia.ColorAlphaType
@@ -31,11 +38,8 @@ import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.SourceDataLine
 
 /**
- * Plays one video file with its sound: a music video on an artist's page (tester's list, 5.5).
- *
- * One FFmpeg reader gives picture and sound in the order they are stored. Sound goes straight to the output line,
- * whose blocking writes set the pace; each picture waits until the sound has played up to its time, or is dropped
- * when it comes too late, so lips stay on the words. Without a sound track the wall clock stands in.
+ * Plays either a muxed music video or paired video and audio streams. The output line's played
+ * sample count clocks the pictures. Each separate audio read stays close to the video timestamp.
  */
 class ClipPlayback(
     private val scope: CoroutineScope,
@@ -59,15 +63,40 @@ class ClipPlayback(
     var hasFailed by mutableStateOf(false)
         private set
 
-    private val pendingSeekMs = AtomicLong(NO_SEEK)
+    private var pendingSeekMs = AtomicLong(NO_SEEK)
     private var job: Job? = null
+    private val decoderLock = Mutex()
 
-    fun play(streamUrl: String) {
+    internal fun play(streams: List<ClipStream>, startMs: Long = 0, paused: Boolean = false) {
         job?.cancel()
         hasEnded = false
         hasFailed = false
         isLoading = true
-        job = scope.launch(Dispatchers.IO) { decode(streamUrl) }
+        isPaused = paused
+        positionMs = startMs
+        frame = null
+        val seek = AtomicLong(startMs.takeIf { it > 0 } ?: NO_SEEK)
+        pendingSeekMs = seek
+        job = scope.launch(Dispatchers.IO) {
+            decoderLock.withLock {
+                for (stream in streams) {
+                    try {
+                        decode(stream, seek)
+                        return@launch
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        ensureActive()
+                        Logger.w("ClipPlayback", "Could not play ${stream.height}p: ${e.javaClass.simpleName}")
+                        isLoading = true
+                        frame = null
+                        seek.compareAndSet(NO_SEEK, positionMs)
+                    }
+                }
+                hasFailed = true
+                isLoading = false
+            }
+        }
     }
 
     fun togglePause() {
@@ -85,42 +114,39 @@ class ClipPlayback(
 
     fun stop() {
         job?.cancel()
-        job = null
     }
 
     private data class DecodedVideo(
         val timestampUs: Long,
         val bitmap: ImageBitmap,
+        val generation: Long,
     )
 
-    private suspend fun CoroutineScope.decode(streamUrl: String) {
+    private suspend fun CoroutineScope.decode(stream: ClipStream, pendingSeekMs: AtomicLong) {
         runCatching { avutil.av_log_set_level(avutil.AV_LOG_ERROR) }
-        var grabber: FFmpegFrameGrabber? = null
+        val video = openGrabber(stream.videoUrl)
+        var audio: FFmpegFrameGrabber? = null
         var line: SourceDataLine? = null
-        val videoQueue = Channel<DecodedVideo>(capacity = 8)
+        val videoQueue = Channel<DecodedVideo>(capacity = 3)
+        val generation = AtomicLong()
         try {
-            grabber = FFmpegFrameGrabber(streamUrl).apply {
-                setOption("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                setOption("rw_timeout", "10000000")
-                setOption("reconnect", "1")
-                setOption("reconnect_streamed", "1")
-                setOption("reconnect_delay_max", "5")
-                setOption("reconnect_at_eof", "1")
-                setOption("buffer_size", "4194304")
-                sampleFormat = avutil.AV_SAMPLE_FMT_S16
-                // Handed to Skia as it is: the Java2D route through a BufferedImage cost more than the picture's time.
-                pixelFormat = avutil.AV_PIX_FMT_BGRA
-                start()
+            video.start()
+            if (stream.audioUrl != null) {
+                audio = openGrabber(stream.audioUrl)
+                audio.start()
             }
-            durationMs = grabber.lengthInTime / 1000
-            val sampleRate = grabber.sampleRate
-            val channels = grabber.audioChannels
-            if (sampleRate > 0 && channels > 0) {
-                line = openPlaybackLine(
-                    AudioFormat(sampleRate.toFloat(), 16, channels, true, false),
-                    sampleRate * channels * 2 * LINE_BUFFER_MS / 1000,
-                )
-            }
+            check(video.imageWidth > 0 && video.imageHeight > 0)
+            durationMs = video.lengthInTime / 1000
+            val audioReader = audio ?: video
+            val sampleRate = audioReader.sampleRate
+            val channels = audioReader.audioChannels
+            check(sampleRate > 0 && channels > 0)
+            line = openPlaybackLine(
+                AudioFormat(sampleRate.toFloat(), 16, channels, true, false),
+                sampleRate * channels * 2 * LINE_BUFFER_MS / 1000,
+            )
+            line.start()
+            currentCoroutineContext().ensureActive()
             val clock = Clock(line, sampleRate)
             var bytes = ByteArray(0)
             isLoading = false
@@ -129,6 +155,7 @@ class ClipPlayback(
                 val presenter = launch(Dispatchers.Default) {
                     for (video in videoQueue) {
                         if (!isActive) break
+                        if (video.generation != generation.get()) continue
                         var aheadUs = video.timestampUs - clock.nowUs()
                         if (aheadUs < -LATE_FRAME_US) continue
                         if (aheadUs > MAX_AHEAD_US) {
@@ -142,84 +169,95 @@ class ClipPlayback(
                         while (isActive && isPaused && pendingSeekMs.get() == NO_SEEK) {
                             delay(PAUSED_POLL_MS)
                         }
-                        if (isActive && !isPaused && pendingSeekMs.get() == NO_SEEK) {
+                        if (isActive && !isPaused && video.generation == generation.get() && pendingSeekMs.get() == NO_SEEK) {
                             frame = video.bitmap
                             positionMs = video.timestampUs / 1000
                         }
                     }
                 }
 
+                var audioTimestampUs = -1L
+                var audioEnded = false
+                var previousVideoTimestamp = 0L
+                var sawFrame = false
+                var wroteAudio = false
+                fun writeAudio(next: org.bytedeco.javacv.Frame) {
+                    val samples = next.samples ?: return
+                    val buffers = samples.map { it as? ShortBuffer ?: return }
+                    if (buffers.isEmpty()) return
+                    val count = buffers.minOf { it.remaining() }
+                    val totalBytes = count * buffers.size * 2
+                    if (bytes.size < totalBytes) bytes = ByteArray(totalBytes)
+                    val gain = VolumeCurve.sliderToAmplitude(volume)
+                    var index = 0
+                    for (sample in 0 until count) {
+                        for (buffer in buffers) {
+                            val value = (buffer.get(buffer.position() + sample) * gain).toInt()
+                                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                            bytes[index++] = value.toByte()
+                            bytes[index++] = (value shr 8).toByte()
+                        }
+                    }
+                    if (totalBytes > 0) {
+                        line.write(bytes, 0, totalBytes)
+                        wroteAudio = true
+                    }
+                }
                 try {
                     while (isActive) {
                         val seekMs = pendingSeekMs.getAndSet(NO_SEEK)
                         if (seekMs != NO_SEEK) {
+                            generation.incrementAndGet()
                             while (videoQueue.tryReceive().isSuccess) {}
-                            grabber.setTimestamp(seekMs * 1000)
-                            line?.flush()
-                            clock.restartAt(seekMs * 1000)
+                            line.flush()
+                            val targetUs = seekMs.coerceAtMost(durationMs.takeIf { it > 0 } ?: seekMs) * 1000
+                            video.setTimestamp(targetUs)
+                            audio?.setTimestamp(targetUs)
+                            audioTimestampUs = targetUs - 1
+                            previousVideoTimestamp = targetUs
+                            audioEnded = false
+                            clock.restartAt(targetUs)
                             hasEnded = false
                         }
                         if (isPaused) {
-                            line?.stop()
+                            line.stop()
                             while (isActive && isPaused && pendingSeekMs.get() == NO_SEEK) delay(PAUSED_POLL_MS)
-                            line?.start()
+                            line.start()
                             clock.restartAt(positionMs * 1000)
                             continue
                         }
-                        val next = grabber.grab()
+                        val next = if (audio != null) video.grabImage() else video.grab()
+                        ensureActive()
                         if (next == null) {
-                            line?.drain()
+                            check(sawFrame && wroteAudio) { "Clip ended without both video and audio" }
+                            line.drain()
+                            if (pendingSeekMs.get() != NO_SEEK) continue
                             hasEnded = true
                             isPaused = true
                             continue
                         }
-                        val samplesArray = next.samples
-                        if (samplesArray != null && line != null && samplesArray.isNotEmpty()) {
-                            val gain = VolumeCurve.sliderToAmplitude(volume)
-                            if (samplesArray.size == 1) {
-                                val sb = samplesArray[0] as? ShortBuffer
-                                if (sb != null) {
-                                    val count = sb.remaining()
-                                    val totalBytes = count * 2
-                                    if (bytes.size < totalBytes) bytes = ByteArray(totalBytes)
-                                    val pos = sb.position()
-                                    for (i in 0 until count) {
-                                        val value = (sb.get(pos + i) * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-                                        bytes[i * 2] = value.toByte()
-                                        bytes[i * 2 + 1] = (value shr 8).toByte()
-                                    }
-                                    line.write(bytes, 0, totalBytes)
-                                }
-                            } else if (samplesArray.size >= 2) {
-                                val left = samplesArray[0] as? ShortBuffer
-                                val right = samplesArray[1] as? ShortBuffer
-                                if (left != null && right != null) {
-                                    val count = minOf(left.remaining(), right.remaining())
-                                    val totalBytes = count * 4
-                                    if (bytes.size < totalBytes) bytes = ByteArray(totalBytes)
-                                    val leftPos = left.position()
-                                    val rightPos = right.position()
-                                    for (i in 0 until count) {
-                                        val lVal = (left.get(leftPos + i) * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-                                        val rVal = (right.get(rightPos + i) * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
-                                        val idx = i * 4
-                                        bytes[idx] = lVal.toByte()
-                                        bytes[idx + 1] = (lVal shr 8).toByte()
-                                        bytes[idx + 2] = rVal.toByte()
-                                        bytes[idx + 3] = (rVal shr 8).toByte()
-                                    }
-                                    line.write(bytes, 0, totalBytes)
+                        val timestampUs = next.timestamp
+                        if (audio == null) {
+                            writeAudio(next)
+                        } else {
+                            while (!audioEnded && audioTimestampUs < timestampUs + AUDIO_LEAD_US && isActive) {
+                                val decodedAudio = audio.grabSamples()
+                                if (decodedAudio == null) {
+                                    audioEnded = true
+                                } else {
+                                    audioTimestampUs = decodedAudio.timestamp
+                                    if (audioTimestampUs >= previousVideoTimestamp - AUDIO_LEAD_US) writeAudio(decodedAudio)
                                 }
                             }
+                            previousVideoTimestamp = timestampUs
                         }
                         if (next.image != null) {
-                            val bmp = toBitmap(next)
-                            if (bmp != null) {
-                                val qf = DecodedVideo(next.timestamp, bmp)
-                                while (isActive && videoQueue.trySend(qf).isFailure) {
-                                    if (pendingSeekMs.get() != NO_SEEK || isPaused) break
-                                    delay(5L)
-                                }
+                            val bitmap = toBitmap(next) ?: continue
+                            sawFrame = true
+                            val decoded = DecodedVideo(timestampUs, bitmap, generation.get())
+                            while (isActive && videoQueue.trySend(decoded).isFailure) {
+                                if (pendingSeekMs.get() != NO_SEEK || isPaused) break
+                                delay(5L)
                             }
                         }
                     }
@@ -227,15 +265,27 @@ class ClipPlayback(
                     presenter.cancel()
                 }
             }
-        } catch (e: Exception) {
-            Logger.w("ClipPlayback", "Clip playback failed: ${e.message}")
-            hasFailed = true
-            isLoading = false
         } finally {
             videoQueue.close()
-            runCatching { line?.flush(); line?.stop(); line?.close() }
-            runCatching { grabber?.stop(); grabber?.release() }
+            runCatching { line?.close() }
+            runCatching { audio?.release() }
+            runCatching { video.release() }
         }
+    }
+
+    private fun openGrabber(url: String): FFmpegFrameGrabber = FFmpegFrameGrabber(url).apply {
+        val headers = YoutubeAudioResolver.requestHeaders(url)
+        headers["User-Agent"]?.let { setOption("user_agent", it) }
+        val otherHeaders = headers.filterKeys { it != "User-Agent" }
+        if (otherHeaders.isNotEmpty()) {
+            setOption("headers", otherHeaders.entries.joinToString("") { (key, value) -> "$key: $value\r\n" })
+        }
+        setOption("rw_timeout", "8000000")
+        setOption("reconnect", "1")
+        setOption("reconnect_streamed", "1")
+        setOption("reconnect_delay_max", "2")
+        sampleFormat = avutil.AV_SAMPLE_FMT_S16
+        pixelFormat = avutil.AV_PIX_FMT_BGRA
     }
 
     /** One decoded picture (BGRA, as the grabber was asked for) as an image Compose can draw. */
@@ -256,12 +306,14 @@ class ClipPlayback(
         private var baseFrames = line?.longFramePosition ?: 0L
         private var baseNanos = System.nanoTime()
 
+        @Synchronized
         fun restartAt(us: Long) {
             baseUs = us
             baseFrames = line?.longFramePosition ?: 0L
             baseNanos = System.nanoTime()
         }
 
+        @Synchronized
         fun nowUs(): Long {
             val wallUs = baseUs + (System.nanoTime() - baseNanos) / 1000
             if (line == null || sampleRate <= 0) return wallUs
@@ -276,8 +328,8 @@ class ClipPlayback(
 
     private companion object {
         const val NO_SEEK = -1L
-        /** Room for a whole run of sound stored ahead of its pictures, so writing it never holds up decoding the pictures. */
-        const val LINE_BUFFER_MS = 1000
+        const val LINE_BUFFER_MS = 250
+        const val AUDIO_LEAD_US = 120_000L
         const val PAUSED_POLL_MS = 40L
 
         /** A picture this far behind the sound is skipped rather than shown late. */

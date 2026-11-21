@@ -2430,6 +2430,15 @@ internal fun StartMixingCard(playerViewModel: PlayerViewModel) {
             )
             add(
                 VibeStation(
+                    id = "official",
+                    title = str("mix_vibe_official"),
+                    subtitle = str("mix_vibe_official_sub"),
+                    icon = Icons.Rounded.Verified,
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.Official
+                )
+            )
+            add(
+                VibeStation(
                     id = "rock",
                     title = str("mix_vibe_rock"),
                     subtitle = str("mix_vibe_rock_sub"),

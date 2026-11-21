@@ -3645,4 +3645,27 @@
     <string name="mini_player_cover_as_background_desc">Hiện ảnh bìa album phía sau các nút điều khiển</string>
     <string name="mini_player_progress_fill">Tô đầy theo tiến độ</string>
     <string name="mini_player_progress_fill_desc">Tô đầy trình phát mini theo tiến độ bài hát thay cho vạch mảnh</string>
+    <string name="feed_tab_discover">Khám phá</string>
+    <string name="feed_tab_following">Đang theo dõi</string>
+    <string name="feed_sign_in_hint">Đăng nhập để xem bài đăng của nghệ sĩ bạn theo dõi</string>
+    <string name="feed_empty_discover">Hiện chưa có gì để khám phá</string>
+    <string name="pref_feed_official_only">Chỉ nghệ sĩ chính thức</string>
+    <string name="pref_feed_official_only_desc">Hiện bài hát của tài khoản đã xác minh hoặc Pro và bản phát hành có mã ISRC</string>
+    <string name="feed_reposted_by">%1$s đã đăng lại</string>
+    <string name="feed_follow">Theo dõi</string>
+    <string name="feed_unfollow">Đang theo dõi</string>
+    <string name="feed_like">Thích</string>
+    <string name="feed_dislike">Không thích</string>
+    <string name="feed_comments">Bình luận</string>
+    <string name="feed_add_to_playlist">Thêm vào danh sách phát</string>
+    <string name="track_info_sheet_title">Thông tin bài hát</string>
+    <string name="pref_feed_video_samples">Đoạn video YouTube</string>
+    <string name="pref_feed_video_samples_desc">Phát đoạn video nhạc không tiếng khi không có ảnh bìa động</string>
+    <string name="artist_clip_resolution">%1$dp</string>
+    <string name="mix_vibe_official">Bản phối chính thức</string>
+    <string name="mix_vibe_official_sub">Chỉ gồm bài hát của nghệ sĩ chính thức</string>
+    <string name="feed_previews">Bản nghe thử</string>
+    <string name="feed_previous_preview">Bản nghe thử trước</string>
+    <string name="feed_next_preview">Bản nghe thử tiếp theo</string>
+    <string name="feed_more">Tải thêm</string>
 </resources>

@@ -10,6 +10,16 @@ class ArtistClipsTest {
         Clip("https://youtube.com/watch?v=" + title.hashCode(), title, uploader, null, durationSec, 1_000L)
 
     @Test
+    fun `paired rendition falls back within the chosen resolution cap`() {
+        val fourK = ArtistClips.ClipStream("4k", 2160, "separate-audio")
+        val hd = ArtistClips.ClipStream("hd", 720, "separate-audio")
+        val muxed = ArtistClips.ClipStream("muxed", 360)
+        val streams = listOf(muxed, fourK, hd, hd)
+        assertEquals(listOf(fourK, hd, muxed), ArtistClips.playbackOrder(streams, 2160))
+        assertEquals(listOf(hd, muxed), ArtistClips.playbackOrder(streams, 720))
+    }
+
+    @Test
     fun `keeps the artist's own videos and drops everyone else's`() {
         val found = listOf(
             clip("Rihanna - Umbrella (Official Music Video) ft. JAY-Z", "Rihanna"),

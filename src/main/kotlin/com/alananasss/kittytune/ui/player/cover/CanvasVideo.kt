@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -17,7 +18,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.alananasss.kittytune.data.cover.HlsVariantResolver
+import com.alananasss.kittytune.data.YoutubeAudioResolver
 import com.alananasss.kittytune.utils.Logger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,7 +35,7 @@ import kotlin.math.max
 /** Decodes are app-wide and shared: every CanvasVideo showing one URL splits one stream. */
 private val canvasHubScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 private val canvasHub = SharedDecodeHub<ImageBitmap>(canvasHubScope) { url, emit ->
-    decodeCanvasFrames(url, emit)
+    decodeCanvasFrames(url, emit = emit)
 }
 
 @Composable
@@ -41,9 +44,13 @@ fun CanvasVideo(
     isPlaying: Boolean = true,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
+    clipStartMs: Long = 0,
+    clipEndMs: Long? = null,
+    onError: (() -> Unit)? = null,
 ) {
-    var currentBitmap by remember(canvasUrl) { mutableStateOf<ImageBitmap?>(null) }
-    var isVideoReady by remember(canvasUrl) { mutableStateOf(false) }
+    val handleError by rememberUpdatedState(onError)
+    var currentBitmap by remember(canvasUrl, clipStartMs, clipEndMs) { mutableStateOf<ImageBitmap?>(null) }
+    var isVideoReady by remember(canvasUrl, clipStartMs, clipEndMs) { mutableStateOf(false) }
 
     val alpha by animateFloatAsState(
         targetValue = if (isVideoReady) 1f else 0f,
@@ -55,8 +62,22 @@ fun CanvasVideo(
     // free. Stopping here and resuming on the last frame is invisible, the way the other ambient effects
     // already stop (issue #66).
     val isWindowSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
-    LaunchedEffect(canvasUrl, isPlaying, isWindowSeen) {
+    LaunchedEffect(canvasUrl, isPlaying, isWindowSeen, clipStartMs, clipEndMs) {
         if (canvasUrl.isBlank() || !isPlaying || !isWindowSeen) return@LaunchedEffect
+        if (handleError != null || clipEndMs != null) {
+            decodeCanvasFrames(canvasUrl, clipStartMs, clipEndMs) { bitmap ->
+                if (bitmap != null) {
+                    currentBitmap = bitmap
+                    isVideoReady = true
+                }
+            }
+            if (isActive) {
+                currentBitmap = null
+                isVideoReady = false
+                handleError?.invoke()
+            }
+            return@LaunchedEffect
+        }
         // StateFlow replays the latest frame, so resuming shows an image immediately
         // instead of flashing the placeholder while the decoder spins back up.
         val frames = canvasHub.flowFor(canvasUrl)
@@ -90,19 +111,24 @@ fun CanvasVideo(
  * The single decode behind every viewer of [canvasUrl]: open, downscale, then emit frames
  * until cancelled. Errors end the job; the hub drops it so the next viewer starts fresh.
  */
-private suspend fun CoroutineScope.decodeCanvasFrames(canvasUrl: String, emit: (ImageBitmap?) -> Unit) {
+private suspend fun CoroutineScope.decodeCanvasFrames(
+    canvasUrl: String,
+    clipStartMs: Long = 0,
+    clipEndMs: Long? = null,
+    emit: (ImageBitmap?) -> Unit,
+) {
     withContext(Dispatchers.IO) {
         // Silence FFmpeg low-level C logging
         runCatching { avutil.av_log_set_level(avutil.AV_LOG_ERROR) }
 
         // Resolve master HLS playlist to single optimal stream to avoid probing all 20+ variants
-        val streamUrl = HlsVariantResolver.resolveOptimalVariant(canvasUrl)
+        val streamUrl = if (clipEndMs == null) HlsVariantResolver.resolveOptimalVariant(canvasUrl) else canvasUrl
         val isApple = streamUrl.contains("apple.com") || streamUrl.contains("itunes.apple.com")
 
         var grabber: FFmpegFrameGrabber? = null
         var converter: Java2DFrameConverter? = null
         try {
-            grabber = openCanvasGrabber(streamUrl, isApple, decodeSize = null)
+            grabber = openCanvasGrabber(streamUrl, isApple, clipEndMs != null, decodeSize = null)
 
             // A canvas is ambience, always drawn downscaled: decoding it full-res feeds
             // full-size frames through H.264, a Java2D conversion and a Skia upload for
@@ -114,7 +140,7 @@ private suspend fun CoroutineScope.decodeCanvasFrames(canvasUrl: String, emit: (
                 runCatching { grabber.stop() }
                 runCatching { grabber.release() }
                 grabber = openCanvasGrabber(
-                    streamUrl, isApple,
+                    streamUrl, isApple, clipEndMs != null,
                     decodeSize = (probed.first * scale).toInt() to (probed.second * scale).toInt(),
                 )
             }
@@ -123,15 +149,19 @@ private suspend fun CoroutineScope.decodeCanvasFrames(canvasUrl: String, emit: (
             val fps = grabber.frameRate.takeIf { it > 0 && it.isFinite() } ?: 30.0
             val targetFrameDelayMs = max(CANVAS_TARGET_FRAME_DELAY_MS, (1000.0 / fps).toLong())
 
+            val startUs = clipStartMs * 1000
+            val endUs = clipEndMs?.times(1000)
+            if (startUs > 0) grabber.setVideoTimestamp(startUs)
             while (isActive) {
                 val frameStart = System.currentTimeMillis()
                 var frame = grabber.grabImage()
-                if (frame == null) {
+                if (frame == null || endUs != null && frame.timestamp >= endUs) {
                     // Loop video
                     runCatching {
-                        grabber.setTimestamp(0)
+                        grabber.setVideoTimestamp(startUs)
                     }.onFailure {
-                        runCatching { grabber.restart() }
+                        grabber.restart()
+                        if (startUs > 0) grabber.setVideoTimestamp(startUs)
                     }
                     frame = grabber.grabImage()
                     if (frame == null) break
@@ -146,8 +176,10 @@ private suspend fun CoroutineScope.decodeCanvasFrames(canvasUrl: String, emit: (
                 val sleepMs = max(4L, targetFrameDelayMs - elapsed)
                 delay(sleepMs)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Logger.w("CanvasVideo", "Error decoding canvas video: ${e.message}")
+            Logger.w("CanvasVideo", "Error decoding canvas video: ${e.javaClass.simpleName}")
         } finally {
             runCatching { converter?.close() }
             runCatching {
@@ -173,6 +205,7 @@ private const val CANVAS_MAX_DECODE_DIM = 480
 private fun openCanvasGrabber(
     streamUrl: String,
     isApple: Boolean,
+    isYouTube: Boolean,
     decodeSize: Pair<Int, Int>?,
 ): FFmpegFrameGrabber = FFmpegFrameGrabber(streamUrl).apply {
     setOption("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
@@ -180,12 +213,21 @@ private fun openCanvasGrabber(
     setOption("reconnect", "1")
     setOption("reconnect_streamed", "1")
     setOption("reconnect_delay_max", "2")
-    if (isApple) {
+    if (isYouTube) {
+        val headers = YoutubeAudioResolver.requestHeaders(streamUrl)
+        headers["User-Agent"]?.let { setOption("user_agent", it) }
+        setOption("headers", headers.filterKeys { it != "User-Agent" }.entries.joinToString("") { (name, value) -> "$name: $value\r\n" })
+    } else if (isApple) {
         setOption("headers", "Origin: https://music.apple.com\r\nReferer: https://music.apple.com/\r\n")
     }
     if (decodeSize != null && decodeSize.first > 0 && decodeSize.second > 0) {
         setImageWidth(decodeSize.first)
         setImageHeight(decodeSize.second)
     }
-    start()
+    try {
+        start()
+    } catch (e: Exception) {
+        runCatching { release() }
+        throw e
+    }
 }

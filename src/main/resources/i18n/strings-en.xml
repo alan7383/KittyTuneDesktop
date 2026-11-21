@@ -3562,4 +3562,27 @@
     <string name="mini_player_cover_as_background_desc">Show the album cover behind the mini player controls</string>
     <string name="mini_player_progress_fill">Progress fill</string>
     <string name="mini_player_progress_fill_desc">Fill the mini player as the track plays instead of showing a thin line</string>
+    <string name="feed_tab_discover">Discover</string>
+    <string name="feed_tab_following">Following</string>
+    <string name="feed_sign_in_hint">Sign in to see updates from the artists you follow</string>
+    <string name="feed_empty_discover">Nothing to discover yet — check back in a moment</string>
+    <string name="pref_feed_official_only">Official artists only</string>
+    <string name="pref_feed_official_only_desc">Show only tracks from official artists: verified or Pro accounts and releases with an ISRC</string>
+    <string name="feed_reposted_by">Reposted by %1$s</string>
+    <string name="feed_follow">Follow</string>
+    <string name="feed_unfollow">Following</string>
+    <string name="feed_like">Like</string>
+    <string name="feed_dislike">Dislike</string>
+    <string name="feed_comments">Comments</string>
+    <string name="feed_add_to_playlist">Add to playlist</string>
+    <string name="track_info_sheet_title">Track info</string>
+    <string name="pref_feed_video_samples">YouTube video samples</string>
+    <string name="pref_feed_video_samples_desc">Use muted music video excerpts when animated artwork is unavailable</string>
+    <string name="artist_clip_resolution">%1$dp</string>
+    <string name="mix_vibe_official">Official mix</string>
+    <string name="mix_vibe_official_sub">Only tracks from official artists</string>
+    <string name="feed_previews">Previews</string>
+    <string name="feed_previous_preview">Previous preview</string>
+    <string name="feed_next_preview">Next preview</string>
+    <string name="feed_more">Load more</string>
 </resources>

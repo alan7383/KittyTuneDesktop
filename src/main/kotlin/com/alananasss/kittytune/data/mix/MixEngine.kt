@@ -60,6 +60,7 @@ object MixEngine {
     sealed interface Recipe {
         /** From everything the listener plays. The plain "start mixing" press. */
         data object MyTaste : Recipe
+        data object Official : Recipe
 
         /** "In the Yeat style" — the neighbourhood around one artist, not that artist's catalogue. */
         data class LikeArtist(val artistId: Long?, val artistName: String) : Recipe
@@ -129,8 +130,10 @@ object MixEngine {
             println("KittyTune mix: ${seeds.size} seeds -> ${candidates.size} candidates")
             if (candidates.isEmpty()) return@withContext Result.NothingFound(Result.Stage.NO_CANDIDATES)
 
+            val eligible = if (recipe == Recipe.Official) candidates.filter { MixRanking.isOfficialArtist(it.track) } else candidates
+            if (eligible.isEmpty()) return@withContext Result.NothingFound(Result.Stage.ALL_FILTERED)
             val tracks = MixRanking.order(
-                candidates = candidates,
+                candidates = eligible,
                 taste = taste,
                 size = size,
                 seed = now,
@@ -170,7 +173,7 @@ object MixEngine {
         // larger limit, so a genre mix asks for one rather than coming back a third full.
         is Recipe.InGenre -> listOf(Seed.OfGenre(recipe.genre, 1f, wide = true))
 
-        Recipe.MyTaste -> {
+        Recipe.MyTaste, Recipe.Official -> {
             if (taste.isEmpty) emptyList() else buildList {
                 val random = java.util.Random(System.currentTimeMillis())
 
@@ -403,6 +406,7 @@ object MixEngine {
     private fun describe(recipe: Recipe, seeds: List<Seed>): String = when (recipe) {
         is Recipe.LikeArtist -> recipe.artistName
         is Recipe.InGenre -> recipe.genre
+        Recipe.Official -> ""
         Recipe.MyTaste -> seeds.filterIsInstance<Seed.OfArtist>()
             .take(2)
             .joinToString(", ") { it.name }

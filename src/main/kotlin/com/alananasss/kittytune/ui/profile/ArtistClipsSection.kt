@@ -40,6 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +83,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.data.artist.ArtistClips
 import com.alananasss.kittytune.data.artist.Clip
+import com.alananasss.kittytune.data.playbackKey
 import com.alananasss.kittytune.media.ClipPlayback
 import com.alananasss.kittytune.ui.home.formatCompactNumber
 import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -156,7 +160,13 @@ internal fun ClipCard(clip: Clip, onClick: () -> Unit) {
 internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val playback = remember(clip) { ClipPlayback(scope) }
-    var hasNoStream by remember(clip) { mutableStateOf(false) }
+    var streams by remember(clip) { mutableStateOf<List<ArtistClips.ClipStream>?>(null) }
+    val preferences = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var maxHeight by remember { mutableStateOf(preferences.getClipMaxHeight()) }
+    var showQuality by remember { mutableStateOf(false) }
+    var reload by remember(clip) { mutableStateOf(0) }
+    val choices = remember(streams, maxHeight) { ArtistClips.playbackOrder(streams.orEmpty(), maxHeight) }
+    val hasNoStream = streams != null && choices.isEmpty()
 
     var fullscreen by remember { mutableStateOf(false) }
     // The dialog's own window is put into fullscreen via the screen device and given its old size back afterwards;
@@ -170,6 +180,7 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
         // pause below would pause it for everyone.
         com.alananasss.kittytune.data.together.Together.stopListening()
         val wasPlaying = playerViewModel.isPlaying
+        val pausedTrack = playerViewModel.currentTrack?.playbackKey()
         playerViewModel.pause()
         onDispose {
             runCatching {
@@ -183,12 +194,14 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
                 }
             }
             playback.stop()
-            if (wasPlaying) playerViewModel.play()
+            if (wasPlaying && playerViewModel.currentTrack?.playbackKey() == pausedTrack) playerViewModel.play()
         }
     }
-    LaunchedEffect(clip) {
-        val url = ArtistClips.streamUrl(clip)
-        if (url == null) hasNoStream = true else playback.play(url)
+    LaunchedEffect(clip, reload) {
+        streams = ArtistClips.streams(clip)
+    }
+    LaunchedEffect(choices, maxHeight, reload) {
+        if (choices.isNotEmpty()) playback.play(choices, playback.positionMs, playback.isPaused) else playback.stop()
     }
 
     LaunchedEffect(fullscreen) {
@@ -245,6 +258,25 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
                         Text(clip.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(clip.uploader, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
+                    Box {
+                        TextButton(onClick = { showQuality = true }) {
+                            Text(str("artist_clip_resolution", maxHeight))
+                        }
+                        DropdownMenu(expanded = showQuality, onDismissRequest = { showQuality = false }) {
+                            listOf(360, 720, 1080, 1440, 2160).forEach { height ->
+                                DropdownMenuItem(
+                                    text = { Text(str("artist_clip_resolution", height)) },
+                                    onClick = {
+                                        showQuality = false
+                                        if (height != maxHeight) {
+                                            maxHeight = height
+                                            preferences.setClipMaxHeight(height)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
                         Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                     }
@@ -267,8 +299,15 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
                         AsyncImage(model = clip.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     }
                     when {
-                        hasNoStream || playback.hasFailed -> Text(str("artist_clip_failed"), color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                        playback.isLoading -> ContainedLoadingIndicator(Modifier.size(56.dp))
+                        hasNoStream || playback.hasFailed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(str("artist_clip_failed"), color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                            TextButton(onClick = {
+                                playback.stop()
+                                streams = null
+                                reload++
+                            }) { Text(str("btn_retry")) }
+                        }
+                        streams == null || playback.isLoading -> ContainedLoadingIndicator(Modifier.size(56.dp))
                     }
                 }
                 Box(if (fullscreen) Modifier.padding(16.dp) else Modifier) {

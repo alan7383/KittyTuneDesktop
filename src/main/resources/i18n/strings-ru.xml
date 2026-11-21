@@ -3564,4 +3564,27 @@
     <string name="mini_player_cover_as_background_desc">Показывает обложку альбома за элементами управления</string>
     <string name="mini_player_progress_fill">Заполнение по ходу трека</string>
     <string name="mini_player_progress_fill_desc">Заполняет мини-плеер по мере воспроизведения вместо тонкой полосы</string>
+    <string name="feed_tab_discover">Рекомендации</string>
+    <string name="feed_tab_following">Подписки</string>
+    <string name="feed_sign_in_hint">Войдите, чтобы видеть публикации исполнителей, на которых подписаны</string>
+    <string name="feed_empty_discover">Пока нет новых рекомендаций</string>
+    <string name="pref_feed_official_only">Только официальные исполнители</string>
+    <string name="pref_feed_official_only_desc">Показывать треки проверенных или Pro-аккаунтов и релизы с кодом ISRC</string>
+    <string name="feed_reposted_by">Репост от %1$s</string>
+    <string name="feed_follow">Подписаться</string>
+    <string name="feed_unfollow">Вы подписаны</string>
+    <string name="feed_like">Нравится</string>
+    <string name="feed_dislike">Не нравится</string>
+    <string name="feed_comments">Комментарии</string>
+    <string name="feed_add_to_playlist">Добавить в плейлист</string>
+    <string name="track_info_sheet_title">О треке</string>
+    <string name="pref_feed_video_samples">Видеофрагменты YouTube</string>
+    <string name="pref_feed_video_samples_desc">Воспроизводить отрывки клипов без звука, если анимированная обложка недоступна</string>
+    <string name="artist_clip_resolution">%1$dp</string>
+    <string name="mix_vibe_official">Официальный микс</string>
+    <string name="mix_vibe_official_sub">Только треки официальных исполнителей</string>
+    <string name="feed_previews">Фрагменты</string>
+    <string name="feed_previous_preview">Предыдущий фрагмент</string>
+    <string name="feed_next_preview">Следующий фрагмент</string>
+    <string name="feed_more">Загрузить ещё</string>
 </resources>

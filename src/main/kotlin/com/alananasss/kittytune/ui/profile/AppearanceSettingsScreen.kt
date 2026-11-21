@@ -327,6 +327,7 @@ internal fun CoversSettingsGroup() {
     val prefs = remember { PlayerPreferences() }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
+    val feedVideoSamples by prefs.feedVideoSamplesFlow().collectAsState(initial = prefs.getFeedVideoSamplesEnabled())
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
     SettingsGroup(
         title = str("settings_group_covers"),
@@ -357,6 +358,19 @@ internal fun CoversSettingsGroup() {
                         prefs.setAnimatedCoversFadeUiEnabled(it)
                     },
                     highlightKey = "pref_animated_covers_fade_ui",
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_feed_video_samples"),
+                    subtitle = str("pref_feed_video_samples_desc"),
+                    hasSwitch = true,
+                    switchState = feedVideoSamples,
+                    onSwitchChange = {
+                        prefs.setFeedVideoSamplesEnabled(it)
+                    },
+                    highlightKey = "pref_feed_video_samples",
                 )
             }
             add { shape ->

@@ -3563,4 +3563,27 @@
     <string name="mini_player_cover_as_background_desc">Affiche la pochette derrière les commandes du mini-lecteur</string>
     <string name="mini_player_progress_fill">Remplissage de la progression</string>
     <string name="mini_player_progress_fill_desc">Remplit le mini-lecteur au fil du morceau à la place de la fine barre</string>
+    <string name="feed_tab_discover">Découvrir</string>
+    <string name="feed_tab_following">Abonnements</string>
+    <string name="feed_sign_in_hint">Connecte-toi pour voir les publications des artistes que tu suis</string>
+    <string name="feed_empty_discover">Rien à découvrir pour le moment</string>
+    <string name="pref_feed_official_only">Artistes officiels uniquement</string>
+    <string name="pref_feed_official_only_desc">Afficher les titres des comptes vérifiés ou Pro et les sorties avec un code ISRC</string>
+    <string name="feed_reposted_by">Republié par %1$s</string>
+    <string name="feed_follow">Suivre</string>
+    <string name="feed_unfollow">Abonné</string>
+    <string name="feed_like">J’aime</string>
+    <string name="feed_dislike">Je n’aime pas</string>
+    <string name="feed_comments">Commentaires</string>
+    <string name="feed_add_to_playlist">Ajouter à une playlist</string>
+    <string name="track_info_sheet_title">Infos du titre</string>
+    <string name="pref_feed_video_samples">Extraits vidéo YouTube</string>
+    <string name="pref_feed_video_samples_desc">Afficher des extraits de clips sans son quand aucune pochette animée n’est disponible</string>
+    <string name="artist_clip_resolution">%1$dp</string>
+    <string name="mix_vibe_official">Mix officiel</string>
+    <string name="mix_vibe_official_sub">Titres d’artistes officiels uniquement</string>
+    <string name="feed_previews">Aperçus</string>
+    <string name="feed_previous_preview">Aperçu précédent</string>
+    <string name="feed_next_preview">Aperçu suivant</string>
+    <string name="feed_more">Charger la suite</string>
 </resources>

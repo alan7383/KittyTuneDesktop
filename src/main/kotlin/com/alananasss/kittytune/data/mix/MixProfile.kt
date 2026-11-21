@@ -258,6 +258,10 @@ object MixRanking {
         return !restricted || youtubeFallback
     }
 
+    fun isOfficialArtist(track: Track): Boolean =
+        track.user?.verified == true || track.user?.isPro == true ||
+            !track.publisherMetadata?.isrc.isNullOrBlank()
+
     private const val AFFINITY_WEIGHT = 1.0f
     private const val POPULARITY_WEIGHT = 0.25f
     const val FOLLOWERS_WEIGHT = 0.20f
