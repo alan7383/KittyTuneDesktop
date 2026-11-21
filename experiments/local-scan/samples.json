@@ -1,0 +1,272 @@
+[
+  {
+    "pair": 0,
+    "variant": "baseline",
+    "sample": 0,
+    "wall_ms": 194.6004,
+    "cpu_ms": 187.5,
+    "allocated_bytes": 3966120,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "baseline",
+    "sample": 1,
+    "wall_ms": 192.1237,
+    "cpu_ms": 250.0,
+    "allocated_bytes": 3965920,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "baseline",
+    "sample": 2,
+    "wall_ms": 190.7674,
+    "cpu_ms": 250.0,
+    "allocated_bytes": 3927416,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "baseline",
+    "sample": 3,
+    "wall_ms": 195.9289,
+    "cpu_ms": 296.875,
+    "allocated_bytes": 3873088,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "baseline",
+    "sample": 4,
+    "wall_ms": 177.0569,
+    "cpu_ms": 234.375,
+    "allocated_bytes": 3871648,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "candidate",
+    "sample": 0,
+    "wall_ms": 52.6856,
+    "cpu_ms": 78.125,
+    "allocated_bytes": 1146608,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "candidate",
+    "sample": 1,
+    "wall_ms": 50.8027,
+    "cpu_ms": 46.875,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "candidate",
+    "sample": 2,
+    "wall_ms": 50.6767,
+    "cpu_ms": 62.5,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "candidate",
+    "sample": 3,
+    "wall_ms": 50.2054,
+    "cpu_ms": 46.875,
+    "allocated_bytes": 1146872,
+    "tracks": 300
+  },
+  {
+    "pair": 0,
+    "variant": "candidate",
+    "sample": 4,
+    "wall_ms": 48.7243,
+    "cpu_ms": 46.875,
+    "allocated_bytes": 1146328,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "candidate",
+    "sample": 0,
+    "wall_ms": 52.6206,
+    "cpu_ms": 46.875,
+    "allocated_bytes": 1146608,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "candidate",
+    "sample": 1,
+    "wall_ms": 52.306,
+    "cpu_ms": 62.5,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "candidate",
+    "sample": 2,
+    "wall_ms": 52.2209,
+    "cpu_ms": 93.75,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "candidate",
+    "sample": 3,
+    "wall_ms": 50.4088,
+    "cpu_ms": 46.875,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "candidate",
+    "sample": 4,
+    "wall_ms": 53.0974,
+    "cpu_ms": 78.125,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "baseline",
+    "sample": 0,
+    "wall_ms": 228.1202,
+    "cpu_ms": 250.0,
+    "allocated_bytes": 3966144,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "baseline",
+    "sample": 1,
+    "wall_ms": 210.2446,
+    "cpu_ms": 250.0,
+    "allocated_bytes": 3965944,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "baseline",
+    "sample": 2,
+    "wall_ms": 213.2305,
+    "cpu_ms": 328.125,
+    "allocated_bytes": 3925520,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "baseline",
+    "sample": 3,
+    "wall_ms": 218.5813,
+    "cpu_ms": 359.375,
+    "allocated_bytes": 3873112,
+    "tracks": 300
+  },
+  {
+    "pair": 1,
+    "variant": "baseline",
+    "sample": 4,
+    "wall_ms": 203.1308,
+    "cpu_ms": 265.625,
+    "allocated_bytes": 3871240,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "baseline",
+    "sample": 0,
+    "wall_ms": 190.2145,
+    "cpu_ms": 203.125,
+    "allocated_bytes": 3966120,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "baseline",
+    "sample": 1,
+    "wall_ms": 192.0611,
+    "cpu_ms": 203.125,
+    "allocated_bytes": 3940000,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "baseline",
+    "sample": 2,
+    "wall_ms": 192.8784,
+    "cpu_ms": 281.25,
+    "allocated_bytes": 3869912,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "baseline",
+    "sample": 3,
+    "wall_ms": 180.1759,
+    "cpu_ms": 281.25,
+    "allocated_bytes": 3872296,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "baseline",
+    "sample": 4,
+    "wall_ms": 181.7167,
+    "cpu_ms": 250.0,
+    "allocated_bytes": 3871648,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "candidate",
+    "sample": 0,
+    "wall_ms": 52.3073,
+    "cpu_ms": 62.5,
+    "allocated_bytes": 1146608,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "candidate",
+    "sample": 1,
+    "wall_ms": 54.014,
+    "cpu_ms": 93.75,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "candidate",
+    "sample": 2,
+    "wall_ms": 49.2233,
+    "cpu_ms": 62.5,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "candidate",
+    "sample": 3,
+    "wall_ms": 49.399,
+    "cpu_ms": 62.5,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  },
+  {
+    "pair": 2,
+    "variant": "candidate",
+    "sample": 4,
+    "wall_ms": 48.3156,
+    "cpu_ms": 46.875,
+    "allocated_bytes": 1146304,
+    "tracks": 300
+  }
+]
