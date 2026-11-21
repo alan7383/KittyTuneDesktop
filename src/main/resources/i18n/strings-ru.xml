@@ -578,7 +578,7 @@
     <string name="empty_folder_kaomoji">( ˶• ᴗ •˶ )</string>
     <string name="empty_folder_subtitle">Добавьте плейлисты в эту папку, чтобы организовать библиотеку</string>
     <string name="empty_folder_title">Эта папка пуста</string>
-    <string name="empty_playlist_generic">Вы ещё не добавили треки в плейлист</string>
+    <string name="empty_playlist_generic">Этот плейлист пуст</string>
     <string name="empty_playlist_generic_kaomoji">( . •́ _ʖ •̀ .)</string>
     <string name="empty_playlist_search_kaomoji">( o _ о)</string>
     <string name="empty_playlist_search_subtitle">Мы не смогли найти ничего соответствующего вашему фильтру</string>
@@ -1112,7 +1112,7 @@
     <string name="pref_lyrics_local">Предпочитать локальные файлы</string>
     <string name="pref_lyrics_local_sub">Использовать встроенные теги ID3, если они доступны</string>
     <string name="pref_lyrics_provider_max_quality">Максимальное качество (Musixmatch)</string>
-    <string name="pref_lyrics_provider_open_source">Открытый исходный код (LrcLib)</string>
+    <string name="pref_lyrics_provider_open_source">Бесплатно (LrcLib)</string>
     <string name="pref_lyrics_provider_title">Источники текстов</string>
     <string name="pref_lyrics_reset">По умолчанию</string>
     <string name="pref_lyrics_romanization">Показать произношение (ромадзи)</string>
@@ -1140,7 +1140,7 @@
     <string name="pref_animated_covers_fade_ui_desc">Использовать вертикальные анимированные обложки в качестве динамического фона</string>
     <string name="pref_animated_artist_profiles">Анимированные профили исполнителей</string>
     <string name="pref_animated_artist_profiles_desc">Отображать анимированные видео-обложки на страницах исполнителей</string>
-    <string name="pref_norm_info_body_1">KittyTune использует стандарт EBU R128 (ITU-R BS.1770) для измерения воспринимаемой громкости в LUFS. Ваши треки будут звучать с одинаковой комфортной громкостью.</string>
+    <string name="pref_norm_info_body_1">Треки часто записывают с разной громкостью. Нормализация автоматически выравнивает громкость, чтобы музыка звучала на комфортном уровне без постоянной ручной регулировки.</string>
     <string name="pref_norm_info_body_2">Как это работает:\n• KittyTune измеряет истинную громкость каждой песни (в LUFS).\n• При воспроизведении громкость динамически корректируется в соответствии с выбранным целевым уровнем.\n• Встроенный лимитер предотвращает любые искажения и клиппинг.\n\nУровни:\n• Тихий (-19 LUFS): Идеально подходит для ночного прослушивания или наушников.\n• Нормальный (-14 LUFS): Стандарт, используемый Spotify и YouTube.\n• Громкий (-11 LUFS): Лучше всего для шумной обстановки или внешних колонок.</string>
     <string name="pref_norm_info_title">Нормализация звука</string>
     <string name="pref_norm_level_loud">Громкий</string>

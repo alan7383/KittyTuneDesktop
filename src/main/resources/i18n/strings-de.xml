@@ -180,7 +180,7 @@
     <string name="btn_see_all">Alle anzeigen</string>
     <string name="btn_options">Optionen</string>
     <string name="btn_play">Abspielen</string>
-    <string name="btn_shuffle">Zufallswiedergabe</string>
+    <string name="btn_shuffle">Mischen</string>
     <string name="btn_download">Herunterladen</string>
     <string name="btn_downloaded">Heruntergeladen</string>
     <string name="cover_copy_link">Link kopieren</string>
@@ -389,8 +389,8 @@
     <string name="playlist_by_user">Von %1$s</string>
     <string name="playlist_downloading_progress">Wird heruntergeladen&#8230; %1$d%%</string>
     <string name="add_to_playlist_new">Neue Playlist</string>
-    <string name="add_to_playlist_title_single">Hinzufügen zu&#8230;</string>
-    <string name="add_to_playlist_title_multi">%1$d Titel hinzufügen zu&#8230;</string>
+    <string name="add_to_playlist_title_single">Zu … hinzufügen</string>
+    <string name="add_to_playlist_title_multi">%1$d Titel zu … hinzufügen</string>
 
     <string name="dialog_delete_playlist_title">Playlist löschen?</string>
     <string name="dialog_delete_playlist_msg">Diese Aktion kann nicht rückgängig gemacht werden.</string>
@@ -516,7 +516,7 @@
     <string name="effect_vinyl_lofi">Vinyl-Lo-Fi</string>
     <string name="fx_vinyl_lofi_desc">Warmes Plattenspieler-Vinyl mit Nadelknistern, Bandschwankungen und analoger Wärme</string>
     <string name="label_vinyl_crackles">Knistern &amp; Staub: %1$d%%</string>
-    <string name="label_vinyl_flutter">Bandschwankung: %1$d%%</string>
+    <string name="label_vinyl_flutter">Bandflattern: %1$d %%</string>
     <string name="preset_vinyl_chill">Chillhop</string>
     <string name="preset_vinyl_vintage">70er-Vinyl</string>
     <string name="preset_vinyl_cassette">80er-Kassette</string>
