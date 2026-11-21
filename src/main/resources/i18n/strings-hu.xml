@@ -3537,4 +3537,26 @@
     <string name="together_sync_synced">Szinkronizálva</string>
     <string name="together_sync_syncing">Szinkronizálás…</string>
     <string name="together_sync_waiting">Várakozás a házigazdára</string>
+    <string name="game_eat_playlist">Edd meg ezt a lejátszási listát</string>
+    <string name="game_wave_title">Edd meg a hullámot</string>
+    <string name="game_score">Megevett: %1$d</string>
+    <string name="game_best">Legjobb: %1$d</string>
+    <string name="game_of_total">/ %1$d</string>
+    <string name="game_idle">Játék indítása</string>
+    <string name="game_wave_idle">Éhes vagy valami újra?</string>
+    <string name="game_eat_hint">Egy borító megevésével elindul a dal.</string>
+    <string name="game_paused">Szüneteltetve</string>
+    <string name="game_over">Játék vége</string>
+    <string name="game_finished_title">A lejátszási lista elfogyott!</string>
+    <string name="game_wave_finished">A hullám elfogyott!</string>
+    <string name="game_finished_text">Megevett dalok: %1$d</string>
+    <string name="game_restart">Újra</string>
+    <string name="game_now_playing">Most szól</string>
+    <string name="game_loading">Az ízletes számok előkészítése…</string>
+    <string name="game_empty">Itt még nincs mit megenni</string>
+    <string name="game_up">Fel</string>
+    <string name="game_down">Le</string>
+    <string name="game_left">Balra</string>
+    <string name="game_right">Jobbra</string>
+    <string name="game_hint">Irányítás a nyilakkal · Szünet a szóközzel</string>
 </resources>

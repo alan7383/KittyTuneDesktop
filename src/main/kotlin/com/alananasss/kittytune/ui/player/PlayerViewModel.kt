@@ -4208,6 +4208,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         /** False for a stream whose order is the point, like My Wave: shuffle mode leaves it as it is. */
         respectShuffle: Boolean = true,
         autoPlay: Boolean = true,
+        startAtPositionMs: Long? = null,
     ) {
         if (tracks.isEmpty()) return
         // Apply the current master's content filter before sending a remote queue as well.
@@ -4220,7 +4221,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             val index = effectiveStartIndex
             val start = if (cleanTracks.size > 500) (index - 250).coerceIn(0, cleanTracks.size - 500) else 0
             val state = PlaybackSnapshot(SyncLog.deviceId, System.currentTimeMillis(), cleanTracks.drop(start).take(500),
-                index - start, pendingSeekPosition ?: 0L, true, false, uiRepeatMode.name)
+                index - start, startAtPositionMs ?: pendingSeekPosition ?: 0L, true, false, uiRepeatMode.name)
             ConnectManager.command(ConnectManager.selectedDevice.value!!, "transfer", state = state)
             pendingSeekPosition = null
             return
@@ -4259,10 +4260,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             // when played from any context (search, playlist, album) — only the context itself
             // was recorded (line ~3956), leaving the "Listening History" tab empty. Station/yt_radio
             // exclusion is already handled inside playTrackAtIndex (line ~4085).
-            playTrackAtIndex(0, addToHistory = true, autoPlay = autoPlay)
+            playTrackAtIndex(0, addToHistory = true, autoPlay = autoPlay, startAtPositionMs = startAtPositionMs)
         } else {
             _queue.addAll(cleanTracks)
-            playTrackAtIndex(effectiveStartIndex, addToHistory = true, autoPlay = autoPlay)
+            playTrackAtIndex(effectiveStartIndex, addToHistory = true, autoPlay = autoPlay, startAtPositionMs = startAtPositionMs)
         }
 
         updateQueueState(); saveStateAsync(saveQueue = true)
@@ -4417,7 +4418,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false, autoPlay: Boolean = true) {
+    /** Selects a swallowed cover in the existing queue. The game can restore its playlist if needed. */
+    internal fun playTrackInQueue(track: Track, startAtPositionMs: Long): Boolean {
+        if (!applyingConnectCommand && !applyingTogether && ConnectManager.selectedDevice.value != null) return false
+        val key = track.playbackKey()
+        val index = _queue.indexOfFirst { it.playbackKey() == key }
+        if (index < 0 || com.alananasss.kittytune.data.BlockManager.isBlocked(_queue[index])) return false
+        playTrackAtIndex(index, startAtPositionMs = startAtPositionMs)
+        return true
+    }
+
+    private fun playTrackAtIndex(
+        index: Int,
+        addToHistory: Boolean = true,
+        isCrossfade: Boolean = false,
+        autoPlay: Boolean = true,
+        startAtPositionMs: Long? = null,
+    ) {
         if (index < 0 || index >= _queue.size) {
             MusicManager.cancelCrossfade()
             currentContext = null; return
@@ -4430,6 +4447,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             playTrackAtIndex(index, addToHistory, isCrossfade, autoPlay)
             return
         }
+        if (startAtPositionMs != null) pendingSeekPosition = null
+        val startPosition = startAtPositionMs ?: 0L
         currentQueueIndex = index
         val trackToPlay = _queue[index]
         consecutivePlayerErrors = 0
@@ -4447,8 +4466,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         playWhenReady = autoPlay
         MusicManager.playWhenReadyRequested = autoPlay
         MusicManager.isLoadingTrack = true
-        isLoading = true; duration = trackToPlay.effectiveFullDurationMs ?: trackToPlay.durationMs ?: 0L; currentPosition = 0L
-        beginListenSession(trackToPlay)
+        isLoading = true; duration = trackToPlay.effectiveFullDurationMs ?: trackToPlay.durationMs ?: 0L; currentPosition = startPosition
+        beginListenSession(trackToPlay, startPosition)
         // Alongside the session rather than anywhere else, so "played" means the same to the queue as
         // it does to the statistics.
         playedTrackIds = playedTrackIds + trackToPlay.id
@@ -4459,7 +4478,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         currentTrack = trackToPlay; MusicManager.currentTrack = trackToPlay
         currentStreamSource = trackToPlay.source
 
-        playRobustly(index, autoPlay = autoPlay, isCrossfade = isCrossfade)
+        playRobustly(index, autoPlay = autoPlay, startPosition = startPosition, isCrossfade = isCrossfade)
         refillWaveIfLow()
         togetherNextOffset = 0
         com.alananasss.kittytune.data.together.Together.onHostPlaybackChanged()
@@ -4521,7 +4540,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 track = finalTrack,
                 context = currentContext,
                 isManual = true,
-                startPositionMs = if (isCrossfade) currentPosition else 0L
+                startPositionMs = if (isCrossfade) currentPosition else startPosition
             )
 
             if (addToHistory && currentContext?.navigationId?.startsWith("station:") != true && currentContext?.navigationId?.startsWith(

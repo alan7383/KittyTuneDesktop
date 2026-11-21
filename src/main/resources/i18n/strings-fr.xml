@@ -3537,4 +3537,26 @@
     <string name="together_invite_qr">QR code d’invitation Together</string>
     <string name="together_copy_code">Copier le code de session</string>
     <string name="together_invite_qr_instructions">Scanne le code avec ton appareil photo, puis touche Rejoindre dans KittyTune.</string>
+    <string name="game_eat_playlist">Manger cette playlist</string>
+    <string name="game_wave_title">Manger la vague</string>
+    <string name="game_score">Mangés : %1$d</string>
+    <string name="game_best">Meilleur : %1$d</string>
+    <string name="game_of_total">sur %1$d</string>
+    <string name="game_idle">Jouer</string>
+    <string name="game_wave_idle">Envie de nouveauté ?</string>
+    <string name="game_eat_hint">Mangez une pochette pour jouer son morceau.</string>
+    <string name="game_paused">En pause</string>
+    <string name="game_over">Partie terminée</string>
+    <string name="game_finished_title">Playlist dévorée !</string>
+    <string name="game_wave_finished">La vague est dévorée !</string>
+    <string name="game_finished_text">Morceaux mangés : %1$d</string>
+    <string name="game_restart">Rejouer</string>
+    <string name="game_now_playing">En cours de lecture</string>
+    <string name="game_loading">Préparation des morceaux savoureux…</string>
+    <string name="game_empty">Rien à manger ici pour l’instant</string>
+    <string name="game_up">Haut</string>
+    <string name="game_down">Bas</string>
+    <string name="game_left">Gauche</string>
+    <string name="game_right">Droite</string>
+    <string name="game_hint">Flèches pour diriger · Espace pour mettre en pause</string>
 </resources>

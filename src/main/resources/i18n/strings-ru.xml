@@ -3538,4 +3538,26 @@
     <string name="together_sync_synced">Синхронизировано</string>
     <string name="together_sync_syncing">Синхронизация…</string>
     <string name="together_sync_waiting">Ожидание ведущего</string>
+    <string name="game_eat_playlist">Съесть этот плейлист</string>
+    <string name="game_wave_title">Съесть волну</string>
+    <string name="game_score">Съедено: %1$d</string>
+    <string name="game_best">Рекорд: %1$d</string>
+    <string name="game_of_total">из %1$d</string>
+    <string name="game_idle">Начать игру</string>
+    <string name="game_wave_idle">Охота за новинками</string>
+    <string name="game_eat_hint">Съешьте обложку, чтобы включить трек.</string>
+    <string name="game_paused">Пауза</string>
+    <string name="game_over">Игра окончена</string>
+    <string name="game_finished_title">Плейлист съеден!</string>
+    <string name="game_wave_finished">Волна съедена!</string>
+    <string name="game_finished_text">Съедено песен: %1$d</string>
+    <string name="game_restart">Играть ещё</string>
+    <string name="game_now_playing">Сейчас играет</string>
+    <string name="game_loading">Готовим вкусные треки…</string>
+    <string name="game_empty">Здесь пока нечего есть</string>
+    <string name="game_up">Вверх</string>
+    <string name="game_down">Вниз</string>
+    <string name="game_left">Влево</string>
+    <string name="game_right">Вправо</string>
+    <string name="game_hint">Стрелки — управление · Пробел — пауза</string>
 </resources>

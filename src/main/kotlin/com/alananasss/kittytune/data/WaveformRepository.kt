@@ -6,6 +6,7 @@ import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -17,6 +18,7 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.math.pow
 
 /**
@@ -46,16 +48,7 @@ object WaveformRepository {
     ): FullTrackWaveformDecoder.DecodedWaveform? {
         val trackId = track.id
         if (trackId <= 0L) return null
-        decodedCache[trackId]?.let { return it }
-
-        val diskFile = decodedCacheFile(trackId)
-        if (diskFile.exists() && diskFile.length() > 0) {
-            val decoded = withContext(Dispatchers.IO) { runCatching { readDecoded(diskFile) }.getOrNull() }
-            if (decoded != null && decoded.peaks.isNotEmpty()) {
-                decodedCache[trackId] = decoded
-                return decoded
-            }
-        }
+        cachedWaveform(trackId)?.let { return it }
 
         // SoundCloud's waveform JSON: real peaks, just coarse. Good enough for the editor.
         val cloud = runCatching { soundCloudSamples(track) }.getOrNull()
@@ -72,6 +65,33 @@ object WaveformRepository {
         }
 
         return decodeAndCache(track, onProgress)
+    }
+
+    /** Cheap waveform sources only. The game never starts a full-audio decode. */
+    internal suspend fun samplesForHighlight(track: Track): FloatArray? {
+        if (track.id <= 0L) return null
+        return try {
+            cachedWaveform(track.id)?.peaks ?: soundCloudSamples(track, timeoutMs = 2_000L)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun cachedWaveform(trackId: Long): FullTrackWaveformDecoder.DecodedWaveform? {
+        decodedCache[trackId]?.let { return it }
+
+        val diskFile = decodedCacheFile(trackId)
+        if (diskFile.exists() && diskFile.length() > 0) {
+            val decoded = withContext(Dispatchers.IO) { runCatching { readDecoded(diskFile) }.getOrNull() }
+            if (decoded != null && decoded.peaks.isNotEmpty()) {
+                decodedCache[trackId] = decoded
+                return decoded
+            }
+        }
+
+        return null
     }
 
     private suspend fun decodeAndCache(
@@ -133,14 +153,21 @@ object WaveformRepository {
     }
 
     /** SoundCloud's own waveform for the track, looked up by id when the track came without its url. */
-    private suspend fun soundCloudSamples(track: Track): FloatArray? = withContext(Dispatchers.IO) {
+    private suspend fun soundCloudSamples(track: Track, timeoutMs: Long? = null): FloatArray? = withContext(Dispatchers.IO) {
         var url = track.waveformUrl
         if (url.isNullOrBlank() && (track.source == null || track.source == "soundcloud")) {
-            url = runCatching { RetrofitClient.create().getTracksByIds(track.id.toString()).firstOrNull()?.waveformUrl }.getOrNull()
+            url = try {
+                RetrofitClient.create().getTracksByIds(track.id.toString()).firstOrNull()?.waveformUrl
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
         }
         if (url.isNullOrBlank()) return@withContext null
-        val body = httpClient.newCall(Request.Builder().url(url).build()).execute().use { it.body?.string() }
-            ?: return@withContext null
+        val call = httpClient.newCall(Request.Builder().url(url).build())
+        if (timeoutMs != null) call.timeout().timeout(timeoutMs, TimeUnit.MILLISECONDS)
+        val body = call.execute().use { it.body?.string() } ?: return@withContext null
         parseSoundCloudWaveform(body)
     }
 

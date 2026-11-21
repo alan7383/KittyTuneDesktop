@@ -3536,4 +3536,26 @@
     <string name="together_sync_synced">Sincronizado</string>
     <string name="together_sync_syncing">Sincronizando…</string>
     <string name="together_sync_waiting">Aguardando o anfitrião</string>
+    <string name="game_eat_playlist">Coma esta playlist</string>
+    <string name="game_wave_title">Coma a onda</string>
+    <string name="game_score">Devoradas: %1$d</string>
+    <string name="game_best">Recorde: %1$d</string>
+    <string name="game_of_total">de %1$d</string>
+    <string name="game_idle">Iniciar jogo</string>
+    <string name="game_wave_idle">Com fome de novidades?</string>
+    <string name="game_eat_hint">Coma uma capa para tocar a faixa.</string>
+    <string name="game_paused">Pausado</string>
+    <string name="game_over">Fim de jogo</string>
+    <string name="game_finished_title">Playlist devorada!</string>
+    <string name="game_wave_finished">A onda foi devorada!</string>
+    <string name="game_finished_text">Músicas devoradas: %1$d</string>
+    <string name="game_restart">Jogar novamente</string>
+    <string name="game_now_playing">Tocando agora</string>
+    <string name="game_loading">Preparando faixas saborosas…</string>
+    <string name="game_empty">Ainda não há nada para comer aqui</string>
+    <string name="game_up">Cima</string>
+    <string name="game_down">Baixo</string>
+    <string name="game_left">Esquerda</string>
+    <string name="game_right">Direita</string>
+    <string name="game_hint">Use as setas para mover · Espaço para pausar</string>
 </resources>
