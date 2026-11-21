@@ -35,12 +35,16 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     private val seekWindow = (sampleRate * 0.015).toInt().coerceAtLeast(64)    // ±15 ms search
 
     /** Rising half-Hann crossfade ramp, [overlap] long: 0 at the start, 1 at the end. */
-    private val ramp = FloatArray(overlap) {
-        (0.5 - 0.5 * cos(PI * it / (overlap - 1).coerceAtLeast(1))).toFloat()
+    private val ramp by lazy {
+        FloatArray(overlap) {
+            (0.5 - 0.5 * cos(PI * it / (overlap - 1).coerceAtLeast(1))).toFloat()
+        }
     }
 
-    private val input = FloatRing(channels, 1 shl 14)
-    private val mid = FloatRing(channels, 1 shl 14)
+    private val inputState = lazy { FloatRing(channels, 1 shl 14) }
+    private val input get() = inputState.value
+    private val midState = lazy { FloatRing(channels, 1 shl 14) }
+    private val mid get() = midState.value
     private val output = ShortRing(1 shl 15)
 
     /** WSOLA carry-over: the frame whose second half still has to be crossfaded out. */
@@ -57,7 +61,7 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     /** Q32.32 accumulator for stage 1's analysis hop, so a fractional hop averages out exactly. */
     private var hopPhase = 0L
 
-    private val kernel = PolyphaseSinc(KERNEL_TAPS, KERNEL_PHASES)
+    private val kernel by lazy { PolyphaseSinc(KERNEL_TAPS, KERNEL_PHASES) }
     private val coefficients = FloatArray(KERNEL_TAPS)
 
     private val frame = FloatArray(channels)
@@ -68,8 +72,8 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     }
 
     fun flush() {
-        input.clear()
-        mid.clear()
+        if (inputState.isInitialized()) input.clear()
+        if (midState.isInitialized()) mid.clear()
         output.clear()
         tail = null
         phase = 0L
@@ -79,6 +83,17 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     /** Feed interleaved 16-bit PCM (as shorts). */
     fun queue(samples: ShortArray, count: Int) {
         val frames = count / channels
+        if (abs(speed / pitch - 1f) < 1e-3f && abs(pitch - 1f) < 1e-3f &&
+            (!inputState.isInitialized() || input.size == 0)
+        ) {
+            if (midState.isInitialized() && mid.size > 0) {
+                mid.clear()
+                phase = 0L
+            }
+            output.push(samples, frames * channels)
+            return
+        }
+        val input = input
         input.ensure(frames)
         var i = 0
         for (f in 0 until frames) {
@@ -117,6 +132,8 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
 
     /** 1x playback: neither stage has anything to do, so hand the input straight over. */
     private fun passInputToOutput() {
+        val input = input
+        val mid = mid
         if (mid.size > 0) {
             mid.clear()
             phase = 0L
@@ -128,6 +145,8 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     }
 
     private fun passInputToMid() {
+        val input = input
+        val mid = mid
         val n = input.size
         mid.ensure(n)
         for (f in 0 until n) {
@@ -138,6 +157,7 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
     }
 
     private fun passMidToOutput() {
+        val mid = mid
         if (phase >= ONE) {
             mid.drop((phase ushr 32).toInt())
             phase = 0L
@@ -155,6 +175,8 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
      * there is no seam where one block ends and the next begins.
      */
     private fun resample(step: Long) {
+        val mid = mid
+        val kernel = kernel
         val taps = KERNEL_TAPS
         val coef = coefficients
         while (true) {
@@ -194,6 +216,9 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
      * one so the waveform stays in phase. [tail] persists across calls.
      */
     private fun timeStretch(ratio: Float) {
+        val input = input
+        val mid = mid
+        val ramp = ramp
         val need = frameSize + seekWindow
         val hopStep = (overlap.toDouble() * ratio * ONE).toLong()
         while (input.size >= need) {
@@ -386,9 +411,25 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
             size++
         }
 
+        fun push(samples: ShortArray, count: Int) {
+            if (count <= 0) return
+            if (count > buf.size - size) grow(count)
+            val at = (head + size) and mask
+            val first = minOf(count, buf.size - at)
+            samples.copyInto(buf, at, 0, first)
+            samples.copyInto(buf, 0, first, count)
+            size += count
+        }
+
         fun drainTo(out: ShortArray, max: Int): Int {
             val n = minOf(max, out.size, size)
-            for (i in 0 until n) out[i] = buf[(head + i) and mask]
+            if (n > 0) {
+                val src = buf
+                val start = head
+                val first = minOf(n, src.size - start)
+                src.copyInto(out, 0, start, start + first)
+                src.copyInto(out, first, 0, n - first)
+            }
             head = (head + n) and mask
             size -= n
             return n
@@ -399,11 +440,16 @@ class TimeStretcher(sampleRate: Int, private val channels: Int) {
             size = 0
         }
 
-        private fun grow() {
-            val cap = (mask + 1) shl 1
+        private fun grow(extra: Int = 1) {
             val src = buf
+            val start = head
+            val length = size
+            var cap = src.size shl 1
+            while (cap < length + extra) cap = cap shl 1
             val dst = ShortArray(cap)
-            for (i in 0 until size) dst[i] = src[(head + i) and mask]
+            val first = minOf(length, src.size - start)
+            src.copyInto(dst, 0, start, start + first)
+            src.copyInto(dst, first, 0, length - first)
             buf = dst
             mask = cap - 1
             head = 0
