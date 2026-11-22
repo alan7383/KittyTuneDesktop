@@ -343,8 +343,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     val currentAudioFxPreset: AudioFxPreset
         get() = AudioFxPreset(effectsState, equalizerState)
 
+    /**
+     * The preset that sounds like what is playing now: the one last turned on when it still matches,
+     * otherwise any preset with the same sound (saving the current sound makes that preset active).
+     */
     val activeAudioFxPresetName: String?
-        get() = audioFxPresetActivation?.name?.takeIf { audioFxPresets[it] == currentAudioFxPreset }
+        get() {
+            val current = currentAudioFxPreset.portable()
+            audioFxPresetActivation?.name?.let { if (audioFxPresets[it] == current) return it }
+            return audioFxPresets.entries.firstOrNull { it.value == current }?.key
+        }
+
+    fun isAudioFxPresetActive(name: String): Boolean = audioFxPresets[name] == currentAudioFxPreset.portable()
 
     /** Line-by-line lyrics fill top to bottom as they are sung (the "Sweep" line animation). */
     var lyricsSweepEnabled by mutableStateOf(playerPrefs.getLyricsSweepEnabled())
@@ -5962,33 +5972,68 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var pinnedAudioFx by mutableStateOf(playerPrefs.getPinnedAudioFx())
         private set
 
-    fun saveAudioFxPreset(name: String, preset: AudioFxPreset): Boolean {
-        val trimmedName = name.trim()
-        if (trimmedName.isBlank() || audioFxPresets.keys.any { it.equals(trimmedName, ignoreCase = true) }) {
-            return false
+    /** Why a name cannot be used for a preset, or null when it can. [except] is the preset being renamed. */
+    fun audioFxPresetNameError(name: String, except: String? = null): AudioFxPresetNameError? {
+        val trimmed = name.trim()
+        return when {
+            trimmed.isEmpty() -> AudioFxPresetNameError.EMPTY
+            trimmed.length > AudioFxPreset.MAX_NAME_LENGTH -> AudioFxPresetNameError.TOO_LONG
+            audioFxPresets.keys.any { it.equals(trimmed, ignoreCase = true) && !it.equals(except, ignoreCase = false) } ->
+                AudioFxPresetNameError.TAKEN
+            else -> null
         }
-        val updated = audioFxPresets + (trimmedName to preset)
-        playerPrefs.saveAudioFxPresets(updated)
-        audioFxPresets = updated
-        storePinnedAudioFx(listOf(AudioFxPreset.tileId(trimmedName)) + pinnedAudioFx)
+    }
+
+    /** Saves the current sound under [name]. It plays already, so it is the active preset from now on. */
+    fun saveAudioFxPreset(name: String, preset: AudioFxPreset = currentAudioFxPreset): Boolean {
+        val trimmedName = name.trim()
+        if (audioFxPresetNameError(trimmedName) != null) return false
+        storeAudioFxPresets(audioFxPresets + (trimmedName to preset.portable()))
+        return true
+    }
+
+    /** Renames a preset in place, keeping its position, and keeps it active when it was. */
+    fun renameAudioFxPreset(name: String, newName: String): Boolean {
+        val trimmed = newName.trim()
+        if (name !in audioFxPresets || audioFxPresetNameError(trimmed, except = name) != null) return false
+        if (trimmed == name) return true
+        storeAudioFxPresets(audioFxPresets.entries.associate { (key, value) -> (if (key == name) trimmed else key) to value })
+        audioFxPresetActivation?.takeIf { it.name == name }?.let { updateAudioFxPresetActivation(it.copy(name = trimmed)) }
+        return true
+    }
+
+    /** Replaces a preset's sound with what is playing now. */
+    fun updateAudioFxPreset(name: String): Boolean {
+        if (name !in audioFxPresets) return false
+        val activation = audioFxPresetActivation
+        storeAudioFxPresets(audioFxPresets + (name to currentAudioFxPreset.portable()))
+        // Turning it off later should still go back to what played before the presets, not to itself.
+        if (activation != null && activation.name != name) updateAudioFxPresetActivation(activation.copy(name = name))
         return true
     }
 
     fun deleteAudioFxPreset(name: String) {
-        val updated = audioFxPresets - name
-        playerPrefs.saveAudioFxPresets(updated)
-        audioFxPresets = updated
-        val tileId = AudioFxPreset.tileId(name)
-        if (tileId in pinnedAudioFx) storePinnedAudioFx(pinnedAudioFx - tileId)
+        if (name !in audioFxPresets) return
+        storeAudioFxPresets(audioFxPresets - name)
         clearModifiedAudioFxPreset()
     }
 
+    private fun storeAudioFxPresets(presets: Map<String, AudioFxPreset>) {
+        playerPrefs.saveAudioFxPresets(presets)
+        audioFxPresets = presets
+    }
+
+    /**
+     * Turns a preset on, or off when it is what plays now. Off goes back to what played before the first
+     * preset of the sequence, or to no effects when that is unknown (a preset saved from the current sound).
+     * Returns false when the result needs the loud-volume warning first; nothing changes then.
+     */
     fun toggleAudioFxPreset(name: String): Boolean {
         val preset = audioFxPresets[name] ?: return true
         val current = currentAudioFxPreset
-        val activation = audioFxPresetActivation?.takeIf { audioFxPresets[it.name] == current }
-        val activationToRestore = activation?.takeIf { it.name == name }
-        val target = activationToRestore?.previous ?: preset
+        val isOn = preset == current.portable()
+        val activation = audioFxPresetActivation?.takeIf { audioFxPresets[it.name] == current.portable() }
+        val target = if (isOn) activation?.previous ?: AudioFxPreset.neutral(current) else preset
         if (target.effects.isEarrapeEnabled && !hasSeenEarrapeWarning()) return false
         if (effectsState.speed != target.effects.speed) {
             routeRemote("speed", (target.effects.speed * 100f).roundToInt().toLong())
@@ -5998,7 +6043,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         equalizerState = target.equalizer
         // Switching presets keeps the settings from before the first preset in this sequence.
         updateAudioFxPresetActivation(
-            if (activationToRestore != null) null else AudioFxPresetActivation(name, activation?.previous ?: current)
+            if (isOn) null else AudioFxPresetActivation(name, activation?.previous ?: current)
         )
         applyEqualizerAndSave()
         applyEffectsAndSave()
@@ -6007,9 +6052,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun clearModifiedAudioFxPreset() {
-        if (audioFxPresetActivation != null && activeAudioFxPresetName == null) {
-            updateAudioFxPresetActivation(null)
-        }
+        val activation = audioFxPresetActivation ?: return
+        if (audioFxPresets[activation.name] != currentAudioFxPreset.portable()) updateAudioFxPresetActivation(null)
     }
 
     private fun updateAudioFxPresetActivation(activation: AudioFxPresetActivation?) {
@@ -6081,14 +6125,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         return true
     }
 
+    /**
+     * Sets which effects the grid shows, in order. Only the grid changes: an effect taken off it keeps
+     * playing, and stays on in the full list, where it can be turned off.
+     */
     fun updatePinnedAudioFx(fxIds: List<String>) {
-        val removed = pinnedAudioFx.filterNot { fxIds.contains(it) }
-        val activePreset = activeAudioFxPresetName
-        if (activePreset != null && AudioFxPreset.tileId(activePreset) in removed) {
-            if (!toggleAudioFxPreset(activePreset)) updateAudioFxPresetActivation(null)
-        }
-        disableEffects(removed)
-        storePinnedAudioFx(fxIds)
+        storePinnedAudioFx(fxIds.filterNot(AudioFxPreset::isTileId).distinct())
     }
 
     private fun storePinnedAudioFx(fxIds: List<String>) {
