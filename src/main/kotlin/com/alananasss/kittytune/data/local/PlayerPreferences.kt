@@ -5,6 +5,7 @@ import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.data.audio.SavedEqProfile
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.ui.player.AudioFxPreset
 import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.RepeatMode
@@ -265,6 +266,7 @@ class PlayerPreferences {
         private const val KEY_TRACK_JSON = "last_track_json"
         private const val KEY_POSITION = "last_position"
         private const val KEY_EFFECTS = "audio_effects"
+        private const val KEY_AUDIO_FX_PRESETS = "audio_fx_presets"
         private const val KEY_EQUALIZER_STATE = "equalizer_state_v2"
         private const val KEY_EQ_AUTO_APPLY = "auto_eq_auto_apply"
         private const val KEY_SAVED_EQ_PROFILES = "saved_eq_profiles_v1"
@@ -2047,6 +2049,25 @@ class PlayerPreferences {
     }
 
     fun saveEffects(state: AudioEffectsState) = Prefs.putString(KEY_EFFECTS, gson.toJson(state))
+
+    fun getAudioFxPresets(): Map<String, AudioFxPreset> {
+        val json = Prefs.getString(KEY_AUDIO_FX_PRESETS, null) ?: return emptyMap()
+        return runCatching {
+            val type = object : TypeToken<Map<String, AudioFxPreset?>>() {}.type
+            gson.fromJson<Map<String, AudioFxPreset?>>(json, type).orEmpty().mapNotNull { (name, preset) ->
+                val effects = preset?.effects ?: return@mapNotNull null
+                val equalizer: EqualizerState? = preset.equalizer
+                if (name.isBlank() || equalizer == null || !effects.speed.isFinite() || effects.speed <= 0f) {
+                    return@mapNotNull null
+                }
+                name to preset
+            }.toMap()
+        }.getOrDefault(emptyMap())
+    }
+
+    fun saveAudioFxPresets(presets: Map<String, AudioFxPreset>) {
+        Prefs.putString(KEY_AUDIO_FX_PRESETS, gson.toJson(presets))
+    }
     fun saveDownloadLocation(uriString: String?) = if (uriString != null) Prefs.putString(KEY_DOWNLOAD_DIR, uriString) else Prefs.remove(KEY_DOWNLOAD_DIR)
     fun getDownloadLocation(): String? = Prefs.getString(KEY_DOWNLOAD_DIR, null)
     fun getLastTrack(): Track? { if (!getPersistentQueueEnabled()) return null; val json = Prefs.getString(KEY_TRACK_JSON, null) ?: return null; return try { gson.fromJson(json, Track::class.java) } catch (_: Exception) { null } }

@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.player
 
+import com.google.gson.annotations.SerializedName
+
 enum class RepeatMode { NONE, ALL, ONE }
 
 enum class LyricsProvider { MAX_QUALITY, OPEN_SOURCE }
@@ -122,6 +124,11 @@ data class EqualizerState(
     val autoProfileSource: String? = null,
     val autoProfileDeviceKey: String? = null,
     val autoProfileDeviceName: String? = null,
+)
+
+data class AudioFxPreset(
+    @SerializedName("effects") val effects: AudioEffectsState,
+    @SerializedName("equalizer") val equalizer: EqualizerState
 )
 
 data class EqualizerPreset(

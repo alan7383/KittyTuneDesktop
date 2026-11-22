@@ -88,6 +88,10 @@
     <string name="ambient_rain">Chuva</string>
     <string name="app_name">KittyTune</string>
     <string name="audio_fx_long_press_hint">Toque e segure um bloco para ajustar suas configurações</string>
+    <string name="audio_fx_save_preset">Salvar predefinição</string>
+    <string name="audio_fx_preset_name">Nome da predefinição</string>
+    <string name="audio_fx_preset_name_used">Já existe uma predefinição com esse nome.</string>
+    <string name="audio_fx_delete_preset">Excluir predefinição?</string>
     <string name="audio_source_desktop">Áudio do computador (som do sistema)</string>
     <string name="audio_source_desktop_tag">Áudio do computador</string>
     <string name="audio_source_header">Fonte da gravação de áudio</string>

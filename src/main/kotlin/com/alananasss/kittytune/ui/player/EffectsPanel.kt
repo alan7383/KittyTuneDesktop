@@ -93,6 +93,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     var showBassBoostDialog by remember { mutableStateOf(false) }
     var showEarrapeDialog by remember { mutableStateOf(false) }
     var showEarrapeWarning by remember { mutableStateOf(false) }
+    var presetAwaitingWarning by remember { mutableStateOf<AudioFxPreset?>(null) }
     var showEightDDialog by remember { mutableStateOf(false) }
     var showMuffledDialog by remember { mutableStateOf(false) }
     var showReverbDialog by remember { mutableStateOf(false) }
@@ -526,6 +527,14 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
+            AudioFxPresetControls(viewModel) { preset ->
+                if (!viewModel.applyAudioFxPreset(preset)) {
+                    presetAwaitingWarning = preset
+                    showEarrapeWarning = true
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+
             if (pinnedTiles.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -631,7 +640,17 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     }
 
     if (showEarrapeWarning) {
-        EarrapeWarningDialog(viewModel = viewModel, onDismiss = { showEarrapeWarning = false })
+        EarrapeWarningDialog(
+            viewModel = viewModel,
+            onConfirm = {
+                val preset = presetAwaitingWarning
+                if (preset == null) viewModel.toggleEarrape() else viewModel.applyAudioFxPreset(preset)
+            },
+            onDismiss = {
+                showEarrapeWarning = false
+                presetAwaitingWarning = null
+            },
+        )
     }
 
     if (showEightDDialog) {
@@ -1596,7 +1615,7 @@ private fun EarrapeDialog(viewModel: PlayerViewModel, onShowWarning: () -> Unit,
 }
 
 @Composable
-private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
+private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     var countdown by remember { mutableStateOf(5) }
     LaunchedEffect(Unit) {
         while (countdown > 0) {
@@ -1612,7 +1631,7 @@ private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
             TextButton(shapes = ButtonDefaults.shapes(),
                 onClick = {
                     viewModel.setHasSeenEarrapeWarning(true)
-                    viewModel.toggleEarrape()
+                    onConfirm()
                     onDismiss()
                 },
                 enabled = countdown == 0

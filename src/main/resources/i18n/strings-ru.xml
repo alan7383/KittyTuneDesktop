@@ -88,6 +88,10 @@
     <string name="ambient_rain">Дождь</string>
     <string name="app_name">KittyTune</string>
     <string name="audio_fx_long_press_hint">Удерживайте кнопку для настройки эффекта</string>
+    <string name="audio_fx_save_preset">Сохранить пресет</string>
+    <string name="audio_fx_preset_name">Название пресета</string>
+    <string name="audio_fx_preset_name_used">Пресет с таким названием уже есть.</string>
+    <string name="audio_fx_delete_preset">Удалить пресет?</string>
     <string name="audio_source_desktop">Звук с компьютера</string>
     <string name="audio_source_desktop_tag">Звук компьютера</string>
     <string name="audio_source_header">Источник записи звука</string>

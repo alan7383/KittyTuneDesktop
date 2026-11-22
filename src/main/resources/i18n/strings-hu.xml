@@ -88,6 +88,10 @@
     <string name="ambient_rain">Eső</string>
     <string name="app_name">KittyTune</string>
     <string name="audio_fx_long_press_hint">Tartsd hosszan lenyomva a gombot a testreszabáshoz</string>
+    <string name="audio_fx_save_preset">Hangprofil mentése</string>
+    <string name="audio_fx_preset_name">Hangprofil neve</string>
+    <string name="audio_fx_preset_name_used">Már létezik ilyen nevű hangprofil.</string>
+    <string name="audio_fx_delete_preset">Törlöd a hangprofilt?</string>
     <string name="audio_source_desktop">Asztali hang (Számítógép hangja)</string>
     <string name="audio_source_desktop_tag">Asztali hang</string>
     <string name="audio_source_header">Hangrögzítés forrása</string>

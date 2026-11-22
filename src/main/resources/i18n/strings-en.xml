@@ -88,6 +88,10 @@
     <string name="ambient_rain">Rain</string>
     <string name="app_name">KittyTune</string>
     <string name="audio_fx_long_press_hint">Long press a tile to customize its settings</string>
+    <string name="audio_fx_save_preset">Save preset</string>
+    <string name="audio_fx_preset_name">Preset name</string>
+    <string name="audio_fx_preset_name_used">A preset with this name already exists.</string>
+    <string name="audio_fx_delete_preset">Delete preset?</string>
     <string name="audio_source_desktop">Desktop audio (Computer sound)</string>
     <string name="audio_source_desktop_tag">Desktop audio</string>
     <string name="audio_source_header">Audio recording source</string>
