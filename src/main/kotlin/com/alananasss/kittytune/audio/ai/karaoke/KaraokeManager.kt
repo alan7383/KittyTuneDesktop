@@ -284,13 +284,8 @@ object KaraokeManager {
     }
 
     fun getBinaryDownloadUrl(): String? {
-        val os = System.getProperty("os.name", "").lowercase()
-        val isWindows = os.contains("win")
-        val isMac = os.contains("mac")
-        return when {
-            isWindows -> "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/demucs-x86_64-pc-windows-msvc.zip"
-            isMac -> "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/demucs-aarch64-apple-darwin.tar.gz"
-            else -> "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/demucs-x86_64-unknown-linux-gnu.tar.gz"
+        return nativeDemucsPlatform(System.getProperty("os.name", ""), System.getProperty("os.arch", ""))?.let {
+            "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/${it.archive}"
         }
     }
 
@@ -372,15 +367,9 @@ object KaraokeManager {
         System.getenv("KITTYTUNE_DEMUCS")?.takeIf { it.isNotBlank() }?.let {
             return configuredDemucsBinary(it)
         }
-        val os = System.getProperty("os.name", "").lowercase()
-        val isWindows = os.contains("win")
-        val isMac = os.contains("mac")
-        val binName = if (isWindows) "demucs.exe" else "demucs"
-        val resourceSubdir = when {
-            isWindows -> "windows-x86_64"
-            isMac -> "macos-aarch64"
-            else -> "linux-x86_64"
-        }
+        val platform = nativeDemucsPlatform(System.getProperty("os.name", ""), System.getProperty("os.arch", "")) ?: return null
+        val binName = platform.executable
+        val resourceSubdir = platform.resourceSubdir
         val resourcePath = "/native/$resourceSubdir/$binName"
 
         val binDir = File(AppDirs.dataDir, "bin")
@@ -473,6 +462,12 @@ object KaraokeManager {
      */
     fun startModelDownload() {
         if (_downloadState.value is ModelDownloadState.Downloading || isModelReady()) return
+        if (getBinaryDownloadUrl() == null && getNativeDemucsBinary() == null) {
+            _downloadState.value = ModelDownloadState.Error(
+                "Native separation is unavailable for this platform. Import a compatible ONNX model in Karaoke settings."
+            )
+            return
+        }
 
         downloadJob?.cancel()
         downloadJob = scope.launch(Dispatchers.IO) {
