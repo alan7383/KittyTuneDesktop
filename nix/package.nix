@@ -2,6 +2,7 @@
 , stdenv
 , fetchurl
 , dpkg
+, callPackage
 , autoPatchelfHook
 , makeWrapper
 , alsa-lib
@@ -40,6 +41,7 @@ let
   };
 
   currentSystem = stdenv.hostPlatform.system;
+  nativeDemucs = if currentSystem == "x86_64-linux" then callPackage ./demucs.nix { } else null;
   currentSource = sources.${currentSystem} or (throw "Unsupported system for kitty-tune: ${currentSystem}");
 
   runtimeLibs = [
@@ -74,6 +76,7 @@ let
 
 in stdenv.mkDerivation rec {
   inherit pname version;
+  passthru.nativeDemucs = nativeDemucs;
 
   src = fetchurl {
     url = "https://github.com/alan7383/KittyTuneDesktop/releases/download/v${version}/kitty-tune_${version}_${currentSource.arch}.deb";
@@ -150,6 +153,7 @@ EOF
     # Create binary wrapper with full dynamic library paths (Skiko, ALSA, GTK, X11, Wayland, PulseAudio)
     mkdir -p "$out/bin"
     makeWrapper "$out/opt/kitty-tune/bin/KittyTune" "$out/bin/kitty-tune" \
+      ${lib.optionalString (nativeDemucs != null) ''--set-default KITTYTUNE_DEMUCS "${nativeDemucs}/bin/demucs"''} \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibs}" \
       --prefix XDG_DATA_DIRS : "${gtk3}/share/gsettings-schemas/${gtk3.name}:$XDG_DATA_DIRS" \
       --prefix ALSA_PLUGIN_DIR : "${alsa-plugins}/lib/alsa-lib" \
