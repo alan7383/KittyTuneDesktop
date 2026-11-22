@@ -345,6 +345,7 @@ class Player {
     val isPlaying: Boolean get() = activeEngine.isPlaying
     internal val isReadyForPlayback: Boolean get() = activeEngine.state == AudioEngine.State.READY
     val currentPosition: Long get() = activeEngine.positionMs
+    internal val isSeekPending: Boolean get() = activeEngine.isSeekPending
 
     /** Live beat grid of the track being heard (the Kitty pet dances on it). */
     val liveBeat: com.alananasss.kittytune.audio.beat.LiveBeatTracker get() = activeEngine.liveBeat

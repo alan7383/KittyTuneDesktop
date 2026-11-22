@@ -69,6 +69,7 @@ class AudioEngine(private val isolated: Boolean = false) {
     private var decodedPositionMs = 0L
 
     val positionMs: Long get() = seekRequest.get()?.positionMs ?: decodedPositionMs
+    internal val isSeekPending: Boolean get() = seekRequest.get()?.warmUp == false
 
     @Volatile
     var durationMs: Long = 0L
@@ -1322,7 +1323,9 @@ class AudioEngine(private val isolated: Boolean = false) {
 
                 if (seekRequest.get() == null) {
                     val rawPos = (grabber?.timestamp ?: 0L) / 1000L
-                    decodedPositionMs = if (durationMs > 0L) rawPos.coerceIn(0L, durationMs) else rawPos.coerceAtLeast(0L)
+                    val framePosition = if (durationMs > 0L) rawPos.coerceIn(0L, durationMs) else rawPos.coerceAtLeast(0L)
+                    // A decoder can land just before the seek target. Only an explicit seek resets the position.
+                    decodedPositionMs = maxOf(decodedPositionMs, framePosition)
                 }
             }
         } catch (t: Throwable) {

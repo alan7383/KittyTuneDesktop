@@ -272,6 +272,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     val isScrubbing: Boolean get() = scrubPreview != null
     internal var seekBarRevision by mutableLongStateOf(0L)
         private set
+    private var isLocalSeekPending by mutableStateOf(false)
+    internal val uiSeekPending: Boolean get() = !isRemotePlayback && isLocalSeekPending
     var isPlayerExpanded by mutableStateOf(false)
     var isLiked by mutableStateOf(false)
 
@@ -1577,7 +1579,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var preFadeVolume: Float? = null
 
     private var pendingSeekPosition: Long? = null
-    private var seekTargetPosition: Long = -1L
     private var lastSeekTimestamp: Long = 0L
     private var saveQueueJob: Job? = null
     private var progressUpdateJob: Job? = null
@@ -1815,7 +1816,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             super.onPositionDiscontinuity(oldPosition, newPosition, reason)
 
             if (reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) {
+                isLocalSeekPending = player.isSeekPending
                 currentPosition = newPosition.positionMs
+                seekBarRevision++
 
                 saveStateAsync(saveQueue = false)
                 updateWindowsMedia()
@@ -5239,7 +5242,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         val known = duration.takeIf { it > 0L }
         val target =
             if (known != null) position.coerceIn(0L, known) else position.coerceAtLeast(0L)
-        seekTargetPosition = target
         lastSeekTimestamp = System.currentTimeMillis()
         currentPosition = target
 
@@ -6679,6 +6681,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             var lastAutomixCheckTime = 0L
             while (isActive && isPlaying) {
                 try {
+                    isLocalSeekPending = player.isSeekPending
                     if (!isLoading) {
                         updateWindowsMedia(MusicManager.player.currentPosition, periodic = true)
                     }
@@ -6691,14 +6694,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
                         val rawEnginePos = MusicManager.player.currentPosition.coerceAtLeast(0L)
                         val enginePos = if (duration > 0L) rawEnginePos.coerceIn(0L, duration) else rawEnginePos
-                        val timeSinceSeek = System.currentTimeMillis() - lastSeekTimestamp
-                        if (timeSinceSeek < 800L) {
-                            if (kotlin.math.abs(enginePos - seekTargetPosition) < 1500L) {
-                                currentPosition = enginePos
-                            }
-                        } else {
-                            currentPosition = enginePos
-                        }
+                        if (!isLocalSeekPending) currentPosition = enginePos
                         mprisService?.syncPosition(enginePos)
                         ensureListenSession()
                         listenSession?.onPosition(currentPosition)
@@ -6857,7 +6853,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     internal fun finishScrub(owner: Any): Long? {
         val position = scrubPreview?.takeIf { it.owner === owner }?.positionMs ?: return null
         seekTo(position)
-        seekBarRevision++
+        if (isRemotePlayback) seekBarRevision++
         return position
     }
 

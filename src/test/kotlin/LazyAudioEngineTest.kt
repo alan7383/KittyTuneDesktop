@@ -69,12 +69,19 @@ class LazyAudioEngineTest {
     @Test fun selectingAndSeekingAnUnplayedItemDoesNotBuildTheDspGraph() {
         val engine = AudioEngine(isolated = true)
         try {
+            assertFalse(engine.isSeekPending)
             engine.setMediaItem("file:///unused.wav", startPositionMs = 1_000L)
             engine.seekTo(2_000L)
+            assertTrue(engine.isSeekPending)
+            assertEquals(2_000L, engine.positionMs)
+            engine.seekTo(3_000L)
+            assertEquals(3_000L, engine.positionMs)
             engine.setTrackLoudness(-12f, -1f)
             assertEquals(-70f, engine.getIntegratedLoudness())
             assertEquals(-120f, engine.getMaxTruePeakDb())
             assertTrue(initialized(engine).isEmpty(), "Preparing an unplayed item allocated DSP")
+            engine.stop()
+            assertFalse(engine.isSeekPending)
         } finally { engine.release() }
     }
 

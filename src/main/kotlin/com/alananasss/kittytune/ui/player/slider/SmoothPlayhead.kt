@@ -38,9 +38,9 @@ private const val IDLE_CHECK_MS = 64L
  *
  * @param reportedMs the player's last reported position.
  * @param isRunning whether the playhead is moving: playing, and neither loading nor being dragged.
- * @param followsInput while dragging or scrubbing: draw [reportedMs] as is, no glide and no prediction.
+ * @param followsInput while input owns the playhead or the decoder is seeking: show [reportedMs] directly.
  * @param trackKey a different track starts over from its own position (the mix glide handles that change).
- * @param seekRevision changes when a seek bar commits, including when a whole click lands between frames.
+ * @param seekRevision changes on an explicit seek, including when a whole click lands between frames.
  */
 @Composable
 internal fun rememberSmoothPlayhead(
@@ -53,30 +53,29 @@ internal fun rememberSmoothPlayhead(
     val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
     val clock = remember { PlayheadClock() }
     // The restored window can draw before the frame loop restarts.
-    val shown = remember(trackKey, seekRevision, isSeen) { mutableLongStateOf(reportedMs) }
+    val shown = remember(trackKey, seekRevision, isSeen, followsInput) { mutableLongStateOf(reportedMs) }
     val reported by rememberUpdatedState(reportedMs)
     val running by rememberUpdatedState(isRunning)
-    val direct by rememberUpdatedState(followsInput)
 
     val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
     // A hidden window draws no playhead, so the clock must not keep asking for frames for one: it sat there
     // awaiting the ambient pulse for as long as music played, even minimised (see WindowVisibility).
     LaunchedEffect(shown, ambientClock) {
         shown.longValue = clock.step(reported, trackKey, direct = true, running = false, now = System.nanoTime())
-        if (!isSeen) return@LaunchedEffect
+        if (!isSeen || followsInput) return@LaunchedEffect
         while (isActive) {
             val animate = running || clock.isGliding
             if (!animate) {
-                // Still: follow what the player says without asking for frames, unless a seek starts a slide.
-                shown.longValue = clock.step(reported, trackKey, direct, running = false, now = System.nanoTime())
+                // Follow paused reports without asking for frames, unless a discontinuity starts a slide.
+                shown.longValue = clock.step(reported, trackKey, direct = false, running = false, now = System.nanoTime())
                 if (!clock.isGliding) delay(IDLE_CHECK_MS)
                 continue
             }
             // Steady playback moves the playhead a few pixels a second, which the shared ambient pulse draws as
             // smoothly as every frame would; a glide after a seek or a drag answers the user, so it keeps the
             // window's full rate (see AmbientClock).
-            val step = { now: Long -> shown.longValue = clock.step(reported, trackKey, direct, running, now) }
-            if (clock.isGliding || direct) withFrameNanos(step)
+            val step = { now: Long -> shown.longValue = clock.step(reported, trackKey, direct = false, running = running, now = now) }
+            if (clock.isGliding) withFrameNanos(step)
             else com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock, step)
         }
     }
@@ -104,6 +103,7 @@ internal class PlayheadClock {
             snapTo(safeReported, now)
             return safeReported
         }
+        val previousDrawn = drawn
         val frameMs = (now - lastFrameNanos).coerceIn(0L, 200_000_000L) / 1_000_000.0
         lastFrameNanos = now
         if (running) drawn += frameMs * rate
@@ -140,7 +140,7 @@ internal class PlayheadClock {
                 drawn = from + (target - from) * FastOutSlowInEasing.transform(t)
             }
         } else if (running) {
-            drawn = drawn.coerceAtMost(safeReported + MAX_RUN_AHEAD_MS * rate)
+            drawn = maxOf(previousDrawn, drawn.coerceAtMost(safeReported + MAX_RUN_AHEAD_MS * rate))
         } else {
             drawn = safeReported.toDouble()
         }

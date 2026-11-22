@@ -78,6 +78,7 @@ internal class WheelSeek(
             commit(next)
             val deadline = System.nanoTime() + CATCH_UP_LIMIT_NANOS
             while (abs(reportedMs() - next) > CAUGHT_UP_MS && System.nanoTime() < deadline) delay(CATCH_UP_POLL_MS)
+            glideJob?.join()
             target = null
         }
     }

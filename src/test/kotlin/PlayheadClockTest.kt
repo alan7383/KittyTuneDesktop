@@ -134,6 +134,41 @@ class PlayheadClockTest {
     }
 
     @Test
+    fun `rapid seeks hold the latest target while the decoder catches up`() {
+        var reported by mutableLongStateOf(10_000L)
+        var revision by mutableLongStateOf(0L)
+        var seeking by mutableStateOf(false)
+        var displayed = 0L
+        val scene = ImageComposeScene(width = 1, height = 1) {
+            val shown = rememberSmoothPlayhead(reported, true, seeking, "track", revision)
+            SideEffect { displayed = shown }
+        }
+        try {
+            val start = System.nanoTime()
+            scene.render(start).close()
+            seeking = true
+            reported = 15_000L
+            revision++
+            scene.render(start + frameNanos).close()
+            assertEquals(15_000L, displayed)
+
+            reported = 20_000L
+            revision++
+            repeat(25) { frame ->
+                scene.render(start + (frame + 2) * frameNanos).close()
+                assertEquals(20_000L, displayed)
+            }
+
+            seeking = false
+            reported = 20_032L
+            scene.render(start + 30 * frameNanos).close()
+            assertEquals(20_032L, displayed)
+        } finally {
+            scene.close()
+        }
+    }
+
+    @Test
     fun `moves every frame between reports and never steps back`() {
         val clock = PlayheadClock()
         var now = 0L
@@ -148,6 +183,19 @@ class PlayheadClockTest {
             last = shown
         }
         assertTrue(kotlin.math.abs(last - now / 1_000_000) < 300, "drifted to $last at ${now / 1_000_000} ms")
+    }
+
+    @Test
+    fun `a delayed report does not pull the running playhead backwards`() {
+        val clock = PlayheadClock()
+        val start = 1_000_000_000L
+        clock.step(40_000L, "a", direct = false, running = true, now = start)
+        var before = 40_000L
+        repeat(20) { frame ->
+            before = clock.step(40_000L, "a", direct = false, running = true, now = start + (frame + 1) * frameNanos)
+        }
+        val next = clock.step(40_025L, "a", direct = false, running = true, now = start + 21 * frameNanos)
+        assertTrue(next >= before, "a late frame moved the playhead from $before to $next")
     }
 
     @Test

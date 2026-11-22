@@ -1,11 +1,13 @@
 import androidx.compose.runtime.MonotonicFrameClock
 import com.alananasss.kittytune.ui.main.WheelSeek
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
@@ -94,6 +96,39 @@ class WheelSeekTest {
         delay(200)
         assertNull(wheel.shownMs)
         scope.cancel()
+    }
+
+    @Test
+    fun `an optimistic position report does not cut the wheel glide short`() = runBlocking {
+        val allowFrames = CompletableDeferred<Unit>()
+        val frameClock = object : MonotonicFrameClock {
+            override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R {
+                allowFrames.await()
+                return FrameClock.withFrameNanos(onFrame)
+            }
+        }
+        val scope = CoroutineScope(coroutineContext + SupervisorJob() + frameClock)
+        val committed = CompletableDeferred<Unit>()
+        var reported = 10_000L
+        val wheel = WheelSeek(
+            scope = scope,
+            drawnMs = { reported },
+            reportedMs = { reported },
+            durationMs = { 240_000L },
+            stepSeconds = { 5f },
+            commit = { reported = it; committed.complete(Unit) },
+        )
+        try {
+            wheel.onNotch(-1f)
+            withTimeout(2_000L) { committed.await() }
+            assertEquals(15_000L, reported)
+            assertEquals(10_000L, wheel.shownMs)
+
+            allowFrames.complete(Unit)
+            withTimeout(2_000L) { while (wheel.isActive) delay(10) }
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test

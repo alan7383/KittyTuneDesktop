@@ -63,7 +63,7 @@ internal fun PlaybackSeekBar(
     val playhead = rememberSmoothPlayhead(
         reportedMs = shownOf(viewModel.uiPlaybackPosition),
         isRunning = viewModel.uiIsPlaying && !viewModel.uiIsLoading,
-        followsInput = wheel.isActive,
+        followsInput = wheel.isActive || viewModel.uiSeekPending,
         trackKey = trackKey,
         seekRevision = viewModel.seekBarRevision,
     )
