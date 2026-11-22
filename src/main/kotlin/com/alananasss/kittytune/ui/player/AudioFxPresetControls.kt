@@ -107,7 +107,8 @@ internal fun AudioFxPresetsSection(
     val presets = viewModel.audioFxPresets
     val activeName = viewModel.activeAudioFxPresetName
 
-    Column(modifier.fillMaxWidth()) {
+    // Nothing saved: no header and no hint taking room. The dialogs below still work, for the Save button.
+    if (presets.isNotEmpty()) Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -138,14 +139,7 @@ internal fun AudioFxPresetsSection(
             }
         }
 
-        if (presets.isEmpty()) {
-            Text(
-                str("audio_fx_presets_empty"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
-        } else {
+        run {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 presets.keys.reversed().chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {

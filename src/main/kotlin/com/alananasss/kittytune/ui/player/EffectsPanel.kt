@@ -137,6 +137,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     var showStudioEditSheet by remember { mutableStateOf(false) }
     var explorerFilter by remember { mutableStateOf(AudioFxFilter.ALL) }
     var showSavePresetDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     val allEffects = remember {
         listOf(
@@ -485,6 +486,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
             // The tab already says what this is, so the speed card leads (issue #66).
             SpeedCard(viewModel, allowPitch = true)
             Spacer(Modifier.height(24.dp))
+            // With nothing saved the section would only hold a hint; the Save button at the bottom is enough.
             AudioFxPresetsSection(
                 viewModel = viewModel,
                 onNeedsEarrapeWarning = { name ->
@@ -494,7 +496,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 showSaveDialog = showSavePresetDialog,
                 onDismissSaveDialog = { showSavePresetDialog = false },
             )
-            Spacer(Modifier.height(24.dp))
+            if (viewModel.audioFxPresets.isNotEmpty()) Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
             val activeCount = allEffects.count { it.isActive(viewModel.effectsState) }
@@ -617,6 +619,9 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(14.dp))
 
+            AudioFxExportCard(viewModel, allEffects, onOpen = { showExportDialog = true })
+            Spacer(Modifier.height(10.dp))
+
             AudioFxActionsRow(
                 onSave = { showSavePresetDialog = true },
                 onExplore = {
@@ -628,6 +633,11 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     }
 
     // ── Dialogs ──
+    AudioFxExportNotifier()
+    if (showExportDialog) {
+        AudioFxExportDialog(viewModel, allEffects, onDismiss = { showExportDialog = false })
+    }
+
     if (showBassBoostDialog) {
         BassBoostDialog(viewModel = viewModel, onDismiss = { showBassBoostDialog = false })
     }

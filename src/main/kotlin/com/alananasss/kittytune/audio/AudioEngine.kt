@@ -1483,6 +1483,79 @@ class AudioEngine(private val isolated: Boolean = false) {
         }
     }
 
+    /**
+     * Decodes [url] from the start through the very chain [pushFrame] feeds while playing (limiter, every
+     * effect, the equalizer, then the time stretcher for speed and pitch) and hands the result to [sink] as
+     * interleaved 16-bit stereo at [outputRateHz], as fast as the CPU allows. Nothing reaches a speaker.
+     *
+     * Meant for an [isolated] engine of its own, configured with [applyEffects]/[applyEqualizer] first: the
+     * playing one keeps its state. [onProgress] gets 0..1 of the source read. Throws
+     * [kotlinx.coroutines.CancellationException] once [isCancelled] says so.
+     */
+    fun renderOffline(
+        url: String,
+        headers: Map<String, String>,
+        trackId: Long?,
+        sink: (samples: ShortArray, count: Int) -> Unit,
+        onProgress: (Float) -> Unit = {},
+        isCancelled: () -> Boolean = { false },
+    ) {
+        check(isolated) { "render on an isolated engine, never on the one that plays" }
+        synchronized(effectStateLock) {
+            vocalTrackId = trackId
+            if (effectNodes.isInitialized()) {
+                vocalRemover.setTrack(trackId)
+                vocalBoost.setTrack(trackId)
+            }
+            seekVocalProcessors(0L)
+        }
+        val grabber = FFmpegFrameGrabber(url).apply {
+            if (headers.isNotEmpty()) {
+                setOption("headers", headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" } + "\r\n")
+            }
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                setOption("reconnect", "1")
+                setOption("reconnect_streamed", "1")
+                setOption("reconnect_on_network_error", "1")
+                setOption("rw_timeout", "15000000")
+            }
+            sampleRate = outputSampleRate
+            audioChannels = outputChannels
+            sampleMode = FrameGrabber.SampleMode.FLOAT
+        }
+        val out = ShortArray(16_384)
+        val emit = {
+            while (stretcher.available() >= outputChannels) {
+                val n = stretcher.drain(out, out.size)
+                if (n <= 0) break
+                sink(out, n)
+            }
+        }
+        try {
+            grabber.startUnlocked()
+            val total = grabber.lengthInTime.coerceAtLeast(0L)
+            var lastReported = -1f
+            while (true) {
+                if (isCancelled()) throw kotlinx.coroutines.CancellationException("export cancelled")
+                val frame = grabber.grabSamples() ?: break
+                val samples = frame.samples ?: continue
+                pushFrame(samples, frame.audioChannels)
+                emit()
+                if (total > 0) {
+                    val fraction = (grabber.timestamp.toFloat() / total).coerceIn(0f, 1f)
+                    if (fraction - lastReported >= 0.005f) {
+                        lastReported = fraction
+                        onProgress(fraction)
+                    }
+                }
+            }
+            if (stretcherState.isInitialized()) emit()
+            onProgress(1f)
+        } finally {
+            grabber.releaseUnlockedQuietly()
+        }
+    }
+
     private var lineWriteBuffer = ByteArray(0)
 
     private fun writeToLine(samples: ShortArray, count: Int, localLine: SourceDataLine?) {

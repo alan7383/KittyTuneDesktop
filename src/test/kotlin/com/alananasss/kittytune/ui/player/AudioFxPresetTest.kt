@@ -283,6 +283,65 @@ class AudioFxPresetTest {
         }
     }
 
+    @Test
+    fun withNoPresetsThePanelSkipsTheSectionAndOffersTheExport() = withPlayer { player, _, _ ->
+        player.setHasSeenEarrapeWarning(true)
+        player.resetAllEffects()
+        player.toggleEarrape(); player.setEarrapeIntensity(0.1f)
+        player.toggleBassBoost(); player.setBassBoostIntensity(0.2f)
+        player.setCustomSpeed(0.9f)
+        player.currentTrack = com.alananasss.kittytune.domain.Track(
+            id = 42, title = "Jester", artworkUrl = null, durationMs = 141_000,
+            user = com.alananasss.kittytune.domain.User(1, "overtonight", null),
+        )
+        val scene = ImageComposeScene(width = 460, height = 1500) {
+            SoundTuneTheme(themeMode = AppThemeMode.DARK, dynamicColor = false, keyColor = 0xFF6382FF.toInt(), colorStyle = "Expressive") {
+                Surface(Modifier.fillMaxSize()) { EffectsPanel(player) }
+            }
+        }
+        try {
+            scene.render(0L).close()
+            assertNull(scene.findNode { it.config.getOrNull(SemanticsProperties.Text)?.any { t -> t.text == str("audio_fx_saved_presets") } == true })
+            scene.findLabel(str("audio_fx_save_preset"))
+            val card = scene.findLabel(str("fx_export_title"))
+            scene.render(500_000_000L).use { it.save("audio-fx-panel-export.png") }
+            assertTrue(card.config[SemanticsActions.OnClick].action?.invoke() == true)
+            repeat(30) { scene.render(600_000_000L + it * 16_000_000L).close() }
+            scene.findLabel(str("fx_export_start"))
+            scene.render(1_500_000_000L).use { it.save("audio-fx-export-dialog.png") }
+        } finally {
+            scene.close()
+        }
+
+        // The dialog at a desktop window's size, in each of its states.
+        val flow = com.alananasss.kittytune.audio.AudioFxExporter::class.java.getDeclaredField("_state").apply { isAccessible = true }
+            .get(com.alananasss.kittytune.audio.AudioFxExporter) as kotlinx.coroutines.flow.MutableStateFlow<com.alananasss.kittytune.audio.AudioFxExporter.State>
+        val states = listOf(
+            "setup" to com.alananasss.kittytune.audio.AudioFxExporter.State.Idle,
+            "running" to com.alananasss.kittytune.audio.AudioFxExporter.State.Running("Jester", com.alananasss.kittytune.audio.AudioFxExporter.Format.MP3, 0.42f),
+            "done" to com.alananasss.kittytune.audio.AudioFxExporter.State.Done(File("C:/Users/you/Music/KittyTune/Effects/overtonight - Jester (FX).mp3")),
+            "failed" to com.alananasss.kittytune.audio.AudioFxExporter.State.Failed(com.alananasss.kittytune.audio.AudioFxExporter.Failure.PROTECTED, null),
+        )
+        try {
+            for ((label, exportState) in states) {
+                flow.value = exportState
+                val dialog = ImageComposeScene(width = 900, height = 1300) {
+                    SoundTuneTheme(themeMode = AppThemeMode.DARK, dynamicColor = false, keyColor = 0xFF6382FF.toInt(), colorStyle = "Expressive") {
+                        Surface(Modifier.fillMaxSize()) { AudioFxExportDialog(player, emptyList()) {} }
+                    }
+                }
+                try {
+                    repeat(40) { dialog.render(it * 16_000_000L).close() }
+                    dialog.render(2_000_000_000L).use { it.save("audio-fx-export-$label.png") }
+                } finally {
+                    dialog.close()
+                }
+            }
+        } finally {
+            flow.value = com.alananasss.kittytune.audio.AudioFxExporter.State.Idle
+        }
+    }
+
     private fun org.jetbrains.skia.Image.save(name: String) {
         val preview = File("build/previews/$name").apply { parentFile.mkdirs() }
         encodeToData(EncodedImageFormat.PNG)!!.use { preview.writeBytes(it.bytes) }
