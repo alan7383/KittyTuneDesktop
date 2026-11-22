@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.data.playbackSource
+
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.animation.core.animateFloatAsState
@@ -1283,7 +1285,7 @@ internal suspend fun loadPlaylistTracksForMenu(
                 durationMs = local.duration,
                 user = com.alananasss.kittytune.domain.User(0, local.artist, null),
                 likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
-                source = local.source,
+                source = local.playbackSource,
                 permalinkUrl = local.permalinkUrl,
             )
         }

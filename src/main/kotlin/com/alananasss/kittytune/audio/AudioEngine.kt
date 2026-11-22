@@ -347,6 +347,7 @@ class AudioEngine(private val isolated: Boolean = false) {
         }
         currentUrl = url
         currentHeaders = headers
+        clearSourceFormat()
         decodedPositionMs = startPositionMs
         durationMs = 0L
         liveBeat.onFlush(startPositionMs.toDouble())
@@ -629,11 +630,19 @@ class AudioEngine(private val isolated: Boolean = false) {
         if (!isolated) com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         currentUrl = null
         currentHeaders = emptyMap()
+        clearSourceFormat()
         sourceAnalysisPending = false
         decodedPositionMs = 0L
         durationMs = 0L
         seekRequest.set(null)
         setState(State.IDLE)
+    }
+
+    /** The badge describes what is playing: never the previous track while the next one opens or after it failed. */
+    private fun clearSourceFormat() {
+        if (sourceFormat == null) return
+        sourceFormat = null
+        onSourceFormat?.invoke(null)
     }
 
     fun release() {

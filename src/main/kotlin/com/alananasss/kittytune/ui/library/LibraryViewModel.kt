@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.library
 
+import com.alananasss.kittytune.data.playbackSource
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -523,7 +525,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                 title = local.title,
                                 user = User(0, local.artist, null),
                                 artworkUrl = local.artworkUrl,
-                                durationMs = local.duration
+                                durationMs = local.duration,
+                                source = local.playbackSource,
+                                permalinkUrl = local.permalinkUrl,
                             )
                         })
                     } else if (playlist.id > 0) {

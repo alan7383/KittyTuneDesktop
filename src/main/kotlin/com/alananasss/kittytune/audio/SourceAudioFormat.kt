@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.audio
 
 import org.bytedeco.ffmpeg.global.avcodec
+import org.bytedeco.ffmpeg.global.avformat
 import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import java.util.Locale
@@ -34,7 +35,11 @@ data class SourceAudioFormat(
                 if (par.codec_type() != avutil.AVMEDIA_TYPE_AUDIO) continue
                 val name = avcodec.avcodec_get_name(par.codec_id())?.string ?: grabber.audioCodecName
                 val depth = par.bits_per_raw_sample().takeIf { it > 0 && isLossless(name) }
-                val bitrate = par.bit_rate().takeIf { it > 0 } ?: grabber.audioBitrate.toLong()
+                val declared = par.bit_rate().takeIf { it > 0 } ?: grabber.audioBitrate.toLong()
+                val measured = if (fc.nb_streams() == 1 && !isLossless(name)) {
+                    measuredBitrate(fc.pb()?.let { avformat.avio_size(it) } ?: -1L, fc.duration())
+                } else null
+                val bitrate = chooseBitrate(declared, measured)
                 return SourceAudioFormat(
                     codec = codecLabel(name),
                     sampleRateHz = par.sample_rate(),
@@ -45,6 +50,26 @@ data class SourceAudioFormat(
             }
             null
         }.getOrNull()
+
+        /** Average bitrate of a file holding nothing but this stream: its size over its duration. */
+        internal fun measuredBitrate(sizeBytes: Long, durationUs: Long): Long? {
+            if (sizeBytes <= 0L || durationUs <= 0L) return null
+            val bps = sizeBytes * 8L * 1_000_000L / durationUs
+            return bps.takeIf { it in 8_000L..2_000_000L }
+        }
+
+        /**
+         * The container's figure is what it claims, and for a fragmented MP4 (YouTube's audio, the stand-in for
+         * a SoundCloud track that cannot stream) FFmpeg works it out as the first fragment's bytes over the
+         * whole track's duration: "AAC 6 kbps" for a 128 kbps stream. Keep the declared nominal value while it
+         * agrees with what the file actually weighs, and use the weight when it does not.
+         */
+        internal fun chooseBitrate(declared: Long, measured: Long?): Long = when {
+            // No claim at all (Ogg): the weight also counts cover art kept in the tags, so say nothing.
+            measured == null || declared <= 0L -> declared
+            kotlin.math.abs(declared - measured) > measured / 4 -> measured
+            else -> declared
+        }
 
         internal fun codecLabel(ffmpegName: String?): String {
             val n = ffmpegName?.lowercase(Locale.US).orEmpty()

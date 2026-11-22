@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.data
 
+import com.alananasss.kittytune.audio.releaseUnlockedQuietly
+import com.alananasss.kittytune.audio.startUnlocked
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.AppDatabase
@@ -149,7 +151,36 @@ object LocalMediaRepository {
         }
     }
 
-    private fun processFile(file: File): LocalTrack? {
+    private fun processFile(file: File): LocalTrack? = readTagged(file) ?: probeWithFfmpeg(file)
+
+    /**
+     * Files jaudiotagger cannot parse (Opus, raw ADTS AAC, AMR, a mislabelled extension...) still play:
+     * the engine decodes them with FFmpeg. Read what FFmpeg sees instead of dropping them from the library.
+     */
+    private fun probeWithFfmpeg(file: File): LocalTrack? = runCatching {
+        val grabber = org.bytedeco.javacv.FFmpegFrameGrabber(file)
+        try {
+            grabber.startUnlocked()
+            if (grabber.audioChannels <= 0) return null
+            val meta = grabber.metadata.orEmpty().mapKeys { it.key.lowercase() }
+            LocalTrack(
+                id = localMediaTrackId(file.absolutePath),
+                title = meta["title"]?.takeIf { it.isNotBlank() }
+                    ?: file.nameWithoutExtension.takeIf { it.isNotBlank() }
+                    ?: str("untitled_track"),
+                artist = (meta["artist"] ?: meta["album_artist"])?.takeIf { it.isNotBlank() } ?: str("unknown_artist"),
+                artworkUrl = "",
+                duration = (grabber.lengthInTime / 1000L).coerceAtLeast(0L),
+                localAudioPath = file.absolutePath,
+                source = "local",
+                localArtworkPath = "",
+            )
+        } finally {
+            grabber.releaseUnlockedQuietly()
+        }
+    }.getOrNull()
+
+    private fun readTagged(file: File): LocalTrack? {
         return try {
             val audioFile = AudioFileIO.read(file)
             val tag = audioFile.tag
@@ -215,6 +246,7 @@ object LocalMediaRepository {
         durationMs = duration,
         user = User(0, artist, null),
         description = str("description_local_file", localAudioPath),
+        source = "local",
     )
 }
 
@@ -224,6 +256,10 @@ internal fun localMediaTrackId(path: String): Long =
 /** Legacy desktop scans used a negative 32-bit path hash and omitted the source. */
 internal val LocalTrack.isUserLocalMedia: Boolean
     get() = source == "local" || (source == null && id in Int.MIN_VALUE.toLong()..-1L && localAudioPath.isNotBlank())
+
+/** The source a Track rebuilt from this row must carry; Track's own default would make it "soundcloud". */
+internal val LocalTrack.playbackSource: String
+    get() = source?.takeIf { it.isNotBlank() } ?: if (isUserLocalMedia) "local" else "soundcloud"
 
 internal fun canonicalMediaPath(path: String): String? =
     if (path.isBlank()) null else runCatching { File(path).canonicalPath }.getOrNull()

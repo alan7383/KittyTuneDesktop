@@ -1,6 +1,9 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.library
 
+import com.alananasss.kittytune.data.isUserLocalMedia
+import com.alananasss.kittytune.data.playbackSource
+
 import androidx.compose.material3.IconButtonDefaults
 
 import androidx.compose.material3.ButtonDefaults
@@ -1126,7 +1129,9 @@ fun PlaylistDetailScreen(
                             durationMs = local.duration,
                             user = User(0, local.artist, null),
                             isLiked = true,
-                            likedAt = local.downloadedAt.takeIf { it > 0 }
+                            likedAt = local.downloadedAt.takeIf { it > 0 },
+                            source = local.playbackSource,
+                            permalinkUrl = local.permalinkUrl,
                         )
                     })
                 }
@@ -1136,7 +1141,7 @@ fun PlaylistDetailScreen(
                     defaultIcon = Icons.Default.SdStorage
                     isLocalPlaylist = false
                     val allTracks = db.getAllTracksList()
-                    val localFileTracks = allTracks.filter { it.id < 0 }
+                    val localFileTracks = allTracks.filter { it.isUserLocalMedia }
                     newTracks.addAll(localFileTracks.map { local ->
                         Track(
                             id = local.id,
@@ -1145,7 +1150,8 @@ fun PlaylistDetailScreen(
                             durationMs = local.duration,
                             user = User(0, local.artist, null),
                             description = str("description_local_file", local.localAudioPath),
-                            likedAt = local.downloadedAt.takeIf { it > 0 }
+                            likedAt = local.downloadedAt.takeIf { it > 0 },
+                            source = "local",
                         )
                     })
                 }
@@ -1234,7 +1240,7 @@ fun PlaylistDetailScreen(
                                 durationMs = local.duration,
                                 user = User(0, local.artist, null),
                                 likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
-                                source = local.source ?: "soundcloud",
+                                source = local.playbackSource,
                                 permalinkUrl = local.permalinkUrl,
                             )
                         })

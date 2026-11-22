@@ -40,6 +40,13 @@ internal fun LocalTrack.matchesPlayback(track: Track): Boolean {
     val requested = track.playbackKey()
     if (saved == requested) return true
 
+    // A scanned or imported file rebuilt into a Track somewhere that forgot its source gets
+    // Track's default "soundcloud". SoundCloud IDs are never negative, so a negative ID with
+    // that default and no catalog link can only be this same local file.
+    if (isUserLocalMedia && requested.source == "soundcloud" && track.id < 0L &&
+        track.permalinkUrl.isNullOrBlank()
+    ) return true
+
     // Rows written before catalog references were stored can still be used if their metadata
     // identifies the same recording. Do not trust a coincidentally equal numeric ID.
     if (!permalinkUrl.isNullOrBlank() || (saved.source != requested.source && saved.source != "soundcloud")) return false
