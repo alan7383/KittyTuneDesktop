@@ -13,6 +13,7 @@ import com.alananasss.kittytune.ui.player.RepeatMode
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.FileReader
@@ -1195,7 +1196,7 @@ class PlayerPreferences {
     fun getAppIconVariant(): String = Prefs.getString(KEY_APP_ICON_VARIANT, "default") ?: "default"
     fun setAppIconVariant(key: String) = Prefs.putString(KEY_APP_ICON_VARIANT, key)
     fun appIconVariantFlow(): Flow<String> =
-        Prefs.stringFlow(KEY_APP_ICON_VARIANT, "default").map { it ?: "default" }
+        Prefs.stringFlow(KEY_APP_ICON_VARIANT, "default").map { it ?: "default" }.distinctUntilChanged()
     fun getThemeMode(): AppThemeMode { val n = Prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name); return try { AppThemeMode.valueOf(n!!) } catch (_: Exception) { AppThemeMode.SYSTEM } }
     fun setThemeMode(mode: AppThemeMode) = Prefs.putString(KEY_THEME_MODE, mode.name)
     fun getPureBlack(): Boolean = Prefs.getBoolean(KEY_PURE_BLACK, false)

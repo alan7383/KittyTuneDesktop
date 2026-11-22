@@ -1,7 +1,15 @@
 package com.alananasss.kittytune.data
 
+import com.alananasss.kittytune.core.Prefs
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
@@ -15,6 +23,32 @@ import kotlin.test.assertTrue
  */
 class WindowsSmtcServiceTest {
     private val windows = System.getProperty("os.name").lowercase().contains("win")
+
+    @Test fun unrelatedPlaybackWritesDoNotRequestASessionRestart() = runBlocking {
+        val saved = Prefs.snapshot()
+        val prefs = PlayerPreferences()
+        prefs.setAppIconVariant("default")
+        val restarts = mutableListOf<String>()
+        val observer = launch(Dispatchers.Unconfined) {
+            prefs.appIconVariantFlow().drop(1).collect { restarts += it }
+        }
+        try {
+            Prefs.putInt("smtc_test_track_id", 7)
+            yield()
+            Prefs.putInt("smtc_test_track_id", 8)
+            yield()
+            assertTrue(restarts.isEmpty(), "Playback writes requested restarts: $restarts")
+
+            prefs.setAppIconVariant("another-icon")
+            yield()
+            Prefs.putInt("smtc_test_track_id", 9)
+            yield()
+            assertEquals(listOf("another-icon"), restarts)
+        } finally {
+            observer.cancelAndJoin()
+            Prefs.restore(saved)
+        }
+    }
 
     private fun probe(title: String, press: String = ""): Map<String, String> {
         val script = File(javaClass.getResource("/smtc-probe.ps1")!!.toURI())
@@ -81,6 +115,13 @@ class WindowsSmtcServiceTest {
                 probe(title, press)
                 assertTrue(waitFor { expected in events }, "$press did not reach the app: $events")
             }
+
+            val nextTitle = "$title next"
+            val next = track.copy(id = 8, title = nextTitle)
+            service.updateMedia(next, isPlaying = true, positionMs = 0, durationMs = 180_000, playbackRate = 1.25f)
+            assertTrue(waitFor { probe(nextTitle)["APP"] == seen["APP"] }, "next track did not replace the media metadata")
+            service.updateMedia(track, isPlaying = true, positionMs = 0, durationMs = 180_000, playbackRate = 1.25f)
+            assertTrue(waitFor { probe(title)["APP"] == seen["APP"] }, "previous track did not replace the media metadata")
         } finally {
             service.close()
         }
