@@ -312,7 +312,7 @@ private fun ShapeOptionCard(
     onClick: () -> Unit
 ) {
     val containerColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        if (isSelected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
         label = "shapeCardContainer"
     )
@@ -356,7 +356,7 @@ private fun ShapeOptionCard(
                     Icon(
                         imageVector = Icons.Rounded.CheckCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -367,12 +367,12 @@ private fun ShapeOptionCard(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -558,7 +558,7 @@ private fun SliderStyleCard(
         onClick = onClick,
         modifier = modifier.height(110.dp),
         shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
@@ -578,11 +578,20 @@ private fun SliderStyleCard(
                     .height(36.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val sliderColors = if (isSelected) {
+                    val foreground = MaterialTheme.colorScheme.onPrimaryContainer
+                    SliderDefaults.colors(
+                        thumbColor = foreground,
+                        activeTrackColor = foreground,
+                        inactiveTrackColor = foreground.copy(alpha = 0.35f)
+                    )
+                } else SliderDefaults.colors()
                 PlayerSlider(
                     value = 0.45f,
                     onValueChange = {},
                     onValueChangeFinished = {},
                     sliderStyle = style,
+                    colors = sliderColors,
                     isPlaying = true,
                     valueRange = 0f..1f,
                     modifier = Modifier.fillMaxWidth()
@@ -597,7 +606,7 @@ private fun SliderStyleCard(
                     Icon(
                         imageVector = Icons.Rounded.Check,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(14.dp)
                     )
                 }
@@ -605,7 +614,7 @@ private fun SliderStyleCard(
                     text = title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                 )
             }
         }

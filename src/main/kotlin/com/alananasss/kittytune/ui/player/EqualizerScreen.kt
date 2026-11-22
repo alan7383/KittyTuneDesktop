@@ -825,7 +825,7 @@ private fun AutoEqAppliedCard(
 ) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -843,7 +843,7 @@ private fun AutoEqAppliedCard(
                 Text(
                     text = str("equalizer_auto_applied"),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
@@ -858,7 +858,7 @@ private fun AutoEqAppliedCard(
                     Text(
                         text = meta,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -868,7 +868,7 @@ private fun AutoEqAppliedCard(
                 Icon(
                     imageVector = Icons.Rounded.Close,
                     contentDescription = str("equalizer_auto_remove"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
@@ -885,14 +885,18 @@ private fun AutoEqResultRow(
     isApplying: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val contentColor = if (isApplied) colors.onPrimaryContainer else colors.onSurface
+    val secondaryColor = if (isApplied) colors.onPrimaryContainer else colors.onSurfaceVariant
     FilledTonalButton(
         onClick = onClick,
         enabled = !isApplying,
         shapes = ButtonDefaults.shapes(),
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = if (isApplied) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface
+            containerColor = if (isApplied) colors.primaryContainer
+            else colors.surfaceContainerHigh,
+            contentColor = contentColor,
+            disabledContainerColor = if (isApplied) colors.primaryContainer else colors.onSurface.copy(alpha = 0.12f)
         ),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
         modifier = Modifier.fillMaxWidth()
@@ -915,7 +919,7 @@ private fun AutoEqResultRow(
                     text = profile.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = contentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
@@ -925,7 +929,7 @@ private fun AutoEqResultRow(
                     Icon(
                         imageVector = Icons.Rounded.Check,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = contentColor,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -938,19 +942,19 @@ private fun AutoEqResultRow(
                 Text(
                     text = profile.attribution,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = secondaryColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "•",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = secondaryColor.copy(alpha = 0.6f)
                 )
                 Text(
                     text = profile.formFactor,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (isApplied) contentColor else colors.primary,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -962,13 +966,13 @@ private fun AutoEqResultRow(
             CircularProgressIndicator(
                 modifier = Modifier.size(20.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary
+                color = if (isApplied) contentColor else colors.primary
             )
         } else {
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = str("equalizer_auto_apply"),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = secondaryColor,
                 modifier = Modifier.size(22.dp)
             )
         }

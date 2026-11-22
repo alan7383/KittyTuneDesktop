@@ -1816,7 +1816,7 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                                                 Icon(
                                                     imageVector = Icons.Rounded.AutoAwesome,
                                                     contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    tint = if (isReady && !isProcessing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                                                     modifier = Modifier.size(18.dp),
                                                 )
                                                 Text(
@@ -1901,7 +1901,7 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                                         Icon(
                                             imageVector = Icons.Rounded.Verified,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = if (isReady && !isProcessing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(22.dp),
                                         )
                                         Column {
@@ -2157,7 +2157,7 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                                             Icon(
                                                 imageVector = Icons.Rounded.AutoAwesome,
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
+                                                tint = if (isReady && !isProcessing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(18.dp),
                                             )
                                             Text(
@@ -2242,7 +2242,7 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                                     Icon(
                                         imageVector = Icons.Rounded.Verified,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = if (isReady && !isProcessing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(22.dp),
                                     )
                                     Column {

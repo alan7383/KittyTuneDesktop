@@ -1303,7 +1303,7 @@ private fun KaraokeModelCard(
                 if (isReady) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1313,7 +1313,7 @@ private fun KaraokeModelCard(
                             Icon(
                                 Icons.Rounded.Check,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(12.dp),
                             )
                             Text(
