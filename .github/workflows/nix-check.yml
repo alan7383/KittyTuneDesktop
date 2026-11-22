@@ -8,6 +8,7 @@ on:
       - 'shell.nix'
       - 'nix/**'
       - '.github/workflows/nix-check.yml'
+      - 'scripts/update-nix.sh'
   pull_request:
     paths:
       - 'flake.nix'
@@ -15,6 +16,7 @@ on:
       - 'shell.nix'
       - 'nix/**'
       - '.github/workflows/nix-check.yml'
+      - 'scripts/update-nix.sh'
   workflow_dispatch:
 
 permissions:
@@ -61,6 +63,9 @@ jobs:
 
       - name: Test audio routing defaults and overrides
         run: python3 nix/tests/test_audio_env.py
+
+      - name: Test manual release updates
+        run: python3 nix/tests/test_manual_update.py
 
       - name: Check Flake Syntax & Outputs
         run: nix flake check

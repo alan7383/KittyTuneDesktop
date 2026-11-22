@@ -20,6 +20,7 @@ kotlin-js-store/
 *.wav
 *.py
 !nix/tests/test_audio_env.py
+!nix/tests/test_manual_update.py
 !scripts/check-linux-dbus.py
 *.ps1
 !src/main/resources/updater/*.ps1
