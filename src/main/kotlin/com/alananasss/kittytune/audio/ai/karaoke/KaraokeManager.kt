@@ -1296,7 +1296,7 @@ object KaraokeManager {
                 }
 
                 if (!processedWithDemucs) {
-                    val separatedPcm = processSeparationWithOnnx(fullPcm, trackId) { inferProgress, chunkDetail ->
+                    val separatedPcm = processSeparationWithOnnx(fullPcm, trackId, forceCpu = shouldRunDemucs) { inferProgress, chunkDetail ->
                         val overallProgress = 0.26f + (inferProgress * 0.69f)
                         updateProgress(overallProgress, chunkDetail ?: str("karaoke_separating_neural_cpu"))
                     }
@@ -1571,20 +1571,20 @@ object KaraokeManager {
     private suspend fun processSeparationWithOnnx(
         inputStereoPcm: FloatArray,
         trackId: Long,
+        forceCpu: Boolean,
         onProgress: (Float, String?) -> Unit
     ): Pair<FloatArray, FloatArray> {
-        val totalFrames = inputStereoPcm.size / 2
-        val outputInstrumental = FloatArray(inputStereoPcm.size)
-        val outputVocals = FloatArray(inputStereoPcm.size)
-
-        val modelFile = getModelFile()
         val prefs = PlayerPreferences()
-        val useGpu = prefs.karaokeGpuAccelerationEnabled
-        val selectedGpuId = prefs.karaokeSelectedGpuId
+        val request = onnxSeparationRequest(
+            getOnnxModelFile(), forceCpu, prefs.karaokeGpuAccelerationEnabled, prefs.karaokeSelectedGpuId
+        )
 
         OnnxHelper.ensureNativeLibrariesLoaded()
         val env = OnnxHelper.getOrInitEnvironment()
-        val session = getOrCreateSession(env, modelFile, useGpu, selectedGpuId)
+        val session = getOrCreateSession(env, request.model, request.useGpu, request.selectedGpuId)
+        val totalFrames = inputStereoPcm.size / 2
+        val outputInstrumental = FloatArray(inputStereoPcm.size)
+        val outputVocals = FloatArray(inputStereoPcm.size)
         val originalPriority = Thread.currentThread().priority
         Thread.currentThread().priority = Thread.MIN_PRIORITY
 
