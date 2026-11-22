@@ -59,11 +59,17 @@ jobs:
           name: flake-lock
           path: flake.lock
 
+      - name: Test audio routing defaults and overrides
+        run: python3 nix/tests/test_audio_env.py
+
       - name: Check Flake Syntax & Outputs
         run: nix flake check
 
       - name: Build KittyTune Package via Flake
         run: nix build .#default --print-build-logs
+
+      - name: Test packaged audio hook
+        run: KITTYTUNE_TEST_AUDIO_HOOK="$PWD/result/libexec/kittytune-audio-env.sh" python3 nix/tests/test_audio_env.py
 
       - name: Validate Output Derivation
         run: |
@@ -76,4 +82,5 @@ jobs:
           file result/bin/kitty-tune
           test -x result/bin/kitty-tune
           test -x result/bin/KittyTune
+          test -f result/libexec/kittytune-audio-env.sh
           echo "Nix package built successfully and executable is verified!"

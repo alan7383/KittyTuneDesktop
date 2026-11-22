@@ -136,6 +136,11 @@ Keywords=music;player;soundcloud;streaming;lyrics;lossless;karaoke;
 StartupWMClass=kittytune
 EOF
 
+    mkdir -p "$out/libexec"
+    substitute ${./audio-env.sh} "$out/libexec/kittytune-audio-env.sh" \
+      --subst-var-by alsaPlugins "${alsa-plugins}/lib/alsa-lib" \
+      --subst-var-by alsaConfig "$out/etc/asound.conf"
+
     # Default ALSA configuration fallback for environments without physical ALSA soundcards (e.g. WSL2 / WSLg)
     mkdir -p "$out/etc"
     cat << 'EOF' > "$out/etc/asound.conf"
@@ -152,9 +157,7 @@ EOF
     makeWrapper "$out/opt/kitty-tune/bin/KittyTune" "$out/bin/kitty-tune" \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibs}" \
       --prefix XDG_DATA_DIRS : "${gtk3}/share/gsettings-schemas/${gtk3.name}:$XDG_DATA_DIRS" \
-      --prefix ALSA_PLUGIN_DIR : "${alsa-plugins}/lib/alsa-lib" \
-      --run 'if [ -e /mnt/wslg/PulseServer ] && [ -z "$PULSE_SERVER" ]; then export PULSE_SERVER=unix:/mnt/wslg/PulseServer; fi' \
-      --run 'if [ ! -f /etc/asound.conf ] && [ ! -f ~/.asoundrc ] && [ -f "'$out'/etc/asound.conf" ]; then export ALSA_CONFIG_PATH="'$out'/etc/asound.conf"; fi' \
+      --run '. "'$out'/libexec/kittytune-audio-env.sh"' \
       --set-default ORT_DISABLE_TELEMETRY "1"
 
     # Alias KittyTune (capitalized) to kitty-tune
