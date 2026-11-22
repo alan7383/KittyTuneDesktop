@@ -661,15 +661,24 @@ val compileNativeWidevine = tasks.register<Exec>("compileNativeWidevine") {
 }
 
 val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") {
-    description = "Builds the Windows media bridge from source into generated resources."
+    description = "Builds the Windows media bridge for the app image and Gradle runs."
     enabled = desktopIsWindows
-    val outDir = layout.buildDirectory.dir("generated/native-resources/native")
+    val outDir = layout.buildDirectory.dir("generated/smtc")
     inputs.files("scripts/build-smtc-bridge.ps1", "src/main/resources/native/WindowsSmtcBridge.cs",
-        "src/main/resources/icons/kittytune.ico")
+        "src/main/resources/icons/kittytune.ico", "src/main/resources/native/WindowsSmtcBridge.exe")
     outputs.file(outDir.map { it.file("WindowsSmtcBridge.exe") })
     commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
         "-File", project.file("scripts/build-smtc-bridge.ps1").absolutePath,
         "-OutDir", outDir.get().asFile.absolutePath)
+}
+
+val windowsSmtcBridge = compileWindowsSmtcBridge.map { it.outputs.files.singleFile }
+
+tasks.withType<JavaExec>().matching { it.name == "run" || it.name == "runRelease" }.configureEach {
+    if (desktopIsWindows) {
+        dependsOn(compileWindowsSmtcBridge)
+        systemProperty("kittytune.smtc.bridge", windowsSmtcBridge.get().absolutePath)
+    }
 }
 
 val compileCdmNativeHost = tasks.register<Exec>("compileCdmNativeHost") {
@@ -710,7 +719,7 @@ sourceSets.main {
     resources.exclude("native/**/demucs*")
     if (desktopIsWindows) {
         resources.exclude("icons/kittytune.icns")
-        resources.exclude("native/WindowsSmtcBridge.exe")
+        resources.exclude("native/WindowsSmtcBridge.*")
         resources.exclude("native/linux-x86_64/**")
         resources.exclude("native/*.so")
         resources.exclude("native/*.dylib")
@@ -737,11 +746,10 @@ sourceSets.main {
 tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
     dependsOn(compileNativeWidevine)
-    if (desktopIsWindows) dependsOn(compileWindowsSmtcBridge)
     if (desktopIsWindows) dependsOn(compileCdmNativeHost)
     from(layout.buildDirectory.dir("generated/native-resources")) {
         if (desktopIsWindows) {
-            include("native/*.dll", "native/WindowsSmtcBridge.exe", "native/widevinelinux/ktcdm.exe")
+            include("native/*.dll", "native/widevinelinux/ktcdm.exe")
         } else if (System.getProperty("os.name").lowercase().contains("mac")) {
             include("native/*.dylib")
         } else {
@@ -957,9 +965,14 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageT
     if (desktopIsWindows && name in listOf("createDistributable", "createReleaseDistributable")) {
         finalizedBy(enableSegmentHeap)
         val packagedVersion = project.version.toString()
+        val bridgeFile = windowsSmtcBridge
         inputs.property("readableVersion", packagedVersion)
+        inputs.file(bridgeFile).withPropertyName("windowsSmtcBridge")
         doLast {
-            destinationDir.get().asFile.resolve("KittyTune/version.txt").writeText("$packagedVersion\n", Charsets.UTF_8)
+            val appImage = destinationDir.get().asFile.resolve("KittyTune")
+            appImage.resolve("version.txt").writeText("$packagedVersion\n", Charsets.UTF_8)
+            // Preserve the name shown by Windows when a media session has no shortcut identity.
+            bridgeFile.get().copyTo(appImage.resolve("app/smtc/KittyTune.exe"), overwrite = true)
         }
     }
 }

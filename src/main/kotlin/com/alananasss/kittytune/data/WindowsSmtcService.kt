@@ -8,7 +8,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.Closeable
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * KittyTune in the Windows media flyout, on the lock screen and behind the keyboard's media keys.
@@ -35,16 +34,20 @@ class WindowsSmtcService(
     private var lastTimelineUpdateNanos: Long? = null
 
     private fun start(): Process? {
-        val exe = extractBridge() ?: return null
         // Our own launcher path, so the bridge can give Windows's flyout a shortcut to resolve the
         // session's app identity from (see WindowsSmtcBridge.cs). Dev runs from gradle have no
         // launcher exe; the bridge then only patches whatever shortcut already exists.
-        val launcher = System.getProperty("jpackage.app-path")?.takeIf {
-            it.substringAfterLast('/').substringAfterLast('\\').equals("KittyTune.exe", ignoreCase = true)
-        } ?: ProcessHandle.current().info().command().orElse(null)
-            ?.takeIf { it.substringAfterLast('/').substringAfterLast('\\').equals("KittyTune.exe", ignoreCase = true) }
+        val launcher = sequenceOf(
+            System.getProperty("jpackage.app-path"),
+            ProcessHandle.current().info().command().orElse(null),
+        ).filterNotNull().map(::File).firstOrNull { it.name.equals("KittyTune.exe", ignoreCase = true) }
+        val exe = if (launcher != null) {
+            launcher.absoluteFile.parentFile.resolve(PACKAGED_BRIDGE_PATH)
+        } else {
+            System.getProperty("kittytune.smtc.bridge")?.let(::File)
+        }?.takeIf { it.isAbsolute && it.isFile } ?: return null
         return ProcessBuilder(
-            mutableListOf(exe.absolutePath).also { if (launcher != null) it.add(launcher) },
+            listOfNotNull(exe.absolutePath, launcher?.absolutePath),
         ).redirectErrorStream(true).start()
     }
 
@@ -60,26 +63,6 @@ class WindowsSmtcService(
             else -> null
         }
         if (action != null) mainScope.launch { action() }
-    }
-
-    /**
-     * Copies the bridge out of the jar, into a folder named after its content hash. A bridge left
-     * running by an earlier instance keeps its file locked, and an update must not end up talking to
-     * that stale copy. Named `KittyTune.exe` because Windows labels the session with the file name.
-     */
-    private fun extractBridge(): File? {
-        val bytes = javaClass.getResourceAsStream("/native/$BRIDGE_RESOURCE")?.use { it.readBytes() }
-            ?: File("src/main/resources/native/$BRIDGE_RESOURCE").takeIf { it.exists() }?.readBytes()
-            ?: return null
-        val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }.take(12)
-        val target = File(File(System.getProperty("java.io.tmpdir"), "kittytune_smtc"), hash).resolve("KittyTune.exe")
-        if (target.isFile && target.length() == bytes.size.toLong()) return target
-        // Set executable on the temp copy too, not only on dev-mode resources, so a fresh hash-dir
-        // never starts non-executable.
-        target.parentFile.mkdirs()
-        target.setExecutable(true)
-        target.writeBytes(bytes)
-        return target
     }
 
     /** Playback events publish immediately. Continuous playback refreshes the Windows timeline once a second. */
@@ -123,7 +106,7 @@ class WindowsSmtcService(
 
     companion object {
         const val APP_USER_MODEL_ID = "KittyTune.KittyTune"
-        private const val BRIDGE_RESOURCE = "WindowsSmtcBridge.exe"
+        internal const val PACKAGED_BRIDGE_PATH = "app/smtc/KittyTune.exe"
         val CONTROL_CHARS = Regex("[\\t\\r\\n]")
     }
 }
