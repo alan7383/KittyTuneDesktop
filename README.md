@@ -175,7 +175,8 @@ Pre-built binaries for Linux, Windows, and macOS are available on the [releases 
 | Arch Linux | Pacman package | `sudo pacman -U kitty-tune-*.pkg.tar.zst` |
 | NixOS / Nix | Flake / Package | `nix run github:alan7383/KittyTuneDesktop` |
 | Debian / Ubuntu / Mint | Debian package (`.deb`) | `sudo apt install ./kitty-tune_*_amd64.deb` |
-| Fedora / RHEL / openSUSE | RPM package (`.rpm`) | `sudo dnf install ./kitty-tune-*.rpm` |
+| Fedora / RHEL | RPM package (`.rpm`) | `sudo dnf install ./kitty-tune-*.rpm` |
+| openSUSE / SUSE | RPM package (`.rpm`) | `sudo zypper install ./kitty-tune-*.rpm` |
 | Windows x64 | Portable ZIP with bundled Java runtime | [Windows guide](WINDOWS.md) |
 
 ## Windows and macOS
@@ -223,6 +224,13 @@ Download the `.rpm` file from the [releases](https://github.com/alan7383/KittyTu
 ```bash
 sudo dnf install ./kitty-tune-*.rpm
 ```
+
+On openSUSE/SUSE, use:
+```bash
+sudo zypper install ./kitty-tune-*.rpm
+```
+
+Choose the package for your CPU architecture (`x86_64`/`amd64` or `aarch64`/`arm64`). The in-app updater uses the distribution's `ID` and `ID_LIKE` metadata to choose the existing package family, including derivatives. It falls back to a compatible AppImage when that family's package is missing; native library requirements still apply.
 </details>
 
 ## Arch Linux

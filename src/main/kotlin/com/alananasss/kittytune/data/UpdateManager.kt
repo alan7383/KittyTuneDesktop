@@ -244,29 +244,17 @@ object UpdateManager {
                     ?: dmgs.firstOrNull { !it.name.contains("-arm64", ignoreCase = true) && !it.name.contains("-x64", ignoreCase = true) }
             }
             osName.contains("nux") || osName.contains("nix") -> {
-                val archName = if (isArm) "aarch64" else "x86_64"
-                val debArch = if (isArm) "arm64" else "amd64"
-
-                val isArch = File("/etc/arch-release").exists() || File("/etc/pacman.conf").exists()
-                val isDebian = File("/etc/debian_version").exists()
-                val isRpm = File("/etc/redhat-release").exists() || File("/etc/fedora-release").exists()
-
-                if (isArch) {
-                    assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && (it.name.contains(archName, ignoreCase = true) || it.name.contains(osArch, ignoreCase = true)) }
-                        ?: assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) }
-                } else if (isDebian) {
-                    assets.find { it.name.endsWith(".deb", ignoreCase = true) && (it.name.contains(debArch, ignoreCase = true) || it.name.contains(archName, ignoreCase = true)) }
-                        ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
-                } else if (isRpm) {
-                    assets.find { it.name.endsWith(".rpm", ignoreCase = true) && (it.name.contains(archName, ignoreCase = true) || it.name.contains(osArch, ignoreCase = true)) }
-                        ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) }
-                } else {
-                    assets.find { it.name.endsWith(".AppImage", ignoreCase = true) }
-                        ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
-                        ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) }
-                        ?: assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && it.name.contains(archName, ignoreCase = true) }
-                        ?: assets.firstOrNull()
-                }
+                val osRelease = runCatching {
+                    val releaseFile = File("/etc/os-release").takeIf { it.isFile } ?: File("/usr/lib/os-release")
+                    releaseFile.readText()
+                }.getOrDefault("")
+                val family = linuxPackageFamily(
+                    osRelease,
+                    File("/etc/arch-release").exists() || File("/etc/pacman.conf").exists(),
+                    File("/etc/debian_version").exists(),
+                    File("/etc/redhat-release").exists() || File("/etc/fedora-release").exists(),
+                )
+                selectLinuxUpdateAsset(assets, osArch, family)
             }
             else -> assets.firstOrNull()
         }
