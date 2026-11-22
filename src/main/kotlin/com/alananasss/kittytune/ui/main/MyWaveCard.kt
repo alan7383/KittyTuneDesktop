@@ -7,9 +7,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.wave.WaveMode
+import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.game.SnakeGameLauncher
 import com.alananasss.kittytune.ui.game.SnakeGameMode
 import com.alananasss.kittytune.ui.game.SnakeGameRequest
@@ -95,7 +100,15 @@ internal fun MyWaveCard(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 Spacer(Modifier.width(16.dp))
+                // The wave as a game: as big as the play button beside it, and in the same family.
+                Tip(str("game_wave_title")) {
                 FilledTonalIconButton(
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = scheme.secondaryContainer,
+                        contentColor = scheme.onSecondaryContainer,
+                    ),
+                    modifier = Modifier.size(PLAY_SIZE),
                     onClick = {
                         val title = str("wave_title")
                         SnakeGameLauncher.launch(
@@ -107,8 +120,10 @@ internal fun MyWaveCard(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                         )
                     },
                 ) {
-                    Icon(Icons.Rounded.SportsEsports, contentDescription = str("game_wave_title"))
+                    Icon(Icons.Rounded.SportsEsports, contentDescription = str("game_wave_title"), modifier = Modifier.size(32.dp))
                 }
+                }
+                Spacer(Modifier.width(12.dp))
                 WavePlayButton(vm, isPlayingWave)
             }
 
@@ -184,41 +199,37 @@ private fun NowInWave(vm: PlayerViewModel) {
 
 @Composable
 private fun WaveModeRow(selected: WaveMode, onSelect: (WaveMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        WaveMode.entries.forEach { mode ->
-            WaveModeChip(mode, isSelected = mode == selected, onClick = { onSelect(mode) })
-        }
-    }
-}
-
-@Composable
-private fun WaveModeChip(mode: WaveMode, isSelected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(
-        if (isSelected) scheme.secondaryContainer else scheme.surfaceContainerHighest.copy(alpha = 0.7f),
-        label = "waveModeContainer",
-    )
-    val content by animateColorAsState(
-        if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
-        label = "waveModeContent",
-    )
-    val (icon, label) = waveModeVisual(mode)
-    run {
-        Surface(
-            onClick = onClick,
-            shape = CircleShape,
-            color = container,
-            contentColor = content,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-            }
-        }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+    ) {
+        ExpressiveConnectedButtonGroup(
+            options = WaveMode.entries,
+            selectedOption = selected,
+            onOptionSelected = onSelect,
+            fillMaxWidth = false,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            checkedContainerColor = scheme.primary,
+            checkedContentColor = scheme.onPrimary,
+            uncheckedContainerColor = scheme.surfaceContainerHighest.copy(alpha = 0.7f),
+            uncheckedContentColor = scheme.onSurfaceVariant,
+            iconSpacing = 6.dp,
+            iconProvider = { mode ->
+                val (icon, _) = waveModeVisual(mode)
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            labelProvider = { mode ->
+                val (_, label) = waveModeVisual(mode)
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (mode == selected) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                )
+            },
+        )
     }
 }
 
