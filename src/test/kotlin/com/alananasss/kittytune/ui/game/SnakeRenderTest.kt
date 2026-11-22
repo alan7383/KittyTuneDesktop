@@ -9,6 +9,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.semantics.getOrNull
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.domain.Track
 import org.jetbrains.skia.EncodedImageFormat
@@ -66,9 +67,13 @@ class SnakeRenderTest {
             }
             assertEquals(1, played.size)
 
-            val banner = Offset(245f, 123f)
-            scene.sendPointerEvent(PointerEventType.Press, banner)
-            scene.sendPointerEvent(PointerEventType.Release, banner)
+            // The song card opens the player, wherever the layout puts it.
+            val nowPlaying = Strings.get("game_now_playing")
+            val banner = scene.semanticsOwners.firstNotNullOfOrNull { it.rootSemanticsNode.find(nowPlaying) }
+                ?: error("Missing now playing card")
+            val center = banner.boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, center)
+            scene.sendPointerEvent(PointerEventType.Release, center)
             renderFrames()
             assertEquals(1, playerOpened)
         } finally {
@@ -76,4 +81,10 @@ class SnakeRenderTest {
             Strings.appLanguage = previousLanguage
         }
     }
+}
+
+private fun androidx.compose.ui.semantics.SemanticsNode.find(label: String): androidx.compose.ui.semantics.SemanticsNode? {
+    val texts = config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text).orEmpty()
+    if (texts.any { it.text == label }) return this
+    return children.firstNotNullOfOrNull { it.find(label) }
 }

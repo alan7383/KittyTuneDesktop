@@ -38,6 +38,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.data.together.Together
 import com.alananasss.kittytune.ui.ImageLoaderFactory
+import com.alananasss.kittytune.ui.game.SnakeGameLauncher
 import com.alananasss.kittytune.ui.main.MainScreen
 import com.alananasss.kittytune.ui.setup.SetupScreen
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
@@ -586,6 +587,16 @@ fun main(args: Array<String>) {
                 icon = appIcon,
             state = windowState,
             onPreviewKeyEvent = { event ->
+                if (SnakeGameLauncher.pending != null) {
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                        SnakeGameLauncher.dismiss()
+                        return@Window true
+                    }
+                    if (SnakeGameLauncher.handleKeyEvent(event)) {
+                        return@Window true
+                    }
+                    return@Window false
+                }
                 if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
                     DesktopBackDispatcher.onBack()
                     true
@@ -656,7 +667,9 @@ fun main(args: Array<String>) {
                 }
             },
             onKeyEvent = { event ->
-                if (!com.alananasss.kittytune.core.TextInputTracker.isFocused()) {
+                if (SnakeGameLauncher.pending != null) {
+                    false
+                } else if (!com.alananasss.kittytune.core.TextInputTracker.isFocused()) {
                     com.alananasss.kittytune.core.GlobalShortcutDispatcher.dispatch(event)
                 } else false
             },

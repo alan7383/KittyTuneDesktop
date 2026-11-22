@@ -1,6 +1,22 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.alananasss.kittytune.ui.game
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.SentimentDissatisfied
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
+import com.alananasss.kittytune.ui.common.Tip
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -58,10 +74,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,10 +87,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -92,6 +112,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.BlockManager
@@ -126,6 +147,12 @@ internal object SnakeGameLauncher {
     var pending by mutableStateOf<SnakeGameRequest?>(null)
         private set
 
+    internal var keyHandler: ((KeyEvent) -> Boolean)? = null
+
+    fun handleKeyEvent(event: KeyEvent): Boolean {
+        return keyHandler?.invoke(event) ?: false
+    }
+
     fun launch(request: SnakeGameRequest) {
         if (request.mode == SnakeGameMode.PLAYLIST && request.tracks.isEmpty()) return
         pending = request
@@ -133,6 +160,7 @@ internal object SnakeGameLauncher {
 
     fun dismiss() {
         pending = null
+        keyHandler = null
     }
 
     fun bestScore(): Int = prefs.getInt(KEY_BEST, 0)
@@ -298,6 +326,7 @@ internal class SnakeEngine(
 @Composable
 internal fun SnakeGameHost(playerViewModel: PlayerViewModel) {
     val request = SnakeGameLauncher.pending ?: return
+    BackHandler(onBack = { SnakeGameLauncher.dismiss() })
     Dialog(
         onDismissRequest = { SnakeGameLauncher.dismiss() },
         properties = DialogProperties(
@@ -332,6 +361,9 @@ internal fun SnakeGameHost(playerViewModel: PlayerViewModel) {
 
 private const val COLS = 15
 private const val ROWS = 21
+
+/** Wide enough for the board with the score, the song and the controls beside it. */
+private val SIDE_BY_SIDE_WIDTH = 720.dp
 
 @Composable
 internal fun SnakeGameScreen(
@@ -369,61 +401,40 @@ internal fun SnakeGameScreen(
     var best by remember { mutableStateOf(SnakeGameLauncher.bestScore()) }
 
     Surface(
-        modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).heightIn(max = 820.dp).fillMaxHeight(0.94f),
-        shape = RoundedCornerShape(26.dp),
-        color = GameColors.Background,
+        modifier = Modifier.widthIn(max = 1000.dp).fillMaxWidth(0.94f).heightIn(max = 880.dp).fillMaxHeight(0.94f),
+        shape = RoundedCornerShape(32.dp),
+        color = scheme.surfaceContainerLow,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            // Header: title, close
+        Column(Modifier.fillMaxSize().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Icon(
-                    Icons.Rounded.SportsEsports,
-                    contentDescription = null,
-                    tint = scheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                GameBadge()
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        text = str(if (isWave) "game_wave_title" else "game_eat_playlist"),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
+                        str(if (isWave) "game_wave_title" else "game_eat_playlist"),
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = request.title,
-                        color = Color.White.copy(alpha = 0.6f),
-                        style = MaterialTheme.typography.bodySmall,
+                        request.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                IconButton(
-                    onClick = { onClose() },
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.08f),
-                        contentColor = Color.White,
-                    ),
-                ) {
-                    Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
+                Spacer(Modifier.width(12.dp))
+                Tip(str("btn_close")) {
+                    FilledTonalIconButton(onClick = onClose, shapes = IconButtonDefaults.shapes()) {
+                        Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
+                    }
                 }
             }
-
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(16.dp))
 
             when {
-                isWave && waveTracks == null -> GameMessage(
-                    text = str("game_loading"),
-                    icon = { GameSpinner() },
-                )
-                sourceTracks.isNullOrEmpty() -> GameMessage(
-                    text = str("game_empty"),
-                )
+                isWave && waveTracks == null -> GameMessage(str("game_loading"), loading = true)
+                sourceTracks.isNullOrEmpty() -> GameMessage(str("game_empty"))
                 else -> SnakeGameBoardArea(
                     sourceTracks = sourceTracks,
                     onPlayTrack = onPlayTrack,
@@ -447,6 +458,23 @@ internal fun SnakeGameScreen(
     }
 }
 
+/** Which way a key steers, whatever the keyboard: arrows, WASD (QWERTY), ZQSD (AZERTY) and the number pad. */
+internal fun steeringFor(key: Key, char: Char? = null): SnakeDirection? {
+    val lower = char?.lowercaseChar()
+    return when {
+        key == Key.DirectionUp || key == Key.NumPad8 || key == Key.W || key == Key.Z || lower == 'z' || lower == 'w' -> SnakeDirection.UP
+        key == Key.DirectionDown || key == Key.NumPad2 || key == Key.NumPad5 || key == Key.S || lower == 's' -> SnakeDirection.DOWN
+        key == Key.DirectionLeft || key == Key.NumPad4 || key == Key.A || key == Key.Q || lower == 'q' || lower == 'a' -> SnakeDirection.LEFT
+        key == Key.DirectionRight || key == Key.NumPad6 || key == Key.D || lower == 'd' -> SnakeDirection.RIGHT
+        else -> null
+    }
+}
+
+internal fun steeringFor(event: KeyEvent): SnakeDirection? {
+    val char = runCatching { event.utf16CodePoint.toChar() }.getOrNull()
+    return steeringFor(event.key, char)
+}
+
 @Composable
 private fun SnakeGameBoardArea(
     sourceTracks: List<Track>,
@@ -458,7 +486,6 @@ private fun SnakeGameBoardArea(
     onRestartWave: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val scheme = MaterialTheme.colorScheme
     // The snake wears the pet cat's coat: fur for the body, its eyes and markings for the face.
     val pet = remember { PetConfig.load() }
 
@@ -482,6 +509,56 @@ private fun SnakeGameBoardArea(
         if (isWave) onRestartWave() // the wave loads a fresh batch; the board re-enters on its own
         engine.reset()
     }
+    val togglePause: () -> Unit = {
+        when (engine.phase) {
+            SnakePhase.RUNNING -> engine.pause()
+            SnakePhase.IDLE, SnakePhase.PAUSED -> engine.ensureRunning()
+            SnakePhase.OVER, SnakePhase.WIN -> restart()
+        }
+    }
+
+    val onKey: (KeyEvent) -> Boolean = { event ->
+        val direction = steeringFor(event)
+        val char = runCatching { event.utf16CodePoint.toChar().lowercaseChar() }.getOrNull()
+        val isPauseKey = event.key == Key.Spacebar || event.key == Key.P || char == 'p'
+        val isEnterKey = event.key == Key.Enter || event.key == Key.NumPadEnter
+
+        when {
+            direction != null -> {
+                if (event.type == KeyEventType.KeyDown) {
+                    if (engine.phase == SnakePhase.OVER || engine.phase == SnakePhase.WIN) {
+                        restart()
+                    }
+                    engine.turn(direction)
+                    engine.ensureRunning()
+                }
+                true
+            }
+            isPauseKey -> {
+                if (event.type == KeyEventType.KeyUp) togglePause()
+                true
+            }
+            isEnterKey -> {
+                if (event.type == KeyEventType.KeyUp && engine.phase != SnakePhase.RUNNING) togglePause()
+                true
+            }
+            event.key == Key.Escape -> {
+                if (event.type == KeyEventType.KeyUp) onClose()
+                true
+            }
+            else -> false
+        }
+    }
+
+    val currentOnKey by rememberUpdatedState(onKey)
+    DisposableEffect(engine) {
+        SnakeGameLauncher.keyHandler = { currentOnKey(it) }
+        onDispose {
+            if (SnakeGameLauncher.keyHandler != null) {
+                SnakeGameLauncher.keyHandler = null
+            }
+        }
+    }
 
     // The ticker: slower at first, frantic once the menu is half eaten.
     LaunchedEffect(engine, engine.phase, engine.speedMs) {
@@ -495,80 +572,244 @@ private fun SnakeGameBoardArea(
         if (engine.score > best) onBest(engine.score)
     }
 
-    // Score pop.
-    val scoreScale = remember { Animatable(1f) }
-    LaunchedEffect(engine.score) {
-        if (engine.score > 0) {
-            scoreScale.snapTo(1.3f)
-            scoreScale.animateTo(1f, tween(240))
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(focusRequester) { runCatching { focusRequester.requestFocus() } }
+    LaunchedEffect(engine.phase) {
+        if (engine.phase == SnakePhase.RUNNING) {
+            runCatching { focusRequester.requestFocus() }
         }
     }
 
-    var dragAccum by remember { mutableStateOf(Offset.Zero) }
-    val density = LocalDensity.current
-
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
-    Column(
-        modifier = Modifier.fillMaxSize()
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
             .focusRequester(focusRequester)
-            .onPreviewKeyEvent { event ->
-                val direction = when (event.key) {
-                    Key.DirectionUp, Key.W, Key.Z -> SnakeDirection.UP
-                    Key.DirectionDown, Key.S -> SnakeDirection.DOWN
-                    Key.DirectionLeft, Key.A, Key.Q -> SnakeDirection.LEFT
-                    Key.DirectionRight, Key.D -> SnakeDirection.RIGHT
-                    else -> null
-                }
-                when {
-                    direction != null -> {
-                        if (event.type == KeyEventType.KeyDown) {
-                            engine.turn(direction)
-                            engine.ensureRunning()
-                        }
-                        true
-                    }
-                    event.key == Key.Spacebar -> {
-                        if (event.type == KeyEventType.KeyUp) {
-                            when (engine.phase) {
-                                SnakePhase.RUNNING -> engine.pause()
-                                SnakePhase.IDLE, SnakePhase.PAUSED -> engine.ensureRunning()
-                                SnakePhase.OVER, SnakePhase.WIN -> restart()
-                            }
-                        }
-                        true
-                    }
-                    else -> false
+            .focusable()
+            .onPreviewKeyEvent(onKey),
+    ) {
+        val board: @Composable (Modifier) -> Unit = { modifier ->
+            SnakeBoard(
+                engine = engine,
+                pet = pet,
+                isWave = isWave,
+                best = best,
+                onRequestFocus = { runCatching { focusRequester.requestFocus() } },
+                onStart = {
+                    engine.ensureRunning()
+                    runCatching { focusRequester.requestFocus() }
+                },
+                onRestart = restart,
+                onClose = onClose,
+                modifier = modifier,
+            )
+        }
+        if (maxWidth >= SIDE_BY_SIDE_WIDTH) {
+            Row(Modifier.fillMaxSize()) {
+                board(Modifier.weight(1f).fillMaxHeight())
+                Spacer(Modifier.width(20.dp))
+                Column(
+                    modifier = Modifier.width(300.dp).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ScoreCards(engine.score, best, engine.trackCount)
+                    NowPlayingCard(bannerTrack, onOpenPlayer)
+                    Spacer(Modifier.weight(1f))
+                    ControlsCard()
+                    PauseButton(engine.phase, onClick = togglePause, modifier = Modifier.fillMaxWidth())
                 }
             }
-            .focusable(),
-    ) {
-        // Score row
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.08f),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.MusicNote,
-                        contentDescription = null,
-                        tint = scheme.primary,
-                        modifier = Modifier.size(16.dp),
+        } else {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ScoreCards(engine.score, best, engine.trackCount, modifier = Modifier.weight(1f), compact = true)
+                    Spacer(Modifier.width(10.dp))
+                    PauseButton(engine.phase, onClick = togglePause)
+                }
+                NowPlayingCard(bannerTrack, onOpenPlayer)
+                board(Modifier.weight(1f).fillMaxWidth())
+                Text(
+                    str("game_hint"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+/** The board itself: the grid, the covers to eat, the snake, and what to do when it is not running. */
+@Composable
+private fun SnakeBoard(
+    engine: SnakeEngine,
+    pet: com.alananasss.kittytune.ui.pet.PetSettings,
+    isWave: Boolean,
+    best: Int,
+    onRequestFocus: () -> Unit = {},
+    onStart: () -> Unit,
+    onRestart: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val density = LocalDensity.current
+    var dragAccum by remember { mutableStateOf(Offset.Zero) }
+    val gridColor = scheme.outlineVariant.copy(alpha = 0.45f)
+    val glowColor = scheme.tertiary
+
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val cell = min(constraints.maxWidth.toFloat() / COLS, constraints.maxHeight.toFloat() / ROWS)
+        val cellDp = with(density) { cell.toDp() }
+        val boardW = with(density) { (cell * COLS).toDp() }
+        val boardH = with(density) { (cell * ROWS).toDp() }
+
+        Box(
+            modifier = Modifier
+                .size(boardW, boardH)
+                .clip(RoundedCornerShape(28.dp))
+                .background(scheme.surfaceContainerLowest)
+                .pointerInput(engine) {
+                    detectDragGestures(
+                        onDragStart = {
+                            dragAccum = Offset.Zero
+                            onRequestFocus()
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragAccum += dragAmount
+                            val threshold = cell * 0.85f
+                            if (abs(dragAccum.x) > threshold || abs(dragAccum.y) > threshold) {
+                                val dir = if (abs(dragAccum.x) > abs(dragAccum.y)) {
+                                    if (dragAccum.x > 0) SnakeDirection.RIGHT else SnakeDirection.LEFT
+                                } else {
+                                    if (dragAccum.y > 0) SnakeDirection.DOWN else SnakeDirection.UP
+                                }
+                                engine.turn(dir)
+                                engine.ensureRunning()
+                                dragAccum = Offset.Zero
+                            }
+                        },
                     )
-                    Spacer(Modifier.width(6.dp))
+                },
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawGrid(cell, gridColor)
+                drawFoodsGlow(engine.foods, cell, glowColor)
+                drawSnake(
+                    engine.snake, cell,
+                    fur = Color(pet.palette.fur),
+                    shade = Color(pet.palette.shade),
+                    mark = Color(pet.palette.mark),
+                    eyeColor = Color(pet.eyeColor),
+                )
+            }
+
+            engine.foods.forEach { food ->
+                val appeared = remember(food.track.id, food.cell) { Animatable(0.4f) }
+                LaunchedEffect(food.track.id, food.cell) {
+                    appeared.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 500f))
+                }
+                AsyncImage(
+                    model = trackImageModel(food.track),
+                    contentDescription = food.track.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .offset { IntOffset((food.cell.x * cell).roundToInt(), (food.cell.y * cell).roundToInt()) }
+                        .size(cellDp)
+                        .padding(2.5.dp)
+                        .graphicsLayer {
+                            scaleX = appeared.value
+                            scaleY = appeared.value
+                        }
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(scheme.surfaceContainerHighest),
+                )
+            }
+
+            val overlayAlpha by animateFloatAsState(
+                targetValue = if (engine.phase == SnakePhase.RUNNING) 0f else 1f,
+                label = "overlay",
+            )
+            if (overlayAlpha > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = overlayAlpha }
+                        .background(scheme.scrim.copy(alpha = 0.45f))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when (engine.phase) {
+                        SnakePhase.IDLE -> GameOverlayCard(
+                            title = str(if (isWave) "game_wave_idle" else "game_idle"),
+                            body = str("game_eat_hint"),
+                            primary = { BigPlayButton(onStart) },
+                        )
+                        SnakePhase.PAUSED -> GameOverlayCard(
+                            title = str("game_paused"),
+                            primary = { BigPlayButton(onStart) },
+                        )
+                        SnakePhase.OVER -> GameOverlayCard(
+                            title = str("game_over"),
+                            body = str("game_score", engine.score) + "  ·  " + str("game_best", best),
+                            icon = Icons.Rounded.SentimentDissatisfied,
+                            primary = { RestartButtons(onRestart, onClose) },
+                        )
+                        SnakePhase.WIN -> GameOverlayCard(
+                            title = str(if (isWave) "game_wave_finished" else "game_finished_title"),
+                            body = str("game_finished_text", engine.score),
+                            icon = Icons.Rounded.EmojiEvents,
+                            primary = { RestartButtons(onRestart, onClose) },
+                        )
+                        SnakePhase.RUNNING -> Unit
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Pieces ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun GameBadge() {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(MaterialShapes.Cookie9Sided.toShape())
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.SportsEsports, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(26.dp))
+    }
+}
+
+/** Songs eaten (the score), the best run, and how far through the menu this run is. */
+@Composable
+private fun ScoreCards(score: Int, best: Int, total: Int, modifier: Modifier = Modifier, compact: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    val scoreScale = remember { Animatable(1f) }
+    LaunchedEffect(score) {
+        if (score > 0) {
+            scoreScale.snapTo(1.25f)
+            scoreScale.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 600f))
+        }
+    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(shape = RoundedCornerShape(24.dp), color = scheme.primaryContainer, modifier = Modifier.weight(1f)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.MusicNote, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(str("game_score_label"), style = MaterialTheme.typography.labelMedium, color = scheme.onPrimaryContainer)
+                    }
                     Text(
-                        text = str("game_score", engine.score),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
+                        "$score",
+                        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
+                        color = scheme.onPrimaryContainer,
                         modifier = Modifier.graphicsLayer {
                             scaleX = scoreScale.value
                             scaleY = scoreScale.value
@@ -576,415 +817,238 @@ private fun SnakeGameBoardArea(
                     )
                 }
             }
-            Surface(shape = RoundedCornerShape(12.dp), color = Color.White.copy(alpha = 0.08f)) {
-                Text(
-                    text = str("game_best", best),
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                )
-            }
-            if (engine.trackCount > 0) {
-                Text(
-                    text = str("game_of_total", engine.trackCount),
-                    color = Color.White.copy(alpha = 0.45f),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            FilledTonalIconButton(
-                onClick = { engine.pause() },
-                enabled = engine.phase == SnakePhase.RUNNING,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color.White.copy(alpha = 0.08f),
-                    contentColor = Color.White,
-                    disabledContainerColor = Color.White.copy(alpha = 0.04f),
-                    disabledContentColor = Color.White.copy(alpha = 0.3f),
-                ),
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(Icons.Rounded.Pause, contentDescription = str("action_pause"), modifier = Modifier.size(18.dp))
+            Surface(shape = RoundedCornerShape(24.dp), color = scheme.surfaceContainerHigh, modifier = Modifier.weight(1f)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.EmojiEvents, null, tint = scheme.tertiary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(str("game_best_label"), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+                    }
+                    Text(
+                        "$best",
+                        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
+        if (total > 0 && !compact) {
+            Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerHigh) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        "${score.coerceAtMost(total)} " + str("game_of_total", total),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = scheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinearWavyProgressIndicator(
+                        progress = { (score.toFloat() / total).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
 
-        Spacer(Modifier.height(6.dp))
-
-        // Show the first song as soon as the run starts, then follow each swallowed cover.
-        AnimatedVisibility(
-            visible = bannerTrack != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.9f),
-            exit = fadeOut() + scaleOut(targetScale = 0.9f),
+/** The song the last cover played; a click opens the player on it. */
+@Composable
+private fun NowPlayingCard(track: Track?, onOpenPlayer: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    AnimatedVisibility(
+        visible = track != null,
+        enter = fadeIn() + scaleIn(initialScale = 0.92f),
+        exit = fadeOut() + scaleOut(targetScale = 0.92f),
+    ) {
+        FilledTonalButton(
+            onClick = onOpenPlayer,
+            shapes = ButtonDefaults.shapes(),
+            contentPadding = PaddingValues(10.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = scheme.secondaryContainer),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = scheme.primary.copy(alpha = 0.16f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenPlayer),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    AsyncImage(
-                        model = trackImageModel(bannerTrack),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.1f)),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = str("game_now_playing"),
-                            color = scheme.primary,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = bannerTrack?.let { "${it.title.orEmpty()} • ${it.displayArtist}" }.orEmpty(),
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-
-        // The board
-        BoxWithConstraints(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(vertical = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            val maxW = constraints.maxWidth.toFloat()
-            val maxH = constraints.maxHeight.toFloat()
-            val cell = min(maxW / COLS, maxH / ROWS)
-            val cellDp = with(density) { cell.toDp() }
-            val boardW = with(density) { (cell * COLS).toDp() }
-            val boardH = with(density) { (cell * ROWS).toDp() }
-
-            Box(
-                modifier = Modifier
-                    .size(boardW, boardH)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(GameColors.Board)
-                    .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(20.dp))
-                    .pointerInput(engine) {
-                        detectDragGestures(
-                            onDragStart = { dragAccum = Offset.Zero },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragAccum += dragAmount
-                                val threshold = cell * 0.85f
-                                if (abs(dragAccum.x) > threshold || abs(dragAccum.y) > threshold) {
-                                    val dir = if (abs(dragAccum.x) > abs(dragAccum.y)) {
-                                        if (dragAccum.x > 0) SnakeDirection.RIGHT else SnakeDirection.LEFT
-                                    } else {
-                                        if (dragAccum.y > 0) SnakeDirection.DOWN else SnakeDirection.UP
-                                    }
-                                    engine.turn(dir)
-                                    engine.ensureRunning()
-                                    dragAccum = Offset.Zero
-                                }
-                            },
-                        )
-                    },
-            ) {
-                // Grid, food glow and snake
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawGrid(cell)
-                    drawFoodsGlow(engine.foods, cell)
-                    drawSnake(
-                        engine.snake, cell,
-                        fur = Color(pet.palette.fur),
-                        shade = Color(pet.palette.shade),
-                        mark = Color(pet.palette.mark),
-                        eyeColor = Color(pet.eyeColor),
-                    )
-                }
-
-                // Food covers as real images over the canvas
-                engine.foods.forEach { food ->
-                    val appeared = remember(food.track.id, food.cell) { Animatable(0.4f) }
-                    LaunchedEffect(food.track.id, food.cell) {
-                        appeared.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 500f))
-                    }
-                    AsyncImage(
-                        model = trackImageModel(food.track),
-                        contentDescription = food.track.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .offset {
-                                IntOffset(
-                                    (food.cell.x * cell).roundToInt(),
-                                    (food.cell.y * cell).roundToInt(),
-                                )
-                            }
-                            .size(cellDp)
-                            .padding(2.5.dp)
-                            .graphicsLayer {
-                                scaleX = appeared.value
-                                scaleY = appeared.value
-                            }
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White.copy(alpha = 0.12f)),
-                    )
-                }
-
-                // Overlays
-                val overlayAlpha by animateFloatAsState(
-                    targetValue = if (engine.phase == SnakePhase.RUNNING) 0f else 1f,
-                    label = "overlay",
+            AsyncImage(
+                model = trackImageModel(track),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(scheme.surfaceContainerHighest),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(str("game_now_playing"), style = MaterialTheme.typography.labelSmall, color = scheme.primary, fontWeight = FontWeight.Bold)
+                Text(
+                    track?.title.orEmpty(),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (overlayAlpha > 0.01f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = overlayAlpha }
-                            .background(Color.Black.copy(alpha = 0.6f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        when (engine.phase) {
-                            SnakePhase.IDLE -> OverlayIdle(
-                                onStart = engine::ensureRunning,
-                                isWave = isWave,
-                            )
-                            SnakePhase.PAUSED -> OverlayPaused(onResume = engine::ensureRunning)
-                            SnakePhase.OVER -> OverlayOver(
-                                score = engine.score,
-                                best = best,
-                                onRestart = restart,
-                                onClose = onClose,
-                            )
-                            SnakePhase.WIN -> OverlayWin(
-                                score = engine.score,
-                                onRestart = restart,
-                                onClose = onClose,
-                                isWave = isWave,
-                            )
-                            SnakePhase.RUNNING -> Unit
-                        }
-                    }
-                }
+                Text(
+                    track?.displayArtist.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
         }
+    }
+}
 
-        // D-pad
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            DpadButton(Icons.Rounded.KeyboardArrowUp, str("game_up")) {
-                engine.turn(SnakeDirection.UP); engine.ensureRunning()
+/** The keys, as keycaps: arrows or WASD / ZQSD to steer, Space or P to pause. */
+@Composable
+private fun ControlsCard() {
+    val scheme = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(24.dp), color = scheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Keyboard, null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(str("game_controls"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                DpadButton(Icons.Rounded.KeyboardArrowLeft, str("game_left")) {
-                    engine.turn(SnakeDirection.LEFT); engine.ensureRunning()
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Keycap(icon = Icons.Rounded.KeyboardArrowUp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Keycap(icon = Icons.Rounded.KeyboardArrowLeft)
+                        Keycap(icon = Icons.Rounded.KeyboardArrowDown)
+                        Keycap(icon = Icons.Rounded.KeyboardArrowRight)
+                    }
                 }
                 Spacer(Modifier.width(14.dp))
-                DpadButton(Icons.Rounded.KeyboardArrowDown, str("game_down")) {
-                    engine.turn(SnakeDirection.DOWN); engine.ensureRunning()
-                }
-                Spacer(Modifier.width(14.dp))
-                DpadButton(Icons.Rounded.KeyboardArrowRight, str("game_right")) {
-                    engine.turn(SnakeDirection.RIGHT); engine.ensureRunning()
+                Column {
+                    Text(str("game_key_steer"), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text("WASD · ZQSD", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = str("game_hint"),
-                color = Color.White.copy(alpha = 0.4f),
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
-// ─── Overlays & small pieces ────────────────────────────────────────────────────────────
-
-@Composable
-private fun OverlayIdle(onStart: () -> Unit, isWave: Boolean) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledIconButton(
-            onClick = onStart,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            modifier = Modifier.size(72.dp),
-        ) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = str("btn_play"), modifier = Modifier.size(38.dp))
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = str(if (isWave) "game_wave_idle" else "game_idle"),
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = str("game_eat_hint"),
-            color = Color.White.copy(alpha = 0.65f),
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun OverlayPaused(onResume: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledIconButton(
-            onClick = onResume,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            modifier = Modifier.size(72.dp),
-        ) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = str("btn_play"), modifier = Modifier.size(38.dp))
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = str("game_paused"),
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-@Composable
-private fun OverlayOver(score: Int, best: Int, onRestart: () -> Unit, onClose: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = str("game_over"),
-            color = Color.White,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = str("game_score", score) + "  •  " + str("game_best", best),
-            color = Color.White.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(14.dp))
-        FilledTonalButton(onClick = onRestart) {
-            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(str("game_restart"))
-        }
-        TextButton(onClick = onClose) {
-            Text(str("btn_close"), color = Color.White.copy(alpha = 0.6f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Keycap(label = str("game_key_space"), wide = true)
+                Spacer(Modifier.width(6.dp))
+                Keycap(label = "P")
+                Spacer(Modifier.width(14.dp))
+                Text(str("game_key_pause"), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
 @Composable
-private fun OverlayWin(score: Int, onRestart: () -> Unit, onClose: () -> Unit, isWave: Boolean) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = str(if (isWave) "game_wave_finished" else "game_finished_title"),
-            color = Color.White,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = str("game_finished_text", score),
-            color = Color.White.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(14.dp))
-        FilledTonalButton(onClick = onRestart) {
-            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(str("game_restart"))
-        }
-        TextButton(onClick = onClose) {
-            Text(str("btn_close"), color = Color.White.copy(alpha = 0.6f))
-        }
-    }
-}
-
-@Composable
-private fun DpadButton(icon: ImageVector, desc: String, onClick: () -> Unit) {
-    FilledTonalIconButton(
-        onClick = onClick,
-        colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = Color.White.copy(alpha = 0.08f),
-            contentColor = Color.White,
-        ),
-        modifier = Modifier.size(52.dp),
+private fun Keycap(label: String? = null, icon: ImageVector? = null, wide: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = scheme.surfaceContainerHighest,
+        border = BorderStroke(1.dp, scheme.outlineVariant),
+        modifier = Modifier.height(32.dp).widthIn(min = if (wide) 72.dp else 32.dp),
     ) {
-        Icon(icon, contentDescription = desc)
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 8.dp)) {
+            if (icon != null) Icon(icon, null, modifier = Modifier.size(18.dp))
+            if (label != null) Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
 @Composable
-private fun GameMessage(text: String, icon: (@Composable () -> Unit)? = null) {
+private fun PauseButton(phase: SnakePhase, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val running = phase == SnakePhase.RUNNING
+    FilledTonalButton(
+        onClick = onClick,
+        shapes = ButtonDefaults.shapes(),
+        modifier = modifier.height(52.dp),
+    ) {
+        Icon(if (running) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(str(if (running) "action_pause" else "btn_play"))
+    }
+}
+
+@Composable
+private fun GameOverlayCard(
+    title: String,
+    body: String? = null,
+    icon: ImageVector? = null,
+    primary: @Composable () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(32.dp), color = scheme.surfaceContainerHigh, modifier = Modifier.widthIn(max = 320.dp)) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (icon != null) {
+                Box(
+                    modifier = Modifier.size(64.dp).clip(MaterialShapes.SoftBurst.toShape()).background(scheme.tertiaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, tint = scheme.onTertiaryContainer, modifier = Modifier.size(32.dp))
+                }
+                Spacer(Modifier.height(14.dp))
+            }
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            if (body != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(18.dp))
+            primary()
+        }
+    }
+}
+
+@Composable
+private fun BigPlayButton(onClick: () -> Unit) {
+    FilledIconButton(
+        onClick = onClick,
+        shapes = IconButtonDefaults.shapes(),
+        modifier = Modifier.size(80.dp),
+    ) {
+        Icon(Icons.Rounded.PlayArrow, contentDescription = str("btn_play"), modifier = Modifier.size(40.dp))
+    }
+}
+
+@Composable
+private fun RestartButtons(onRestart: () -> Unit, onClose: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Button(onClick = onRestart, shapes = ButtonDefaults.shapes(), modifier = Modifier.height(52.dp)) {
+            Icon(Icons.Rounded.Refresh, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(str("game_restart"))
+        }
+        TextButton(onClick = onClose, shapes = ButtonDefaults.shapes()) { Text(str("btn_close")) }
+    }
+}
+
+@Composable
+private fun GameMessage(text: String, loading: Boolean = false) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(32.dp),
     ) {
-        icon?.invoke()
-        if (icon != null) Spacer(Modifier.height(14.dp))
-        Text(
-            text = text,
-            color = Color.White.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-        )
+        if (loading) {
+            ContainedLoadingIndicator(Modifier.size(64.dp))
+        } else {
+            Box(
+                modifier = Modifier.size(72.dp).clip(MaterialShapes.Cookie12Sided.toShape()).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.SportsEsports, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
-}
-
-@Composable
-private fun GameSpinner() {
-    val transition = rememberInfiniteTransition(label = "spinner")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Restart),
-        label = "angle",
-    )
-    Icon(
-        Icons.Rounded.SportsEsports,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .size(42.dp)
-            .graphicsLayer { rotationZ = angle },
-    )
 }
 
 // ─── Canvas drawing ─────────────────────────────────────────────────────────────────────
 
-private object GameColors {
-    val Background = Color(0xFF0D0D12)
-    val Board = Color(0xFF15151C)
-    val Grid = Color(0xFF23232D)
-    val FoodGlow = Color(0xFFFFC96B)
-}
 
-private fun DrawScope.drawGrid(cell: Float) {
+private fun DrawScope.drawGrid(cell: Float, color: Color) {
     for (x in 1 until COLS) {
         for (y in 1 until ROWS) {
             drawCircle(
-                color = GameColors.Grid,
+                color = color,
                 radius = cell * 0.045f,
                 center = Offset(x * cell, y * cell),
             )
@@ -992,10 +1056,10 @@ private fun DrawScope.drawGrid(cell: Float) {
     }
 }
 
-private fun DrawScope.drawFoodsGlow(foods: List<SnakeFood>, cell: Float) {
+private fun DrawScope.drawFoodsGlow(foods: List<SnakeFood>, cell: Float, color: Color) {
     foods.forEach { food ->
         drawCircle(
-            color = GameColors.FoodGlow.copy(alpha = 0.26f),
+            color = color.copy(alpha = 0.26f),
             radius = cell * 0.72f,
             center = Offset(
                 food.cell.x * cell + cell / 2f,
