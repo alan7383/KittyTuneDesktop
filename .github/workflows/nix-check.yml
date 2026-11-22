@@ -68,6 +68,11 @@ jobs:
       - name: Build KittyTune Package via Flake
         run: nix build .#default --print-build-logs
 
+      - name: Run packaged native helper without a model
+        run: |
+          helper=$(nix eval --raw .#packages.x86_64-linux.default.nativeDemucs.outPath)
+          "$helper/bin/demucs" --help
+
       - name: Test packaged audio hook
         run: KITTYTUNE_TEST_AUDIO_HOOK="$PWD/result/libexec/kittytune-audio-env.sh" python3 nix/tests/test_audio_env.py
 

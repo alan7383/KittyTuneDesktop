@@ -369,6 +369,9 @@ object KaraokeManager {
      * Extracts and returns the native demucs executable bundled with KittyTune.
      */
     fun getNativeDemucsBinary(): File? {
+        System.getenv("KITTYTUNE_DEMUCS")?.takeIf { it.isNotBlank() }?.let {
+            return configuredDemucsBinary(it)
+        }
         val os = System.getProperty("os.name", "").lowercase()
         val isWindows = os.contains("win")
         val isMac = os.contains("mac")

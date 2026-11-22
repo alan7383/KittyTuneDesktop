@@ -1055,7 +1055,7 @@ tasks.register<Test>("headlessTest") {
     maxHeapSize = "768m"
     maxParallelForks = 1
     filter {
-        listOf("*KaraokeOnnxFallbackTest", "*LinuxUpdateAssetsTest", "*AmbientPcmTest", "*StreamingAmbientPlaybackTest", "*RainPlayerTest", "TimeStretcherTest", "SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
+        listOf("*ConfiguredDemucsTest", "*KaraokeOnnxFallbackTest", "*LinuxUpdateAssetsTest", "*AmbientPcmTest", "*StreamingAmbientPlaybackTest", "*RainPlayerTest", "TimeStretcherTest", "SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
             "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest", "DownloadFilesTest", "LyricsMergePerformanceTest", "*LyricsMatcherTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest", "*FadingEdgeRenderTest",
