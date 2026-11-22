@@ -609,7 +609,7 @@ object UpdateManager {
             }
 
             Log "Stopping processes for ${'$'}exePath..."
-            ${'$'}bridgePath = [IO.Path]::GetFullPath((Join-Path ${'$'}installDir '${WindowsSmtcService.PACKAGED_BRIDGE_PATH}'))
+            ${'$'}bridgePath = [IO.Path]::GetFullPath((Join-Path ${'$'}installDir '${WindowsSmtcService.LEGACY_BRIDGE_PATH}'))
             ${'$'}procs = Get-Process -Name "KittyTune", "WindowsSmtcBridge" -ErrorAction SilentlyContinue | Where-Object {
                 try {
                     ${'$'}processPath = [IO.Path]::GetFullPath(${'$'}_.Path)

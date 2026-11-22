@@ -31,7 +31,7 @@ object WindowsAppIdHelper {
 
         // Process-level AppUserModelID is deliberately NOT set on the JVM process so that
         // the Windows Taskbar dynamically updates button icons via standard WM_SETICON messages.
-        // SMTC media controls are handled independently by WindowsSmtcBridge.exe with its own AUMID.
+        // The media controls (WindowsSmtcService) run in this same process and need no AUMID of their own.
 
         // 2. Ensure shortcuts on Taskbar, Start Menu, Desktop have System.AppUserModel.ID set
         thread(isDaemon = true, name = "WindowsAppIdHelper-ShortcutSync") {

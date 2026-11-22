@@ -7,14 +7,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.Closeable
-import java.io.File
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * KittyTune in the Windows media flyout, on the lock screen and behind the keyboard's media keys.
  *
- * System Media Transport Controls are WinRT, out of the JVM's reach, so a small bundled process
- * (`native/WindowsSmtcBridge.cs`) owns the session and the two talk over its stdin/stdout. The bridge
- * exits when its stdin closes, so it goes away with the app even if the app is killed.
+ * Runs inside the app's own process ([WinRtSmtc]). Earlier versions started a separate helper
+ * executable for this, which antivirus engines flagged (issue #145); there is no helper any more.
+ * Every WinRT call happens on one worker thread, so a slow call never holds up the UI.
  */
 class WindowsSmtcService(
     private val onPlay: () -> Unit,
@@ -25,44 +26,53 @@ class WindowsSmtcService(
     private val onSeek: (Long) -> Unit,
 ) : Closeable {
 
-    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val bridge = if (System.getProperty("os.name").lowercase().contains("win") &&
+    private val enabled = System.getProperty("os.name").lowercase().contains("win") &&
         !java.lang.Boolean.getBoolean("kittytune.trainStartupCache")
-    ) {
-        SmtcBridgeWorker(::start, ::handleBridgeLine)
-    } else null
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val worker = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "WindowsSmtc").apply { isDaemon = true }
+    }
+    @Volatile private var closed = false
+    // Only the worker touches these.
+    private var controls: WinRtSmtc? = null
+    private var latest: Update? = null
     private var lastTimelineUpdateNanos: Long? = null
 
-    private fun start(): Process? {
-        // Our own launcher path, so the bridge can give Windows's flyout a shortcut to resolve the
-        // session's app identity from (see WindowsSmtcBridge.cs). Dev runs from gradle have no
-        // launcher exe; the bridge then only patches whatever shortcut already exists.
-        val launcher = sequenceOf(
-            System.getProperty("jpackage.app-path"),
-            ProcessHandle.current().info().command().orElse(null),
-        ).filterNotNull().map(::File).firstOrNull { it.name.equals("KittyTune.exe", ignoreCase = true) }
-        val exe = if (launcher != null) {
-            launcher.absoluteFile.parentFile.resolve(PACKAGED_BRIDGE_PATH)
-        } else {
-            System.getProperty("kittytune.smtc.bridge")?.let(::File)
-        }?.takeIf { it.isAbsolute && it.isFile } ?: return null
-        return ProcessBuilder(
-            listOfNotNull(exe.absolutePath, launcher?.absolutePath),
-        ).redirectErrorStream(true).start()
+    private data class Update(
+        val title: String,
+        val artist: String,
+        val album: String,
+        val artwork: String,
+        val playing: Boolean,
+        val positionMs: Long,
+        val durationMs: Long,
+        val rate: Double,
+    )
+
+    init {
+        if (enabled) submit { open() }
     }
 
-    private fun handleBridgeLine(line: String) {
-        val action: (() -> Unit)? = when {
-            line == "CMD:PLAY" -> onPlay
-            line == "CMD:PAUSE" -> onPause
-            line == "CMD:TOGGLE" -> onPlayPause
-            line == "CMD:NEXT" -> onNext
-            line == "CMD:PREV" -> onPrevious
-            line.startsWith("SEEK:") -> line.removePrefix("SEEK:").toLongOrNull()?.let { ms -> { onSeek(ms) } }
-            line.startsWith("ERROR:") -> { println("Windows SMTC bridge: $line"); null }
-            else -> null
-        }
-        if (action != null) mainScope.launch { action() }
+    private fun open() {
+        // The launcher, for the Start Menu shortcut a portable install has to be given (see
+        // WindowsShortcutIdentity). Dev runs have none and only patch shortcuts that already exist.
+        val launcher = sequenceOf(System.getProperty("jpackage.app-path"), ProcessHandle.current().info().command().orElse(null))
+            .filterNotNull().map { java.io.File(it) }.firstOrNull { it.name.equals("KittyTune.exe", ignoreCase = true) && it.isFile }
+        controls = WinRtSmtc(
+            appUserModelId = APP_USER_MODEL_ID,
+            launcher = launcher,
+            onButton = { button ->
+                val action: (() -> Unit)? = when (button) {
+                    WinRtSmtc.Button.PLAY -> onPlay
+                    WinRtSmtc.Button.PAUSE, WinRtSmtc.Button.STOP -> onPause
+                    WinRtSmtc.Button.NEXT -> onNext
+                    WinRtSmtc.Button.PREVIOUS -> onPrevious
+                    WinRtSmtc.Button.OTHER -> null
+                }
+                if (action != null && !closed) mainScope.launch { action() }
+            },
+            onSeek = { ms -> if (!closed) mainScope.launch { onSeek(ms) } },
+        )
     }
 
     /** Playback events publish immediately. Continuous playback refreshes the Windows timeline once a second. */
@@ -74,39 +84,68 @@ class WindowsSmtcService(
         playbackRate: Float,
         periodic: Boolean = false,
     ) {
-        if (bridge == null) return
-        val now = System.nanoTime()
-        val lastUpdate = lastTimelineUpdateNanos
-        if (periodic && (track == null || (lastUpdate != null && now - lastUpdate < 1_000_000_000L))) return
-        lastTimelineUpdateNanos = now
-        val fields = listOf(
-            "UPDATE",
-            track?.title.orEmpty(),
-            track?.displayArtist.orEmpty(),
-            (track?.publisherMetadata?.albumTitle ?: track?.publisherMetadata?.releaseTitle).orEmpty(),
-            track?.fullResArtwork.orEmpty(),
-            if (isPlaying) "1" else "0",
-            positionMs.coerceAtLeast(0L).toString(),
-            durationMs.coerceAtLeast(0L).toString(),
-            playbackRate.toString(),
+        if (!enabled) return
+        val update = Update(
+            title = track?.title.orEmpty(),
+            artist = track?.displayArtist.orEmpty(),
+            album = (track?.publisherMetadata?.albumTitle ?: track?.publisherMetadata?.releaseTitle).orEmpty(),
+            artwork = track?.fullResArtwork.orEmpty(),
+            playing = isPlaying,
+            positionMs = positionMs.coerceAtLeast(0L),
+            durationMs = durationMs.coerceAtLeast(0L),
+            rate = playbackRate.toDouble(),
         )
-        val message = fields.joinToString("\t") { it.replace(CONTROL_CHARS, " ") }
-        bridge.update(message)
+        submit {
+            val now = System.nanoTime()
+            val last = lastTimelineUpdateNanos
+            if (periodic && (track == null || (last != null && now - last < 1_000_000_000L))) return@submit
+            if (update == latest) return@submit
+            lastTimelineUpdateNanos = now
+            latest = update
+            publish(update)
+        }
     }
 
-    /** Queued with media writes; the new helper receives the latest known update automatically. */
+    private fun publish(update: Update) {
+        controls?.update(
+            update.title, update.artist, update.album, update.artwork,
+            update.playing, update.positionMs, update.durationMs, update.rate,
+        )
+    }
+
+    /** Recreates the session (after the audio device or Explorer restarted) and republishes the last state. */
     fun restart() {
-        bridge?.restart()
+        if (!enabled) return
+        submit {
+            controls?.close()
+            controls = null
+            open()
+            latest?.let(::publish)
+        }
+    }
+
+    private fun submit(action: () -> Unit) {
+        if (closed) return
+        runCatching {
+            worker.execute {
+                if (!closed) runCatching(action).onFailure { println("Windows SMTC unavailable: ${it.message}") }
+            }
+        }
     }
 
     override fun close() {
-        bridge?.close()
+        if (closed) return
+        closed = true
+        runCatching { worker.execute { runCatching { controls?.close() }; controls = null } }
+        worker.shutdown()
+        runCatching { worker.awaitTermination(2, TimeUnit.SECONDS) }
         mainScope.cancel()
     }
 
     companion object {
         const val APP_USER_MODEL_ID = "KittyTune.KittyTune"
-        internal const val PACKAGED_BRIDGE_PATH = "app/smtc/KittyTune.exe"
-        val CONTROL_CHARS = Regex("[\\t\\r\\n]")
+
+        /** Where versions up to 1.7.0 installed the helper executable; the updater still stops one left running. */
+        internal const val LEGACY_BRIDGE_PATH = "app/smtc/KittyTune.exe"
     }
 }

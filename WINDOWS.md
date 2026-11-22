@@ -27,8 +27,8 @@ normal security metadata. Do not change the workspace's sandbox ACLs to work aro
 ## Build
 
 Use Windows x64, JDK 21+ with `jpackage`, a Windows SDK, and either Visual Studio
-C++ Build Tools or MinGW `g++` on PATH. The media bridge also uses the .NET
-Framework C# compiler included with Windows.
+C++ Build Tools or MinGW `g++` on PATH. The Windows media controls need nothing
+extra: they run inside the app through WinRT.
 
 ```powershell
 .\scripts\build-windows.ps1 -JavaHome 'C:\path\to\jdk-21'

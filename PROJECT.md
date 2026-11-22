@@ -6,10 +6,9 @@
   - `src/main/kotlin/com/alananasss/kittytune/core/AppIconRuntime.kt`: Manages runtime AWT/Win32 window icon ladders (`target.iconImages`) via `WM_SETICON` (16, 20, 24, 32, 48, 64, 128, 256 px).
   - `src/main/kotlin/com/alananasss/kittytune/core/AppIconInstaller.kt` & `WindowsAppIdHelper.kt`: Windows shortcut patching, multi-res ICO generation in `%APPDATA%\KittyTune\icons\`, and shell notification (`SHChangeNotify`, `ie4uinit`, `StartMenuExperienceHost`).
   - `src/main/kotlin/com/alananasss/kittytune/ui/screens/settings/AppearanceSettingsScreen.kt`: UI for selecting icon variants.
-- **SMTC Subsystem (.NET Bridge)**:
-  - `src/main/resources/native/WindowsSmtcBridge.cs` (compiled to `WindowsSmtcBridge.exe`): Standalone process managing WinRT `MediaPlayer` and `SystemMediaTransportControls`.
-  - Sets its own `SetCurrentProcessExplicitAppUserModelID("KittyTune.KittyTune")` and ensures a Start Menu shortcut with `System.AppUserModel.ID` exists so the Windows media flyout identifies the player as "KittyTune".
-  - Communicates with JVM `WindowsSmtcService.kt` via stdio JSON messages.
+- **SMTC Subsystem (in-process WinRT)**:
+  - `src/main/kotlin/com/alananasss/kittytune/data/WinRtSmtc.kt`: Drives a WinRT `MediaPlayer`'s `SystemMediaTransportControls` from the JVM through `combase.dll` and JNA. No helper executable (the former `WindowsSmtcBridge.exe` was flagged by antivirus engines, issue #145).
+  - `src/main/kotlin/com/alananasss/kittytune/data/WindowsSmtcService.kt`: Keeps every WinRT call on one worker thread and maps buttons and seeks to the player.
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
@@ -46,10 +45,9 @@
   - Preserves `System.AppUserModel.ID` (`{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}`, 5 = `"KittyTune.KittyTune"`) on the Start Menu shortcut.
   - Calls `notifyWindowsShell()`: `SHChangeNotify(SHCNE_ASSOCCHANGED)`, `ie4uinit`, and `StartMenuExperienceHost` restart.
 
-### `WindowsSmtcService` ↔ `WindowsSmtcBridge.exe`
-- Stdio JSON protocol.
-- Bridge independently calls `SetCurrentProcessExplicitAppUserModelID("KittyTune.KittyTune")` and ensures Start Menu shortcut presence.
-- Main JVM does not participate in process AUMID registration.
+### `WindowsSmtcService` ↔ `WinRtSmtc`
+- In-process; no IPC and no separate process.
+- The session belongs to the app's own process, identified by the `KittyTune.exe` launcher.
 
 ## Code Layout
 - `src/main/kotlin/com/alananasss/kittytune/Main.kt`
@@ -57,8 +55,8 @@
 - `src/main/kotlin/com/alananasss/kittytune/core/AppIconRuntime.kt`
 - `src/main/kotlin/com/alananasss/kittytune/core/AppIconInstaller.kt`
 - `src/main/kotlin/com/alananasss/kittytune/core/WindowsAppIdHelper.kt`
-- `src/main/kotlin/com/alananasss/kittytune/core/WindowsSmtcService.kt`
+- `src/main/kotlin/com/alananasss/kittytune/data/WindowsSmtcService.kt`
+- `src/main/kotlin/com/alananasss/kittytune/data/WinRtSmtc.kt`
 - `src/main/kotlin/com/alananasss/kittytune/ui/player/PlayerViewModel.kt`
-- `src/main/resources/native/WindowsSmtcBridge.cs`
 - `src/test/kotlin/com/alananasss/kittytune/core/WindowsAppIdHelperTest.kt`
 - `src/test/kotlin/com/alananasss/kittytune/core/AppIconRuntimeTest.kt`
