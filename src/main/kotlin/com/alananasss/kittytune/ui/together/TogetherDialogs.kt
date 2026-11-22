@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PersonOutline
 import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
@@ -55,6 +56,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -540,7 +542,7 @@ fun LiveListenDialog(
 @Composable
 fun TogetherInviteDialog(
     code: String,
-    onJoinAndListen: (String) -> Unit,
+    onJoinAndListen: (String, String) -> Unit,
     onOpenRoomOnly: (String) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
@@ -549,6 +551,8 @@ fun TogetherInviteDialog(
     val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
     val room = rooms[normalized] ?: Together.Room(normalized, "")
     val cs = MaterialTheme.colorScheme
+    val defaultNickname = str("together_invite_default_nickname")
+    var nickname by rememberSaveable(normalized) { mutableStateOf(Together.displayName(defaultNickname)) }
 
     DisposableEffect(normalized) {
         Together.previewRoom(normalized)
@@ -558,8 +562,7 @@ fun TogetherInviteDialog(
     }
 
     val hostName = room.hostDisplayName
-        ?: room.name.substringBefore("·").trim().takeIf { it.isNotBlank() }
-    val isLive = room.hasLiveHost || room.listeners.isNotEmpty()
+    val isLive = room.hasLiveHost
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -568,6 +571,7 @@ fun TogetherInviteDialog(
         Surface(
             modifier = Modifier
                 .widthIn(min = 380.dp, max = 500.dp)
+                .heightIn(max = 664.dp)
                 .padding(16.dp),
             shape = RoundedCornerShape(32.dp),
             color = cs.surfaceContainer,
@@ -577,13 +581,14 @@ fun TogetherInviteDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 ExpressiveCookieBadge(
                     isActive = isLive,
-                    size = 76.dp,
+                    size = 68.dp,
                     activeColor = cs.primary,
                     inactiveColor = cs.secondaryContainer,
                 ) {
@@ -642,6 +647,8 @@ fun TogetherInviteDialog(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     color = cs.onSurface,
                 )
 
@@ -703,7 +710,10 @@ fun TogetherInviteDialog(
                                     fontWeight = FontWeight.Bold,
                                 )
                                 Text(
-                                    text = str("together_invite_connecting"),
+                                    text = str(
+                                        if (isLive) "together_invite_waiting_track"
+                                        else "together_invite_connecting"
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = cs.onSurfaceVariant,
                                 )
@@ -730,17 +740,29 @@ fun TogetherInviteDialog(
                     }
                 }
 
+                OutlinedTextField(
+                    value = nickname,
+                    onValueChange = { nickname = it },
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
+                    label = { Text(str("together_invite_nickname")) },
+                    supportingText = { Text(str("together_invite_nickname_hint")) },
+                    leadingIcon = { Icon(Icons.Rounded.PersonOutline, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                )
+
                 Button(
-                    onClick = { onJoinAndListen(normalized) },
+                    onClick = { onJoinAndListen(normalized, nickname.trim()) },
+                    enabled = nickname.isNotBlank(),
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp),
+                        .heightIn(min = 54.dp),
                 ) {
                     Icon(Icons.Rounded.Headphones, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text = str("together_listen"),
+                        text = str("together_invite_confirm"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
@@ -749,24 +771,25 @@ fun TogetherInviteDialog(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    OutlinedButton(
+                        onClick = onDismissRequest,
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(str("btn_cancel"))
+                    }
                     FilledTonalButton(
                         onClick = { onOpenRoomOnly(normalized) },
                         shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .weight(1f)
-                            .height(46.dp),
+                            .heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(str("together_invite_view_only"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    OutlinedButton(
-                        onClick = onDismissRequest,
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.height(46.dp),
-                    ) {
-                        Text(str("btn_cancel"))
+                        Text(str("together_invite_view_only"), textAlign = TextAlign.Center)
                     }
                 }
             }

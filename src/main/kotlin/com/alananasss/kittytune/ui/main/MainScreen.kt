@@ -236,15 +236,8 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        com.alananasss.kittytune.core.TogetherUriRequests.requests.collect { req ->
-            playerViewModel.isPlayerExpanded = false
-            playerViewModel.showLyricsSheet = false
-            if (req.autoJoin) {
-                com.alananasss.kittytune.data.together.Together.joinAndListen(req.code)
-                playerViewModel.navigateToPlaylistId = "together:${req.code}"
-            } else {
-                playerViewModel.pendingTogetherInviteCode = req.code
-            }
+        com.alananasss.kittytune.core.TogetherUriRequests.requests.collect { code ->
+            playerViewModel.pendingTogetherInviteCode = code
         }
     }
 
@@ -1539,13 +1532,18 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
     playerViewModel.pendingTogetherInviteCode?.let { inviteCode ->
         com.alananasss.kittytune.ui.together.TogetherInviteDialog(
             code = inviteCode,
-            onJoinAndListen = { code ->
-                playerViewModel.pendingTogetherInviteCode = null
-                com.alananasss.kittytune.data.together.Together.joinAndListen(code)
-                playerViewModel.navigateToPlaylistId = "together:$code"
+            onJoinAndListen = { code, nickname ->
+                com.alananasss.kittytune.data.together.Together.joinAndListen(code, nickname)?.let { joined ->
+                    playerViewModel.pendingTogetherInviteCode = null
+                    playerViewModel.isPlayerExpanded = false
+                    playerViewModel.showLyricsSheet = false
+                    playerViewModel.navigateToPlaylistId = "together:${joined.code}"
+                }
             },
             onOpenRoomOnly = { code ->
                 playerViewModel.pendingTogetherInviteCode = null
+                playerViewModel.isPlayerExpanded = false
+                playerViewModel.showLyricsSheet = false
                 com.alananasss.kittytune.data.together.Together.join(code)
                 playerViewModel.navigateToPlaylistId = "together:$code"
             },

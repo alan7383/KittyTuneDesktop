@@ -5,7 +5,6 @@ import com.alananasss.kittytune.core.str
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
-import java.net.URI
 import java.net.URLDecoder
 
 /**
@@ -15,8 +14,7 @@ import java.net.URLDecoder
  * as the primary invite URL so that:
  * 1. Discord Rich Presence accepts it in `metadata.button_urls` (Discord requires `https://`).
  * 2. Every chat app (Discord, WhatsApp, Telegram, SMS) renders it as a clickable link.
- * 3. Opening the link shows the KittyTune Live Invite page, which triggers `kittytune://together/ABCD-EFGH?join=1`
- *    to wake or launch KittyTune on Android, Windows, Linux, or macOS.
+ * 3. The live invite page opens `kittytune://together/ABCD-EFGH` for confirmation in KittyTune.
  */
 object TogetherLinks {
 
@@ -46,11 +44,8 @@ object TogetherLinks {
         return "${WEB_BASE_URL}?together=$formatted"
     }
 
-    fun appDeepLink(code: String, autoJoin: Boolean = false): String {
-        val formatted = TogetherWire.displayCode(code)
-        val suffix = if (autoJoin) "?join=1" else ""
-        return "$APP_SCHEME://$APP_HOST_TOGETHER/$formatted$suffix"
-    }
+    fun appDeepLink(code: String): String =
+        "$APP_SCHEME://$APP_HOST_TOGETHER/${TogetherWire.displayCode(code)}"
 
     fun isCustomSchemeUri(raw: String?): Boolean {
         if (raw.isNullOrBlank()) return false
@@ -61,21 +56,6 @@ object TogetherLinks {
     }
 
     fun isTogetherUri(raw: String?): Boolean = extractCodeFromUri(raw) != null
-
-    fun isAutoJoinUri(uriString: String?): Boolean {
-        if (uriString.isNullOrBlank()) return false
-        val query = runCatching { URI(uriString.trim()).rawQuery }.getOrNull()
-            ?: uriString.substringAfter('?', "")
-        if (query.isBlank()) return false
-        for (pair in query.split('&')) {
-            val key = pair.substringBefore('=').lowercase()
-            val value = pair.substringAfter('=', "").lowercase()
-            if ((key == "join" || key == "autojoin") && (value == "1" || value == "true")) {
-                return true
-            }
-        }
-        return false
-    }
 
     fun extractCodeFromUri(uriString: String?): String? {
         if (uriString.isNullOrBlank()) return null

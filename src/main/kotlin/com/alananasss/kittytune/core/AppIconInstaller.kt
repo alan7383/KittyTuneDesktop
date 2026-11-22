@@ -296,13 +296,7 @@ object AppIconInstaller {
             .forEach { (path, content) -> append('\n').append(path).append('|').append(content) }
     }
 
-    /**
-     * Tells the shell its per-file association data changed. `SHChangeNotify` is the documented
-     * way and costs nothing; `ie4uinit` rebuilds the icon cache; the Start Menu keeps its own
-     * in-memory copy in StartMenuExperienceHost, which only lets go when it restarts — that is
-     * safe (Windows brings it back on demand, and open windows and the taskbar are untouched).
-     */
-    internal fun notifyWindowsShell() {
+    internal fun notifyWindowsAssociationsChanged() {
         runCatching {
             val shell = com.sun.jna.Native.load(
                 "shell32", WindowsShellNotifier::class.java,
@@ -310,6 +304,14 @@ object AppIconInstaller {
             )
             shell.SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, null, null)
         }
+    }
+
+    /**
+     * Refreshes the icon cache and restarts StartMenuExperienceHost to clear its in-memory copy.
+     * Windows brings it back on demand.
+     */
+    internal fun notifyWindowsShell() {
+        notifyWindowsAssociationsChanged()
         listOf(
             listOf("ie4uinit.exe", "-show"),
             listOf("ie4uinit.exe", "-ClearIconCache"),

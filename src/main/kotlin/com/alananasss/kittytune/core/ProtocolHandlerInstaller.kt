@@ -4,6 +4,8 @@ import com.alananasss.kittytune.data.together.TogetherLinks
 import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.WinReg
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -42,33 +44,31 @@ object ProtocolHandlerInstaller {
 
     private fun registerWindows() {
         val exe = locateWindowsExecutable() ?: return
-        val exePath = exe.canonicalPath
-        val commandValue = buildWindowsOpenCommand(exePath)
-        val stampFile = File(AppDirs.dataDir.apply { mkdirs() }, STAMP_FILE_NAME)
-        val expectedStamp = "win|${TogetherLinks.APP_SCHEME}|$commandValue"
-        if (stampFile.isFile && runCatching { stampFile.readText() }.getOrNull() == expectedStamp) {
-            return
+        if (repairWindowsProtocolRegistration("Software\\Classes\\${TogetherLinks.APP_SCHEME}", exe.canonicalPath)) {
+            AppIconInstaller.notifyWindowsAssociationsChanged()
         }
+    }
 
-        val regExe = "${System.getenv("SystemRoot") ?: "C:\\Windows"}\\System32\\reg.exe"
-        val baseKey = "HKCU\\Software\\Classes\\${TogetherLinks.APP_SCHEME}"
+    /** Check the installed values on every launch so updates can repair partial or stale registrations. */
+    internal fun repairWindowsProtocolRegistration(baseKey: String, exePath: String): Boolean {
+        val registry = WinReg.HKEY_CURRENT_USER
+        val values = listOf(
+            Triple(baseKey, "", "URL:KittyTune Protocol"),
+            Triple(baseKey, "URL Protocol", ""),
+            Triple("$baseKey\\DefaultIcon", "", "\"$exePath\",0"),
+            Triple("$baseKey\\shell\\open\\command", "", buildWindowsOpenCommand(exePath)),
+        )
 
-        fun regAdd(key: String, vararg args: String): Boolean {
-            val proc = ProcessBuilder(listOf(regExe, "add", key, "/f") + args)
-                .redirectErrorStream(true)
-                .start()
-            proc.inputStream.bufferedReader().use { it.readText() }
-            return proc.waitFor(4, TimeUnit.SECONDS) && proc.exitValue() == 0
+        if (values.all { (key, name, expected) ->
+                runCatching { Advapi32Util.registryGetStringValue(registry, key, name) }.getOrNull() == expected
+            }
+        ) return false
+
+        for ((key, name, value) in values) {
+            Advapi32Util.registryCreateKey(registry, key)
+            Advapi32Util.registrySetStringValue(registry, key, name, value)
         }
-
-        val ok = regAdd(baseKey, "/ve", "/d", "URL:KittyTune Protocol") &&
-            regAdd(baseKey, "/v", "URL Protocol", "/d", "") &&
-            regAdd("$baseKey\\DefaultIcon", "/ve", "/d", "\"$exePath\",0") &&
-            regAdd("$baseKey\\shell\\open\\command", "/ve", "/d", commandValue)
-
-        if (ok) {
-            runCatching { stampFile.writeText(expectedStamp) }
-        }
+        return true
     }
 
     internal fun locateWindowsExecutable(): File? {

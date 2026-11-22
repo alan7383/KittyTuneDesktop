@@ -134,6 +134,9 @@ fun main(args: Array<String>) {
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
+    if (!trainStartupCache && System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+        com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
+    }
     // Two costs that do not have to be on the path to the first frame, because neither is on the AWT
     // thread: Skiko's native library (13 MB to map and relocate, needed by the first window and by
     // nothing before it) and the Swing look and feel (Swing's own dialogs, which only exist once
@@ -286,7 +289,7 @@ fun main(args: Array<String>) {
             if (iconIntegrationReady && !trainStartupCache) {
                 if (isMacHost) com.alananasss.kittytune.core.AppIconRuntime.applyMacDockIcon(appIconVariant)
                 runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
-                com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
+                if (!isWindowsHost) com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
             }
         }
 

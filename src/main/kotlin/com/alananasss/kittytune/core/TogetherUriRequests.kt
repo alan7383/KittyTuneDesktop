@@ -8,20 +8,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 
-data class TogetherUriRequest(
-    val code: String,
-    val autoJoin: Boolean,
-)
-
 /**
- * Buffered channel of `kittytune://together/...` (or `?together=`) deep-link requests arriving
+ * Buffered channel of Together invite codes arriving
  * either as startup CLI arguments, via [SingleInstance] loopback forwarding from a second launch
  * triggered by a browser's "Open KittyTune?" prompt, or via macOS AppleEvents (`setOpenURIHandler`).
  */
 object TogetherUriRequests {
-    private val channel = Channel<TogetherUriRequest>(Channel.UNLIMITED)
+    private val channel = Channel<String>(Channel.UNLIMITED)
 
-    val requests: Flow<TogetherUriRequest> = channel.receiveAsFlow()
+    val requests: Flow<String> = channel.receiveAsFlow()
 
     /**
      * Whether a Together invite reached this run (at launch or later). Someone who came to listen
@@ -32,10 +27,8 @@ object TogetherUriRequests {
 
     fun submitUri(rawUri: String?): Boolean {
         val code = TogetherLinks.extractCodeFromUri(rawUri) ?: return false
-        val autoJoin = TogetherLinks.isAutoJoinUri(rawUri)
         receivedThisRun = true
-        channel.trySend(TogetherUriRequest(code = code, autoJoin = autoJoin))
-        return true
+        return channel.trySend(code).isSuccess
     }
 
     fun dispatchIncomingArgs(args: List<String>) {

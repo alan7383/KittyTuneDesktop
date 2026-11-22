@@ -14,6 +14,8 @@ import com.alananasss.kittytune.data.together.TogetherRelay
 import com.alananasss.kittytune.data.together.TogetherWire
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.WinReg
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -24,10 +26,12 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.security.MessageDigest
+import java.util.UUID
 
 class TogetherLiveLinksAndProtocolTest {
 
@@ -59,19 +63,12 @@ class TogetherLiveLinksAndProtocolTest {
         val inviteUrl = TogetherLinks.inviteUrl(code)
         assertEquals("https://alan7383.github.io/kittytune-website/?together=ABCD-EFGH", inviteUrl)
         assertEquals(code, TogetherLinks.extractCodeFromUri(inviteUrl))
-        assertFalse(TogetherLinks.isAutoJoinUri(inviteUrl))
-
-        val autoJoinDeepLink = TogetherLinks.appDeepLink(code, autoJoin = true)
-        assertEquals("kittytune://together/ABCD-EFGH?join=1", autoJoinDeepLink)
-        assertEquals(code, TogetherLinks.extractCodeFromUri(autoJoinDeepLink))
-        assertTrue(TogetherLinks.isAutoJoinUri(autoJoinDeepLink))
-        assertTrue(TogetherLinks.isCustomSchemeUri(autoJoinDeepLink))
-        assertTrue(TogetherLinks.isTogetherUri(autoJoinDeepLink))
-
-        val previewDeepLink = TogetherLinks.appDeepLink(code, autoJoin = false)
-        assertEquals("kittytune://together/ABCD-EFGH", previewDeepLink)
-        assertEquals(code, TogetherLinks.extractCodeFromUri(previewDeepLink))
-        assertFalse(TogetherLinks.isAutoJoinUri(previewDeepLink))
+        val appLink = TogetherLinks.appDeepLink(code)
+        assertEquals("kittytune://together/ABCD-EFGH", appLink)
+        assertEquals(code, TogetherLinks.extractCodeFromUri(appLink))
+        assertEquals(code, TogetherLinks.extractCodeFromUri("$appLink?join=1"))
+        assertTrue(TogetherLinks.isCustomSchemeUri(appLink))
+        assertTrue(TogetherLinks.isTogetherUri(appLink))
 
         val multilineShare = "Écoute ma musique en direct sur KittyTune !\n$inviteUrl\nCode : ABCD-EFGH"
         assertEquals(code, TogetherLinks.extractCode(multilineShare, allowRawCode = true))
@@ -317,15 +314,35 @@ class TogetherLiveLinksAndProtocolTest {
     }
 
     @Test
-    fun testTogetherUriRequestsDispatchesDeepLinkFromCliArgs() = runBlocking {
+    fun testTogetherUriRequestsDeliversLegacyLinksForConfirmation() = runBlocking {
         TogetherUriRequests.dispatchIncomingArgs(
             listOf("\"kittytune://together/K9M2-P4X7?join=1\"")
         )
         val received = withTimeout(2_000L) {
             TogetherUriRequests.requests.first()
         }
-        assertEquals("K9M2P4X7", received.code)
-        assertTrue(received.autoJoin)
+        assertEquals("K9M2P4X7", received)
+        assertNull(Together.active.value)
+        assertFalse(Together.saved.value.any { it.code == received })
+    }
+
+    @Test
+    fun testConfirmedNicknameIsUsedWhenJoining() {
+        val code = "K9M2P4X7"
+        val previousName = Together.myName
+        try {
+            assertNull(Together.joinAndListen(code, "   "))
+            assertNull(Together.active.value)
+            assertEquals(previousName, Together.myName)
+
+            assertEquals(code, Together.joinAndListen(code, "  DJ Nébuleuse  ")?.code)
+            assertEquals(code, Together.active.value)
+            assertEquals("DJ Nébuleuse", Together.myName)
+            assertFalse(Together.isHostOf(code))
+        } finally {
+            Together.forget(code)
+            Together.myName = previousName
+        }
     }
 
     @Test
@@ -341,6 +358,37 @@ class TogetherLiveLinksAndProtocolTest {
         )
         assertTrue(desktopContent.contains("Exec=/opt/kitty-tune/bin/KittyTune %U"))
         assertTrue(desktopContent.contains("x-scheme-handler/kittytune;"))
+    }
+
+    @Test
+    fun testWindowsUpdateRepairsPartialAndStaleProtocolRegistrations() {
+        assumeTrue(System.getProperty("os.name").startsWith("Windows", ignoreCase = true))
+        val registry = WinReg.HKEY_CURRENT_USER
+        val key = "Software\\KittyTune-Protocol-Test-${UUID.randomUUID()}"
+        val commandKey = "$key\\shell\\open\\command"
+        val iconKey = "$key\\DefaultIcon"
+        val oldLauncher = "C:\\Program Files\\Old KittyTune\\KittyTune.exe"
+        val newLauncher = "C:\\Program Files\\KittyTune 2\\KittyTune.exe"
+        try {
+            Advapi32Util.registryCreateKey(registry, key)
+            Advapi32Util.registrySetStringValue(registry, key, "URL Protocol", "")
+            Advapi32Util.registryCreateKey(registry, iconKey)
+            Advapi32Util.registrySetStringValue(registry, iconKey, "", "\"$oldLauncher\",0")
+            assertFalse(Advapi32Util.registryKeyExists(registry, commandKey))
+
+            assertTrue(ProtocolHandlerInstaller.repairWindowsProtocolRegistration(key, oldLauncher))
+            assertEquals("\"$oldLauncher\" \"%1\"", Advapi32Util.registryGetStringValue(registry, commandKey, ""))
+
+            assertTrue(ProtocolHandlerInstaller.repairWindowsProtocolRegistration(key, newLauncher))
+            assertEquals("\"$newLauncher\" \"%1\"", Advapi32Util.registryGetStringValue(registry, commandKey, ""))
+            assertEquals("\"$newLauncher\",0", Advapi32Util.registryGetStringValue(registry, iconKey, ""))
+            assertEquals("", Advapi32Util.registryGetStringValue(registry, key, "URL Protocol"))
+            assertFalse(ProtocolHandlerInstaller.repairWindowsProtocolRegistration(key, newLauncher))
+        } finally {
+            for (path in listOf(commandKey, "$key\\shell\\open", "$key\\shell", iconKey, key)) {
+                if (Advapi32Util.registryKeyExists(registry, path)) Advapi32Util.registryDeleteKey(registry, path)
+            }
+        }
     }
 
     @Test
