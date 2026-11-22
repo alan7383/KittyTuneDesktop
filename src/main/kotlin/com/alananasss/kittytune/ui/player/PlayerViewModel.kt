@@ -201,6 +201,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 val remoteSpeed = peer?.snapshot?.speed
                 if (remoteSpeed != null && isRemotePlayback && effectsState.speed != remoteSpeed) {
                     effectsState = effectsState.copy(speed = remoteSpeed)
+                    clearModifiedAudioFxPreset()
                 }
                 if (displayedTrack != null && displayedTrack.id != previousTrackId) loadLyrics(displayedTrack)
                 remotePosition = peer?.position() ?: 0L
@@ -334,6 +335,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var effectsState by mutableStateOf(playerPrefs.getLastEffects())
     var equalizerState by mutableStateOf(playerPrefs.getEqualizerState())
         private set
+
+    var audioFxPresets by mutableStateOf(playerPrefs.getAudioFxPresets())
+        private set
+    private var audioFxPresetActivation by mutableStateOf(playerPrefs.getAudioFxPresetActivation())
+
+    val currentAudioFxPreset: AudioFxPreset
+        get() = AudioFxPreset(effectsState, equalizerState)
+
+    val activeAudioFxPresetName: String?
+        get() = audioFxPresetActivation?.name?.takeIf { audioFxPresets[it] == currentAudioFxPreset }
 
     /** Line-by-line lyrics fill top to bottom as they are sung (the "Sweep" line animation). */
     var lyricsSweepEnabled by mutableStateOf(playerPrefs.getLyricsSweepEnabled())
@@ -5665,15 +5676,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun setRainVolume(volume: Float) {
-        effectsState =
-            effectsState.copy(rainVolume = volume); MusicManager.applyEffects(effectsState); viewModelScope.launch(
-            Dispatchers.IO
-        ) { playerPrefs.saveEffects(effectsState) }
+        effectsState = effectsState.copy(rainVolume = volume)
+        applyEffectsAndSave()
     }
 
     fun setCustomSpeed(speed: Float) {
         if (routeRemote("speed", (speed * 100f).toLong())) {
             effectsState = effectsState.copy(speed = speed)
+            clearModifiedAudioFxPreset()
             return
         }
         val factor = if (isPreciseSpeedEnabled) 20f else 10f;
@@ -5952,9 +5962,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var pinnedAudioFx by mutableStateOf(playerPrefs.getPinnedAudioFx())
         private set
 
-    var audioFxPresets by mutableStateOf(playerPrefs.getAudioFxPresets())
-        private set
-
     fun saveAudioFxPreset(name: String, preset: AudioFxPreset): Boolean {
         val trimmedName = name.trim()
         if (trimmedName.isBlank() || audioFxPresets.keys.any { it.equals(trimmedName, ignoreCase = true) }) {
@@ -5970,20 +5977,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         val updated = audioFxPresets - name
         playerPrefs.saveAudioFxPresets(updated)
         audioFxPresets = updated
+        clearModifiedAudioFxPreset()
     }
 
-    fun applyAudioFxPreset(preset: AudioFxPreset): Boolean {
-        if (preset.effects.isEarrapeEnabled && !hasSeenEarrapeWarning()) return false
-        if (effectsState.speed != preset.effects.speed) {
-            routeRemote("speed", (preset.effects.speed * 100f).roundToInt().toLong())
+    fun toggleAudioFxPreset(name: String): Boolean {
+        val preset = audioFxPresets[name] ?: return true
+        val current = currentAudioFxPreset
+        val activation = audioFxPresetActivation?.takeIf { audioFxPresets[it.name] == current }
+        val activationToRestore = activation?.takeIf { it.name == name }
+        val target = activationToRestore?.previous ?: preset
+        if (target.effects.isEarrapeEnabled && !hasSeenEarrapeWarning()) return false
+        if (effectsState.speed != target.effects.speed) {
+            routeRemote("speed", (target.effects.speed * 100f).roundToInt().toLong())
         }
 
-        effectsState = preset.effects
-        equalizerState = preset.equalizer
+        effectsState = target.effects
+        equalizerState = target.equalizer
+        // Switching presets keeps the settings from before the first preset in this sequence.
+        updateAudioFxPresetActivation(
+            if (activationToRestore != null) null else AudioFxPresetActivation(name, activation?.previous ?: current)
+        )
         applyEqualizerAndSave()
         applyEffectsAndSave()
         ConnectManager.publish(connectSnapshot())
         return true
+    }
+
+    private fun clearModifiedAudioFxPreset() {
+        if (audioFxPresetActivation != null && activeAudioFxPresetName == null) {
+            updateAudioFxPresetActivation(null)
+        }
+    }
+
+    private fun updateAudioFxPresetActivation(activation: AudioFxPresetActivation?) {
+        audioFxPresetActivation = activation
+        playerPrefs.saveAudioFxPresetActivation(activation)
     }
 
     fun disableEffects(fxIds: Collection<String>) {
@@ -6090,6 +6118,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun applyEffectsAndSave() {
+        clearModifiedAudioFxPreset()
         MusicManager.applyEffects(effectsState)
         mprisService?.updateRate(effectsState.speed.toDouble())
         viewModelScope.launch(Dispatchers.IO) {
@@ -6102,6 +6131,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var equalizerSaveJob: Job? = null
 
     private fun applyEqualizerAndSave() {
+        clearModifiedAudioFxPreset()
         MusicManager.applyEqualizer(equalizerState)
         val snapshot = equalizerState
         equalizerSaveJob?.cancel()

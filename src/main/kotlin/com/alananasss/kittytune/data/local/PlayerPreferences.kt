@@ -6,6 +6,7 @@ import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.data.audio.SavedEqProfile
 import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.ui.player.AudioFxPreset
+import com.alananasss.kittytune.ui.player.AudioFxPresetActivation
 import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.RepeatMode
@@ -267,6 +268,7 @@ class PlayerPreferences {
         private const val KEY_POSITION = "last_position"
         private const val KEY_EFFECTS = "audio_effects"
         private const val KEY_AUDIO_FX_PRESETS = "audio_fx_presets"
+        private const val KEY_AUDIO_FX_PRESET_ACTIVATION = "audio_fx_preset_activation"
         private const val KEY_EQUALIZER_STATE = "equalizer_state_v2"
         private const val KEY_EQ_AUTO_APPLY = "auto_eq_auto_apply"
         private const val KEY_SAVED_EQ_PROFILES = "saved_eq_profiles_v1"
@@ -2067,6 +2069,22 @@ class PlayerPreferences {
 
     fun saveAudioFxPresets(presets: Map<String, AudioFxPreset>) {
         Prefs.putString(KEY_AUDIO_FX_PRESETS, gson.toJson(presets))
+    }
+
+    internal fun getAudioFxPresetActivation(): AudioFxPresetActivation? {
+        val json = Prefs.getString(KEY_AUDIO_FX_PRESET_ACTIVATION, null) ?: return null
+        return runCatching { gson.fromJson(json, AudioFxPresetActivation::class.java) }.getOrNull()?.takeIf {
+            val name: String? = it.name
+            val previous: AudioFxPreset? = it.previous
+            val effects: AudioEffectsState? = previous?.effects
+            val equalizer: EqualizerState? = previous?.equalizer
+            !name.isNullOrBlank() && effects != null && equalizer != null &&
+                effects.speed.isFinite() && effects.speed > 0f
+        }
+    }
+
+    internal fun saveAudioFxPresetActivation(activation: AudioFxPresetActivation?) {
+        Prefs.putString(KEY_AUDIO_FX_PRESET_ACTIVATION, activation?.let(gson::toJson))
     }
     fun saveDownloadLocation(uriString: String?) = if (uriString != null) Prefs.putString(KEY_DOWNLOAD_DIR, uriString) else Prefs.remove(KEY_DOWNLOAD_DIR)
     fun getDownloadLocation(): String? = Prefs.getString(KEY_DOWNLOAD_DIR, null)

@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -93,7 +96,8 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     var showBassBoostDialog by remember { mutableStateOf(false) }
     var showEarrapeDialog by remember { mutableStateOf(false) }
     var showEarrapeWarning by remember { mutableStateOf(false) }
-    var presetAwaitingWarning by remember { mutableStateOf<AudioFxPreset?>(null) }
+    var presetAwaitingWarning by remember { mutableStateOf<String?>(null) }
+    var presetToDelete by remember { mutableStateOf<String?>(null) }
     var showEightDDialog by remember { mutableStateOf(false) }
     var showMuffledDialog by remember { mutableStateOf(false) }
     var showReverbDialog by remember { mutableStateOf(false) }
@@ -452,6 +456,11 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val pinnedTiles = remember(viewModel.pinnedAudioFx, availableEffects) {
         viewModel.pinnedAudioFx.mapNotNull { id -> availableEffects.find { it.id == id } }
     }
+    val gridItems: List<AudioFxGridItem> = remember(pinnedTiles, viewModel.audioFxPresets) {
+        viewModel.audioFxPresets.keys.reversed().map { AudioFxGridItem.Preset(it) } +
+            pinnedTiles.map { AudioFxGridItem.BuiltIn(it) }
+    }
+    val activePresetName = viewModel.activeAudioFxPresetName
 
     if (showStudioEditSheet) {
         AudioFxStudioSheet(
@@ -527,15 +536,14 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 }
             }
 
-            AudioFxPresetControls(viewModel) { preset ->
-                if (!viewModel.applyAudioFxPreset(preset)) {
-                    presetAwaitingWarning = preset
-                    showEarrapeWarning = true
-                }
-            }
+            AudioFxPresetControls(
+                viewModel = viewModel,
+                presetToDelete = presetToDelete,
+                onDismissDelete = { presetToDelete = null },
+            )
             Spacer(Modifier.height(14.dp))
 
-            if (pinnedTiles.isEmpty()) {
+            if (gridItems.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -556,23 +564,48 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    pinnedTiles.chunked(2).forEach { rowItems ->
+                    gridItems.chunked(2).forEach { rowItems ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            rowItems.forEach { fx ->
-                                FxTile(
-                                    label = str(fx.titleKey),
-                                    icon = fx.icon,
-                                    isActive = fx.isActive(viewModel.effectsState),
-                                    onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
-                                    onLongClick = fx.onOpenDialog,
-                                    onSecondaryClick = fx.onSecondaryClick?.let { { it(viewModel) } },
-                                    modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                                    isDanger = fx.isDanger,
-                                    tooltip = fx.tooltip(),
-                                )
+                            rowItems.forEach { item ->
+                                val tileModifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f)
+                                when (item) {
+                                    is AudioFxGridItem.BuiltIn -> {
+                                        val fx = item.definition
+                                        key(fx.id) {
+                                            FxTile(
+                                                label = str(fx.titleKey),
+                                                icon = fx.icon,
+                                                isActive = fx.isActive(viewModel.effectsState),
+                                                onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
+                                                onLongClick = fx.onOpenDialog,
+                                                onSecondaryClick = fx.onSecondaryClick?.let { { it(viewModel) } },
+                                                modifier = tileModifier,
+                                                isDanger = fx.isDanger,
+                                                tooltip = fx.tooltip(),
+                                            )
+                                        }
+                                    }
+                                    is AudioFxGridItem.Preset -> key(item.name) {
+                                        val isActive = item.name == activePresetName
+                                        FxTile(
+                                            label = item.name,
+                                            icon = if (isActive) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                                            isActive = isActive,
+                                            onClick = {
+                                                if (!viewModel.toggleAudioFxPreset(item.name)) {
+                                                    presetAwaitingWarning = item.name
+                                                    showEarrapeWarning = true
+                                                }
+                                            },
+                                            onLongClick = { presetToDelete = item.name },
+                                            modifier = tileModifier,
+                                            tooltip = item.name,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -618,7 +651,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = "${pinnedTiles.size}",
+                                text = "${gridItems.size}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -643,8 +676,8 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
         EarrapeWarningDialog(
             viewModel = viewModel,
             onConfirm = {
-                val preset = presetAwaitingWarning
-                if (preset == null) viewModel.toggleEarrape() else viewModel.applyAudioFxPreset(preset)
+                val presetName = presetAwaitingWarning
+                if (presetName == null) viewModel.toggleEarrape() else viewModel.toggleAudioFxPreset(presetName)
             },
             onDismiss = {
                 showEarrapeWarning = false
@@ -856,6 +889,15 @@ fun FxTile(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(88.dp)
+                    .semantics {
+                        selected = isActive
+                        if (onLongClick != null) {
+                            this.onLongClick {
+                                onLongClick()
+                                true
+                            }
+                        }
+                    }
                     .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
                         if (onSecondaryClick != null) {
                             onSecondaryClick()
