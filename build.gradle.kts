@@ -79,7 +79,7 @@ dependencies {
             exclude(group = "org.jetbrains.skiko", module = "skiko-awt-runtime-windows-x64")
         }
     }
-    implementation("com.mocharealm.accompanist:lyrics-core:0.5.0")
+    implementation("com.mocharealm.accompanist:lyrics-core:0.5.1")
     implementation("org.jetbrains.compose.material3:material3:1.13.0-beta02")
     implementation(compose.materialIconsExtended)
     implementation(compose.components.resources)
