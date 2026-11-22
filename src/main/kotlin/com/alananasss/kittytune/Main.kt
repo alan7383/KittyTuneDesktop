@@ -114,6 +114,9 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
         AppState.MAIN -> {
             com.alananasss.kittytune.utils.StartupTimeline.mark("router: composing main screen")
             if (playerViewModel != null) MainScreen(playerViewModel = playerViewModel) else MainScreen()
+            // One-time "what's new" carousel for people who updated (not fresh installs). It goes
+            // first: the pet announcement, when someone is due both, waits until it is closed.
+            com.alananasss.kittytune.ui.common.WhatsNewHost(setupCompletedAtLaunch = setupCompletedAtLaunch, playerViewModel = playerViewModel)
             // One-time "new: kitty pet" announcement for people who updated (not fresh installs).
             com.alananasss.kittytune.ui.pet.PetAnnouncementHost(setupCompletedAtLaunch = setupCompletedAtLaunch, playerViewModel = playerViewModel)
         }

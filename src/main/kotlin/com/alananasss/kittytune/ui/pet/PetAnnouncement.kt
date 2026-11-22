@@ -116,7 +116,7 @@ fun PetAnnouncementDialog(onAdopt: () -> Unit, onLater: () -> Unit) {
 
 /**
  * Shows [PetAnnouncementDialog] once, to people who updated (not fresh installs), and never over the
- * update prompt. "Adopt" opens the pet's settings, where the setup starts.
+ * update prompt or the "what's new" carousel. "Adopt" opens the pet's settings, where the setup starts.
  */
 @Composable
 fun PetAnnouncementHost(setupCompletedAtLaunch: Boolean, playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel?) {
@@ -124,7 +124,7 @@ fun PetAnnouncementHost(setupCompletedAtLaunch: Boolean, playerViewModel: com.al
     val updateStatus by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
     val blocked = updateStatus == com.alananasss.kittytune.data.UpdateStatus.AVAILABLE ||
         updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING
-    if (!show || blocked) return
+    if (!show || blocked || com.alananasss.kittytune.ui.common.WhatsNew.visible) return
     PetAnnouncementDialog(
         onAdopt = {
             PetConfig.markAnnounced()

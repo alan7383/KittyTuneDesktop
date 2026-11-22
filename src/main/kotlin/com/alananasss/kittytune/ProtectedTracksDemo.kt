@@ -36,6 +36,7 @@ internal object ProtectedTracksDemo {
         PlayerPreferences().setHasCompletedSetup(true)
         TokenManager.setGuestMode(true)
         com.alananasss.kittytune.ui.pet.PetConfig.markAnnounced()
+        com.alananasss.kittytune.ui.common.WhatsNew.markSeen()
     }
 
     @Composable

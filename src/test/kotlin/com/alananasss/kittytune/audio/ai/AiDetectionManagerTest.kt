@@ -406,17 +406,6 @@ class AiDetectionManagerTest {
                     downloadBtnContent.contains("214") ||
                     Regex("\\(\\s*\\d+").containsMatchIn(downloadBtnContent),
             )
-
-            // block_model_delete_body must not contain hardcoded size tokens
-            val deleteBodyMatch = Regex("<string name=\"block_model_delete_body\">(.*?)</string>").find(text)
-            assertNotNull("block_model_delete_body must exist in $fileName", deleteBodyMatch)
-            val deleteBodyContent = deleteBodyMatch!!.groupValues[1]
-            assertFalse(
-                "block_model_delete_body in $fileName should not have hardcoded size tokens: $deleteBodyContent",
-                deleteBodyContent.contains("17,2") ||
-                    deleteBodyContent.contains("17.2") ||
-                    Regex("\\(\\s*\\d+").containsMatchIn(deleteBodyContent),
-            )
         }
     }
 

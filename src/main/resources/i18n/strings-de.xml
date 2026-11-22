@@ -74,7 +74,6 @@
     <string name="block_model_active_ready">Engine aktiv und bereit</string>
     <string name="block_model_card_subtitle">Lokales neuronales Modell</string>
     <string name="block_model_card_title">Neuronaler ArtifactNet-Detektor</string>
-    <string name="block_model_delete_body">Die Modelldateien werden vom Gerät gelöscht. KI-Erkennung und Auto-Skip werden pausiert, bis das Modell erneut geladen wird.</string>
     <string name="block_model_delete_btn">Modell deinstallieren</string>
     <string name="block_model_delete_title">KI-Modell deinstallieren?</string>
     <string name="block_model_download_btn">Modell herunterladen</string>
@@ -267,7 +266,7 @@
     <!-- EXPLORER & SEARCH                                                                -->
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
 
-    <string name="explorer_title">Explorer</string>
+    <string name="explorer_title">Entdecken</string>
     <string name="explorer_new_releases">Neu</string>
     <string name="explorer_charts">Charts</string>
     <string name="new_releases_popular_tracks">Beliebte Titel</string>
@@ -283,7 +282,7 @@
     <string name="category_mood_calm">Ruhe</string>
     <string name="category_mood_focus">Konzentration</string>
     <string name="category_mood_energy">Energie</string>
-    <string name="category_mood_workout">Workout</string>
+    <string name="category_mood_workout">Training</string>
     <string name="category_mood_gaming">Gaming</string>
     <string name="category_mood_winter">Winter</string>
     <string name="category_mood_driving">Autofahrt</string>
@@ -370,7 +369,7 @@
     <string name="lib_guest_mode">Gastmodus • Zum Synchronisieren anmelden</string>
     <string name="lib_sort_by_title">Sortieren nach</string>
 
-    <string name="lib_playlists">Playlists</string>
+    <string name="lib_playlists">Wiedergabelisten</string>
     <string name="lib_artists">Künstler</string>
     <string name="lib_albums">Alben</string>
     <string name="lib_stations">Sender</string>
@@ -511,7 +510,7 @@
     <string name="preset_pnd_bathroom">Badezimmer</string>
     <string name="preset_pnd_hallway">Flur</string>
     <string name="preset_pnd_next_door">Nebenan</string>
-    <string name="effect_super_wide">Super Wide</string>
+    <string name="effect_super_wide">Extrem breit</string>
     <string name="fx_super_wide_desc">Erweitert die Stereobühne weit über deine Kopfhörer hinaus mit psychoakustischem Haas-Crossfeed</string>
     <string name="label_sw_width">Stereobreite: %1$d%%</string>
     <string name="label_sw_depth">Raumtiefe: %1$d %%</string>
@@ -674,7 +673,7 @@
     <string name="btn_explore_all_effects">Alle Effekte entdecken</string>
     <string name="edit_tiles_title">Kacheln bearbeiten</string>
     <string name="edit_tiles_subtitle">Wähle Kacheln aus, die an das Schnellmenü angeheftet werden</string>
-    <string name="category_power_eq">Power &amp; EQ</string>
+    <string name="category_power_eq">Leistung und Equalizer</string>
     <string name="category_spatial">Raumklang &amp; 3D</string>
     <string name="category_ambience_filters">Atmosphäre &amp; Räume</string>
     <string name="category_retro_vintage">Retro &amp; Texturen</string>
@@ -768,7 +767,6 @@
     <string name="generic_title">Titel</string>
     <string name="generic_artist">Künstler</string>
 
-    <string name="prefix_local_file_marker">Lokale Datei: </string>
     <string name="detail_duration">Dauer</string>
     <string name="detail_unknown">Unbekannt</string>
     <string name="description_local_file">Lokale Datei: %1$s</string>
@@ -864,7 +862,6 @@
     <string name="color_palette_screen_title">Design</string>
     <string name="pref_color_style_title">Farbstil</string>
     <string name="pref_color_spec_title">Farbspezifikation</string>
-    <string name="pref_seed_palette_title">Ausgangspalette</string>
     <string name="pref_custom_seed_title">Eigene Ausgangsfarbe</string>
     <string name="pref_color_generation_title">Farb-Engine</string>
     <string name="color_hex_label">Hex</string>
@@ -873,52 +870,12 @@
     <string name="color_brightness_label">Helligkeit</string>
 
     <!-- Colors (Seed Palette) -->
-    <string name="color_group_deep_blues">Tiefe Blautöne</string>
-    <string name="color_seed_deep_blue">Tiefblau</string>
-    <string name="color_seed_abyss">Abgrund</string>
-    <string name="color_seed_space_blue">Weltraumblau</string>
-    <string name="color_seed_ink_blue">Tintenblau</string>
-    <string name="color_seed_midnight_indigo">Mitternachtsindigo</string>
-    <string name="color_seed_cosmic_blue">Kosmisches Blau</string>
-    <string name="color_seed_twilight">Dämmerung</string>
-    <string name="color_seed_royal_navy">Königsmarineblau</string>
-    <string name="color_seed_midnight">Mitternacht</string>
-    <string name="color_seed_navy">Marineblau</string>
-    <string name="color_group_blues_cyans">Blau- &amp; Cyantöne</string>
-    <string name="color_seed_sapphire">Saphir</string>
     <string name="color_seed_electric_blue">Elektrisches Blau</string>
-    <string name="color_seed_azure">Azurblau</string>
     <string name="color_seed_cyan">Cyan</string>
-    <string name="color_seed_teal">Petrol</string>
-    <string name="color_group_greens_teals">Grün- &amp; Petroltöne</string>
-    <string name="color_seed_deep_teal">Tiefes Petrol</string>
-    <string name="color_seed_emerald">Smaragd</string>
-    <string name="color_seed_forest">Waldgrün</string>
-    <string name="color_seed_moss">Moos</string>
-    <string name="color_seed_lime">Limette</string>
-    <string name="color_seed_olive">Oliv</string>
-    <string name="color_group_sunset_warm">Warme Sonnenuntergangstöne</string>
     <string name="color_seed_gold">Gold</string>
-    <string name="color_seed_amber">Bernstein</string>
     <string name="color_seed_kitty_orange">Kitty-Orange</string>
-    <string name="color_seed_deep_orange">Tiefes Orange</string>
-    <string name="color_seed_coral">Koralle</string>
-    <string name="color_seed_sand">Sand</string>
-    <string name="color_group_pinks_purples">Pink- &amp; Lilatöne</string>
-    <string name="color_seed_crimson">Karmesinrot</string>
-    <string name="color_seed_rose">Rosé</string>
-    <string name="color_seed_hot_pink">Knallpink</string>
-    <string name="color_seed_magenta">Magenta</string>
     <string name="color_seed_plum">Pflaume</string>
-    <string name="color_seed_deep_purple">Tiefes Lila</string>
-    <string name="color_seed_indigo">Indigo</string>
-    <string name="color_seed_periwinkle">Immergrünblau</string>
-    <string name="color_group_neutrals">Neutrale Töne</string>
-    <string name="color_seed_blue_gray">Blaugrau</string>
     <string name="color_seed_slate">Schiefer</string>
-    <string name="color_seed_graphite">Graphit</string>
-    <string name="color_seed_warm_gray">Warmgrau</string>
-    <string name="color_seed_mocha">Mokka</string>
     <string name="pref_start_screen">Startbildschirm</string>
     <string name="pref_theme_pure_black">Reines Schwarz (AMOLED)</string>
     <string name="pref_theme_pure_black_sub">Spart Akku auf OLED-Displays</string>
@@ -1130,14 +1087,13 @@
     <string name="about_credits_translation_section">Übersetzungen</string>
     <string name="about_role_dev">Erfinder &amp; Hauptentwickler</string>
     <string name="about_role_dev_desc">App-Architektur, Funktionen &amp; UI-Design</string>
-    <string name="about_role_translation">Übersetzung</string>
     <string name="about_role_translation_ru">Russische Übersetzung</string>
     <string name="about_role_translation_ru_desc">Vollständige russische Lokalisierung auf Crowdin</string>
     <string name="about_role_translation_vi">Vietnamesische Übersetzung</string>
     <string name="about_role_translation_vi_desc">Vietnamesische Lokalisierung &amp; Beiträge</string>
     <string name="about_role_translation_qa">Übersetzungen &amp; QA</string>
     <string name="about_role_translation_qa_desc">Übersetzungen, Tests &amp; Vorschläge</string>
-    <string name="about_role_qa">QA &amp; Feedback</string>
+    <string name="about_role_qa">Qualitätssicherung und Feedback</string>
     <string name="about_role_qa_desc">App-Tests, Tablet-Feedback &amp; Vorschläge</string>
 
     <string name="update_available_title">Update verfügbar</string>
@@ -1279,7 +1235,7 @@
 
     <string name="label_intensity">Intensität: %d%%</string>
     <string name="label_speed_8d">Rotationsgeschwindigkeit: %d%%</string>
-    <string name="label_cutoff">Filter: %d%%</string>
+    <string name="label_cutoff">Filter: %d %%</string>
     <string name="btn_earrape">Earrape</string>
     <string name="warning_title">Warnung</string>
 
@@ -1350,7 +1306,7 @@
     <string name="about_kofi_desc">Dieses Projekt ist vollständig kostenlos und quelloffen. Wenn dir meine Arbeit gefällt, unterstütze ihre Entwicklung gerne mit einem Kaffee auf Ko-fi!</string>
     <string name="about_kofi_btn">Ko-fi</string>
     <string name="about_website_group">KittyTune überall</string>
-    <string name="about_website_title">Website</string>
+    <string name="about_website_title">Webseite</string>
     <string name="about_downloads_title">Andere Plattformen</string>
     <string name="about_downloads_desc">Windows, Linux, macOS</string>
     <!-- Volume Normalization Info Dialog -->
@@ -1371,7 +1327,7 @@
     <string name="history_empty_contexts">Keine zuletzt gespielten Playlists oder Sender</string>
     <string name="history_search_hint">Im Verlauf suchen&#8230;</string>
     <string name="history_guest_desc">Melde dich bei SoundCloud an, um deinen Hörverlauf auf all deinen Geräten zu synchronisieren und zu verwalten.</string>
-    <string name="history_type_playlist">Playlist</string>
+    <string name="history_type_playlist">Wiedergabeliste</string>
     <string name="history_type_likes">Gelikte Titel</string>
 
     <!-- SoundCloud Upload Feature -->
@@ -1384,7 +1340,7 @@
     <string name="upload_picker_btn">Audiodatei auswählen</string>
     <string name="upload_picker_max_size">Maximale Dateigröße: 5 GB</string>
     <string name="upload_file_change">Ändern</string>
-    <string name="upload_artwork_label">Cover</string>
+    <string name="upload_artwork_label">Titelbild</string>
     <string name="upload_artwork_change">Cover ändern</string>
     <string name="upload_field_title">Titel *</string>
     <string name="upload_field_description">Beschreibung</string>
@@ -1516,7 +1472,7 @@
     <string name="upload_field_contains_music_desc">Gib an, ob dieser Titel ein Musikstück oder gesprochenes Audio / ein Podcast ist</string>
     <string name="upload_field_album_title">Albumtitel</string>
     <string name="upload_field_release_title">Titel der Veröffentlichung</string>
-    <string name="upload_field_upc_or_ean">Barcode (UPC / EAN)</string>
+    <string name="upload_field_upc_or_ean">Strichcode (UPC / EAN)</string>
     <string name="upload_field_p_line">P-Line (℗ Tonträger-Copyright)</string>
     <string name="upload_field_c_line">C-Line (© Kompositions-Copyright)</string>
     <string name="upload_field_iswc">ISWC</string>
@@ -1924,7 +1880,7 @@
 
     <!-- Added translations for desktop & feature parity -->
     <string name="about_check_updates">Nach Updates suchen</string>
-    <string name="about_credits_community_section">Community &amp; QA</string>
+    <string name="about_credits_community_section">Community und Qualitätssicherung</string>
     <string name="about_credits_contribute_section">Möchtest du beitragen?</string>
     <string name="about_credits_crowdin_desc">Hilf mit, KittyTune auf Crowdin in deine Sprache zu übersetzen</string>
     <string name="about_credits_crowdin_title">KittyTune übersetzen</string>
@@ -1940,10 +1896,8 @@
     <string name="about_credits_kofi_title">Auf Ko-fi unterstützen</string>
     <string name="about_discord">Discord-Server</string>
     <string name="about_help_group">Hilfe &amp; Open Source</string>
-    <string name="about_role_community_contrib">Code &amp; Community</string>
+    <string name="about_role_community_contrib">Code und Community-Beiträge</string>
     <string name="about_role_community_contrib_desc">Beiträge, Feedback &amp; Vorschläge</string>
-    <string name="about_role_translation_de">Deutsche Übersetzung</string>
-    <string name="about_role_translation_de_desc">Deutsche Lokalisierung &amp; UI-Anpassungen</string>
     <string name="about_role_translation_hu">Ungarische Übersetzung</string>
     <string name="about_role_translation_hu_desc">Vollständige ungarische Lokalisierung auf Crowdin</string>
     <string name="artist_preset_discography">Vollständige Diskografie</string>
@@ -2243,10 +2197,8 @@
     <string name="queue_history_clear_title">Verlauf leeren</string>
     <string name="queue_history_clear_msg">Möchtest du wirklich alle gespeicherten Warteschlangen löschen?</string>
     <string name="queue_history_snapshot">Aktuelle Warteschlange speichern</string>
-    <string name="queue_history_snapshot_desc">Aktuelle Titel im Verlauf speichern</string>
     <string name="queue_archived_message">Vorherige Warteschlange gespeichert</string>
     <string name="queue_history_restore">Warteschlange wiederherstellen</string>
-    <string name="queue_history_restored">Warteschlange wiederhergestellt</string>
     <string name="queue_history_delete">Löschen</string>
     <string name="queue_history_count_one">1 gespeicherte Warteschlange</string>
     <string name="queue_history_count">%1$d gespeicherte Warteschlangen</string>
@@ -2274,9 +2226,6 @@
     <string name="search_tracks_hint">Titel filtern</string>
     <string name="search_yandex_notice">Yandex Music-Ergebnisse sind Katalogeinträge. Durch Klicken wird nach demselben Song auf einer abspielbaren Quelle gesucht.</string>
     <string name="settings_tab_sources">Quellen</string>
-    <string name="setup_appearance">Erscheinungsbild</string>
-    <string name="setup_choose_color">Wähle deine Lieblingsfarbe</string>
-    <string name="setup_continue">Weiter</string>
     <string name="setup_discord_change">Konto wechseln</string>
     <string name="setup_discord_connect">Konto verbinden</string>
     <string name="setup_discord_connected">Verbunden</string>
@@ -2284,15 +2233,6 @@
     <string name="setup_discord_not_connected">Nicht verbunden</string>
     <string name="setup_discord_rpc">Discord Rich Presence</string>
     <string name="setup_discord_rpc_desc">Zeige in deinem Discord-Profil, was du gerade hörst</string>
-    <string name="setup_end4_detected">End4-Design erkannt</string>
-    <string name="setup_general">Allgemein</string>
-    <string name="setup_language">Sprache</string>
-    <string name="setup_theme_dark">Dunkel</string>
-    <string name="setup_theme_light">Hell</string>
-    <string name="setup_theme_mode">Design-Modus</string>
-    <string name="setup_theme_system">System</string>
-    <string name="setup_title">KittyTune-Konfiguration</string>
-    <string name="setup_use_end4">Möchtest du die End4-Designkonfiguration verwenden?</string>
     <string name="setup_use_windows_color">Möchtest du die App mit deiner Windows-Akzentfarbe synchronisieren?</string>
     <string name="setup_windows_color">Windows-Farben erkannt</string>
     <string name="shortcut_key_then">dann</string>
@@ -2691,13 +2631,11 @@
     <string name="together_create">Neue gemeinsame Playlist</string>
     <string name="together_join">Mit Code beitreten</string>
     <string name="together_name_hint">Name der Playlist</string>
-    <string name="together_code_hint">Code, etwa ABCD-EFGH</string>
     <string name="together_code">Code %1$s</string>
     <string name="together_code_copied">Code kopiert, schick ihn deinen Freunden</string>
     <string name="together_listen">Zusammen hören</string>
     <string name="together_listening_now">Hören gerade: %1$s</string>
     <string name="together_nobody">Noch hört niemand zu</string>
-    <string name="together_host">Gastgeber</string>
     <string name="together_become_host">Gastgeber werden</string>
     <string name="together_leave">Nicht mehr mithören</string>
     <string name="together_forget">Aus der Bibliothek entfernen</string>
@@ -3068,17 +3006,13 @@
     <string name="passport_open_folder">Im Ordner anzeigen</string>
     <string name="passport_copy_mrz">MRZ-Code kopieren</string>
     <!-- KITTY PET (imported from Android by scripts/pet/import_android_pet.py) -->
-    <string name="widget_pet_label">Kätzchen</string>
-    <string name="widget_pet_desc">Eine kleine Katze, die zu deiner Musik tanzt</string>
     <string name="pet_status_dancing">Am Viben ~</string>
     <string name="pet_status_happy">Schnurrt, ganz glücklich ♡</string>
     <string name="pet_status_sad">Spielst du mir was vor?</string>
     <string name="pet_status_sleeping">Zzz… weck mich mit Musik</string>
     <string name="pet_status_booped">hihi~ das kitzelt ♡</string>
     <string name="pet_settings_title">Kätzchen</string>
-    <string name="pet_settings_sub">Dein kleines Tamagotchi auf dem Startbildschirm</string>
     <string name="pet_ob_hello_title">Das ist dein Kätzchen!</string>
-    <string name="pet_ob_hello_body">Eine winzige Pixelkatze, die auf deinem Startbildschirm wohnt und deine Musik liebt. Richten wir sie zusammen ein.</string>
     <string name="pet_ob_color_title">Wähle sein Fell</string>
     <string name="pet_ob_color_body">Nimm die Farbe, die dir am besten gefällt. Du kannst sie jederzeit ändern.</string>
     <string name="pet_ob_name_title">Gib ihm einen Namen</string>
@@ -3090,18 +3024,10 @@
     <string name="pet_how_day">Keine Musik: es lebt sein Leben. Frühstück am Morgen, Wollknäuel am Nachmittag, Brotlaib-Modus am Abend, Dösen in der Nacht… und kleine Überraschungen</string>
     <string name="pet_how_sad">Nach 2 Stunden ohne Musik wird es traurig…</string>
     <string name="pet_how_sleep">…und nach 8 Stunden schläft es ein. Spiel ein Lied, um es zu wecken!</string>
-    <string name="pet_how_boop">Tippe es an für ein Stupsen. Tippe auf die Blase, um es mit Musik zu füttern</string>
-    <string name="pet_ob_widget_title">Auf den Startbildschirm damit</string>
-    <string name="pet_ob_widget_body">Füge das Widget hinzu, damit dir deine Katze Gesellschaft leistet.</string>
-    <string name="pet_add_widget">Widget hinzufügen</string>
-    <string name="pet_add_widget_manual">Lange auf den Startbildschirm drücken, dann Widgets → KittyTune → Kätzchen</string>
-    <string name="pet_settings_section">Deine Katze</string>
     <string name="pet_settings_name">Name</string>
     <string name="pet_settings_color">Fellfarbe</string>
-    <string name="pet_settings_widget_section">Widget</string>
     <string name="pet_settings_replay">Tutorial wiederholen</string>
     <string name="pet_settings_replay_sub">Nochmal sehen, wie deine Katze funktioniert</string>
-    <string name="pet_settings_tap_hint">Antippen zum Stupsen ♡</string>
     <string name="pet_color_cream">Creme</string>
     <string name="pet_color_ginger">Rot</string>
     <string name="pet_color_grey">Grau</string>
@@ -3141,11 +3067,9 @@
     <string name="pet_ivy_adopt">Ivy adoptieren</string>
     <string name="pet_ivy_later">Nicht jetzt</string>
     <string name="pet_ivy_mode">Ivy-Modus</string>
-    <string name="pet_ivy_mode_sub">Der Kater des Entwicklers, mit seinem Look und seinen Weltraum-Momenten</string>
     <string name="pet_ivy_replay">Enthüllung nochmal ansehen</string>
     <string name="pet_announce_badge">Neu in KittyTune</string>
     <string name="pet_announce_title">Eine kleine Katze will einziehen!</string>
-    <string name="pet_announce_body">Das ist dein Pixel-Haustier: Es wohnt auf deinem Startbildschirm, tanzt zu deiner Musik, langweilt sich, wenn es still ist, und hat viele Überraschungen parat. Mit einem Foto sieht es sogar aus wie deine eigene Katze.</string>
     <string name="pet_announce_adopt">Meine Katze adoptieren</string>
     <string name="pet_announce_later">Vielleicht später</string>
     <string name="pet_rare_cameo">Wer war diese schwarze Katze?!</string>
@@ -3164,7 +3088,6 @@
     <string name="pet_excl_fan_of">Fan Nr. 1 von %1$s</string>
     <string name="pet_act_hum_title">Summt „%1$s“</string>
     <string name="pet_settings_exclusives">Momente über deine Musik</string>
-    <string name="pet_settings_exclusives_sub">Stöbert in deinen Likes, bewertet sie, feuert deinen Top-Künstler an (bleibt auf dem Handy)</string>
     <string name="pet_pattern_custom">Eigenes</string>
     <string name="pet_photo_markers_hint">Zieh die grünen Ringe auf die Augen und den rosa Punkt auf die Nase</string>
     <string name="pet_photo_marker_eyes">Augen</string>
@@ -3172,7 +3095,6 @@
     <string name="pet_photo_next">Weiter</string>
     <string name="pet_photo_edit">Pixel feinjustieren</string>
     <string name="pet_editor_title">Fell bemalen</string>
-    <string name="pet_editor_hint">Tippe oder wische über die Katze, um Pixel für Pixel zu malen</string>
     <string name="pet_brush_coat">Fell</string>
     <string name="pet_brush_mark">Zeichnung</string>
     <string name="pet_brush_white">Weiß</string>
@@ -3234,15 +3156,10 @@
     <string name="pet_photo_analyzing">%1$s posiert…</string>
     <string name="pet_photo_applied">%1$s hat einen neuen Look!</string>
     <string name="pet_photo_apply">Diesen Look nehmen</string>
-    <string name="pet_photo_body">Mach oder wähle ein Foto deiner Katze und ein Algorithmus macht daraus ihren Pixel-Zwilling: Fellfarben, Muster und Augen.</string>
-    <string name="pet_photo_camera">Foto aufnehmen</string>
-    <string name="pet_photo_card_body">Fotografiere deine echte Katze und erhalte ihren Pixel-Zwilling</string>
     <string name="pet_photo_card_title">Aus einem Foto erstellen</string>
     <string name="pet_photo_colors">Farben</string>
-    <string name="pet_photo_crop_hint">Verschiebe und zoome, bis das Gesicht den Kreis füllt</string>
     <string name="pet_photo_error">Dieses Foto lässt sich nicht öffnen, versuche ein anderes</string>
     <string name="pet_photo_eyes_unknown">nicht gefunden</string>
-    <string name="pet_photo_gallery">Aus der Galerie wählen</string>
     <string name="pet_photo_headline">Deine Katze, in Pixeln</string>
     <string name="pet_photo_make">Pixeln!</string>
     <string name="pet_photo_result">Hier ist deine Pixelkatze!</string>
@@ -3260,7 +3177,6 @@
     <string name="pet_rare_rainbow">Ein Regenbogen!</string>
     <string name="pet_rare_royal">Königlicher Modus</string>
     <string name="pet_rare_star">Sternschnuppe, wünsch dir was!</string>
-    <string name="pet_rare_tip">Psst… ganz seltene Momente können auf deinem Widget auftauchen. Jeder gesehene landet hier!</string>
     <string name="pet_rare_ufo">Hey! Mein Wollknäuel!!</string>
     <string name="pet_reset_confirm">Mit einem neuen Kätzchen neu anfangen? Aussehen, Einstellungen, Statistiken und Sammlung werden zurückgesetzt.</string>
     <string name="pet_section_accessories">Accessoires</string>
@@ -3292,7 +3208,6 @@
     <string name="pet_settings_show_status">Statusblase zeigen</string>
     <string name="pet_settings_sleep_after">Schläft ein nach</string>
     <string name="pet_settings_speed">Animationstempo</string>
-    <string name="pet_settings_tap">Beim Antippen der Katze</string>
     <string name="pet_settings_wall">Wandfarbe</string>
     <string name="pet_speed_fast">Flott</string>
     <string name="pet_speed_normal">Normal</string>
@@ -3373,7 +3288,6 @@
     <string name="drm_info_found">Wie wir es gefunden haben</string>
     <string name="drm_wiz_how_nobrowser_title">Kein Browser im Hintergrund</string>
     <string name="drm_wiz_how_nobrowser">KittyTune öffnet nie einen Browser: Es nutzt nur das Entschlüsselungsmodul, sonst nichts.</string>
-    <string name="drm_wiz_setup_light">Es wird kein Browser installiert oder gestartet: Nur das Widevine-Modul wird behalten. Danach startet Linux erst beim ersten geschützten Titel und beendet sich kurz danach von selbst, um so wenig Speicher wie möglich zu belegen.</string>
     <string name="drm_wiz_start">Los geht’s</string>
     <string name="drm_wiz_next">Weiter</string>
     <string name="drm_wiz_finish">Fertig</string>
@@ -3391,11 +3305,8 @@
     <string name="drm_wiz_how_windows">KittyTune führt Chromes Linux-Widevine-Modul in seinem eigenen Prozess aus, mit einem dafür geschriebenen Loader. Die Lizenz kommt zur App zurück, die dann jedes Fragment selbst entschlüsselt, also funktionieren Equalizer, Effekte und Visualizer auch bei geschützten Titeln.</string>
     <string name="drm_wiz_how_desktop">Hier nutzt KittyTune das Widevine-CDM deines Browsers (Chrome, Firefox, Brave…). Es findet es selbst.</string>
     <string name="drm_method_pro_light">Leicht: etwa 60 MB auf der Platte, keine virtuelle Maschine</string>
-    <string name="drm_wiz_setup_title">Das Linux-Modul installieren</string>
-    <string name="drm_wiz_setup_body">KittyTune erledigt alles, ohne dass du einen Befehl eintippen musst: Es lädt sein Linux-Abbild herunter (etwa 11 MB), holt das Widevine-Modul aus Chrome für Linux (etwa 140 MB von Googles Servern, nur das Modul wird behalten) und prüft dann, dass es funktioniert. Etwa 60 MB bleiben auf der Festplatte.</string>
     <string name="drm_wiz_setup_start">Einrichtung starten</string>
     <string name="drm_wiz_setup_failed">Die Einrichtung ist beim Schritt „%1$s“ fehlgeschlagen.</string>
-    <string name="drm_wiz_enabling">Windows-Komponente wird aktiviert…</string>
     <string name="drm_wiz_details_show">Details anzeigen</string>
     <string name="drm_wiz_details_hide">Details ausblenden</string>
     <string name="drm_wiz_done_title">Alles bereit</string>
@@ -3407,11 +3318,6 @@
     <string name="pref_drm_group_help">Hilfe</string>
     <string name="pref_drm_tour_title">Assistent neu starten</string>
     <string name="pref_drm_tour_desc">Noch einmal von vorn beginnen, falls du zu schnell durchgeklickt hast</string>
-    <string name="pref_drm_platforms_effects">Effekte und Equalizer</string>
-    <string name="pref_drm_platforms_visualizer">Visualizer und Audioanalyse</string>
-    <string name="pref_drm_platforms_download">Download geschützter Titel</string>
-    <string name="pref_drm_platforms_start">Start, ohne erst den ganzen Titel vorzubereiten</string>
-    <string name="pref_drm_beta_badge">BETA</string>
     <string name="pref_drm_group_playback">Wiedergabe</string>
     <string name="pref_drm_group_cdm">Widevine-Modul</string>
     <string name="pref_drm_autodetect_desc">Sucht auf dem gesamten Rechner nach einem CDM</string>
@@ -3420,13 +3326,12 @@
     <string name="pref_drm_testing">Test läuft…</string>
     <string name="pref_drm_attempt_title">Geschützte Titel versuchen</string>
     <string name="pref_drm_attempt_desc">Wenn deaktiviert, wechselt KittyTune direkt zu den anderen Quellen</string>
-    <string name="pref_drm_windows_unavailable">Der geschützte Windows-Player konnte nicht gestartet werden</string>
     <string name="pref_drm_windows_test_ok">Test bestanden, geschützte Titel werden auf diesem PC abgespielt</string>
     <string name="pref_drm_windows_test_failed">Test fehlgeschlagen, siehe Protokoll unten</string>
     <string name="drm_unavailable_toast_windows">🔒 Geschützter Titel: hier nicht verfügbar. Siehe Einstellungen, Sonstiges, Geschützte Titel</string>
     <string name="drm_download_failed">Geschützter Titel: der Download ist fehlgeschlagen. Prüfe das CDM unter Einstellungen, Sonstiges</string>
     <string name="track_playback_unavailable">Dieser Titel konnte nicht abgespielt werden. Tippe auf Wiedergabe, um es erneut zu versuchen.</string>
-    <string name="download_offline_source_unavailable">No source is available to download this track for offline playback.</string>
+    <string name="download_offline_source_unavailable">Für diesen Titel ist keine Quelle zum Offline-Download verfügbar.</string>
     <!-- Desktop compatibility and declarative updates -->
     <string name="floating_compat_title">Kompatibilitätsmodus</string>
     <string name="floating_compat_desc">Undurchsichtige schwebende Fenster. Behebt Einfrieren bei RivaTuner (RTSS) und einigen Overlays</string>
@@ -3662,7 +3567,7 @@
     <string name="mix_smart_sort_applied">Warteschlange für harmonisches Mixen sortiert</string>
     <string name="transition_saved">Übergang gespeichert</string>
     <string name="diag_badge_direct">Direkt</string>
-    <string name="diag_badge_resampled">Resampled</string>
+    <string name="diag_badge_resampled">Abtastrate angepasst</string>
     <string name="diag_bus_format">Bus-Format</string>
     <string name="diag_chip_bitrate">Bitrate</string>
     <string name="diag_chip_channels">Kanäle</string>
@@ -3694,7 +3599,6 @@
     <string name="pref_lyrics_line_animation">Zeilenweise Animation</string>
     <string name="pref_lyrics_line_animation_sub">Die aktuelle Zeile füllt sich mit einem Verlauf von oben nach unten</string>
     <string name="pref_instrumental_indicator">Instrumental-Anzeige</string>
-    <string name="pref_instrumental_indicator_sub">Wird bei langen Instrumentalpassagen in zeilenweisen Songtexten angezeigt</string>
     <string name="pref_instrumental_note_wave">Note + Welle</string>
     <string name="pref_instrumental_circle">Fortschrittskreis</string>
     <string name="pref_instrumental_dots">Atmende Punkte</string>
@@ -3729,10 +3633,9 @@
     <string name="together_reset_link_desc">Neuen persönlichen Sitzungscode erstellen und bisherigen Link ungültig machen</string>
     <string name="together_link_or_code_hint">Einladungslink oder Code einfügen (ABCD-EFGH)</string>
     <string name="together_clipboard_banner">Einladung aus Zwischenablage beitreten (%1$s)</string>
-    <string name="together_live_session_name">%1$s · Live</string>
     <string name="together_saved_sessions">Deine Sitzungen</string>
     <string name="together_no_saved_sessions">Noch keine Sitzungen gespeichert — starte einen Livestream oder tritt oben bei.</string>
-    <string name="together_host_badge">Host</string>
+    <string name="together_host_badge">Gastgeber</string>
     <string name="together_live_badge">LIVE</string>
     <string name="together_paste">Einfügen</string>
     <string name="together_edit_name">Anzeigename</string>
@@ -3794,7 +3697,6 @@
     <string name="feed_sign_in_hint">Melde dich an, um Beiträge abonnierter Künstler zu sehen</string>
     <string name="feed_empty_discover">Gerade gibt es nichts zu entdecken</string>
     <string name="pref_feed_official_only">Nur offizielle Künstler</string>
-    <string name="pref_feed_official_only_desc">Titel von verifizierten oder Pro-Konten und Veröffentlichungen mit ISRC anzeigen</string>
     <string name="feed_reposted_by">Repost von %1$s</string>
     <string name="feed_follow">Folgen</string>
     <string name="feed_unfollow">Abonniert</string>
@@ -3812,4 +3714,19 @@
     <string name="feed_previous_preview">Vorherige Vorschau</string>
     <string name="feed_next_preview">Nächste Vorschau</string>
     <string name="feed_more">Mehr laden</string>
+    <string name="whats_new_badge">Neuigkeiten</string>
+    <string name="whats_new_together_title">Gemeinsam hören</string>
+    <string name="whats_new_together_body">Starte eine Live-Session und teile einen Link oder Code: Deine Freunde hören genau dieselbe Musik wie du, in Echtzeit, auf dem Handy oder am Computer.</string>
+    <string name="whats_new_together_action">Together öffnen</string>
+    <string name="whats_new_reactions_title">Reaktionen &amp; QR-Einladungen</string>
+    <string name="whats_new_reactions_body">Sende Live-Emoji-Reaktionen, lade andere per QR-Code ein und sieh auf einen Blick, ob alle synchron sind.</string>
+    <string name="whats_new_playlists_title">Geteilte Playlists</string>
+    <string name="whats_new_playlists_body">Erstellt gemeinsam eine Playlist: Alle schlagen Titel vor, der Host nimmt sie an, und sie bleibt synchron, auch wenn gerade niemand abspielt.</string>
+    <string name="whats_new_discord_title">Discord-Status</string>
+    <string name="whats_new_discord_body">Zeig auf deinem Discord-Profil, was du gerade hörst. Während einer Live-Session können Freunde über die Schaltfläche „Live mithören“ mit einem Klick dazukommen.</string>
+    <string name="whats_new_discord_action">Discord einrichten</string>
+    <string name="whats_new_next">Weiter</string>
+    <string name="whats_new_back">Zurück</string>
+    <string name="whats_new_skip">Überspringen</string>
+    <string name="whats_new_done">Alles klar</string>
 </resources>

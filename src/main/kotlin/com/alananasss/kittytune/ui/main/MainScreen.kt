@@ -178,8 +178,17 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                     )
                 )
             }
+            // the "what's new" carousel's Discord slide: settings, opened on the Discord page
+            if (destinationId == "discord_settings") {
+                com.alananasss.kittytune.ui.profile.SettingsNavigation.go(
+                    com.alananasss.kittytune.ui.profile.SettingsPlace(
+                        com.alananasss.kittytune.ui.profile.SettingsCategory.MISC,
+                        listOf(com.alananasss.kittytune.ui.profile.SettingsSubPage.MISC_DISCORD),
+                    )
+                )
+            }
             val targetRoute = when {
-                destinationId == "pet_settings" || destinationId == "settings" -> "settings"
+                destinationId == "pet_settings" || destinationId == "discord_settings" || destinationId == "settings" -> "settings"
                 destinationId == "history" -> "history"
                 destinationId == "home" || destinationId == "search" -> "home"
                 destinationId == "charts" -> "charts"
