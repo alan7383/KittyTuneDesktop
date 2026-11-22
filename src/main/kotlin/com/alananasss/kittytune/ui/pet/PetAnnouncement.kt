@@ -124,7 +124,8 @@ fun PetAnnouncementHost(setupCompletedAtLaunch: Boolean, playerViewModel: com.al
     val updateStatus by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
     val blocked = updateStatus == com.alananasss.kittytune.data.UpdateStatus.AVAILABLE ||
         updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING
-    if (!show || blocked || com.alananasss.kittytune.ui.common.WhatsNew.visible) return
+    if (!show || blocked || com.alananasss.kittytune.ui.common.WhatsNew.visible ||
+        com.alananasss.kittytune.core.TogetherUriRequests.receivedThisRun) return
     PetAnnouncementDialog(
         onAdopt = {
             PetConfig.markAnnounced()

@@ -1,5 +1,8 @@
 package com.alananasss.kittytune.core
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.alananasss.kittytune.data.together.TogetherLinks
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -20,9 +23,17 @@ object TogetherUriRequests {
 
     val requests: Flow<TogetherUriRequest> = channel.receiveAsFlow()
 
+    /**
+     * Whether a Together invite reached this run (at launch or later). Someone who came to listen
+     * should land in the room, so one-time announcements wait for a later launch.
+     */
+    var receivedThisRun by mutableStateOf(false)
+        private set
+
     fun submitUri(rawUri: String?): Boolean {
         val code = TogetherLinks.extractCodeFromUri(rawUri) ?: return false
         val autoJoin = TogetherLinks.isAutoJoinUri(rawUri)
+        receivedThisRun = true
         channel.trySend(TogetherUriRequest(code = code, autoJoin = autoJoin))
         return true
     }

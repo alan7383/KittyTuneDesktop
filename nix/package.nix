@@ -131,7 +131,7 @@ Icon=kittytune
 Terminal=false
 Type=Application
 Categories=AudioVideo;Audio;Player;Music;
-MimeType=audio/mpeg;audio/flac;audio/mp4;audio/aac;audio/ogg;audio/opus;audio/wav;audio/x-ms-wma;
+MimeType=audio/mpeg;audio/flac;audio/mp4;audio/aac;audio/ogg;audio/opus;audio/wav;audio/x-ms-wma;x-scheme-handler/kittytune;
 Keywords=music;player;soundcloud;streaming;lyrics;lossless;karaoke;
 StartupWMClass=kittytune
 EOF

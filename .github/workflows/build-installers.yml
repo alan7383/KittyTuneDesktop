@@ -198,10 +198,11 @@ jobs:
           cat << 'DESKTOP' > arch_build/pkg/usr/share/applications/kitty-tune.desktop
           [Desktop Entry]
           Name=KittyTune
-          Exec=/opt/kitty-tune/bin/KittyTune
+          Exec=/opt/kitty-tune/bin/KittyTune %U
           Icon=kittytune
           Type=Application
           Categories=AudioVideo;Audio;
+          MimeType=x-scheme-handler/kittytune;
           DESKTOP
           
           cp arch_build/pkg/opt/kitty-tune/lib/KittyTune.png arch_build/pkg/usr/share/icons/hicolor/256x256/apps/kittytune.png
@@ -358,10 +359,11 @@ jobs:
           cat << 'DESKTOP' > arch_build_arm/pkg/usr/share/applications/kitty-tune.desktop
           [Desktop Entry]
           Name=KittyTune
-          Exec=/opt/kitty-tune/bin/KittyTune
+          Exec=/opt/kitty-tune/bin/KittyTune %U
           Icon=kittytune
           Type=Application
           Categories=AudioVideo;Audio;
+          MimeType=x-scheme-handler/kittytune;
           DESKTOP
           
           cp arch_build_arm/pkg/opt/kitty-tune/lib/KittyTune.png arch_build_arm/pkg/usr/share/icons/hicolor/256x256/apps/kittytune.png

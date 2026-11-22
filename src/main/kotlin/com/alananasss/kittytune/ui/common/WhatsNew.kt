@@ -437,8 +437,12 @@ private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
 fun WhatsNewHost(setupCompletedAtLaunch: Boolean, playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel?) {
     remember { WhatsNew.start(setupCompletedAtLaunch) }
     val updateStatus by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
+    // Opened from a Together invite (the website's "Open in KittyTune", a shared link): the person
+    // came to listen, so the carousel waits for a later launch instead of covering the room.
     val blocked = updateStatus == com.alananasss.kittytune.data.UpdateStatus.AVAILABLE ||
-        updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING
+        updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING ||
+        com.alananasss.kittytune.core.TogetherUriRequests.receivedThisRun ||
+        playerViewModel?.pendingTogetherInviteCode != null
     if (!WhatsNew.visible || blocked) return
     WhatsNewDialog(
         onDone = { WhatsNew.markSeen() },
