@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import com.alananasss.kittytune.core.linuxOAuthCallbackScript
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.GuestDataSummary
 import com.alananasss.kittytune.data.GuestDataTransferManager
@@ -177,15 +178,7 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
                         if (!appDir.exists()) appDir.mkdirs()
 
                         val shellFile = java.io.File(appDir, "sc_handler.sh")
-                        shellFile.writeText(buildString {
-                            append("#!/bin/bash\n")
-                            append("# Forward success and denial; ignore parameter-free probes.\n")
-                            append("# SoundCloud's deep-link check sends sc://auth without code=\n")
-                            append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
-                            append("if [[ \"\$1\" == *\"code=\"* || \"\$1\" == *\"error=\"* ]]; then\n")
-                            append("  curl -s -X POST 'http://127.0.0.1:$port/callback' -d \"\$1\"\n")
-                            append("fi\n")
-                        })
+                        shellFile.writeText(linuxOAuthCallbackScript(port, listOf("code", "error")))
                         shellFile.setExecutable(true)
 
                         val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")

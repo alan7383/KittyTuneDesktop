@@ -2,6 +2,9 @@
 , stdenv
 , fetchurl
 , dpkg
+, curl
+, xdg-utils
+, desktop-file-utils
 , autoPatchelfHook
 , makeWrapper
 , alsa-lib
@@ -150,6 +153,8 @@ EOF
     # Create binary wrapper with full dynamic library paths (Skiko, ALSA, GTK, X11, Wayland, PulseAudio)
     mkdir -p "$out/bin"
     makeWrapper "$out/opt/kitty-tune/bin/KittyTune" "$out/bin/kitty-tune" \
+      --prefix PATH : "${lib.makeBinPath [ curl xdg-utils desktop-file-utils ]}" \
+      --set KITTYTUNE_CURL "${curl}/bin/curl" \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibs}" \
       --prefix XDG_DATA_DIRS : "${gtk3}/share/gsettings-schemas/${gtk3.name}:$XDG_DATA_DIRS" \
       --prefix ALSA_PLUGIN_DIR : "${alsa-plugins}/lib/alsa-lib" \

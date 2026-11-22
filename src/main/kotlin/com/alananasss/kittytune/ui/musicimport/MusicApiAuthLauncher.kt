@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.musicimport
 
 import com.alananasss.kittytune.core.AppDirs
+import com.alananasss.kittytune.core.linuxOAuthCallbackScript
 import com.alananasss.kittytune.core.openUrl
 import com.alananasss.kittytune.data.musicimport.MusicApi
 import com.alananasss.kittytune.data.musicimport.MusicApiAuth
@@ -175,14 +176,7 @@ object MusicApiAuthLauncher {
     private fun registerLinuxHandler(appDir: File) {
         val actualPort = (server?.address as? InetSocketAddress)?.port ?: CALLBACK_PORT
         val shellFile = File(appDir, "soundcloud_handler.sh")
-        shellFile.writeText(buildString {
-            append("#!/bin/bash\n")
-            append("# Only forward the musicapi deep-link redirect (contains data64=).\n")
-            append("# Other soundcloud:// links are intentionally ignored.\n")
-            append("if [[ \"\$1\" == *\"data64=\"* ]]; then\n")
-            append("  curl -s -X POST 'http://127.0.0.1:$actualPort/callback' -d \"\$1\"\n")
-            append("fi\n")
-        })
+        shellFile.writeText(linuxOAuthCallbackScript(actualPort, listOf("data64")))
         shellFile.setExecutable(true)
 
         val mimeDir = File(System.getProperty("user.home"), ".local/share/applications")
