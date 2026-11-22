@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit
  *
  *  1. `KITTYTUNE_CDM_SIDECAR` — a quoted command line, e.g.
  *     `C:\...\ktcdm.exe C:\...\libwidevinecdm.so`
- *  2. `%LOCALAPPDATA%\KittyTune\cdm-sidecar.json` — `{"command": ["ktcdm.exe", "libwidevinecdm.so"]}`,
+ *  2. `%LOCALAPPDATA%\KittyTuneCdm\cdm-sidecar.json` — `{"command": ["ktcdm.exe", "libwidevinecdm.so"]}`,
  *     written by the in-app setup ([NativeCdmSetup]) and deleted by its uninstall.
  *
  * A configuration that goes through `wsl.exe` is ignored: WSL is no longer a supported backend, and
@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit
 internal object CdmSidecar {
 
     private const val TAG = "CdmSidecar"
-    private const val CONFIG_NAME = "cdm-sidecar.json"
 
     /** How long a failed probe is trusted before the next track may retry it. */
     private const val RETRY_AFTER_MS = 5 * 60_000L
@@ -265,8 +264,9 @@ internal object CdmSidecar {
         if (fromEnvironment.isNotEmpty()) {
             return splitCommand(fromEnvironment).takeIf { it.isNotEmpty() && !goesThroughWsl(it) }
         }
-        val local = System.getenv("LOCALAPPDATA") ?: return null
-        val file = File(local, "KittyTune/$CONFIG_NAME")
+        if (System.getenv("LOCALAPPDATA") == null) return null
+        NativeCdmSetup.migrateLegacyInstall()
+        val file = NativeCdmSetup.configFile
         if (file.isFile) {
             return runCatching {
                 val array = JSONObject(file.readText()).getJSONArray("command")

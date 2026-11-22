@@ -54,7 +54,7 @@ class CdmSidecarTest {
     fun `without a configuration nothing is guessed or connected`() {
         assumeTrue("an explicit override is set", System.getenv("KITTYTUNE_CDM_SIDECAR").isNullOrBlank())
         val local = System.getenv("LOCALAPPDATA")
-        assumeTrue("a real setup is configured here", local == null || !File(local, "KittyTune/cdm-sidecar.json").isFile)
+        assumeTrue("a real setup is configured here", local == null || !NativeCdmSetup.configFile.isFile)
         CdmSidecar.reset()
         assertFalse(CdmSidecar.verify())
         assertFalse(CdmSidecar.isInstalled)

@@ -137,6 +137,8 @@ fun main(args: Array<String>) {
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
     if (!trainStartupCache && System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
         com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
+        // Off the startup path: moves an install the MSI would delete, or redoes one an update deleted.
+        com.alananasss.kittytune.data.drm.NativeCdmSetup.repairIfLost()
     }
     // Two costs that do not have to be on the path to the first frame, because neither is on the AWT
     // thread: Skiko's native library (13 MB to map and relocate, needed by the first window and by

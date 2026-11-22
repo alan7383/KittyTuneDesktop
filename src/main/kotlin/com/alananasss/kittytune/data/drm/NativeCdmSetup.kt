@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data.drm
 
+import com.alananasss.kittytune.core.AtomicFiles
 import com.alananasss.kittytune.data.network.ProxyManager
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +18,7 @@ import java.security.MessageDigest
  * There is no virtual machine, no Linux distribution, no Windows feature to enable and therefore no
  * administrator prompt and no restart. The daemon is a single 200 KB executable the app already
  * ships; the only thing downloaded is Google's own `libwidevinecdm.so`, taken from the Chrome package
- * at setup and kept under `%LOCALAPPDATA%\KittyTune\cdm`.
+ * at setup and kept under `%LOCALAPPDATA%\KittyTuneCdm`.
  *
  * The module is **not bundled** with KittyTune: it is Google's proprietary binary, it is not
  * redistributable, and it changes with every Chrome release — a copy frozen inside an installer would
@@ -41,24 +42,62 @@ internal object NativeCdmSetup {
 
     val windows: Boolean = System.getProperty("os.name").startsWith("Windows", true)
 
-    /** Where the module, the daemon and the scratch files live. User-writable: no elevation. */
-    val installDirectory: File
-        get() {
-            val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
-            return File(base, "KittyTune/cdm")
-        }
+    private val localAppData: File
+        get() = File(System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir"))
+
+    /**
+     * Where the module, the daemon, the configuration and the scratch files live. User-writable: no elevation.
+     *
+     * Deliberately **outside** `%LOCALAPPDATA%\KittyTune`: that folder is the MSI's install directory, and
+     * jpackage's installer removes it recursively on uninstall, which every update performs on the
+     * previous version. Kept there, the module vanished with each update (msiexec log: WixRemoveFoldersEx
+     * on `KittyTune\cdm\`).
+     */
+    val installDirectory: File get() = File(localAppData, "KittyTuneCdm")
 
     val moduleFile: File get() = File(installDirectory, MODULE_NAME)
 
     /** The daemon under its default name; the real one is content-addressed, see [extractDaemon]. */
     val hostFile: File get() = File(installDirectory, HOST_NAME)
 
-    /** The configuration file [CdmSidecar] already reads. Written here, never hand-edited. */
-    val configFile: File
-        get() {
-            val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
-            return File(base, "KittyTune/$CONFIG_NAME")
-        }
+    /** The configuration file [CdmSidecar] reads. Written here, never hand-edited. */
+    val configFile: File get() = File(installDirectory, CONFIG_NAME)
+
+    /** Where versions up to 1.7.0 kept everything, inside the install directory. */
+    private val legacyConfigFile: File get() = File(localAppData, "KittyTune/$CONFIG_NAME")
+
+    /**
+     * Moves an installation an older version left inside the install directory to [installDirectory],
+     * before the next update deletes it. Only a native one: a configuration that drives `wsl.exe` is
+     * the dropped backend, and [WslCleanup] owns it.
+     */
+    @Synchronized
+    fun migrateLegacyInstall(configFile: File = this.configFile, legacyConfigFile: File = this.legacyConfigFile) {
+        if (!windows || configFile.isFile || !legacyConfigFile.isFile) return
+        runCatching {
+            val array = JSONObject(legacyConfigFile.readText()).getJSONArray("command")
+            val command = (0 until array.length()).map { array.getString(it) }
+            if (command.size < 2) return
+            val host = File(command[0])
+            val module = File(command[1])
+            if (!host.name.startsWith("ktcdm", true) || !host.isFile || !module.isFile) return
+            val installDirectory = configFile.parentFile
+            val legacyDirectory = File(legacyConfigFile.parentFile, "cdm")
+            installDirectory.mkdirs()
+            val newHost = File(installDirectory, host.name)
+            val newModule = File(installDirectory, MODULE_NAME)
+            host.copyTo(newHost, overwrite = true)
+            module.copyTo(newModule, overwrite = true)
+            if (newHost.length() != host.length() || !isUsableModule(newModule)) return
+            newHost.setExecutable(true)
+            writeConfiguration(newHost, newModule, configFile)
+            Logger.d(TAG, "moved the CDM out of the install directory to ${installDirectory.absolutePath}")
+            runCatching { legacyConfigFile.delete() }
+            if (host.parentFile?.canonicalFile == legacyDirectory.canonicalFile) runCatching { host.delete() }
+            if (module.parentFile?.canonicalFile == legacyDirectory.canonicalFile) runCatching { module.delete() }
+            runCatching { if (legacyDirectory.listFiles()?.isEmpty() == true) legacyDirectory.delete() }
+        }.onFailure { Logger.w(TAG, "could not move the legacy CDM: ${it.message}") }
+    }
 
     enum class Step { CHECK, HOST, DOWNLOAD, EXTRACT, CONFIG, PROBE, CONNECT }
 
@@ -77,6 +116,7 @@ internal object NativeCdmSetup {
      * [extractDaemon]), so it cannot be guessed — it has to be read back.
      */
     fun configuredCommand(): List<String>? = runCatching {
+        migrateLegacyInstall()
         if (!configFile.isFile) return@runCatching null
         val array = JSONObject(configFile.readText()).getJSONArray("command")
         (0 until array.length()).map { array.getString(it) }
@@ -160,6 +200,7 @@ internal object NativeCdmSetup {
                 return@withContext false
             }
             report("  probe: the daemon answers")
+            com.alananasss.kittytune.data.local.PlayerPreferences().setNativeCdmInstalled(true)
 
             onStep(Step.CONNECT)
             // The method is the native one by construction now: drop anything resolved or licensed
@@ -177,6 +218,7 @@ internal object NativeCdmSetup {
 
     /** Removes the module, every daemon copy and the configuration. Keeps nothing else. */
     fun uninstall() {
+        com.alananasss.kittytune.data.local.PlayerPreferences().setNativeCdmInstalled(false)
         // Stop ours first: Windows will not delete a running executable, and a leftover copy would
         // make the next install look broken.
         runCatching { CdmSidecar.reset() }
@@ -184,12 +226,43 @@ internal object NativeCdmSetup {
         runCatching { moduleFile.delete() }
         runCatching { hostFile.delete() }
         runCatching { configFile.delete() }
+        runCatching { legacyConfigFile.delete() }
         runCatching {
             installDirectory.listFiles()
                 ?.filter { it.name.startsWith("ktcdm") || it.name.startsWith("data.tar") || it.name.endsWith(".deb") }
                 ?.forEach { it.delete() }
         }
         com.alananasss.kittytune.data.StreamResolver.forgetStreams()
+    }
+
+    /**
+     * Puts the module back, without asking, for someone who had installed it and lost it.
+     *
+     * Keeping the module out of the install directory protects it from now on, but the update *to* this
+     * version was run by the previous one's uninstaller, which had already deleted it. The choice is
+     * stored (the marker, or protected tracks on after the assistant), so redo the setup in the background
+     * rather than leave every protected track falling back. At most one try a day.
+     */
+    fun repairIfLost() {
+        if (!windows) return
+        Thread({
+            runCatching {
+                val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                if (isInstalled()) {
+                    if (!prefs.getNativeCdmInstalled()) prefs.setNativeCdmInstalled(true)
+                    return@runCatching
+                }
+                val hadIt = prefs.getNativeCdmInstalled() ||
+                    (prefs.getProtectedTracksEnabled() && prefs.getDrmOnboardingDone())
+                if (!hadIt) return@runCatching
+                val now = System.currentTimeMillis()
+                if (now - prefs.getNativeCdmRepairAttemptAt() < 24L * 60 * 60 * 1000) return@runCatching
+                prefs.setNativeCdmRepairAttemptAt(now)
+                Logger.d(TAG, "the CDM is gone (removed by an update); reinstalling it")
+                val ok = kotlinx.coroutines.runBlocking { provision() }
+                Logger.d(TAG, "automatic reinstall: ${if (ok) "OK" else "failed"}")
+            }
+        }, "KittyTune-cdm-repair").apply { isDaemon = true; start() }
     }
 
     /**
@@ -301,10 +374,17 @@ internal object NativeCdmSetup {
 
     private fun isUsableModule(file: File): Boolean = ChromeCdmArchive.isUsableModule(file)
 
-    private fun writeConfiguration(host: File, module: File) {
+    private fun writeConfiguration(host: File, module: File, configFile: File = this.configFile) {
         val command = JSONArray().put(host.absolutePath).put(module.absolutePath)
         val json = JSONObject().put("command", command)
-        configFile.parentFile?.mkdirs()
-        configFile.writeText(json.toString(2))
+        val directory = configFile.parentFile
+        directory.mkdirs()
+        val temporary = File.createTempFile("cdm-sidecar-", ".tmp", directory)
+        try {
+            temporary.writeText(json.toString(2))
+            AtomicFiles.replace(temporary, configFile)
+        } finally {
+            temporary.delete()
+        }
     }
 }

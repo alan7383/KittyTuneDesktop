@@ -32,7 +32,7 @@ class SidecarLockOrderTest {
         assumeTrue(System.getenv("KITTYTUNE_CDM_SIDECAR").isNullOrBlank())
         val base = System.getenv("LOCALAPPDATA")
         assumeTrue(base != null)
-        val config = File(base!!, "KittyTune/cdm-sidecar.json")
+        val config = NativeCdmSetup.configFile
         val previous = config.takeIf { it.isFile }?.readBytes()
         CdmSidecar.reset()
         try {

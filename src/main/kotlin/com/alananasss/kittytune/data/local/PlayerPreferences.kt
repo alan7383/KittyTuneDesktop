@@ -538,6 +538,8 @@ class PlayerPreferences {
         private const val KEY_PROTECTED_ANNOUNCED_VERSION = "protected_announced_version"
         private const val KEY_PROTECTED_HINT_VERSION = "protected_hint_version"
         private const val KEY_DRM_ONBOARDING_DONE = "drm_onboarding_done"
+        private const val KEY_NATIVE_CDM_INSTALLED = "native_cdm_installed"
+        private const val KEY_NATIVE_CDM_REPAIR_AT = "native_cdm_repair_attempt_at"
         private const val KEY_WSL_SETUP_PENDING = "wsl_setup_pending_reboot"
         private const val KEY_WSL_SETUP_VERSION = "wsl_setup_version"
         private const val KEY_WSL_FEATURES_BY_APP = "wsl_features_enabled_by_kittytune"
@@ -983,6 +985,12 @@ class PlayerPreferences {
     /** Whether the protected tracks introduction was shown, so it opens by itself only once. */
     fun getDrmOnboardingDone(): Boolean = Prefs.getBoolean(KEY_DRM_ONBOARDING_DONE, false)
     fun setDrmOnboardingDone(done: Boolean) = Prefs.putBoolean(KEY_DRM_ONBOARDING_DONE, done)
+
+    /** The native Widevine module was set up successfully and not removed by the user since. */
+    fun getNativeCdmInstalled(): Boolean = Prefs.getBoolean(KEY_NATIVE_CDM_INSTALLED, false)
+    fun setNativeCdmInstalled(installed: Boolean) = Prefs.putBoolean(KEY_NATIVE_CDM_INSTALLED, installed)
+    fun getNativeCdmRepairAttemptAt(): Long = Prefs.getLong(KEY_NATIVE_CDM_REPAIR_AT, 0L)
+    fun setNativeCdmRepairAttemptAt(at: Long) = Prefs.putLong(KEY_NATIVE_CDM_REPAIR_AT, at)
 
     fun getDownloadDrmStreamsEnabled(): Boolean = Prefs.getBoolean(KEY_DOWNLOAD_DRM_STREAMS, true)
     fun setDownloadDrmStreamsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DOWNLOAD_DRM_STREAMS, enabled)
