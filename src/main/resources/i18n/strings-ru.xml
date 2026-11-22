@@ -92,6 +92,7 @@
     <string name="audio_fx_preset_name">Название пресета</string>
     <string name="audio_fx_preset_name_used">Пресет с таким названием уже есть.</string>
     <string name="audio_fx_delete_preset">Удалить пресет?</string>
+    <string name="audio_fx_saved_presets">Сохранённые пресеты</string>
     <string name="audio_source_desktop">Звук с компьютера</string>
     <string name="audio_source_desktop_tag">Звук компьютера</string>
     <string name="audio_source_header">Источник записи звука</string>

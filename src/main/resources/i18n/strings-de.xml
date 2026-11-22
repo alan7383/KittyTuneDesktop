@@ -444,6 +444,7 @@
     <string name="audio_fx_preset_name">Name der Voreinstellung</string>
     <string name="audio_fx_preset_name_used">Dieser Name wird bereits verwendet.</string>
     <string name="audio_fx_delete_preset">Voreinstellung löschen?</string>
+    <string name="audio_fx_saved_presets">Gespeicherte Voreinstellungen</string>
     <string name="player_pitch">Tonhöhe</string>
     <string name="pref_precise_speed">Präzise Geschwindigkeit</string>
     <string name="pref_precise_speed_sub">0,05x-Schritte statt 0,1x</string>

@@ -36,11 +36,6 @@ import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
 
-internal sealed interface AudioFxGridItem {
-    data class BuiltIn(val definition: AudioFxDefinition) : AudioFxGridItem
-    data class Preset(val name: String) : AudioFxGridItem
-}
-
 @Composable
 internal fun AudioFxPresetControls(
     viewModel: PlayerViewModel,
@@ -118,26 +113,31 @@ internal fun AudioFxPresetControls(
     }
 
     presetToDelete?.let { name ->
-        EscapableAlertDialog(
-            onDismissRequest = onDismissDelete,
-            title = { Text(str("audio_fx_delete_preset")) },
-            text = { Text(name) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteAudioFxPreset(name)
-                        onDismissDelete()
-                    },
-                    shapes = ButtonDefaults.shapes(),
-                ) {
-                    Text(str("btn_delete"))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissDelete, shapes = ButtonDefaults.shapes()) {
-                    Text(str("btn_cancel"))
-                }
-            },
-        )
+        AudioFxPresetDeleteDialog(name, viewModel, onDismissDelete)
     }
+}
+
+@Composable
+internal fun AudioFxPresetDeleteDialog(name: String, viewModel: PlayerViewModel, onDismiss: () -> Unit) {
+    EscapableAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("audio_fx_delete_preset")) },
+        text = { Text(name) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    viewModel.deleteAudioFxPreset(name)
+                    onDismiss()
+                },
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Text(str("btn_delete"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) {
+                Text(str("btn_cancel"))
+            }
+        },
+    )
 }

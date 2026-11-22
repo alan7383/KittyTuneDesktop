@@ -14,6 +14,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.alananasss.kittytune.core.Application
+import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.local.AppThemeMode
@@ -34,6 +35,7 @@ class AudioFxPresetTest {
     fun namedPresetRestoresExactEffectsSpeedPitchAndEqualizer() = runBlocking(Dispatchers.Main) {
         val prefs = PlayerPreferences()
         val previousActivation = prefs.getAudioFxPresetActivation()
+        val previousPins = prefs.getPinnedAudioFx()
         val owner = object : ViewModelStoreOwner {
             override val viewModelStore = ViewModelStore()
         }
@@ -90,12 +92,37 @@ class AudioFxPresetTest {
             prefs.saveEffects(previous.effects)
             prefs.saveEqualizerState(previous.equalizer)
             prefs.saveAudioFxPresetActivation(previousActivation)
+            prefs.setPinnedAudioFx(previousPins)
             MusicManager.releasePlayer()
+        }
+    }
+
+    @Test
+    fun legacyGridKeepsSavedPresetsAndRemembersAnEmptyGrid() {
+        val previous = Prefs.snapshot()
+        try {
+            val prefs = PlayerPreferences()
+            val preset = AudioFxPreset(AudioEffectsState(), EqualizerState())
+            prefs.saveAudioFxPresets(linkedMapOf("Rain" to preset, "Night mix" to preset))
+            Prefs.remove("pinned_audio_fx_list_v2")
+            Prefs.putString("pinned_audio_fx_list_v1", """["reverb","bass_boost"]""")
+
+            assertEquals(
+                listOf(AudioFxPreset.tileId("Night mix"), AudioFxPreset.tileId("Rain"), "reverb", "bass_boost"),
+                prefs.getPinnedAudioFx(),
+            )
+
+            prefs.setPinnedAudioFx(emptyList())
+            assertTrue(prefs.getPinnedAudioFx().isEmpty())
+            assertEquals(setOf("Rain", "Night mix"), prefs.getAudioFxPresets().keys)
+        } finally {
+            Prefs.restore(previous)
         }
     }
 
     private fun verifyPresetInEffectsGrid(player: PlayerViewModel, name: String, preset: AudioFxPreset) {
         val previous = player.currentAudioFxPreset
+        val tileId = AudioFxPreset.tileId(name)
         val scene = ImageComposeScene(width = 440, height = 780) {
             SoundTuneTheme(
                 themeMode = AppThemeMode.DARK,
@@ -135,18 +162,52 @@ class AudioFxPresetTest {
             assertTrue(scene.findLabel(name).config[SemanticsActions.OnLongClick].action?.invoke() == true)
             scene.render(570_000_000L).close()
             scene.findLabel(str("audio_fx_delete_preset"))
+            assertTrue(scene.findLabel(str("btn_cancel")).config[SemanticsActions.OnClick].action?.invoke() == true)
+            scene.render(590_000_000L).close()
+
+            assertTrue(scene.findLabel(name).config[SemanticsActions.OnClick].action?.invoke() == true)
+            assertTrue(scene.findLabel(str("btn_explore_all_effects")).config[SemanticsActions.OnClick].action?.invoke() == true)
+            scene.render(610_000_000L).close()
+            scene.render(700_000_000L).use { image ->
+                scene.findLabel(str("audio_fx_saved_presets"))
+                val preview = File("build/previews/audio-fx-preset-studio.png").apply { parentFile.mkdirs() }
+                image.encodeToData(EncodedImageFormat.PNG)!!.use { preview.writeBytes(it.bytes) }
+            }
+
+            scene.clickTag("audio-fx-remove-$tileId")
+            assertEquals(previous, player.currentAudioFxPreset)
+            assertFalse(tileId in player.playerPrefs.getPinnedAudioFx())
+            assertEquals(preset, player.audioFxPresets[name])
+            scene.render(720_000_000L).close()
+
+            scene.clickTag("audio-fx-available-$tileId")
+            assertTrue(tileId in player.playerPrefs.getPinnedAudioFx())
+            scene.render(740_000_000L).close()
+
+            scene.clickTag("audio-fx-delete-$tileId")
+            scene.render(760_000_000L).close()
+            scene.findLabel(str("audio_fx_delete_preset"))
             assertTrue(scene.findLabel(str("btn_delete")).config[SemanticsActions.OnClick].action?.invoke() == true)
             assertFalse(player.audioFxPresets.containsKey(name))
+            assertFalse(tileId in player.playerPrefs.getPinnedAudioFx())
         } finally {
             scene.close()
         }
     }
 
     private fun ImageComposeScene.findLabel(label: String): SemanticsNode =
-        semanticsOwners.firstNotNullOfOrNull { it.rootSemanticsNode.findLabel(label) }
+        findNode { it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == label } == true }
             ?: error("Missing Audio FX label: $label")
 
-    private fun SemanticsNode.findLabel(label: String): SemanticsNode? =
-        if (config.getOrNull(SemanticsProperties.Text)?.any { it.text == label } == true) this
-        else children.firstNotNullOfOrNull { it.findLabel(label) }
+    private fun ImageComposeScene.clickTag(tag: String) {
+        val node = findNode { it.config.getOrNull(SemanticsProperties.TestTag) == tag }
+            ?: error("Missing Audio FX control: $tag")
+        assertTrue(node.config[SemanticsActions.OnClick].action?.invoke() == true)
+    }
+
+    private fun ImageComposeScene.findNode(matches: (SemanticsNode) -> Boolean): SemanticsNode? =
+        semanticsOwners.firstNotNullOfOrNull { it.rootSemanticsNode.findNode(matches) }
+
+    private fun SemanticsNode.findNode(matches: (SemanticsNode) -> Boolean): SemanticsNode? =
+        if (matches(this)) this else children.firstNotNullOfOrNull { it.findNode(matches) }
 }

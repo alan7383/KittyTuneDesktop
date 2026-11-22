@@ -262,7 +262,8 @@ class PlayerPreferences {
         const val KEY_KARAOKE_GPU_ACCELERATION = "karaoke_gpu_acceleration_enabled"
         const val KEY_KARAOKE_SELECTED_GPU = "karaoke_selected_gpu_id"
         const val KEY_KARAOKE_AUTO_SEPARATE = "karaoke_auto_separate_enabled"
-        private const val KEY_PINNED_AUDIO_FX = "pinned_audio_fx_list_v1"
+        private const val KEY_LEGACY_PINNED_AUDIO_FX = "pinned_audio_fx_list_v1"
+        private const val KEY_PINNED_AUDIO_FX = "pinned_audio_fx_list_v2"
         private const val KEY_SOUNDCLOUD_HISTORY_SYNC = "soundcloud_history_sync_enabled"
         private const val KEY_TRACK_JSON = "last_track_json"
         private const val KEY_POSITION = "last_position"
@@ -2166,14 +2167,19 @@ class PlayerPreferences {
     }
 
     fun getPinnedAudioFx(): List<String> {
-        val json = Prefs.getString(KEY_PINNED_AUDIO_FX, null) ?: return DEFAULT_PINNED_AUDIO_FX
-        return try {
-            val type = object : TypeToken<List<String>>() {}.type
-            val list: List<String>? = gson.fromJson(json, type)
-            if (list.isNullOrEmpty()) DEFAULT_PINNED_AUDIO_FX else list
-        } catch (_: Exception) {
-            DEFAULT_PINNED_AUDIO_FX
+        val stored = Prefs.getString(KEY_PINNED_AUDIO_FX, null)
+        val json = stored ?: Prefs.getString(KEY_LEGACY_PINNED_AUDIO_FX, null)
+        val pinned = json?.let { raw ->
+            runCatching {
+                val type = object : TypeToken<List<String?>>() {}.type
+                gson.fromJson<List<String?>>(raw, type)?.filterNotNull()?.distinct()
+            }.getOrNull()
+        } ?: DEFAULT_PINNED_AUDIO_FX
+        if (stored == null) {
+            // Previously all saved presets appeared in the grid, ahead of the pinned effects.
+            return getAudioFxPresets().keys.reversed().map { AudioFxPreset.tileId(it) } + pinned
         }
+        return pinned
     }
 
     fun setPinnedAudioFx(fxIds: List<String>) {

@@ -92,6 +92,7 @@
     <string name="audio_fx_preset_name">Nom du preset</string>
     <string name="audio_fx_preset_name_used">Un preset porte déjà ce nom.</string>
     <string name="audio_fx_delete_preset">Supprimer le preset ?</string>
+    <string name="audio_fx_saved_presets">Presets enregistrés</string>
     <string name="audio_source_desktop">Audio du bureau (Son de l\'ordinateur)</string>
     <string name="audio_source_desktop_tag">Audio bureau</string>
     <string name="audio_source_header">Source d\'enregistrement audio</string>

@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -79,11 +80,15 @@ data class AudioFxDefinition(
     val onSecondaryClick: ((PlayerViewModel) -> Unit)? = null,
     /** Drawn in the error colours while on: an effect that can hurt, not one of the ordinary kind. */
     val isDanger: Boolean = false,
+    val presetName: String? = null,
 )
+
+private fun AudioFxDefinition.title(): String = presetName ?: str(titleKey)
 
 /** What the effect does on hover, and how to reach its settings when it has any. */
 @Composable
 private fun AudioFxDefinition.tooltip(): String {
+    presetName?.let { return it }
     val description = str("effect_tip_$id")
     return if (onOpenDialog != null) "$description\n${str("effect_tip_adjust")}" else description
 }
@@ -452,15 +457,29 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
 
     // Every effect runs on protected tracks too: the CDM hands back plaintext samples, so the
     // whole DSP chain is in the path.
-    val availableEffects = allEffects
+    val presetEffects = remember(viewModel, viewModel.audioFxPresets.keys) {
+        viewModel.audioFxPresets.keys.reversed().map { name ->
+            AudioFxDefinition(
+                id = AudioFxPreset.tileId(name),
+                titleKey = "audio_fx_preset_name",
+                icon = Icons.Rounded.BookmarkBorder,
+                categoryKey = "audio_fx_saved_presets",
+                isActive = { viewModel.activeAudioFxPresetName == name },
+                onToggle = { player, showWarning ->
+                    if (!player.toggleAudioFxPreset(name)) {
+                        presetAwaitingWarning = name
+                        showWarning()
+                    }
+                },
+                onOpenDialog = { presetToDelete = name },
+                presetName = name,
+            )
+        }
+    }
+    val availableEffects = presetEffects + allEffects
     val pinnedTiles = remember(viewModel.pinnedAudioFx, availableEffects) {
         viewModel.pinnedAudioFx.mapNotNull { id -> availableEffects.find { it.id == id } }
     }
-    val gridItems: List<AudioFxGridItem> = remember(pinnedTiles, viewModel.audioFxPresets) {
-        viewModel.audioFxPresets.keys.reversed().map { AudioFxGridItem.Preset(it) } +
-            pinnedTiles.map { AudioFxGridItem.BuiltIn(it) }
-    }
-    val activePresetName = viewModel.activeAudioFxPresetName
 
     if (showStudioEditSheet) {
         AudioFxStudioSheet(
@@ -481,7 +500,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
-            val activeCount = availableEffects.count { it.isActive(viewModel.effectsState) }
+            val activeCount = allEffects.count { it.isActive(viewModel.effectsState) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -543,7 +562,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(14.dp))
 
-            if (gridItems.isEmpty()) {
+            if (pinnedTiles.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -564,47 +583,25 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    gridItems.chunked(2).forEach { rowItems ->
+                    pinnedTiles.chunked(2).forEach { rowItems ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            rowItems.forEach { item ->
-                                val tileModifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f)
-                                when (item) {
-                                    is AudioFxGridItem.BuiltIn -> {
-                                        val fx = item.definition
-                                        key(fx.id) {
-                                            FxTile(
-                                                label = str(fx.titleKey),
-                                                icon = fx.icon,
-                                                isActive = fx.isActive(viewModel.effectsState),
-                                                onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
-                                                onLongClick = fx.onOpenDialog,
-                                                onSecondaryClick = fx.onSecondaryClick?.let { { it(viewModel) } },
-                                                modifier = tileModifier,
-                                                isDanger = fx.isDanger,
-                                                tooltip = fx.tooltip(),
-                                            )
-                                        }
-                                    }
-                                    is AudioFxGridItem.Preset -> key(item.name) {
-                                        val isActive = item.name == activePresetName
-                                        FxTile(
-                                            label = item.name,
-                                            icon = if (isActive) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                            isActive = isActive,
-                                            onClick = {
-                                                if (!viewModel.toggleAudioFxPreset(item.name)) {
-                                                    presetAwaitingWarning = item.name
-                                                    showEarrapeWarning = true
-                                                }
-                                            },
-                                            onLongClick = { presetToDelete = item.name },
-                                            modifier = tileModifier,
-                                            tooltip = item.name,
-                                        )
-                                    }
+                            rowItems.forEach { fx ->
+                                key(fx.id) {
+                                    val isActive = fx.isActive(viewModel.effectsState)
+                                    FxTile(
+                                        label = fx.title(),
+                                        icon = if (isActive && fx.presetName != null) Icons.Rounded.Bookmark else fx.icon,
+                                        isActive = isActive,
+                                        onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
+                                        onLongClick = fx.onOpenDialog,
+                                        onSecondaryClick = fx.onSecondaryClick?.let { { it(viewModel) } },
+                                        modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
+                                        isDanger = fx.isDanger,
+                                        tooltip = fx.tooltip(),
+                                    )
                                 }
                             }
                         }
@@ -651,7 +648,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = "${gridItems.size}",
+                                text = "${pinnedTiles.size}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -1032,18 +1029,16 @@ fun AudioFxStudioSheet(
     onDismiss: () -> Unit
 ) {
     val scrollState = rememberScrollState()
+    var presetToDelete by remember { mutableStateOf<String?>(null) }
 
     val categories = remember(allEffects) {
         listOf(
+            Triple("audio_fx_saved_presets", Icons.Rounded.Bookmark, allEffects.filter { it.categoryKey == "audio_fx_saved_presets" }),
             Triple("category_power_eq", Icons.Rounded.Bolt, allEffects.filter { it.categoryKey == "category_power_eq" }),
             Triple("category_spatial", Icons.Rounded.SurroundSound, allEffects.filter { it.categoryKey == "category_spatial" }),
             Triple("category_ambience_filters", Icons.Rounded.WaterDrop, allEffects.filter { it.categoryKey == "category_ambience_filters" }),
             Triple("category_retro_vintage", Icons.Rounded.Radio, allEffects.filter { it.categoryKey == "category_retro_vintage" })
         )
-    }
-
-    val pinnedDefs = remember(viewModel.pinnedAudioFx, allEffects) {
-        viewModel.pinnedAudioFx.mapNotNull { id -> allEffects.find { it.id == id } }
     }
 
     Column(
@@ -1064,7 +1059,7 @@ fun AudioFxStudioSheet(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = null,
+                    contentDescription = str("btn_back"),
                     tint = MaterialTheme.colorScheme.onSurface
                 )
             }
@@ -1149,11 +1144,14 @@ fun AudioFxStudioSheet(
                     categoryIcon = catIcon,
                     effects = fxList,
                     viewModel = viewModel,
-                    onToggleFx = { fxId -> viewModel.togglePinAudioFx(fxId) }
+                    onToggleFx = { fxId -> viewModel.togglePinAudioFx(fxId) },
+                    onDeletePreset = { presetToDelete = it },
                 )
             }
         }
     }
+
+    presetToDelete?.let { AudioFxPresetDeleteDialog(it, viewModel) { presetToDelete = null } }
 }
 
 @Composable
@@ -1371,7 +1369,7 @@ fun ActiveQSTile(
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = str(fx.titleKey),
+                    text = fx.title(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1382,7 +1380,7 @@ fun ActiveQSTile(
             IconButton(
                 onClick = onRemove,
                 shapes = IconButtonDefaults.shapes(),
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(30.dp).testTag("audio-fx-remove-${fx.id}")
             ) {
                 Surface(
                     shape = CircleShape,
@@ -1393,7 +1391,7 @@ fun ActiveQSTile(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Rounded.Remove,
-                            contentDescription = null,
+                            contentDescription = str("menu_remove"),
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -1410,7 +1408,8 @@ fun AvailableCategorySection(
     categoryIcon: ImageVector,
     effects: List<AudioFxDefinition>,
     viewModel: PlayerViewModel,
-    onToggleFx: (String) -> Unit
+    onToggleFx: (String) -> Unit,
+    onDeletePreset: (String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
         Row(
@@ -1436,7 +1435,8 @@ fun AvailableCategorySection(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            effects.chunked(2).forEach { rowItems ->
+            val columns = if (categoryTitleKey == "audio_fx_saved_presets") 1 else 2
+            effects.chunked(columns).forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1447,10 +1447,11 @@ fun AvailableCategorySection(
                             fx = fx,
                             isPinned = isPinned,
                             onClick = { onToggleFx(fx.id) },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            onDelete = fx.presetName?.let { name -> { onDeletePreset(name) } },
                         )
                     }
-                    if (rowItems.size == 1) {
+                    if (columns == 2 && rowItems.size == 1) {
                         Spacer(Modifier.weight(1f))
                     }
                 }
@@ -1465,7 +1466,8 @@ fun AvailableTile(
     fx: AudioFxDefinition,
     isPinned: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDelete: (() -> Unit)? = null,
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (isPinned) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1479,13 +1481,13 @@ fun AvailableTile(
     )
 
     Box(modifier) {
-        Tip(str("effect_tip_${fx.id}")) {
+        Tip(fx.presetName ?: str("effect_tip_${fx.id}")) {
             Surface(
                 onClick = onClick,
                 shape = RoundedCornerShape(22.dp),
                 color = containerColor,
                 contentColor = contentColor,
-                modifier = Modifier.fillMaxWidth().height(72.dp)
+                modifier = Modifier.fillMaxWidth().height(72.dp).testTag("audio-fx-available-${fx.id}")
             ) {
                 Row(
                     modifier = Modifier
@@ -1514,7 +1516,7 @@ fun AvailableTile(
                         }
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = str(fx.titleKey),
+                            text = fx.title(),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -1533,6 +1535,19 @@ fun AvailableTile(
                                 imageVector = if (isPinned) Icons.Rounded.Check else Icons.Rounded.Add,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    if (onDelete != null) {
+                        IconButton(
+                            onClick = onDelete,
+                            shapes = IconButtonDefaults.shapes(),
+                            modifier = Modifier.size(44.dp).testTag("audio-fx-delete-${fx.id}"),
+                        ) {
+                            Icon(
+                                Icons.Rounded.DeleteOutline,
+                                contentDescription = str("btn_delete"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }

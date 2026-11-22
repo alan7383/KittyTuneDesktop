@@ -92,6 +92,7 @@
     <string name="audio_fx_preset_name">Hangprofil neve</string>
     <string name="audio_fx_preset_name_used">Már létezik ilyen nevű hangprofil.</string>
     <string name="audio_fx_delete_preset">Törlöd a hangprofilt?</string>
+    <string name="audio_fx_saved_presets">Mentett hangprofilok</string>
     <string name="audio_source_desktop">Asztali hang (Számítógép hangja)</string>
     <string name="audio_source_desktop_tag">Asztali hang</string>
     <string name="audio_source_header">Hangrögzítés forrása</string>

@@ -92,6 +92,7 @@
     <string name="audio_fx_preset_name">Ön ayar adı</string>
     <string name="audio_fx_preset_name_used">Bu ada sahip bir ön ayar zaten var.</string>
     <string name="audio_fx_delete_preset">Ön ayar silinsin mi?</string>
+    <string name="audio_fx_saved_presets">Kayıtlı ön ayarlar</string>
     <string name="audio_source_desktop">Masaüstü sesi (Bilgisayar sesi)</string>
     <string name="audio_source_desktop_tag">Masaüstü sesi</string>
     <string name="audio_source_header">Ses kayıt kaynağı</string>
