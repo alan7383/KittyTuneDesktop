@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.6.0"
+version = "1.7.0"
 
 val desktopIsWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 val desktopIsLinux = System.getProperty("os.name").startsWith("Linux", ignoreCase = true)
