@@ -1,0 +1,644 @@
+[
+  {
+    "pair": 0,
+    "variant": "baseline",
+    "phases": [
+      {
+        "phase": "before",
+        "heap_used": 7400408,
+        "process_samples": [
+          {
+            "rss": 108109824,
+            "private_bytes": 157847552
+          },
+          {
+            "rss": 110120960,
+            "private_bytes": 159903744
+          },
+          {
+            "rss": 110120960,
+            "private_bytes": 159903744
+          },
+          {
+            "rss": 110120960,
+            "private_bytes": 159903744
+          },
+          {
+            "rss": 110120960,
+            "private_bytes": 159903744
+          }
+        ]
+      },
+      {
+        "phase": "open",
+        "heap_used": 26310712,
+        "process_samples": [
+          {
+            "rss": 128045056,
+            "private_bytes": 178507776
+          },
+          {
+            "rss": 128045056,
+            "private_bytes": 178507776
+          },
+          {
+            "rss": 128045056,
+            "private_bytes": 178507776
+          },
+          {
+            "rss": 128045056,
+            "private_bytes": 178507776
+          },
+          {
+            "rss": 128045056,
+            "private_bytes": 178507776
+          }
+        ]
+      },
+      {
+        "phase": "closed",
+        "heap_used": 7436184,
+        "process_samples": [
+          {
+            "rss": 110260224,
+            "private_bytes": 160161792
+          },
+          {
+            "rss": 110264320,
+            "private_bytes": 160161792
+          },
+          {
+            "rss": 110264320,
+            "private_bytes": 160161792
+          },
+          {
+            "rss": 110264320,
+            "private_bytes": 160161792
+          },
+          {
+            "rss": 110264320,
+            "private_bytes": 160161792
+          }
+        ]
+      }
+    ],
+    "decode": [
+      {
+        "phase": "decode",
+        "sample": 0,
+        "pcm_bytes": 18408960,
+        "wall_ms": 161.3541,
+        "cpu_ms": 171.875
+      },
+      {
+        "phase": "decode",
+        "sample": 1,
+        "pcm_bytes": 18408960,
+        "wall_ms": 130.1367,
+        "cpu_ms": 125.0
+      },
+      {
+        "phase": "decode",
+        "sample": 2,
+        "pcm_bytes": 18408960,
+        "wall_ms": 135.9957,
+        "cpu_ms": 140.625
+      }
+    ]
+  },
+  {
+    "pair": 0,
+    "variant": "candidate",
+    "phases": [
+      {
+        "phase": "before",
+        "heap_used": 7408168,
+        "process_samples": [
+          {
+            "rss": 103239680,
+            "private_bytes": 152567808
+          },
+          {
+            "rss": 103432192,
+            "private_bytes": 153321472
+          },
+          {
+            "rss": 103432192,
+            "private_bytes": 153321472
+          },
+          {
+            "rss": 103432192,
+            "private_bytes": 153321472
+          },
+          {
+            "rss": 103432192,
+            "private_bytes": 153321472
+          }
+        ]
+      },
+      {
+        "phase": "open",
+        "heap_used": 8495344,
+        "process_samples": [
+          {
+            "rss": 103706624,
+            "private_bytes": 157679616
+          },
+          {
+            "rss": 103706624,
+            "private_bytes": 157679616
+          },
+          {
+            "rss": 103706624,
+            "private_bytes": 157679616
+          },
+          {
+            "rss": 103706624,
+            "private_bytes": 157679616
+          },
+          {
+            "rss": 103706624,
+            "private_bytes": 157679616
+          }
+        ]
+      },
+      {
+        "phase": "closed",
+        "heap_used": 7444536,
+        "process_samples": [
+          {
+            "rss": 103559168,
+            "private_bytes": 157499392
+          },
+          {
+            "rss": 103559168,
+            "private_bytes": 157499392
+          },
+          {
+            "rss": 103559168,
+            "private_bytes": 157499392
+          },
+          {
+            "rss": 103559168,
+            "private_bytes": 157499392
+          },
+          {
+            "rss": 103559168,
+            "private_bytes": 157499392
+          }
+        ]
+      }
+    ],
+    "decode": [
+      {
+        "phase": "decode",
+        "sample": 0,
+        "pcm_bytes": 18408960,
+        "wall_ms": 164.8011,
+        "cpu_ms": 171.875
+      },
+      {
+        "phase": "decode",
+        "sample": 1,
+        "pcm_bytes": 18408960,
+        "wall_ms": 130.0096,
+        "cpu_ms": 125.0
+      },
+      {
+        "phase": "decode",
+        "sample": 2,
+        "pcm_bytes": 18408960,
+        "wall_ms": 133.8687,
+        "cpu_ms": 125.0
+      }
+    ]
+  },
+  {
+    "pair": 1,
+    "variant": "candidate",
+    "phases": [
+      {
+        "phase": "before",
+        "heap_used": 7351496,
+        "process_samples": [
+          {
+            "rss": 102227968,
+            "private_bytes": 151052288
+          },
+          {
+            "rss": 106704896,
+            "private_bytes": 155553792
+          },
+          {
+            "rss": 106704896,
+            "private_bytes": 155553792
+          },
+          {
+            "rss": 106704896,
+            "private_bytes": 155553792
+          },
+          {
+            "rss": 106704896,
+            "private_bytes": 155553792
+          }
+        ]
+      },
+      {
+        "phase": "open",
+        "heap_used": 8437184,
+        "process_samples": [
+          {
+            "rss": 106962944,
+            "private_bytes": 156319744
+          },
+          {
+            "rss": 106962944,
+            "private_bytes": 156319744
+          },
+          {
+            "rss": 106962944,
+            "private_bytes": 156319744
+          },
+          {
+            "rss": 106962944,
+            "private_bytes": 156319744
+          },
+          {
+            "rss": 106962944,
+            "private_bytes": 156319744
+          }
+        ]
+      },
+      {
+        "phase": "closed",
+        "heap_used": 7388608,
+        "process_samples": [
+          {
+            "rss": 106815488,
+            "private_bytes": 156139520
+          },
+          {
+            "rss": 106815488,
+            "private_bytes": 156139520
+          },
+          {
+            "rss": 106815488,
+            "private_bytes": 156139520
+          },
+          {
+            "rss": 106815488,
+            "private_bytes": 156139520
+          },
+          {
+            "rss": 106815488,
+            "private_bytes": 156139520
+          }
+        ]
+      }
+    ],
+    "decode": [
+      {
+        "phase": "decode",
+        "sample": 0,
+        "pcm_bytes": 18408960,
+        "wall_ms": 159.5214,
+        "cpu_ms": 156.25
+      },
+      {
+        "phase": "decode",
+        "sample": 1,
+        "pcm_bytes": 18408960,
+        "wall_ms": 129.4439,
+        "cpu_ms": 140.625
+      },
+      {
+        "phase": "decode",
+        "sample": 2,
+        "pcm_bytes": 18408960,
+        "wall_ms": 134.4298,
+        "cpu_ms": 125.0
+      }
+    ]
+  },
+  {
+    "pair": 1,
+    "variant": "baseline",
+    "phases": [
+      {
+        "phase": "before",
+        "heap_used": 7352224,
+        "process_samples": [
+          {
+            "rss": 102469632,
+            "private_bytes": 152834048
+          },
+          {
+            "rss": 106909696,
+            "private_bytes": 157114368
+          },
+          {
+            "rss": 106909696,
+            "private_bytes": 157114368
+          },
+          {
+            "rss": 106909696,
+            "private_bytes": 157114368
+          },
+          {
+            "rss": 106909696,
+            "private_bytes": 157114368
+          }
+        ]
+      },
+      {
+        "phase": "open",
+        "heap_used": 26261456,
+        "process_samples": [
+          {
+            "rss": 124878848,
+            "private_bytes": 176861184
+          },
+          {
+            "rss": 124878848,
+            "private_bytes": 176861184
+          },
+          {
+            "rss": 124878848,
+            "private_bytes": 176861184
+          },
+          {
+            "rss": 124878848,
+            "private_bytes": 176861184
+          },
+          {
+            "rss": 124878848,
+            "private_bytes": 176861184
+          }
+        ]
+      },
+      {
+        "phase": "closed",
+        "heap_used": 7386928,
+        "process_samples": [
+          {
+            "rss": 107094016,
+            "private_bytes": 158842880
+          },
+          {
+            "rss": 107094016,
+            "private_bytes": 158842880
+          },
+          {
+            "rss": 107094016,
+            "private_bytes": 158842880
+          },
+          {
+            "rss": 107094016,
+            "private_bytes": 158842880
+          },
+          {
+            "rss": 107094016,
+            "private_bytes": 158842880
+          }
+        ]
+      }
+    ],
+    "decode": [
+      {
+        "phase": "decode",
+        "sample": 0,
+        "pcm_bytes": 18408960,
+        "wall_ms": 160.4011,
+        "cpu_ms": 156.25
+      },
+      {
+        "phase": "decode",
+        "sample": 1,
+        "pcm_bytes": 18408960,
+        "wall_ms": 130.63,
+        "cpu_ms": 125.0
+      },
+      {
+        "phase": "decode",
+        "sample": 2,
+        "pcm_bytes": 18408960,
+        "wall_ms": 119.1982,
+        "cpu_ms": 125.0
+      }
+    ]
+  },
+  {
+    "pair": 2,
+    "variant": "baseline",
+    "phases": [
+      {
+        "phase": "before",
+        "heap_used": 7400776,
+        "process_samples": [
+          {
+            "rss": 102543360,
+            "private_bytes": 148623360
+          },
+          {
+            "rss": 102813696,
+            "private_bytes": 149458944
+          },
+          {
+            "rss": 102813696,
+            "private_bytes": 149458944
+          },
+          {
+            "rss": 102813696,
+            "private_bytes": 149458944
+          },
+          {
+            "rss": 102813696,
+            "private_bytes": 149458944
+          }
+        ]
+      },
+      {
+        "phase": "open",
+        "heap_used": 26311064,
+        "process_samples": [
+          {
+            "rss": 120688640,
+            "private_bytes": 170569728
+          },
+          {
+            "rss": 120688640,
+            "private_bytes": 170569728
+          },
+          {
+            "rss": 120688640,
+            "private_bytes": 170569728
+          },
+          {
+            "rss": 120688640,
+            "private_bytes": 170569728
+          },
+          {
+            "rss": 120688640,
+            "private_bytes": 170569728
+          }
+        ]
+      },
+      {
+        "phase": "closed",
+        "heap_used": 7436536,
+        "process_samples": [
+          {
+            "rss": 102899712,
+            "private_bytes": 152219648
+          },
+          {
+            "rss": 102899712,
+            "private_bytes": 152219648
+          },
+          {
+            "rss": 102899712,
+            "private_bytes": 152219648
+          },
+          {
+            "rss": 102899712,
+            "private_bytes": 152219648
+          },
+          {
+            "rss": 102899712,
+            "private_bytes": 152219648
+          }
+        ]
+      }
+    ],
+    "decode": [
+      {
+        "phase": "decode",
+        "sample": 0,
+        "pcm_bytes": 18408960,
+        "wall_ms": 157.6509,
+        "cpu_ms": 156.25
+      },
+      {
+        "phase": "decode",
+        "sample": 1,
+        "pcm_bytes": 18408960,
+        "wall_ms": 125.8508,
+        "cpu_ms": 125.0
+      },
+      {
+        "phase": "decode",
+        "sample": 2,
+        "pcm_bytes": 18408960,
+        "wall_ms": 131.9179,
+        "cpu_ms": 125.0
+      }
+    ]
+  },
+  {
+    "pair": 2,
+    "variant": "candidate",
+    "phases": [
+      {
+        "phase": "before",
+        "heap_used": 7395136,
+        "process_samples": [
+          {
+            "rss": 101793792,
+            "private_bytes": 153493504
+          },
+          {
+            "rss": 101847040,
+            "private_bytes": 154173440
+          },
+          {
+            "rss": 101847040,
+            "private_bytes": 154173440
+          },
+          {
+            "rss": 101847040,
+            "private_bytes": 154173440
+          },
+          {
+            "rss": 101847040,
+            "private_bytes": 154173440
+          }
+        ]
+      },
+      {
+        "phase": "open",
+        "heap_used": 8480824,
+        "process_samples": [
+          {
+            "rss": 102031360,
+            "private_bytes": 156938240
+          },
+          {
+            "rss": 102031360,
+            "private_bytes": 156938240
+          },
+          {
+            "rss": 102031360,
+            "private_bytes": 156938240
+          },
+          {
+            "rss": 102031360,
+            "private_bytes": 156938240
+          },
+          {
+            "rss": 102031360,
+            "private_bytes": 156938240
+          }
+        ]
+      },
+      {
+        "phase": "closed",
+        "heap_used": 7432248,
+        "process_samples": [
+          {
+            "rss": 101908480,
+            "private_bytes": 156762112
+          },
+          {
+            "rss": 101908480,
+            "private_bytes": 156762112
+          },
+          {
+            "rss": 101908480,
+            "private_bytes": 156762112
+          },
+          {
+            "rss": 101908480,
+            "private_bytes": 156762112
+          },
+          {
+            "rss": 101908480,
+            "private_bytes": 156762112
+          }
+        ]
+      }
+    ],
+    "decode": [
+      {
+        "phase": "decode",
+        "sample": 0,
+        "pcm_bytes": 18408960,
+        "wall_ms": 156.3628,
+        "cpu_ms": 156.25
+      },
+      {
+        "phase": "decode",
+        "sample": 1,
+        "pcm_bytes": 18408960,
+        "wall_ms": 125.3622,
+        "cpu_ms": 125.0
+      },
+      {
+        "phase": "decode",
+        "sample": 2,
+        "pcm_bytes": 18408960,
+        "wall_ms": 131.2665,
+        "cpu_ms": 140.625
+      }
+    ]
+  }
+]
