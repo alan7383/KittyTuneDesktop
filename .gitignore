@@ -19,6 +19,7 @@ kotlin-js-store/
 !src/main/resources/icons/variants/*.png
 *.wav
 *.py
+!nix/tests/test_manual_update.py
 !scripts/check-linux-dbus.py
 *.ps1
 !src/main/resources/updater/*.ps1
