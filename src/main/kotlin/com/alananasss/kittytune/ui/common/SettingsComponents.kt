@@ -567,21 +567,25 @@ fun SettingsSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     interactionSource: MutableInteractionSource? = null,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    colors: SwitchColors? = null,
+    checkedIconTint: Color = MaterialTheme.colorScheme.primary,
 ) {
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
         enabled = enabled,
         interactionSource = interactionSource,
+        modifier = modifier,
         thumbContent = {
             Icon(
                 imageVector = if (checked) Icons.Rounded.Check else Icons.Rounded.Close,
                 contentDescription = null,
                 modifier = Modifier.size(SwitchDefaults.IconSize),
-                tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                tint = if (checked) checkedIconTint else MaterialTheme.colorScheme.surfaceContainerHighest,
             )
         },
-        colors = SwitchDefaults.colors(
+        colors = colors ?: SwitchDefaults.colors(
             checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
             checkedTrackColor = MaterialTheme.colorScheme.primary,
             uncheckedThumbColor = MaterialTheme.colorScheme.outline,

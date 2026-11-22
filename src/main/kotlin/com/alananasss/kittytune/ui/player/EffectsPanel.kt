@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -102,7 +103,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     var showEarrapeDialog by remember { mutableStateOf(false) }
     var showEarrapeWarning by remember { mutableStateOf(false) }
     var presetAwaitingWarning by remember { mutableStateOf<String?>(null) }
-    var presetToDelete by remember { mutableStateOf<String?>(null) }
     var showEightDDialog by remember { mutableStateOf(false) }
     var showMuffledDialog by remember { mutableStateOf(false) }
     var showReverbDialog by remember { mutableStateOf(false) }
@@ -135,6 +135,8 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     var showAsmrVocalDialog by remember { mutableStateOf(false) }
     var showNightDriveDialog by remember { mutableStateOf(false) }
     var showStudioEditSheet by remember { mutableStateOf(false) }
+    var explorerFilter by remember { mutableStateOf(AudioFxFilter.ALL) }
+    var showSavePresetDialog by remember { mutableStateOf(false) }
 
     val allEffects = remember {
         listOf(
@@ -457,35 +459,20 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
 
     // Every effect runs on protected tracks too: the CDM hands back plaintext samples, so the
     // whole DSP chain is in the path.
-    val presetEffects = remember(viewModel, viewModel.audioFxPresets.keys) {
-        viewModel.audioFxPresets.keys.reversed().map { name ->
-            AudioFxDefinition(
-                id = AudioFxPreset.tileId(name),
-                titleKey = "audio_fx_preset_name",
-                icon = Icons.Rounded.BookmarkBorder,
-                categoryKey = "audio_fx_saved_presets",
-                isActive = { viewModel.activeAudioFxPresetName == name },
-                onToggle = { player, showWarning ->
-                    if (!player.toggleAudioFxPreset(name)) {
-                        presetAwaitingWarning = name
-                        showWarning()
-                    }
-                },
-                onOpenDialog = { presetToDelete = name },
-                presetName = name,
-            )
-        }
-    }
-    val availableEffects = presetEffects + allEffects
+    // Saved presets have their own cards above; the grid and the full list hold effects.
+    val availableEffects = allEffects
     val pinnedTiles = remember(viewModel.pinnedAudioFx, availableEffects) {
         viewModel.pinnedAudioFx.mapNotNull { id -> availableEffects.find { it.id == id } }
     }
 
     if (showStudioEditSheet) {
-        AudioFxStudioSheet(
+        AudioFxExplorer(
             viewModel = viewModel,
-            allEffects = availableEffects,
-            onDismiss = { showStudioEditSheet = false }
+            effects = allEffects,
+            initialFilter = explorerFilter,
+            onToggle = { fx -> fx.onToggle(viewModel) { showEarrapeWarning = true } },
+            onDismiss = { showStudioEditSheet = false },
+            modifier = modifier,
         )
     } else {
         Column(
@@ -497,6 +484,16 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
         ) {
             // The tab already says what this is, so the speed card leads (issue #66).
             SpeedCard(viewModel, allowPitch = true)
+            Spacer(Modifier.height(24.dp))
+            AudioFxPresetsSection(
+                viewModel = viewModel,
+                onNeedsEarrapeWarning = { name ->
+                    presetAwaitingWarning = name
+                    showEarrapeWarning = true
+                },
+                showSaveDialog = showSavePresetDialog,
+                onDismissSaveDialog = { showSavePresetDialog = false },
+            )
             Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
@@ -516,17 +513,29 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (activeCount > 0) {
-                            Spacer(Modifier.width(8.dp))
-                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                                Text(
-                                    str("fx_active_count", activeCount),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                )
-                            }
+                        val badgeAlpha by animateFloatAsState(
+                            targetValue = if (activeCount > 0) 1f else 0f,
+                            label = "badgeAlpha"
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            onClick = {
+                                if (activeCount > 0) {
+                                    explorerFilter = AudioFxFilter.ACTIVE
+                                    showStudioEditSheet = true
+                                }
+                            },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.alpha(badgeAlpha),
+                        ) {
+                            Text(
+                                if (activeCount > 0) str("fx_active_count", activeCount) else str("fx_active_count", 0),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            )
                         }
                     }
                     Spacer(Modifier.height(2.dp))
@@ -537,30 +546,27 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     )
                 }
 
-                if (activeCount > 0) {
-                    Tip(str("btn_reset")) {
-                        IconButton(
-                            onClick = { viewModel.resetAllEffects() },
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.RestartAlt,
-                                contentDescription = str("btn_reset"),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                val resetAlpha by animateFloatAsState(
+                    targetValue = if (activeCount > 0) 1f else 0f,
+                    label = "resetAlpha"
+                )
+                Tip(str("btn_reset")) {
+                    IconButton(
+                        onClick = { viewModel.resetAllEffects() },
+                        shapes = IconButtonDefaults.shapes(),
+                        enabled = activeCount > 0,
+                        modifier = Modifier.size(36.dp).alpha(resetAlpha)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.RestartAlt,
+                            contentDescription = str("btn_reset"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
 
-            AudioFxPresetControls(
-                viewModel = viewModel,
-                presetToDelete = presetToDelete,
-                onDismissDelete = { presetToDelete = null },
-            )
-            Spacer(Modifier.height(14.dp))
 
             if (pinnedTiles.isEmpty()) {
                 Box(
@@ -593,7 +599,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                                     val isActive = fx.isActive(viewModel.effectsState)
                                     FxTile(
                                         label = fx.title(),
-                                        icon = if (isActive && fx.presetName != null) Icons.Rounded.Bookmark else fx.icon,
+                                        icon = fx.icon,
                                         isActive = isActive,
                                         onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
                                         onLongClick = fx.onOpenDialog,
@@ -611,52 +617,13 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(14.dp))
 
-            FilledTonalButton(
-                onClick = { showStudioEditSheet = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shapes = ButtonShapes(RoundedCornerShape(20.dp), RoundedCornerShape(14.dp)),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                ),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.DashboardCustomize,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = str("btn_explore_all_effects"),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(26.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "${pinnedTiles.size}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-            }
+            AudioFxActionsRow(
+                onSave = { showSavePresetDialog = true },
+                onExplore = {
+                    explorerFilter = AudioFxFilter.ALL
+                    showStudioEditSheet = true
+                },
+            )
         }
     }
 
@@ -831,8 +798,8 @@ fun FxTile(
     tooltip: String = "",
 ) {
     val scheme = MaterialTheme.colorScheme
-    val activeContainer = if (isDanger) scheme.errorContainer else scheme.primaryContainer
-    val activeContent = if (isDanger) scheme.onErrorContainer else scheme.onPrimaryContainer
+    val activeContainer = if (isDanger) scheme.errorContainer else scheme.secondaryContainer
+    val activeContent = if (isDanger) scheme.onErrorContainer else scheme.onSecondaryContainer
     val containerColor by animateColorAsState(
         targetValue = if (isActive) activeContainer else scheme.surfaceContainerHigh,
         animationSpec = tween(250), label = "containerColor"
@@ -1021,139 +988,6 @@ private fun formatSpeed(value: Float): String {
     return "$text×"
 }
 
-// ── AudioFxStudioSheet (Matching Android Studio Sheet) ──
-@Composable
-fun AudioFxStudioSheet(
-    viewModel: PlayerViewModel,
-    allEffects: List<AudioFxDefinition>,
-    onDismiss: () -> Unit
-) {
-    val scrollState = rememberScrollState()
-    var presetToDelete by remember { mutableStateOf<String?>(null) }
-
-    val categories = remember(allEffects) {
-        listOf(
-            Triple("audio_fx_saved_presets", Icons.Rounded.Bookmark, allEffects.filter { it.categoryKey == "audio_fx_saved_presets" }),
-            Triple("category_power_eq", Icons.Rounded.Bolt, allEffects.filter { it.categoryKey == "category_power_eq" }),
-            Triple("category_spatial", Icons.Rounded.SurroundSound, allEffects.filter { it.categoryKey == "category_spatial" }),
-            Triple("category_ambience_filters", Icons.Rounded.WaterDrop, allEffects.filter { it.categoryKey == "category_ambience_filters" }),
-            Triple("category_retro_vintage", Icons.Rounded.Radio, allEffects.filter { it.categoryKey == "category_retro_vintage" })
-        )
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 24.dp)
-            .padding(top = 8.dp, bottom = 36.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onDismiss,
-                shapes = IconButtonDefaults.shapes()
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = str("btn_back"),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Surface(
-                onClick = { viewModel.resetPinnedAudioFx() },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.RestartAlt,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = str("btn_reset"),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            text = str("edit_tiles_title"),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = str("edit_tiles_subtitle"),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = str("audio_fx_long_press_hint"),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-        )
-
-        Spacer(Modifier.height(20.dp))
-
-        // Pinned Tiles Container
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
-            ) {
-                DraggablePinnedTilesGrid(
-                    pinnedList = viewModel.pinnedAudioFx,
-                    allEffects = allEffects,
-                    viewModel = viewModel,
-                    onRemoveFx = { fxId ->
-                        viewModel.togglePinAudioFx(fxId)
-                    }
-                )
-            }
-        }
-
-        Spacer(Modifier.height(28.dp))
-
-        categories.forEach { (catKey, catIcon, fxList) ->
-            if (fxList.isNotEmpty()) {
-                AvailableCategorySection(
-                    categoryTitleKey = catKey,
-                    categoryIcon = catIcon,
-                    effects = fxList,
-                    viewModel = viewModel,
-                    onToggleFx = { fxId -> viewModel.togglePinAudioFx(fxId) },
-                    onDeletePreset = { presetToDelete = it },
-                )
-            }
-        }
-    }
-
-    presetToDelete?.let { AudioFxPresetDeleteDialog(it, viewModel) { presetToDelete = null } }
-}
-
 @Composable
 fun DraggablePinnedTilesGrid(
     pinnedList: List<String>,
@@ -1322,8 +1156,8 @@ fun ActiveQSTile(
     modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
-    val activeColor = if (fx.isDanger) scheme.errorContainer else scheme.primaryContainer
-    val activeContentColor = if (fx.isDanger) scheme.onErrorContainer else scheme.onPrimaryContainer
+    val activeColor = if (fx.isDanger) scheme.errorContainer else scheme.secondaryContainer
+    val activeContentColor = if (fx.isDanger) scheme.onErrorContainer else scheme.onSecondaryContainer
 
     val containerColor by animateColorAsState(
         targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1402,163 +1236,6 @@ fun ActiveQSTile(
 }
 
 // ── AvailableCategorySection (Matching Android Category Section) ──
-@Composable
-fun AvailableCategorySection(
-    categoryTitleKey: String,
-    categoryIcon: ImageVector,
-    effects: List<AudioFxDefinition>,
-    viewModel: PlayerViewModel,
-    onToggleFx: (String) -> Unit,
-    onDeletePreset: (String) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
-        ) {
-            Icon(
-                imageVector = categoryIcon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = str(categoryTitleKey),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            val columns = if (categoryTitleKey == "audio_fx_saved_presets") 1 else 2
-            effects.chunked(columns).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    rowItems.forEach { fx ->
-                        val isPinned = viewModel.isAudioFxPinned(fx.id)
-                        AvailableTile(
-                            fx = fx,
-                            isPinned = isPinned,
-                            onClick = { onToggleFx(fx.id) },
-                            modifier = Modifier.weight(1f),
-                            onDelete = fx.presetName?.let { name -> { onDeletePreset(name) } },
-                        )
-                    }
-                    if (columns == 2 && rowItems.size == 1) {
-                        Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── AvailableTile (Matching Android AvailableTile) ──
-@Composable
-fun AvailableTile(
-    fx: AudioFxDefinition,
-    isPinned: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    onDelete: (() -> Unit)? = null,
-) {
-    val containerColor by animateColorAsState(
-        targetValue = if (isPinned) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerHighest,
-        animationSpec = tween(250),
-        label = "availContainerColor"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (isPinned) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(250),
-        label = "availContentColor"
-    )
-
-    Box(modifier) {
-        Tip(fx.presetName ?: str("effect_tip_${fx.id}")) {
-            Surface(
-                onClick = onClick,
-                shape = RoundedCornerShape(22.dp),
-                color = containerColor,
-                contentColor = contentColor,
-                modifier = Modifier.fillMaxWidth().height(72.dp).testTag("audio-fx-available-${fx.id}")
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isPinned) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = fx.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (isPinned) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = fx.title(),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Surface(
-                        shape = CircleShape,
-                        color = if (isPinned) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
-                        contentColor = if (isPinned) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (isPinned) Icons.Rounded.Check else Icons.Rounded.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                    if (onDelete != null) {
-                        IconButton(
-                            onClick = onDelete,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(44.dp).testTag("audio-fx-delete-${fx.id}"),
-                        ) {
-                            Icon(
-                                Icons.Rounded.DeleteOutline,
-                                contentDescription = str("btn_delete"),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Complete Dialog Suite (Matching Android exactly) ──
-
 @Composable
 private fun BassBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
     EscapableAlertDialog(
