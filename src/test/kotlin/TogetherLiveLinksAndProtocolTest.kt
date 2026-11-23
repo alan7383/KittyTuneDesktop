@@ -61,8 +61,11 @@ class TogetherLiveLinksAndProtocolTest {
     fun testInviteUrlAndDeepLinkParsing() {
         val code = "ABCDEFGH"
         val inviteUrl = TogetherLinks.inviteUrl(code)
-        assertEquals("https://kittytune-invite.kt-net.workers.dev/?together=ABCD-EFGH", inviteUrl.substringBefore("&from="))
+        assertEquals("https://kittytune.pages.dev/ABCD-EFGH", inviteUrl.substringBefore("?from="))
         assertEquals(code, TogetherLinks.extractCodeFromUri(inviteUrl))
+        assertEquals(code, TogetherLinks.extractCodeFromUri("https://kittytune.pages.dev/abcdefgh/?together=K7M9-P3Q4"))
+        assertEquals(code, TogetherLinks.extractCodeFromUri("https://kittytune-invite.kt-net.workers.dev/?together=ABCD-EFGH"))
+        assertNull(TogetherLinks.extractCodeFromUri("https://kittytune.pages.dev/ABCD-EFGH-extra"))
         val appLink = TogetherLinks.appDeepLink(code)
         assertEquals("kittytune://together/ABCD-EFGH", appLink)
         assertEquals(code, TogetherLinks.extractCodeFromUri(appLink))
