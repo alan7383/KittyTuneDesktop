@@ -135,6 +135,7 @@ fun main(args: Array<String>) {
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
+    com.alananasss.kittytune.core.PerformanceSettings.applyAtStartup()
     if (!trainStartupCache && System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
         com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
         // Off the startup path: moves an install the MSI would delete, or redoes one an update deleted.

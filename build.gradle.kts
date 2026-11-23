@@ -1039,7 +1039,7 @@ tasks.register<Test>("headlessTest") {
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
             "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest",
-            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest", "*LazyAudioEngineTest", "*LocalMediaScanIndexTest"
+            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest", "*LazyAudioEngineTest", "*LocalMediaScanIndexTest", "PerformanceSettingsTest"
         ).forEach(::includeTestsMatching)
     }
 }

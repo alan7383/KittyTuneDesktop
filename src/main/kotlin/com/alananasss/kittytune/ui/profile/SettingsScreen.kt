@@ -153,6 +153,7 @@ fun SettingsScreen(
 internal enum class SettingsCategory(val titleKey: String, val icon: ImageVector) {
     INTERFACE("settings_cat_interface", Icons.Rounded.Palette),
     AUDIO("settings_cat_audio", Icons.Rounded.GraphicEq),
+    PERFORMANCE("performance_title", Icons.Rounded.Speed),
     SOURCES("settings_tab_sources", Icons.Rounded.ImportExport),
     STORAGE("pref_storage_title", Icons.Rounded.Storage),
     SYNC("settings_cat_sync", Icons.Rounded.Devices),
@@ -295,6 +296,7 @@ private fun SettingsPageContent(
         null -> when (location.category) {
             SettingsCategory.INTERFACE -> CategoryFolderGroup(interfacePages, onOpen)
             SettingsCategory.AUDIO -> CategoryFolderGroup(audioPages, onOpen)
+            SettingsCategory.PERFORMANCE -> PerformanceSettingsScreen()
             SettingsCategory.SOURCES -> CategoryFolderGroup(sourcesPages, onOpen)
             SettingsCategory.STORAGE -> CategoryFolderGroup(storagePages, onOpen)
             SettingsCategory.SYNC -> CategoryFolderGroup(syncPages, onOpen)
@@ -533,6 +535,9 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     )
 
     return listOf(
+        SettingsSearchItem(str("performance_title"), str("performance_renderer_note"), SettingsCategory.PERFORMANCE,
+            SettingsPlace(SettingsCategory.PERFORMANCE), Icons.Rounded.Speed,
+            keywords = listOf("performance", "gpu", "graphics", "renderer", "OpenGL", "Direct3D", "Metal", "vsync", "cache", "memory", "prestazioni", "grafica")),
         // INTERFACE - Pages
         SettingsSearchItem(str("settings_cat_interface"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE), Icons.Rounded.Palette, keywords = listOf("interface", "ui", "look", "appearance", "интерфейс", "внешний вид")),
         SettingsSearchItem(str("settings_page_themes"), str("settings_page_themes_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)), Icons.Rounded.ColorLens, keywords = listOf("theme", "color", "dark", "light", "palette", "oled", "amoled", "thème", "couleur", "тема", "цвета")),

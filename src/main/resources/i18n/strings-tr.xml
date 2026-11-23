@@ -3592,4 +3592,26 @@
     <string name="fx_export_open">Aç</string>
     <string name="fx_export_share">Paylaş</string>
     <string name="fx_export_saved_to_music">Müzik/KittyTune Effects içine kaydedildi</string>
+    <string name="performance_title">Performans</string>
+    <string name="performance_restart">Değişiklikleri uygulamak için KittyTune uygulamasını yeniden başlatın.</string>
+    <string name="performance_pending">Değişiklikler yeniden başlatmayı bekliyor.</string>
+    <string name="performance_renderer">İşleyici</string>
+    <string name="performance_renderer_note">Otomatik seçenek varsayılan grafik arka ucunu ve yedek seçeneği korur. Yazılım modu CPU kullanır.</string>
+    <string name="performance_auto">Otomatik</string>
+    <string name="performance_software">Yazılım (uyumluluk)</string>
+    <string name="performance_gpu">Tercih edilen GPU</string>
+    <string name="performance_gpu_note">Windows üzerinde Direct3D ve macOS üzerinde Metal için geçerlidir. OpenGL kullanılırsa GPU seçimini sistem ve sürücü yapar. Harici GPU daha fazla güç tüketebilir.</string>
+    <string name="performance_integrated">Tümleşik (güç tasarrufu)</string>
+    <string name="performance_discrete">Harici (yüksek performans)</string>
+    <string name="performance_vsync">Dikey eşitleme</string>
+    <string name="performance_vsync_note">İşlemeyi ekranla eşitler. Kapatmak görüntü yırtılmasına ve daha fazla güç tüketimine neden olabilir.</string>
+    <string name="performance_caches">Önbellek sınırları</string>
+    <string name="performance_image_cache">Kapak belleği önbelleği</string>
+    <string name="performance_gpu_cache">Grafik kaynakları önbelleği</string>
+    <string name="performance_disk_cache">Kapak disk önbelleği</string>
+    <string name="performance_cache_note">Düşük sınırlar bellek veya disk alanı kazandırır ancak daha fazla kod çözmeye yol açabilir. Bunlar sınırlardır, ayrılmış bellek değildir.</string>
+    <string name="performance_reset">Varsayılan performans ayarlarını geri yükle</string>
+    <string name="performance_windows_gpu">Windows grafik tercihleri</string>
+    <string name="performance_windows_gpu_note">OpenGL için Windows grafik ayarlarına KittyTune.exe ekleyin ve harici GPU için Yüksek performans seçin. Windows uygulamanın tercihini geçersiz kılabilir.</string>
+    <string name="performance_windows_gpu_error">Grafik ayarları açılamadı. Ayarlar, Sistem, Ekran, Grafik bölümünü elle açın.</string>
 </resources>

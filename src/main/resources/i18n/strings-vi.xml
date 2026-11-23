@@ -3672,4 +3672,26 @@
     <string name="fx_export_open">Mở</string>
     <string name="fx_export_share">Chia sẻ</string>
     <string name="fx_export_saved_to_music">Đã lưu vào Nhạc/KittyTune Effects</string>
+    <string name="performance_title">Hiệu năng</string>
+    <string name="performance_restart">Khởi động lại KittyTune để áp dụng thay đổi.</string>
+    <string name="performance_pending">Các thay đổi đang chờ khởi động lại.</string>
+    <string name="performance_renderer">Bộ kết xuất</string>
+    <string name="performance_renderer_note">Tự động giữ bộ kết xuất mặc định và chế độ dự phòng. Chế độ phần mềm dùng CPU.</string>
+    <string name="performance_auto">Tự động</string>
+    <string name="performance_software">Phần mềm (tương thích)</string>
+    <string name="performance_gpu">GPU ưu tiên</string>
+    <string name="performance_gpu_note">Áp dụng cho Direct3D trên Windows và Metal trên macOS. Với OpenGL, hệ điều hành và trình điều khiển chọn GPU. GPU rời có thể tốn điện hơn.</string>
+    <string name="performance_integrated">Tích hợp (tiết kiệm điện)</string>
+    <string name="performance_discrete">GPU rời (hiệu năng cao)</string>
+    <string name="performance_vsync">Đồng bộ dọc</string>
+    <string name="performance_vsync_note">Đồng bộ kết xuất với màn hình. Tắt có thể gây xé hình và tăng điện năng tiêu thụ.</string>
+    <string name="performance_caches">Giới hạn bộ nhớ đệm</string>
+    <string name="performance_image_cache">Bộ nhớ đệm ảnh bìa trong RAM</string>
+    <string name="performance_gpu_cache">Bộ nhớ đệm tài nguyên đồ họa</string>
+    <string name="performance_disk_cache">Bộ nhớ đệm ảnh bìa trên đĩa</string>
+    <string name="performance_cache_note">Giới hạn thấp tiết kiệm bộ nhớ hoặc dung lượng nhưng có thể tăng việc giải mã lại. Đây là giới hạn, không phải bộ nhớ được đặt trước.</string>
+    <string name="performance_reset">Khôi phục cài đặt hiệu năng</string>
+    <string name="performance_windows_gpu">Tùy chọn đồ họa Windows</string>
+    <string name="performance_windows_gpu_note">Với OpenGL, thêm KittyTune.exe trong cài đặt đồ họa Windows và chọn Hiệu năng cao để yêu cầu GPU rời. Windows có thể ghi đè tùy chọn ứng dụng.</string>
+    <string name="performance_windows_gpu_error">Không thể mở cài đặt đồ họa. Hãy mở thủ công Cài đặt, Hệ thống, Màn hình, Đồ họa.</string>
 </resources>

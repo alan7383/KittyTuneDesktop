@@ -37,20 +37,20 @@ object ImageLoaderFactory {
                 })
             }
             // Decoded bitmaps are Skia memory, outside the Java heap and invisible to -Xmx, and the
-            // GPU keeps its own texture copy of whatever is on screen. 32 MB still holds a couple of
+            // GPU keeps its own texture copy of whatever is on screen. The default 32 MB holds a couple of
             // screens of covers — enough that scrolling back a page is a cache hit while the
             // footprint stays flat — and anything evicted comes back from the disk cache below in a
             // few ms (RAM target, issue #33). It was 64 MB, which for the same working set simply
             // kept twice as many covers resident in native memory.
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizeBytes(32L * 1024 * 1024)
+                    .maxSizeBytes(com.alananasss.kittytune.core.PerformanceSettings.active.imageCacheMiB.toLong() * 1024 * 1024)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(AppDirs.imageCacheDir.toOkioPath())
-                    .maxSizeBytes(256L * 1024 * 1024)
+                    .maxSizeBytes(com.alananasss.kittytune.core.PerformanceSettings.active.diskCacheMiB.toLong() * 1024 * 1024)
                     .build()
             }
             // No global crossfade: it applied to every AsyncImage in the app, including 56-dp
