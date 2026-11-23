@@ -181,9 +181,10 @@ enum class PetTap(val label: String) {
 /** Everything the user can customise. */
 data class PetSettings(
     val name: String = PetConfig.DEFAULT_NAME,
-    val colorId: String = PetColor.CREAM.id,
+    // A ginger tabby out of the box: the cat on KittyTune's cover.
+    val colorId: String = PetColor.GINGER.id,
     val customPalette: PetPalette? = null,
-    val pattern: PetPattern = PetPattern.CLASSIC,
+    val pattern: PetPattern = PetPattern.TABBY,
     val coat: PetCoat? = null,
     val eyeColor: Int = PetEye.ONYX.color,
     val hat: PetHat = PetHat.NONE,
@@ -398,14 +399,26 @@ object PetConfig {
     fun setWindowPinned(value: Boolean) = prefs.putBoolean(KEY_WINDOW_PINNED, value)
 
     /**
-     * Where the cat lives. Desktop keeps the floating always-on-top window it has always had;
-     * "in the app" draws it inside KittyTune's own window, held by the window's edges.
+     * Where the cat lives: on the player bar (the default), in the floating always-on-top window,
+     * or as the widget card inside KittyTune's own window.
      */
-    fun placement(): PetPlacement =
-        if (prefs.getString(KEY_PLACEMENT, null) == PLACEMENT_IN_APP) PetPlacement.IN_APP else PetPlacement.DESKTOP
+    fun placement(): PetPlacement = when (prefs.getString(KEY_PLACEMENT, null)) {
+        PLACEMENT_IN_APP -> PetPlacement.IN_APP
+        PLACEMENT_DESKTOP -> PetPlacement.DESKTOP
+        // New cats (and anyone who never picked a home) live on the player bar: inside the app, out of
+        // the way, and without a window of their own.
+        else -> PetPlacement.BAR
+    }
 
     fun setPlacement(value: PetPlacement) {
-        prefs.putString(KEY_PLACEMENT, if (value == PetPlacement.IN_APP) PLACEMENT_IN_APP else PLACEMENT_DESKTOP)
+        prefs.putString(
+            KEY_PLACEMENT,
+            when (value) {
+                PetPlacement.IN_APP -> PLACEMENT_IN_APP
+                PetPlacement.DESKTOP -> PLACEMENT_DESKTOP
+                PetPlacement.BAR -> PLACEMENT_BAR
+            },
+        )
         changed()
     }
 
@@ -426,6 +439,7 @@ object PetConfig {
 
     private const val PLACEMENT_DESKTOP = "desktop"
     private const val PLACEMENT_IN_APP = "in_app"
+    private const val PLACEMENT_BAR = "bar"
 
     /** Just above the player bar, in the bottom-right corner of the window, on a first run. */
     private const val IN_APP_DEFAULT_Y = 0.82f

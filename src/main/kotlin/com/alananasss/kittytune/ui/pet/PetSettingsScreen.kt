@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Nightlight
+import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Celebration
@@ -648,26 +649,39 @@ private fun PetSettingsContent(
             // ---------------- actions
             item { SectionTitle(str("pet_section_more")) }
             item {
-                val inWindow = PetWindowState.placement == PetPlacement.IN_APP
+                val home = PetWindowState.placement
+                val homeIcon = placementIcon(home)
                 SettingsGroup(
                     items = listOf(
                         { shape ->
-                            // One row, one popup: the cat lives either in the floating window or
-                            // inside this one, never in both, and the choice is made in a dialog.
+                            // One row, one popup: the cat lives in one home at a time (the player bar,
+                            // the floating window or a card in this one), chosen in a dialog.
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_desk_placement"),
-                                subtitle = str(if (inWindow) "pet_desk_inside" else "pet_desk_float"),
-                                icon = if (inWindow) Icons.Rounded.PictureInPicture else Icons.Rounded.DesktopWindows,
+                                subtitle = str(placementTitle(home)),
+                                icon = homeIcon,
                                 onClick = { showPlacementDialog = true }
                             )
                         },
                         { shape ->
                             SettingsItem(
                                 shape = shape,
-                                title = str(if (inWindow) "pet_desk_inside_show" else "pet_desk_show"),
-                                subtitle = str(if (inWindow) "pet_desk_inside_show_sub" else "pet_desk_show_sub"),
-                                icon = if (inWindow) Icons.Rounded.PictureInPicture else Icons.Rounded.DesktopWindows,
+                                title = str(
+                                    when (home) {
+                                        PetPlacement.BAR -> "pet_bar_show"
+                                        PetPlacement.IN_APP -> "pet_desk_inside_show"
+                                        PetPlacement.DESKTOP -> "pet_desk_show"
+                                    }
+                                ),
+                                subtitle = str(
+                                    when (home) {
+                                        PetPlacement.BAR -> "pet_bar_show_sub"
+                                        PetPlacement.IN_APP -> "pet_desk_inside_show_sub"
+                                        PetPlacement.DESKTOP -> "pet_desk_show_sub"
+                                    }
+                                ),
+                                icon = homeIcon,
                                 hasSwitch = true,
                                 switchState = PetWindowState.visible,
                                 onSwitchChange = { PetWindowState.show(it) },
@@ -762,6 +776,12 @@ private fun SectionTitle(text: String) {
 internal fun PetPlacementChoices(selected: PetPlacement, onSelect: (PetPlacement) -> Unit) {
     Column {
         PlacementOption(
+            title = str("pet_bar_title"),
+            subtitle = str("pet_bar_sub"),
+            icon = placementIcon(PetPlacement.BAR),
+            selected = selected == PetPlacement.BAR,
+        ) { onSelect(PetPlacement.BAR) }
+        PlacementOption(
             title = str("pet_desk_float"),
             subtitle = str("pet_desk_float_sub"),
             icon = Icons.Rounded.DesktopWindows,
@@ -774,6 +794,18 @@ internal fun PetPlacementChoices(selected: PetPlacement, onSelect: (PetPlacement
             selected = selected == PetPlacement.IN_APP,
         ) { onSelect(PetPlacement.IN_APP) }
     }
+}
+
+internal fun placementTitle(home: PetPlacement): String = when (home) {
+    PetPlacement.BAR -> "pet_bar_title"
+    PetPlacement.IN_APP -> "pet_desk_inside"
+    PetPlacement.DESKTOP -> "pet_desk_float"
+}
+
+internal fun placementIcon(home: PetPlacement): ImageVector = when (home) {
+    PetPlacement.BAR -> Icons.Rounded.Pets
+    PetPlacement.IN_APP -> Icons.Rounded.PictureInPicture
+    PetPlacement.DESKTOP -> Icons.Rounded.DesktopWindows
 }
 
 /** One home for the cat, in the placement dialog: a radio, what it means, and the pick itself. */
@@ -1172,19 +1204,36 @@ private fun PetOnboarding(
                 PetSetupPage.WIDGET -> {
                     // Same page, its own home: a replayed tutorial must not promise a floating
                     // window to someone who chose to keep the cat inside the app.
-                    val inWindow = PetWindowState.placement == PetPlacement.IN_APP
+                    val home = PetWindowState.placement
                     SetupPage(
-                        title = str(if (inWindow) "pet_desk_inside" else "pet_desk_window_title"),
-                        body = str(if (inWindow) "pet_desk_inside_sub" else "pet_desk_window_body"),
+                        title = str(
+                            when (home) {
+                                PetPlacement.BAR -> "pet_bar_title"
+                                PetPlacement.IN_APP -> "pet_desk_inside"
+                                PetPlacement.DESKTOP -> "pet_desk_window_title"
+                            }
+                        ),
+                        body = str(
+                            when (home) {
+                                PetPlacement.BAR -> "pet_bar_sub"
+                                PetPlacement.IN_APP -> "pet_desk_inside_sub"
+                                PetPlacement.DESKTOP -> "pet_desk_window_body"
+                            }
+                        ),
                         sprite = { PetSprite(PetActivity.LOVE, settings, Modifier.fillMaxWidth(), label = draftName) }
                     ) {
                         Button(onClick = { PetWindowState.show(true) }, shapes = ButtonDefaults.shapes()) {
-                            Icon(
-                                if (inWindow) Icons.Rounded.PictureInPicture else Icons.Rounded.DesktopWindows,
-                                contentDescription = null
-                            )
+                            Icon(placementIcon(home), contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(str(if (inWindow) "pet_desk_inside_show" else "pet_desk_show"))
+                            Text(
+                                str(
+                                    when (home) {
+                                        PetPlacement.BAR -> "pet_bar_show"
+                                        PetPlacement.IN_APP -> "pet_desk_inside_show"
+                                        PetPlacement.DESKTOP -> "pet_desk_show"
+                                    }
+                                )
+                            )
                         }
                     }
                 }

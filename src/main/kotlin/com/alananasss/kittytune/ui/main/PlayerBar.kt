@@ -148,7 +148,10 @@ fun PlayerBar(
                 .padding(horizontal = 24.dp)
                 .height(76.dp)
                 .then(onBarPlaced?.let { report -> Modifier.onGloballyPositioned { report(it) } } ?: Modifier)
+                // The Kitty pet walks along the bar's top edge, wherever the bar is drawn.
+                .onGloballyPositioned { com.alananasss.kittytune.ui.pet.PetBarAnchor.report(it) }
             else -> Modifier.fillMaxWidth().height(88.dp)
+                .onGloballyPositioned { com.alananasss.kittytune.ui.pet.PetBarAnchor.report(it) }
         },
         shape = when (barStyle) {
             com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape

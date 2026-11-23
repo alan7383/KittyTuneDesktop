@@ -82,11 +82,12 @@ import java.awt.Cursor
 import kotlin.math.roundToInt
 
 /**
- * Where the cat lives: [DESKTOP] is the floating always-on-top window, the counterpart of the
- * Android home-screen widget; [IN_APP] is inside KittyTune's own window, where it is held by the
- * window's edges and can never sit over another app.
+ * Where the cat lives: [BAR] walks along the top of the player bar, a small cat with no card around
+ * it that dances to the music and sleeps when it stops; [DESKTOP] is the floating always-on-top
+ * window, the counterpart of the Android home-screen widget; [IN_APP] is the widget card inside
+ * KittyTune's own window, held by the window's edges.
  */
-enum class PetPlacement { DESKTOP, IN_APP }
+enum class PetPlacement { BAR, DESKTOP, IN_APP }
 
 /** Whether the pet is shown (remembered across launches) and where it lives. */
 object PetWindowState {
