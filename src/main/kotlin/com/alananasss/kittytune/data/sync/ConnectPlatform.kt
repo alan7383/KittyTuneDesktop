@@ -13,7 +13,8 @@ internal object ConnectPlatform {
             }.getOrNull()
         }
     }
-    fun trace(event: String) { diagnostics?.info(event) } // Opt-in counts/events only, never frames or credentials.
+    // Events only, never frames or credentials. Always kept for the sync settings' "copy diagnostics".
+    fun trace(event: String) { diagnostics?.info(event); NetLog.i("connect", event) }
     fun canUseLan() = true
     fun canConnect() = true
     fun routeClient(client: okhttp3.OkHttpClient): okhttp3.OkHttpClient? = client
@@ -27,6 +28,10 @@ internal object ConnectPlatform {
     var relayUrl: String
         get() = prefs.getString("connect_relay_url", "").orEmpty()
         set(value) = prefs.putString("connect_relay_url", value)
+    /** Internet control ([ConnectCloud]): null until chosen here or by a paired device. Off by default. */
+    var internetControl: Boolean?
+        get() = prefs.getString("connect_internet_control", null)?.toBooleanStrictOrNull()
+        set(value) = prefs.putString("connect_internet_control", value?.toString())
     /** A self-hosting PC joins its relay locally; the public URL is still shared with phones. */
     var localRelayUrl: String
         get() = prefs.getString("connect_relay_local_url", "").orEmpty()

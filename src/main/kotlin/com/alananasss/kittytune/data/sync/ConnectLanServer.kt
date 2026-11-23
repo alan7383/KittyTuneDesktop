@@ -35,17 +35,27 @@ object ConnectLanServer {
                     require(MessageDigest.isEqual(join["token"].asString.toByteArray(), credentials.token.toByteArray()))
                     device
                 }.getOrNull()
-                if (peer == null || !SyncPlayback.enabled || !SyncService.isListenerEnabled) { conn.close(1008, "Unauthorized"); return }
+                if (peer == null || !SyncPlayback.enabled || !SyncService.isListenerEnabled) {
+                    NetLog.w("connect", "Refused a LAN join from ${conn.remoteSocketAddress?.address?.hostAddress}")
+                    conn.close(1008, "Unauthorized"); return
+                }
                 conn.send("{\"type\":\"ready\"}")
-                links[conn] = ConnectManager.attach(peer, "LAN", { conn.send(it); true }) { conn.close(1000, "idle") }
+                val attached = ConnectManager.attach(peer, "LAN", { conn.send(it); true }, dialer = peer.deviceId) { conn.close(1000, "idle") }
+                if (attached == null) conn.close(1000, "duplicate") else links[conn] = attached
             }
             override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) { links.remove(conn)?.detach() }
-            override fun onError(conn: WebSocket?, ex: Exception) { if (conn != null) links.remove(conn)?.detach() }
-            override fun onStart() {}
+            override fun onError(conn: WebSocket?, ex: Exception) {
+                if (conn != null) links.remove(conn)?.detach()
+                // A null connection is the server itself: most often the port could not be bound.
+                else { NetLog.w("connect", "LAN server on port ${bindAddress.port} failed", ex); Thread { stop() }.start() }
+            }
+            override fun onStart() { NetLog.i("connect", "LAN server listening on port ${bindAddress.port}") }
         }.apply { isReuseAddr = true; connectionLostTimeout = 60; start() }
     }
     @Synchronized fun stop() {
-        runCatching { server?.stop(500) }; server = null
+        val running = server ?: return
+        server = null
+        runCatching { running.stop(500) }
         links.values.forEach { it.detach() }; links.clear()
     }
 }

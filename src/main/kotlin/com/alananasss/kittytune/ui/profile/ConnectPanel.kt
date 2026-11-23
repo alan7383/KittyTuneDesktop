@@ -272,7 +272,8 @@ fun ConnectPanel() {
         }
 
         // Connection error alert
-        val connectionError = peers.values.firstOrNull { !it.connected && it.error.isNotBlank() }?.error
+        val failedPeer = peers.values.firstOrNull { !it.connected && it.error.isNotBlank() }
+        val connectionError = failedPeer?.let { connectErrorText(it.error, it.name) }
         if (!independent && connectionError != null) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -291,11 +292,7 @@ fun ConnectPanel() {
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        text = if (connectionError.startsWith("HTTP")) {
-                            connectionError
-                        } else {
-                            connectionError
-                        },
+                        text = connectionError,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
@@ -543,4 +540,16 @@ private fun friendlyFeedback(message: String): String = when {
     message == "Track changed; choose the device again" -> str("connect_feedback_track_changed")
     message == "Unable to prepare this track" -> str("connect_feedback_unable_to_open")
     else -> message
+}
+
+/** A Connect failure in words: what it most likely means and what to do, not an exception name. */
+internal fun connectErrorText(code: String, peerName: String): String {
+    val error = com.alananasss.kittytune.data.sync.ConnectErrors.parse(code)
+    val name = peerName.ifBlank { "?" }
+    return when {
+        error.kind == com.alananasss.kittytune.data.sync.ConnectErrors.Kind.UNAUTHORIZED -> str("connect_error_unauthorized", name)
+        error.transport == "LAN" -> str("connect_error_lan", name)
+        error.transport == "Internet" -> str("connect_error_relay", error.raw)
+        else -> error.raw
+    }
 }

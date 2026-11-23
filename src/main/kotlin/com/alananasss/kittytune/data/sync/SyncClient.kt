@@ -82,6 +82,7 @@ object SyncClient {
             callback = SyncService.selfPairing().takeIf { SyncService.isRunning },
             playback = SyncPlayback.current(),
             relayUrl = ConnectManager.relayUrl.ifBlank { null },
+            internetControl = ConnectPlatform.internetControl,
         )
 
         val candidateHosts = buildList {
@@ -128,7 +129,10 @@ object SyncClient {
 
         return try {
             client.newCall(request).execute().use { response ->
-                if (response.code == 401) return Result.Unauthorized
+                if (response.code == 401) {
+                    NetLog.w("sync", "$targetHost refused our pairing secret (HTTP 401)")
+                    return Result.Unauthorized
+                }
                 if (!response.isSuccessful) {
                     return Result.Failed("HTTP ${response.code}")
                 }
@@ -139,6 +143,7 @@ object SyncClient {
                 val applied = SyncApply.mergeAndApply(reply.events)
                 SyncPlayback.accept(reply.playback)
                 ConnectManager.importRelayUrl(reply.relayUrl)
+                ConnectManager.importInternetControl(reply.internetControl)
                 // What it reported already accounts for what we just sent, so the next exchange
                 // starts from there instead of from the beginning of the log.
                 SyncLog.setPeerMarks(reply.deviceId, reply.marks)
@@ -156,6 +161,7 @@ object SyncClient {
                     )
                 )
 
+                NetLog.i("sync", "Synced with ${reply.deviceName.ifBlank { peer.deviceName }} at $targetHost: ${applied.size} in, ${outgoing.events.size} out")
                 Result.Success(
                     peerName = reply.deviceName.ifBlank { peer.deviceName },
                     received = applied.size,
@@ -213,7 +219,12 @@ object SyncClient {
      * device is not accepting connections, or a firewall is dropping the port. Both are one switch away,
      * so the message names them instead of quoting the exception (issue #33).
      */
-    private fun describe(t: Throwable, peer: PairingPayload): String = when (t) {
+    private fun describe(t: Throwable, peer: PairingPayload): String {
+        NetLog.w("sync", "Exchange with ${peer.deviceName.ifBlank { peer.deviceId.take(8) }} at ${peer.host}:${peer.port} failed", t)
+        return describeFor(t, peer)
+    }
+
+    private fun describeFor(t: Throwable, peer: PairingPayload): String = when (t) {
         is java.net.SocketTimeoutException, is java.net.ConnectException ->
             "No answer from ${peer.host}:${peer.port}. Check that the other device is running " +
                 "KittyTune with connections accepted, and that ports 47653 and 47654 are allowed in your firewall."
