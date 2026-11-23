@@ -103,7 +103,8 @@ object BackupManager {
             dao.insertPlaylistTrackRefs(data.playlistRefs ?: emptyList())
             dao.insertArtists(data.savedArtists ?: emptyList())
             dao.insertHistoryList(data.history ?: emptyList())
-            dao.insertStatsEvents((data.listeningStats ?: emptyList()).map { it.copy(id = 0) })
+            val restoredListens = dao.insertStatsEvents((data.listeningStats ?: emptyList()).map { it.copy(id = 0) })
+            if (restoredListens > 0) ListeningStatsRepository.onStatsChanged()
 
             LikeRepository.replaceAllLikes(data.likedTracks ?: emptyList())
 

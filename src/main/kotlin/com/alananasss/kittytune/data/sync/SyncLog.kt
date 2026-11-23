@@ -4,17 +4,15 @@ import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.NamedPrefs
 import com.google.gson.Gson
 import java.io.File
+import java.io.IOException
+import java.io.RandomAccessFile
 import java.util.UUID
 
 /**
  * The device's own append-only log, on disk (issue #33).
  *
- * One JSON object per line. Append-only is not a style choice here: it is what makes the file safe
- * to read while it is being written, cheap to add to, and impossible to corrupt retroactively — a
- * half-written last line is dropped on load and nothing before it is affected.
- *
- * A line that will not parse is skipped rather than fatal. A log that refuses to load would take the
- * whole listening history with it, and one bad line costs one event.
+ * Each line can be recovered independently. Keep older lines so a newly paired device can still
+ * receive them and a missing statistics table can be rebuilt from the journal.
  */
 object SyncLog {
 
@@ -22,20 +20,9 @@ object SyncLog {
     private val file: File by lazy { File(AppDirs.dataDir, "sync_log.jsonl") }
     private val prefs by lazy { NamedPrefs("sync_state") }
 
-    /**
-     * What RAM keeps of the log: the highest sequence number each device has reached, and how many
-     * events the file holds. Not the events themselves.
-     *
-     * The whole log used to sit in a list as well as on disk, on the argument that it was small.
-     * It stopped being small when likes joined it: a first seeding pass turns a library of several
-     * thousand tracks into as many events, each carrying the whole track as JSON, and a year of
-     * listens adds tens of thousands more — all resident, forever, in strings nothing but the
-     * merges ever looked at. The file is the record; the index is all the appends need (see
-     * [append]), and readers stream the file and drop the parse the moment they are done. The
-     * transient list a read builds is bounded by what the caller keeps, not by the log's age.
-     */
     private val maxSeqByDevice = HashMap<String, Long>()
-    private var eventCount = 0L
+    private val eventIds = HashSet<String>()
+    private var receivedMarks = emptyMap<String, Long>()
     private var loaded = false
 
     /**
@@ -47,9 +34,6 @@ object SyncLog {
      * once in [ensureLoaded] and extended in [write]. [all] returns a copy (audit Phase 5 IO gain).
      */
     private val eventCache = ArrayList<SyncEvent>()
-
-    /** When the log crosses this many events, it is rotated to keep only the latest per device. */
-    private const val ROTATION_THRESHOLD = 50_000L
 
     /**
      * This install's identity, generated once.
@@ -75,20 +59,25 @@ object SyncLog {
     @Synchronized
     private fun ensureLoaded() {
         if (loaded) return
-        loaded = true
-        if (!file.isFile) return
-        file.forEachLine { line ->
-            val event = parse(line) ?: return@forEachLine
-            eventCount++
-            index(event)
-            eventCache.add(event)
+        maxSeqByDevice.clear()
+        eventIds.clear()
+        eventCache.clear()
+        if (file.exists()) {
+            file.forEachLine { line -> parse(line)?.let(::index) }
         }
+        // An older build could acknowledge a write that failed. Ask the peer again for any
+        // acknowledged tail that is missing from the copy on disk.
+        receivedMarks = readMarks(KEY_MARKS)
+            .mapValues { (origin, mark) -> minOf(mark, maxSeqByDevice[origin] ?: 0L) }
+            .filterValues { it > 0L }
+        loaded = true
     }
 
-    /** Records a parsed line in the RAM index: highest seq per device, and the running count. */
     private fun index(event: SyncEvent) {
+        if (!eventIds.add(event.id)) return
         val known = maxSeqByDevice[event.deviceId]
         if (known == null || event.seq > known) maxSeqByDevice[event.deviceId] = event.seq
+        eventCache.add(event)
     }
 
     private fun parse(line: String): SyncEvent? {
@@ -111,7 +100,7 @@ object SyncLog {
     @Synchronized
     fun size(): Int {
         ensureLoaded()
-        return eventCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        return eventCache.size
     }
 
     /**
@@ -169,67 +158,50 @@ object SyncLog {
     @Synchronized
     fun merge(incoming: List<SyncEvent>): List<SyncEvent> {
         ensureLoaded()
-        val fresh = SyncMerge.selectNew(incoming, marks(), deviceId)
-        if (fresh.isEmpty()) return emptyList()
-        write(fresh)
-        setMarks(SyncMerge.advance(marks(), fresh))
+        val candidates = SyncMerge.selectNew(incoming, receivedMarks, deviceId)
+        val fresh = candidates.filterNot { it.id in eventIds }
+        if (fresh.isNotEmpty()) write(fresh)
+        val next = SyncMerge.advance(receivedMarks, candidates)
+        if (next != receivedMarks) {
+            prefs.putString(KEY_MARKS, gson.toJson(next))
+            receivedMarks = next
+        }
         return fresh
     }
 
     private fun write(batch: List<SyncEvent>) {
-        // The index only advances on a write that landed. On failure the same seq is handed out
-        // again for the retry, rather than leaving a gap: a peer's mark can only cross a gap by
-        // re-receiving everything after it, for ever (see [SyncMerge.advance]).
-        val written = runCatching {
-            file.parentFile?.mkdirs()
-            // One open, one append, one line each: a crash mid-batch leaves whole lines behind it.
-            file.appendText(batch.joinToString("") { gson.toJson(it) + "\n" })
-        }.isSuccess
-        if (written) {
-            for (event in batch) {
-                eventCount++
-                index(event)
-                eventCache.add(event)
-            }
-            // Rotate when the log crosses the threshold: rewrite the file keeping only the latest
-            // ROTATION_THRESHOLD events, and trim the cache to match. Without this the file grew
-            // forever — a year of listening produced an 18 MB file that every sync round re-parsed.
-            if (eventCount > ROTATION_THRESHOLD) {
-                rotate()
+        val bytes = batch.joinToString("\n", postfix = "\n") { gson.toJson(it) }.toByteArray()
+        file.parentFile?.mkdirs()
+        RandomAccessFile(file, "rw").use { output ->
+            val originalSize = output.length()
+            try {
+                if (originalSize > 0) {
+                    output.seek(originalSize - 1)
+                    // Keep a line interrupted by a crash separate from the new batch.
+                    if (output.read() != '\n'.code) output.write('\n'.code)
+                }
+                output.write(bytes)
+                output.fd.sync()
+            } catch (failure: IOException) {
+                // A failed append must leave the same sequence numbers available for the retry.
+                try {
+                    output.setLength(originalSize)
+                    output.fd.sync()
+                } catch (rollback: IOException) {
+                    loaded = false
+                    failure.addSuppressed(rollback)
+                }
+                throw failure
             }
         }
-    }
-
-    /** Rewrites the log file keeping only the latest [ROTATION_THRESHOLD] events, and trims the cache. */
-    private fun rotate() {
-        val keep = eventCache.takeLast(ROTATION_THRESHOLD.toInt())
-        val rewritten = runCatching {
-            file.writeText(keep.joinToString("") { gson.toJson(it) + "\n" })
-        }.isSuccess
-        if (rewritten) {
-            eventCache.clear()
-            eventCache.addAll(keep)
-            eventCount = keep.size.toLong()
-            // Rebuild the index from what survived.
-            maxSeqByDevice.clear()
-            keep.forEach { index(it) }
-        }
+        batch.forEach(::index)
     }
 
     /** How far we have got with each device we have heard from. */
     @Synchronized
     fun marks(): Map<String, Long> {
-        val raw = prefs.getString(KEY_MARKS, null) ?: return emptyMap()
-        return runCatching {
-            @Suppress("UNCHECKED_CAST")
-            (gson.fromJson(raw, Map::class.java) as Map<String, Double>)
-                .mapValues { it.value.toLong() }
-        }.getOrDefault(emptyMap())
-    }
-
-    @Synchronized
-    private fun setMarks(marks: Map<String, Long>) {
-        prefs.putString(KEY_MARKS, gson.toJson(marks))
+        ensureLoaded()
+        return receivedMarks
     }
 
     /**
@@ -239,8 +211,10 @@ object SyncLog {
      * the peer drops what it already has. It only costs bandwidth on the very first exchange.
      */
     @Synchronized
-    fun peerMarks(peerDeviceId: String): Map<String, Long> {
-        val raw = prefs.getString(keyPeerMarks(peerDeviceId), null) ?: return emptyMap()
+    fun peerMarks(peerDeviceId: String): Map<String, Long> = readMarks(keyPeerMarks(peerDeviceId))
+
+    private fun readMarks(key: String): Map<String, Long> {
+        val raw = prefs.getString(key, null) ?: return emptyMap()
         return runCatching {
             @Suppress("UNCHECKED_CAST")
             (gson.fromJson(raw, Map::class.java) as Map<String, Double>)
@@ -273,15 +247,16 @@ object SyncLog {
      */
     @Synchronized
     fun clear() {
+        java.nio.file.Files.deleteIfExists(file.toPath())
         maxSeqByDevice.clear()
-        eventCount = 0L
+        eventIds.clear()
         eventCache.clear()
+        receivedMarks = emptyMap()
         loaded = true
         prefs.remove(KEY_MARKS)
         prefs.all().keys
             .filter { it.startsWith(PEER_MARKS_PREFIX) }
             .forEach { prefs.remove(it) }
-        runCatching { file.delete() }
     }
 
     private fun defaultDeviceName(): String {

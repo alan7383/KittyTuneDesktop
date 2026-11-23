@@ -2217,7 +2217,7 @@
     <string name="listening_stats_period_week_short">Tuần</string>
     <string name="listening_stats_period_month_short">Tháng</string>
     <string name="listening_stats_period_year_short">Năm</string>
-    <string name="listening_stats_change_week">%1$s so với tuần trước</string>
+    <string name="listening_stats_change_week">%1$s so với 7 ngày trước đó</string>
     <string name="listening_stats_change_month">%1$s so với tháng trước</string>
     <string name="listening_stats_change_year">%1$s so với năm trước</string>
     <string name="listening_stats_hours">Thời điểm trong ngày</string>
@@ -2694,7 +2694,7 @@
     <string name="listening_stats_next_period">Kỳ tiếp theo</string>
     <string name="listening_stats_period_month_current">Tháng này</string>
     <string name="listening_stats_period_month_last">Tháng trước</string>
-    <string name="listening_stats_period_week_current">Tuần này</string>
+    <string name="listening_stats_period_week_current">7 ngày qua</string>
     <string name="listening_stats_period_week_last">Tuần trước</string>
     <string name="listening_stats_period_year_current">Năm nay</string>
     <string name="listening_stats_period_year_last">Năm ngoái</string>

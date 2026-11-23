@@ -2369,7 +2369,7 @@
     <string name="listening_stats_period_week_short">Woche</string>
     <string name="listening_stats_period_month_short">Monat</string>
     <string name="listening_stats_period_year_short">Jahr</string>
-    <string name="listening_stats_change_week">%1$s ggü. letzter Woche</string>
+    <string name="listening_stats_change_week">%1$s gegenüber den vorherigen 7 Tagen</string>
     <string name="listening_stats_change_month">%1$s ggü. letztem Monat</string>
     <string name="listening_stats_change_year">%1$s ggü. letztem Jahr</string>
     <string name="listening_stats_hours">Tageszeit</string>
@@ -2846,7 +2846,7 @@
     <string name="listening_stats_next_period">Nächster Zeitraum</string>
     <string name="listening_stats_period_month_current">Diesen Monat</string>
     <string name="listening_stats_period_month_last">Letzten Monat</string>
-    <string name="listening_stats_period_week_current">Diese Woche</string>
+    <string name="listening_stats_period_week_current">Letzte 7 Tage</string>
     <string name="listening_stats_period_week_last">Letzte Woche</string>
     <string name="listening_stats_period_year_current">Dieses Jahr</string>
     <string name="listening_stats_period_year_last">Letztes Jahr</string>

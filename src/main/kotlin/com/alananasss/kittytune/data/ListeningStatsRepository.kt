@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -63,7 +64,7 @@ object ListeningStatsRepository {
     /** Called after anything that changes the table, from either side. */
     fun onStatsChanged() {
         cache.clear()
-        _revision.value = _revision.value + 1
+        _revision.update { it + 1 }
     }
 
     @Suppress("UNCHECKED_CAST")

@@ -92,6 +92,12 @@ data class ListeningReport(
 
 object ListeningReports {
 
+    /** Seven local dates, including today, with adjacent windows for browsing older listens. */
+    fun recentWeek(nowMs: Long, zone: ZoneId, offset: Int = 0): ReportWindow {
+        val end = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate().plusWeeks(offset.toLong()).plusDays(1)
+        return ReportWindow(end.minusWeeks(1).startMs(zone), end.startMs(zone))
+    }
+
     /** The calendar span [period] covers at [nowMs]; "all time" starts at [firstEventMs]. */
     fun windowFor(period: ReportPeriod, nowMs: Long, zone: ZoneId, firstEventMs: Long? = null, offset: Int = 0): ReportWindow {
         val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()

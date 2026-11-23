@@ -242,11 +242,10 @@ object AppDatabase {
                     "CREATE UNIQUE INDEX IF NOT EXISTS idx_stats_sync_event " +
                         "ON listening_stats(syncEventId)"
                 )
-            } catch (_: Exception) {
-                // An existing install can already hold duplicates from before the index existed. The
-                // index is an optimisation on top of INSERT OR IGNORE, not the only defence, so a
-                // table that cannot take it still syncs correctly — it just keeps the duplicates it
-                // already has.
+            } catch (_: java.sql.SQLException) {
+                // Existing duplicates can prevent the unique index from being created. Keep the
+                // existence check in the stats insert indexed on those databases too.
+                st.execute("CREATE INDEX IF NOT EXISTS idx_stats_sync_lookup ON listening_stats(syncEventId)")
             }
         }
     }

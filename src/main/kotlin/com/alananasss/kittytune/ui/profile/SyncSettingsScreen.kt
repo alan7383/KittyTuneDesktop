@@ -290,7 +290,11 @@ fun SyncOptionsPage() {
                 onSwitchChange = { enabled ->
                     syncListensEnabled = enabled
                     playerPrefs.setSyncListensEnabled(enabled)
-                    if (enabled) scope.launch { com.alananasss.kittytune.data.sync.SyncApply.reconcile() }
+                    if (enabled) scope.launch {
+                        runCatching { com.alananasss.kittytune.data.sync.SyncApply.reconcile() }
+                            .onFailure { System.err.println("Sync could not recover listening statistics (${it.message})") }
+                        SyncScheduler.triggerImmediateSync("listening statistics enabled")
+                    }
                 },
             )
             SettingsItem(

@@ -1029,7 +1029,7 @@ tasks.register<Test>("headlessTest") {
     filter {
         listOf("*NativeDemucsPlatformTest", "*ConfiguredDemucsTest", "*KaraokeOnnxFallbackTest", "*LinuxUpdateAssetsTest", "*AmbientPcmTest", "*StreamingAmbientPlaybackTest", "*RainPlayerTest", "TimeStretcherTest", "SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
-            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "DownloadJobsTest", "DownloadFilesTest", "LyricsMergePerformanceTest", "*LyricsMatcherTest",
+            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "SyncListeningStatsTest", "ListeningReportTest", "DownloadJobsTest", "DownloadFilesTest", "LyricsMergePerformanceTest", "*LyricsMatcherTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest", "*FadingEdgeRenderTest",
             "*WindowsUpdateTest", "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",

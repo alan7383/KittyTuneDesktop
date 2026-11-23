@@ -775,7 +775,8 @@ class DownloadDao(private val db: AppDatabase) {
             "INSERT OR IGNORE INTO listening_stats(trackId,trackTitle,artistName,artistId," +
                 "artistPermalink,artistAvatarUrl,artworkUrl,source,eventType,listenDurationMs," +
                 "trackDurationMs,timestamp,furthestPositionMs,syncEventId,genre) " +
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,:eventId,? " +
+                "WHERE :eventId IS NULL OR NOT EXISTS (SELECT 1 FROM listening_stats WHERE syncEventId = :eventId)"
     }
 }
 

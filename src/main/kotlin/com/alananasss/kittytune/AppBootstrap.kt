@@ -204,12 +204,11 @@ object AppBootstrap {
         // Paired once, in step from then on. Costs nothing until something is paired.
         if (!com.alananasss.kittytune.data.sync.SyncPeers.isEmpty()) {
             com.alananasss.kittytune.data.sync.SyncScheduler.start()
-            // Anything the log holds that the statistics table is missing goes back in. The marks advance
-            // when events are merged, not when their rows land, so a failed or cancelled insert used to lose
-            // listens the peer would never send again (issue #33).
-            scope.launch {
-                com.alananasss.kittytune.data.sync.SyncApply.reconcile()
-            }
+        }
+        // The journal can recover listens even with the other device disconnected or unpaired.
+        scope.launch {
+            runCatching { com.alananasss.kittytune.data.sync.SyncApply.reconcile() }
+                .onFailure { System.err.println("Sync: could not recover listening statistics: ${it.message}") }
         }
 
         // 4. Player + session keep-alive.

@@ -12,7 +12,6 @@ import com.alananasss.kittytune.data.stats.ListeningReports
 import com.alananasss.kittytune.data.stats.ReportPeriod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -43,14 +42,12 @@ class ListeningStatsViewModel : ViewModel() {
     var events by mutableStateOf<List<ListeningStatsEvent>>(emptyList())
         private set
 
-    private var oldestEventMs: Long? = null
+    private var historyAnchorMs = 0L
     private var loadJob: Job? = null
 
     init {
-        load()
         viewModelScope.launch {
-            // drop(1): the current value is what the first load already used.
-            ListeningStatsRepository.revision.drop(1).collect { load() }
+            ListeningStatsRepository.revision.collect { load() }
         }
     }
 
@@ -63,6 +60,7 @@ class ListeningStatsViewModel : ViewModel() {
 
     fun previousPeriod() {
         if (period == ReportPeriod.ALL_TIME || !canGoBack) return
+        if (periodOffset == 0) historyAnchorMs = System.currentTimeMillis()
         periodOffset--
         load()
     }
@@ -87,18 +85,20 @@ class ListeningStatsViewModel : ViewModel() {
         loadJob = viewModelScope.launch {
             val zone = ZoneId.systemDefault()
             val now = System.currentTimeMillis()
-            if (oldestEventMs == null) {
-                oldestEventMs = ListeningStatsRepository.getSnapshot(0L).firstAtMs
+            val anchor = if (offset < 0) historyAnchorMs else now
+            val firstEventMs = ListeningStatsRepository.getOldestEventAt()
+            val window = if (selected == ReportPeriod.WEEK) {
+                ListeningReports.recentWeek(anchor, zone, offset)
+            } else {
+                ListeningReports.windowFor(selected, anchor, zone, firstEventMs, offset)
             }
-            val firstEventMs = oldestEventMs
-            val window = ListeningReports.windowFor(selected, now, zone, firstEventMs, offset)
             val previous = ListeningReports.previousWindow(selected, window, zone)
             val rows = ListeningStatsRepository.getEvents(previous?.startMs ?: window.startMs)
             val built = withContext(Dispatchers.Default) {
                 val previousMs = previous?.let { span ->
                     rows.filter { it.timestamp >= span.startMs && it.timestamp < span.endMs }.sumOf { it.listenDurationMs }
                 }
-                ListeningReports.build(selected, window, rows, previousMs, zone)
+                ListeningReports.build(selected, window, rows, previousMs, zone, nowMs = now)
             }
             events = rows.filter { it.timestamp >= window.startMs && it.timestamp < window.endMs }
                 .sortedByDescending { it.timestamp }

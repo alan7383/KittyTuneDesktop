@@ -23,9 +23,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +43,7 @@ import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.ListeningStatsRepository
 import com.alananasss.kittytune.data.local.TopArtistResult
+import com.alananasss.kittytune.data.stats.ListeningReports
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
@@ -63,17 +64,26 @@ private val STATS_CARD_PLACEHOLDER_HEIGHT = 170.dp
 
 @Composable
 internal fun ListeningStatsCard(navController: NavController) {
-    val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
-    val summary by produceState<HomeStatsSummary?>(initialValue = null, key1 = weekAgo) {
+    val repo = ListeningStatsRepository
+    val revision by repo.revision.collectAsState()
+    val summary by produceState<HomeStatsSummary?>(initialValue = null, key1 = revision) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                val repo = ListeningStatsRepository
+                val zone = ZoneId.systemDefault()
+                val now = System.currentTimeMillis()
+                val window = ListeningReports.recentWeek(now, zone)
+                val snapshot = repo.getSnapshot(window.startMs, window.endMs)
+                val events = repo.getRecentEventsBetween(window.startMs, window.endMs, Int.MAX_VALUE)
                 HomeStatsSummary(
-                    listenedMs = repo.getTotalListenTime(weekAgo),
-                    uniqueTracks = repo.getUniqueTracks(weekAgo),
-                    uniqueArtists = repo.getUniqueArtists(weekAgo),
-                    topArtist = repo.getTopArtists(weekAgo, limit = 1).firstOrNull(),
-                    days = HomeStatsDays.lastSeven(repo.getEvents(weekAgo).map { it.timestamp to it.listenDurationMs }),
+                    listenedMs = snapshot.totalListenMs,
+                    uniqueTracks = snapshot.uniqueTracks,
+                    uniqueArtists = snapshot.uniqueArtists,
+                    topArtist = repo.getTopArtistsBetween(window.startMs, window.endMs).firstOrNull(),
+                    days = HomeStatsDays.lastSeven(
+                        events.map { it.timestamp to it.listenDurationMs },
+                        today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate(),
+                        zone = zone,
+                    ),
                 )
             }.getOrNull()
         }
@@ -123,7 +133,7 @@ internal fun StatsCardContent(stats: HomeStatsSummary, onClick: () -> Unit) {
                         maxLines = 1,
                     )
                     Text(
-                        str("listening_stats_period_week"),
+                        str("listening_stats_period_week_current"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = scheme.onSurfaceVariant,
                     )
