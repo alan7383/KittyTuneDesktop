@@ -128,6 +128,9 @@ object ListeningReports {
         return ReportWindow(previousStart.startMs(zone), window.startMs)
     }
 
+    internal fun countedPlays(events: List<ListeningStatsEvent>): List<ListeningStatsEvent> =
+        events.filter { ListenRules.countsAsPlay(it.listenDurationMs, it.trackDurationMs) }
+
     fun build(
         period: ReportPeriod,
         window: ReportWindow,
@@ -138,7 +141,7 @@ object ListeningReports {
         nowMs: Long = System.currentTimeMillis(),
     ): ListeningReport {
         val inWindow = events.filter { it.timestamp >= window.startMs && it.timestamp < window.endMs }
-        val playRows = inWindow.filter { ListenRules.countsAsPlay(it.listenDurationMs, it.trackDurationMs) }
+        val playRows = countedPlays(inWindow)
 
         val hours = LongArray(24)
         val perDay = HashMap<LocalDate, Long>()

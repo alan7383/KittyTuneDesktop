@@ -22,6 +22,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.data.local.ListeningStatsEvent
+import com.alananasss.kittytune.data.stats.ListeningReports
 import com.alananasss.kittytune.data.stats.ReportArtist
 import com.alananasss.kittytune.data.stats.ReportTrack
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -195,20 +196,21 @@ internal fun ArtistsListDialog(artists: List<ReportArtist>, onArtistClick: (Repo
     }
 }
 
-/** Every listen of the span, newest first, under a heading per day. */
+/** Plays counted in the selected span, newest first, grouped by day. */
 @Composable
 internal fun PlaysListDialog(events: List<ListeningStatsEvent>, onTrackClick: (Long) -> Unit, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
     val zone = remember { ZoneId.systemDefault() }
     val timeFormat = remember { DateTimeFormatter.ofPattern("HH:mm") }
     val dayFormat = remember { DateTimeFormatter.ofPattern("EEEE, d MMMM", statsLocale()) }
-    val byDay = remember(events, query) {
-        events.filter { it.trackTitle.matches(query) || it.artistName.matches(query) }
+    val plays = remember(events) { ListeningReports.countedPlays(events) }
+    val byDay = remember(plays, query) {
+        plays.filter { it.trackTitle.matches(query) || it.artistName.matches(query) }
             .groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
     }
     val today = LocalDate.now(zone)
     StatsListDialog(
-        title = str("listening_stats_all_plays"), count = events.size, onDismiss = onDismiss,
+        title = str("listening_stats_all_plays"), count = plays.size, onDismiss = onDismiss,
         sorts = emptyList(), sort = null, onSort = {}, query = query, onQuery = { query = it },
     ) {
         byDay.forEach { (day, dayEvents) ->
