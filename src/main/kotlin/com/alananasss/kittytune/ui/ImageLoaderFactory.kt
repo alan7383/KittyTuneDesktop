@@ -10,6 +10,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.SuccessResult
 import coil3.size.pxOrElse
 import com.alananasss.kittytune.core.AppDirs
+import com.alananasss.kittytune.core.PerformanceSettings
 
 import okio.Path.Companion.toOkioPath
 
@@ -19,6 +20,7 @@ object ImageLoaderFactory {
         // Route image requests through the proxy when one is configured
         // (same as the Android app wiring Coil to ProxyManager's client).
         val okHttp = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
+        val performance = PerformanceSettings.active
         return ImageLoader.Builder(PlatformContext.INSTANCE)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { okHttp }))
@@ -44,13 +46,13 @@ object ImageLoaderFactory {
             // kept twice as many covers resident in native memory.
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizeBytes(com.alananasss.kittytune.core.PerformanceSettings.active.imageCacheMiB.toLong() * 1024 * 1024)
+                    .maxSizeBytes(performance.imageCacheMiB.toLong() * 1024 * 1024)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(AppDirs.imageCacheDir.toOkioPath())
-                    .maxSizeBytes(com.alananasss.kittytune.core.PerformanceSettings.active.diskCacheMiB.toLong() * 1024 * 1024)
+                    .maxSizeBytes(performance.diskCacheMiB.toLong() * 1024 * 1024)
                     .build()
             }
             // No global crossfade: it applied to every AsyncImage in the app, including 56-dp

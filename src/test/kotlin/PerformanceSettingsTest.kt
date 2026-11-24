@@ -15,12 +15,11 @@ class PerformanceSettingsTest {
         assertEquals("67108864", props["skiko.gpu.resourceCacheLimit"])
     }
 
-    @Test fun windowsDiscretePreferenceReachesBothSkikoProperties() {
+    @Test fun windowsDiscretePreferenceUsesSkikosGpuPriority() {
         val props = PerformanceSettings.startupProperties(options(values = mapOf(
             PerformanceSettings.GPU to "DISCRETE", PerformanceSettings.RENDERER to "DIRECT3D")), "Windows 11")
         assertEquals("DIRECT3D", props["skiko.renderApi"])
         assertEquals("discrete", props["skiko.gpu.priority"])
-        assertEquals("discrete", props["skiko.directx.gpu.priority"])
     }
 
     @Test fun openGlDoesNotPretendToSelectAnAdapter() {
@@ -38,10 +37,27 @@ class PerformanceSettingsTest {
     }
 
     @Test fun metalAndLinuxExposeOnlySupportedBackends() {
-        assertEquals(listOf(PerformanceRenderer.AUTO, PerformanceRenderer.METAL), PerformanceSettings.renderers("Mac OS X"))
+        assertEquals(
+            listOf(PerformanceRenderer.AUTO, PerformanceRenderer.METAL, PerformanceRenderer.SOFTWARE_COMPAT),
+            PerformanceSettings.renderers("Mac OS X"),
+        )
         assertFalse(PerformanceSettings.renderers("Linux").contains(PerformanceRenderer.DIRECT3D))
         val selected = options("Mac OS X", mapOf(PerformanceSettings.RENDERER to "METAL", PerformanceSettings.GPU to "INTEGRATED"))
-        assertEquals("integrated", PerformanceSettings.startupProperties(selected, "Mac OS X")["skiko.metal.gpu.priority"])
+        assertEquals("integrated", PerformanceSettings.startupProperties(selected, "Mac OS X")["skiko.gpu.priority"])
+    }
+
+    @Test fun windowsArm64DoesNotOfferOrApplyOpenGl() {
+        val renderer = PerformanceOptions(renderer = PerformanceRenderer.OPENGL)
+        assertTrue(PerformanceRenderer.OPENGL in PerformanceSettings.renderers("Windows 11", "amd64"))
+        assertEquals("OPENGL", PerformanceSettings.startupProperties(renderer, "Windows 11", "amd64")["skiko.renderApi"])
+        for (arch in listOf("aarch64", "arm64")) {
+            assertFalse(PerformanceRenderer.OPENGL in PerformanceSettings.renderers("Windows 11", arch))
+            val imported = PerformanceSettings.read("Windows 11", arch) { key ->
+                "OPENGL".takeIf { key == PerformanceSettings.RENDERER }
+            }
+            assertEquals(PerformanceRenderer.AUTO, imported.renderer)
+            assertFalse(PerformanceSettings.startupProperties(renderer, "Windows 11", arch).containsKey("skiko.renderApi"))
+        }
     }
 
     @Test fun validCacheBudgetsAndVsyncAreApplied() {

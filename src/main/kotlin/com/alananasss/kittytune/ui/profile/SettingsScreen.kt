@@ -535,9 +535,19 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     )
 
     return listOf(
-        SettingsSearchItem(str("performance_title"), str("performance_renderer_note"), SettingsCategory.PERFORMANCE,
-            SettingsPlace(SettingsCategory.PERFORMANCE), Icons.Rounded.Speed,
-            keywords = listOf("performance", "gpu", "graphics", "renderer", "OpenGL", "Direct3D", "Metal", "vsync", "cache", "memory", "prestazioni", "grafica")),
+        SettingsSearchItem(
+            str("performance_title"),
+            str("performance_renderer_note"),
+            SettingsCategory.PERFORMANCE,
+            SettingsPlace(SettingsCategory.PERFORMANCE),
+            Icons.Rounded.Speed,
+            keywords = listOf(
+                str("performance_renderer"), str("performance_gpu"), str("performance_vsync"),
+                str("performance_image_cache"), str("performance_gpu_cache"), str("performance_disk_cache"),
+                "performance", "gpu", "graphics", "renderer", "OpenGL", "Direct3D", "Metal",
+                "vsync", "cache", "memory", "prestazioni", "grafica",
+            ),
+        ),
         // INTERFACE - Pages
         SettingsSearchItem(str("settings_cat_interface"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE), Icons.Rounded.Palette, keywords = listOf("interface", "ui", "look", "appearance", "интерфейс", "внешний вид")),
         SettingsSearchItem(str("settings_page_themes"), str("settings_page_themes_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)), Icons.Rounded.ColorLens, keywords = listOf("theme", "color", "dark", "light", "palette", "oled", "amoled", "thème", "couleur", "тема", "цвета")),

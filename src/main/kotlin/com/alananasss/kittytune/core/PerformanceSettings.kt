@@ -27,11 +27,21 @@ object PerformanceSettings {
     @Volatile var active = PerformanceOptions()
         private set
 
-    fun renderers(os: String = System.getProperty("os.name")): List<PerformanceRenderer> = when {
-        os.startsWith("Windows", true) -> listOf(PerformanceRenderer.AUTO, PerformanceRenderer.DIRECT3D,
-            PerformanceRenderer.OPENGL, PerformanceRenderer.SOFTWARE_COMPAT)
+    fun renderers(
+        os: String = System.getProperty("os.name"),
+        arch: String = System.getProperty("os.arch"),
+    ): List<PerformanceRenderer> = when {
+        os.startsWith("Windows", true) -> buildList {
+            add(PerformanceRenderer.AUTO)
+            add(PerformanceRenderer.DIRECT3D)
+            // Skiko rejects OpenGL before renderer fallback can run on Windows ARM64.
+            if (!arch.equals("aarch64", true) && !arch.equals("arm64", true)) {
+                add(PerformanceRenderer.OPENGL)
+            }
+            add(PerformanceRenderer.SOFTWARE_COMPAT)
+        }
         os.startsWith("Mac", true) || os.startsWith("Darwin", true) ->
-            listOf(PerformanceRenderer.AUTO, PerformanceRenderer.METAL)
+            listOf(PerformanceRenderer.AUTO, PerformanceRenderer.METAL, PerformanceRenderer.SOFTWARE_COMPAT)
         else -> listOf(PerformanceRenderer.AUTO, PerformanceRenderer.OPENGL, PerformanceRenderer.SOFTWARE_COMPAT)
     }
 
@@ -42,11 +52,12 @@ object PerformanceSettings {
 
     fun read(
         os: String = System.getProperty("os.name"),
+        arch: String = System.getProperty("os.arch"),
         value: (String) -> String? = { Prefs.getString(it, null) },
     ): PerformanceOptions {
         fun size(key: String, allowed: List<Int>, default: Int) = value(key)?.toIntOrNull()?.takeIf { it in allowed } ?: default
         return PerformanceOptions(
-            renderer = renderers(os).firstOrNull { it.name == value(RENDERER) } ?: PerformanceRenderer.AUTO,
+            renderer = renderers(os, arch).firstOrNull { it.name == value(RENDERER) } ?: PerformanceRenderer.AUTO,
             gpu = PerformanceGpu.entries.firstOrNull { it.name == value(GPU) } ?: PerformanceGpu.AUTO,
             vsync = value(VSYNC)?.toBooleanStrictOrNull() ?: true,
             imageCacheMiB = size(IMAGE_CACHE, imageCacheSizes, 32),
@@ -55,15 +66,16 @@ object PerformanceSettings {
         )
     }
 
-    fun startupProperties(options: PerformanceOptions, os: String): Map<String, String> = buildMap {
-        if (options.renderer != PerformanceRenderer.AUTO && options.renderer in renderers(os)) {
+    fun startupProperties(
+        options: PerformanceOptions,
+        os: String,
+        arch: String = System.getProperty("os.arch"),
+    ): Map<String, String> = buildMap {
+        if (options.renderer != PerformanceRenderer.AUTO && options.renderer in renderers(os, arch)) {
             put("skiko.renderApi", options.renderer.name)
         }
         if (gpuPreferenceSupported(options.renderer, os) && options.gpu != PerformanceGpu.AUTO) {
-            val priority = if (options.gpu == PerformanceGpu.DISCRETE) "discrete" else "integrated"
-            put("skiko.gpu.priority", priority)
-            put("skiko.directx.gpu.priority", priority)
-            put("skiko.metal.gpu.priority", priority)
+            put("skiko.gpu.priority", options.gpu.name.lowercase())
         }
         put("skiko.vsync.enabled", options.vsync.toString())
         put("skiko.gpu.resourceCacheLimit", (options.gpuCacheMiB.toLong() * 1024 * 1024).toString())

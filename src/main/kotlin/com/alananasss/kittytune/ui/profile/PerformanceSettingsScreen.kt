@@ -36,8 +36,10 @@ internal fun PerformanceSettingsScreen() {
             PerformanceChoice(shape, "performance_renderer", options.renderer.name,
                 PerformanceSettings.renderers(os).map { it.name to when (it) {
                     PerformanceRenderer.AUTO -> str("performance_auto")
+                    PerformanceRenderer.DIRECT3D -> "Direct3D"
+                    PerformanceRenderer.OPENGL -> "OpenGL"
                     PerformanceRenderer.SOFTWARE_COMPAT -> str("performance_software")
-                    else -> it.name.replace("DIRECT3D", "Direct3D").replace("OPENGL", "OpenGL").replace("METAL", "Metal")
+                    PerformanceRenderer.METAL -> "Metal"
                 } }, "performance_renderer_note") { Prefs.putString(PerformanceSettings.RENDERER, it) }
         },
         { shape ->
