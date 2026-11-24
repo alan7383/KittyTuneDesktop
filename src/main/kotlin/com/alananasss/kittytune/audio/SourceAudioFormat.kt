@@ -27,19 +27,25 @@ data class SourceAudioFormat(
     ).joinToString(" • ")
 
     companion object {
-        /** Reads the opened grabber's first audio stream; null when it has none. */
-        fun of(grabber: FFmpegFrameGrabber): SourceAudioFormat? = runCatching {
+        /** [fragmentedHlsBitrateBps] is zero for unmeasured fMP4 HLS, and null for other sources. */
+        fun of(grabber: FFmpegFrameGrabber, fragmentedHlsBitrateBps: Long? = null): SourceAudioFormat? = runCatching {
             val fc = grabber.formatContext ?: return null
             for (i in 0 until fc.nb_streams()) {
                 val par = fc.streams(i)?.codecpar() ?: continue
                 if (par.codec_type() != avutil.AVMEDIA_TYPE_AUDIO) continue
                 val name = avcodec.avcodec_get_name(par.codec_id())?.string ?: grabber.audioCodecName
                 val depth = par.bits_per_raw_sample().takeIf { it > 0 && isLossless(name) }
-                val declared = par.bit_rate().takeIf { it > 0 } ?: grabber.audioBitrate.toLong()
-                val measured = if (fc.nb_streams() == 1 && !isLossless(name)) {
-                    measuredBitrate(fc.pb()?.let { avformat.avio_size(it) } ?: -1L, fc.duration())
-                } else null
-                val bitrate = chooseBitrate(declared, measured)
+                val bitrate = if (fragmentedHlsBitrateBps != null) {
+                    // On incremental fMP4, FFmpeg may divide the bytes it probed by the end
+                    // timestamp of a fragment or of the whole track. Use the fragment's duration.
+                    fragmentedHlsBitrateBps.takeIf { fc.nb_streams() == 1 } ?: 0L
+                } else {
+                    val declared = par.bit_rate().takeIf { it > 0 } ?: grabber.audioBitrate.toLong()
+                    val measured = if (fc.nb_streams() == 1 && !isLossless(name)) {
+                        measuredBitrate(fc.pb()?.let { avformat.avio_size(it) } ?: -1L, fc.duration())
+                    } else null
+                    chooseBitrate(declared, measured)
+                }
                 return SourceAudioFormat(
                     codec = codecLabel(name),
                     sampleRateHz = par.sample_rate(),

@@ -137,6 +137,11 @@ class HlsStreamAdapter(
     var totalDurationMs = 0L
         private set
 
+    /** An estimate from the first measurable media fragment, excluding the init segment. */
+    @Volatile
+    internal var fragmentBitrateBps = 0L
+        private set
+
     /** True when this stream needs its fragments decrypted before they reach the decoder. */
     val isEncrypted: Boolean get() = encryption != null
 
@@ -415,6 +420,13 @@ class HlsStreamAdapter(
     private fun segmentUrlAt(index: Int): String? = segments.getOrNull(index)?.url
 
     @Synchronized
+    private fun recordFragmentSize(index: Int, sizeBytes: Long) {
+        if (fragmentBitrateBps > 0L || initSegmentUrl == null) return
+        val durationMs = segments.getOrNull(index)?.durationMs ?: return
+        fragmentBitrateBps = SourceAudioFormat.measuredBitrate(sizeBytes, durationMs * 1000L) ?: return
+    }
+
+    @Synchronized
     private fun initUrl(): String? = initSegmentUrl
 
     @Synchronized
@@ -455,6 +467,8 @@ class HlsStreamAdapter(
         private var currentStream: InputStream? = null
         private var isClosed = false
         private var emittedInit = false
+        private var measuringFragment = false
+        private var fragmentBytesRead = 0L
 
         override fun read(): Int {
             val b = ByteArray(1)
@@ -471,6 +485,8 @@ class HlsStreamAdapter(
                 // player that gives up on the stream never does.
                 runCatching { currentStream?.close() }
                 currentStream = null
+                measuringFragment = false
+                fragmentBytesRead = 0L
                 throw e
             }
         }
@@ -490,11 +506,12 @@ class HlsStreamAdapter(
                     } else if (currentSegmentIndex < segmentCount()) {
                         val index = currentSegmentIndex
                         val prefetched = openingSegmentData.takeIf { index == 0 }
-                        val clear = clearFragments[index]
-                        currentStream = when {
-                            clear != null -> java.io.ByteArrayInputStream(clear)
-                            prefetched != null -> java.io.ByteArrayInputStream(prefetched)
-                            else -> openSigned(index) { segmentUrlAt(index) }
+                        val cached = clearFragments[index] ?: prefetched
+                        currentStream = if (cached != null) {
+                            recordFragmentSize(index, cached.size.toLong())
+                            ByteArrayInputStream(cached)
+                        } else {
+                            openSigned(index) { segmentUrlAt(index) }
                         }
                         currentSegmentIndex++
                         onFragmentProgress?.invoke(currentSegmentIndex, segmentCount())
@@ -508,6 +525,11 @@ class HlsStreamAdapter(
                     if (read == -1) {
                         currentStream?.close()
                         currentStream = null
+                        if (measuringFragment) {
+                            recordFragmentSize(currentSegmentIndex - 1, fragmentBytesRead)
+                            measuringFragment = false
+                            fragmentBytesRead = 0L
+                        }
                         // Once we've moved past segment 0, the prefetched opening segment data is
                         // dead weight (0.5-2 MB). Null it so GC can collect it. A re-open from
                         // position 0 will re-fetch — one HTTP request, not a user-visible delay
@@ -516,6 +538,7 @@ class HlsStreamAdapter(
                             openingSegmentData = null
                         }
                     } else {
+                        if (measuringFragment) fragmentBytesRead += read
                         return read
                     }
                 }
@@ -559,13 +582,20 @@ class HlsStreamAdapter(
                     response.close()
                     throw IOException("Empty segment body")
                 }
+                if (index != null && fragmentBitrateBps == 0L && hasInitSegment) {
+                    val size = body.contentLength()
+                    if (size > 0L) recordFragmentSize(index, size) else measuringFragment = true
+                }
                 return ClosingStream(body.byteStream(), response)
             }
             // A protected fragment has to be held whole: its samples are decrypted per `senc` entry
             // and the encryption boxes are stripped, so the demuxer never sees the original bytes.
             val decrypted = response.use { it.body?.bytes()?.let { bytes -> decryptSegment(bytes) } }
                 ?: throw IOException("Empty segment body")
-            if (index != null) rememberClear(index, decrypted)
+            if (index != null) {
+                recordFragmentSize(index, decrypted.size.toLong())
+                rememberClear(index, decrypted)
+            }
             return ByteArrayInputStream(decrypted)
         }
 
