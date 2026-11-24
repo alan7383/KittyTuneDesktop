@@ -84,8 +84,9 @@ class SoundCloudDrmPipelineTest {
     fun startServer() {
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/playlist.m3u8") { exchange -> respond(exchange, playlist(), "application/vnd.apple.mpegurl") }
+        // Three fragments: a reader that has read the first and prefetched the second still needs its licence.
         server.createContext("/long.m3u8") { exchange ->
-            val body = String(playlist()).replace("#EXT-X-ENDLIST", "#EXTINF:2.000,\ndata000.m4s\n#EXT-X-ENDLIST")
+            val body = String(playlist()).replace("#EXT-X-ENDLIST", "#EXTINF:2.000,\ndata000.m4s\n".repeat(2) + "#EXT-X-ENDLIST")
             respond(exchange, body.toByteArray(), "application/vnd.apple.mpegurl")
         }
         server.createContext("/analysis.m3u8") { exchange ->
@@ -336,7 +337,8 @@ class SoundCloudDrmPipelineTest {
                 input.read(buffer)
                 adapter.releaseDrm()
                 assertTrue(cdm.closed)
-                assertTrue(input.read(buffer) > 0)
+                // Read to the end: a fragment prefetched before the release may already be in hand.
+                assertTrue(input.readBytes().isNotEmpty())
                 assertEquals(2, licensePosts.get())
             }
         } finally { adapter.releaseDrm() }

@@ -174,6 +174,11 @@ class HlsStreamAdapter(
         private const val CLEAR_CACHE_LIMIT = 64L * 1024 * 1024
 
         private val drmCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        /** Downloads the fragment after the one being read; see [HlsInputStream.schedulePrefetch]. */
+        private val prefetchExecutor = java.util.concurrent.Executors.newCachedThreadPool { task ->
+            Thread(task, "hls-fragment-prefetch").apply { isDaemon = true }
+        }
     }
 
     /** Keeps a decrypted fragment; once every fragment is kept, the CDM is no longer needed. */
@@ -462,6 +467,72 @@ class HlsStreamAdapter(
         return HlsInputStream(startPositionMs)
     }
 
+    /**
+     * Downloads fragment [index] whole (decrypted when protected), re-signing the playlist when its
+     * signature has run out. [onCall] receives each request so a cancelled prefetch can abort it.
+     */
+    private fun fetchFragment(index: Int, onCall: (okhttp3.Call) -> Unit): ByteArray {
+        fun attempt(): ByteArray {
+            val url = segmentUrlAt(index) ?: throw IOException("No fragment to read")
+            val request = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
+            val call = client.newCall(request)
+            onCall(call)
+            return call.execute().use { response ->
+                if (!response.isSuccessful) throw IOException("HTTP ${response.code} for segment")
+                response.body?.bytes()?.takeIf { it.isNotEmpty() } ?: throw IOException("Empty segment body")
+            }
+        }
+        if (SignedUrl.isExpired(segmentUrlAt(index) ?: throw IOException("No fragment to read"))) {
+            refreshSegments()
+        }
+        val raw = try {
+            attempt()
+        } catch (e: IOException) {
+            if (!refreshSegments()) throw e
+            attempt()
+        }
+        val bytes = decryptSegment(raw)
+        recordFragmentSize(index, bytes.size.toLong())
+        rememberClear(index, bytes)
+        return bytes
+    }
+
+    /** The background download of one fragment, ahead of the decoder reaching it. */
+    private inner class FragmentPrefetch(val index: Int) {
+        @Volatile
+        private var cancelled = false
+
+        @Volatile
+        private var call: okhttp3.Call? = null
+
+        private val task = prefetchExecutor.submit(java.util.concurrent.Callable {
+            fetchFragment(index) { next ->
+                call = next
+                if (cancelled) next.cancel()
+            }
+        })
+
+        /** The fragment's bytes, or null when the download failed and the caller should fetch it itself. */
+        fun await(): ByteArray? = try {
+            task.get()
+        } catch (e: java.util.concurrent.ExecutionException) {
+            Logger.e("HlsStreamAdapter", "Prefetch of fragment $index failed: ${e.cause?.message}")
+            null
+        } catch (_: java.util.concurrent.CancellationException) {
+            null
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw java.io.InterruptedIOException("Interrupted waiting for fragment $index").apply { initCause(e) }
+        }
+
+        fun cancel() {
+            cancelled = true
+            // The request is aborted, never the thread: an interrupt could land inside a CDM call.
+            call?.cancel()
+            task.cancel(false)
+        }
+    }
+
     inner class HlsInputStream(startPositionMs: Long) : InputStream() {
         private var currentSegmentIndex = startIndexFor(startPositionMs)
         private var currentStream: InputStream? = null
@@ -469,6 +540,32 @@ class HlsStreamAdapter(
         private var emittedInit = false
         private var measuringFragment = false
         private var fragmentBytesRead = 0L
+
+        @Volatile
+        private var prefetch: FragmentPrefetch? = null
+
+        /**
+         * Starts downloading fragment [index] while the one before it is being decoded.
+         *
+         * The decoder runs only ~200 ms ahead of the speakers (the output line's buffer). Fetching a
+         * fragment only once the decoder reached it, on the decoder's thread, meant any fragment slower
+         * than that to arrive emptied the line: on SoundCloud's 10 s fragments, the track froze every ten
+         * seconds on a slow or distant connection. Fetched one fragment early, it has the whole length of
+         * the current one to arrive. One fragment is held at a time (~200 KB of AAC 160).
+         */
+        private fun schedulePrefetch(index: Int) {
+            if (isClosed || index >= segmentCount() || clearFragments.containsKey(index)) return
+            if (prefetch?.index == index) return
+            prefetch?.cancel()
+            prefetch = FragmentPrefetch(index)
+        }
+
+        /** The prefetched bytes of [index], or null when there are none and it has to be fetched now. */
+        private fun takePrefetched(index: Int): ByteArray? {
+            val pending = prefetch?.takeIf { it.index == index } ?: return null
+            prefetch = null
+            return pending.await()
+        }
 
         override fun read(): Int {
             val b = ByteArray(1)
@@ -506,7 +603,7 @@ class HlsStreamAdapter(
                     } else if (currentSegmentIndex < segmentCount()) {
                         val index = currentSegmentIndex
                         val prefetched = openingSegmentData.takeIf { index == 0 }
-                        val cached = clearFragments[index] ?: prefetched
+                        val cached = clearFragments[index] ?: prefetched ?: takePrefetched(index)
                         currentStream = if (cached != null) {
                             recordFragmentSize(index, cached.size.toLong())
                             ByteArrayInputStream(cached)
@@ -514,6 +611,7 @@ class HlsStreamAdapter(
                             openSigned(index) { segmentUrlAt(index) }
                         }
                         currentSegmentIndex++
+                        schedulePrefetch(currentSegmentIndex)
                         onFragmentProgress?.invoke(currentSegmentIndex, segmentCount())
                     } else {
                         return -1 // EOF
@@ -601,6 +699,8 @@ class HlsStreamAdapter(
 
         override fun close() {
             isClosed = true
+            prefetch?.cancel()
+            prefetch = null
             runCatching { currentStream?.close() }
             currentStream = null
         }

@@ -97,7 +97,8 @@ class HlsSourceAudioFormatTest {
 
                 val unknownBitrate = assertNotNull(SourceAudioFormat.of(grabber, 0L))
                 assertEquals("AAC • 44.1 kHz", unknownBitrate.badgeText())
-                assertEquals(openedFragments, mediaRequests.get())
+                // At most the next fragment, which the adapter prefetches while the current one plays.
+                assertTrue(mediaRequests.get() <= openedFragments + 1, "reading the format fetched fragments")
             }
         } finally {
             server.stop(0)
