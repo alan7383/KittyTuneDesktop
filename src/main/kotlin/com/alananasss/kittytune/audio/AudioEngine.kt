@@ -44,7 +44,7 @@ class AudioEngine(private val isolated: Boolean = false) {
     var onStateChanged: ((State) -> Unit)? = null
     var onPlayingChanged: ((Boolean) -> Unit)? = null
 
-    /** Called on the decoder thread whenever a stream is opened, with what it actually carries. */
+    /** Reports changes to the opened stream's format, including a bitrate learned during playback. */
     var onSourceFormat: ((SourceAudioFormat?) -> Unit)? = null
 
     /** What the open stream carries (codec, rate, depth...), or null before one is opened. */
@@ -645,6 +645,13 @@ class AudioEngine(private val isolated: Boolean = false) {
         onSourceFormat?.invoke(null)
     }
 
+    @Synchronized
+    private fun publishSourceFormat(workerId: Long, format: SourceAudioFormat?) {
+        if (stopFlag || activeWorkerId != workerId || sourceFormat == format) return
+        sourceFormat = format
+        onSourceFormat?.invoke(format)
+    }
+
     fun release() {
         if (released) return
         released = true
@@ -1083,6 +1090,16 @@ class AudioEngine(private val isolated: Boolean = false) {
         var grabber: FFmpegFrameGrabber? = null
         var localLine: SourceDataLine? = null
         var activeUrl = url
+        var awaitingFragmentBitrate: HlsStreamAdapter? = null
+
+        fun publishOpenFormat(opened: FFmpegFrameGrabber) {
+            val adapter = hlsAdapter?.takeIf { it.playlistUrl == activeUrl && it.hasInitSegment }
+            val bitrate = adapter?.fragmentBitrateBps
+            val format = SourceAudioFormat.of(opened, bitrate)
+            awaitingFragmentBitrate = adapter?.takeIf { bitrate == 0L && format != null }
+            publishSourceFormat(workerId, format)
+        }
+
         try {
             // The URL may have been signed long before we got here — a queue prefetch that sat
             // through a whole track, a restored session — and SoundCloud's signature only lasts
@@ -1111,8 +1128,7 @@ class AudioEngine(private val isolated: Boolean = false) {
 
             if (stopFlag || activeWorkerId != workerId) return
 
-            sourceFormat = SourceAudioFormat.of(grabber)
-            onSourceFormat?.invoke(sourceFormat)
+            publishOpenFormat(grabber)
 
             // Only trust the adapter's duration while it actually describes what we opened: a
             // re-resolve can hand back a progressive URL where the playlist used to be.
@@ -1164,6 +1180,7 @@ class AudioEngine(private val isolated: Boolean = false) {
 
                     var seekOk = false
                     var seekFrame: Frame? = null
+                    val previousGrabber = grabber
                     if (!urlExpired) try {
                         if (isHls) {
                             grabber?.releaseUnlockedQuietly()
@@ -1253,6 +1270,7 @@ class AudioEngine(private val isolated: Boolean = false) {
                     }
 
                     if (!isCurrentSeek()) continue
+                    if (seekOk && grabber != null && grabber !== previousGrabber) publishOpenFormat(grabber)
                     decodedPositionMs = seek
                     aiDetection.notifySeek(seek)
                     seekVocalProcessors(seek)
@@ -1304,18 +1322,19 @@ class AudioEngine(private val isolated: Boolean = false) {
                                 "AudioEngine",
                                 "Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream..."
                             )
-                            val recovered = recoverStream(
+                            val (opened, recoveredUrl) = recoverStream(
                                 workerId,
                                 grabber, activeUrl, headers, decodedPositionMs,
                                 maxAttempts = INITIAL_OPEN_ATTEMPTS,
                                 shouldRecover = { seekRequest.get() == null && activeWorkerId == workerId },
                             )
-                            grabber = recovered.first
-                            recovered.second?.let { activeUrl = it }
+                            grabber = opened
+                            recoveredUrl?.let { activeUrl = it }
                             if (seekRequest.get() != null || stopFlag || activeWorkerId != workerId) continue
-                            if (recovered.first == null) {
+                            if (opened == null) {
                                 throw java.io.IOException("Audio stream ended before the track finished at $positionMs ms")
                             }
+                            publishOpenFormat(opened)
                             decodedAudio = true
                             Logger.e("AudioEngine", "Stream recovery succeeded at $positionMs ms")
                             continue
@@ -1323,6 +1342,12 @@ class AudioEngine(private val isolated: Boolean = false) {
                     } else {
                         break
                     }
+                }
+
+                val fragmentBitrate = awaitingFragmentBitrate?.fragmentBitrateBps ?: 0L
+                if (fragmentBitrate > 0L) {
+                    awaitingFragmentBitrate = null
+                    grabber?.let { publishSourceFormat(workerId, SourceAudioFormat.of(it, fragmentBitrate)) }
                 }
 
                 val samples = frame.samples ?: continue
