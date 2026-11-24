@@ -3620,4 +3620,26 @@
     <string name="fx_export_open">Открыть</string>
     <string name="fx_export_share">Поделиться</string>
     <string name="fx_export_saved_to_music">Сохранено в Музыка/KittyTune Effects</string>
+    <string name="performance_title">Производительность</string>
+    <string name="performance_restart">Перезапустите KittyTune для применения изменений.</string>
+    <string name="performance_pending">Изменения ожидают перезапуска.</string>
+    <string name="performance_renderer">Рендерер</string>
+    <string name="performance_renderer_note">Автоматический режим сохраняет стандартный графический API и резервный режим. Программный рендеринг использует процессор.</string>
+    <string name="performance_auto">Автоматически</string>
+    <string name="performance_software">Программный (совместимость)</string>
+    <string name="performance_gpu">Предпочтительный GPU</string>
+    <string name="performance_gpu_note">Для Direct3D в Windows и Metal в macOS. При переходе на OpenGL GPU выбирают ОС и драйвер. Дискретный GPU может потреблять больше энергии.</string>
+    <string name="performance_integrated">Встроенный (экономия энергии)</string>
+    <string name="performance_discrete">Дискретный (высокая производительность)</string>
+    <string name="performance_vsync">Вертикальная синхронизация</string>
+    <string name="performance_vsync_note">Синхронизирует отрисовку с экраном. Отключение может вызвать разрывы изображения и повысить энергопотребление.</string>
+    <string name="performance_caches">Лимиты кэша</string>
+    <string name="performance_image_cache">Кэш обложек в памяти</string>
+    <string name="performance_gpu_cache">Кэш графических ресурсов</string>
+    <string name="performance_disk_cache">Кэш обложек на диске</string>
+    <string name="performance_cache_note">Меньшие лимиты экономят память или место, но могут увеличить повторное декодирование. Лимиты не резервируют память.</string>
+    <string name="performance_reset">Восстановить настройки производительности</string>
+    <string name="performance_windows_gpu">Настройки графики Windows</string>
+    <string name="performance_windows_gpu_note">Для OpenGL добавьте KittyTune.exe в настройки графики Windows и выберите высокую производительность для дискретного GPU. Windows может переопределить выбор приложения.</string>
+    <string name="performance_windows_gpu_error">Не удалось открыть настройки графики. Откройте Параметры, Система, Дисплей, Графика вручную.</string>
 </resources>

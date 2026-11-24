@@ -3840,4 +3840,26 @@
     <string name="fx_export_open">Öffnen</string>
     <string name="fx_export_share">Teilen</string>
     <string name="fx_export_saved_to_music">Gespeichert in Musik/KittyTune Effects</string>
+    <string name="performance_title">Leistung</string>
+    <string name="performance_restart">KittyTune neu starten, um Änderungen anzuwenden.</string>
+    <string name="performance_pending">Änderungen werden nach einem Neustart wirksam.</string>
+    <string name="performance_renderer">Renderer</string>
+    <string name="performance_renderer_note">Automatisch behält das Standard-Grafiksystem samt Ausweichmodus bei. Software-Rendering nutzt die CPU.</string>
+    <string name="performance_auto">Automatisch</string>
+    <string name="performance_software">Software (Kompatibilität)</string>
+    <string name="performance_gpu">Bevorzugte GPU</string>
+    <string name="performance_gpu_note">Gilt für Direct3D unter Windows und Metal unter macOS. Bei OpenGL wählen Betriebssystem und Treiber die GPU. Eine dedizierte GPU kann mehr Strom verbrauchen.</string>
+    <string name="performance_integrated">Integriert (stromsparend)</string>
+    <string name="performance_discrete">Dediziert (hohe Leistung)</string>
+    <string name="performance_vsync">Vertikale Synchronisation</string>
+    <string name="performance_vsync_note">Synchronisiert das Rendering mit dem Bildschirm. Abschalten kann Bildrisse und höheren Stromverbrauch verursachen.</string>
+    <string name="performance_caches">Cache-Grenzen</string>
+    <string name="performance_image_cache">Arbeitsspeicher für Cover</string>
+    <string name="performance_gpu_cache">Cache für Grafikressourcen</string>
+    <string name="performance_disk_cache">Festplatten-Cache für Cover</string>
+    <string name="performance_cache_note">Kleinere Grenzen sparen Speicher, können aber erneutes Dekodieren verursachen. Die Grenzen reservieren keinen Speicher.</string>
+    <string name="performance_reset">Leistungseinstellungen zurücksetzen</string>
+    <string name="performance_windows_gpu">Windows-Grafikeinstellungen</string>
+    <string name="performance_windows_gpu_note">Für OpenGL KittyTune.exe in den Windows-Grafikeinstellungen hinzufügen und Hohe Leistung für die dedizierte GPU wählen. Windows kann die App-Auswahl überschreiben.</string>
+    <string name="performance_windows_gpu_error">Grafikeinstellungen konnten nicht geöffnet werden. Einstellungen, System, Anzeige, Grafik manuell öffnen.</string>
 </resources>

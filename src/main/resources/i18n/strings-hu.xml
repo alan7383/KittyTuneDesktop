@@ -3619,4 +3619,26 @@
     <string name="fx_export_open">Megnyitás</string>
     <string name="fx_export_share">Megosztás</string>
     <string name="fx_export_saved_to_music">Mentve ide: Zene/KittyTune Effects</string>
+    <string name="performance_title">Teljesítmény</string>
+    <string name="performance_restart">A módosításokhoz indítsd újra a KittyTune-t.</string>
+    <string name="performance_pending">A módosítások újraindításra várnak.</string>
+    <string name="performance_renderer">Megjelenítő</string>
+    <string name="performance_renderer_note">Az automatikus mód megtartja az alapértelmezett grafikus hátteret és a tartalék módot. A szoftveres mód a CPU-t használja.</string>
+    <string name="performance_auto">Automatikus</string>
+    <string name="performance_software">Szoftveres (kompatibilitás)</string>
+    <string name="performance_gpu">Előnyben részesített GPU</string>
+    <string name="performance_gpu_note">Windows alatt Direct3D, macOS alatt Metal esetén érvényes. OpenGL esetén a rendszer és az illesztőprogram választ GPU-t. A dedikált GPU többet fogyaszthat.</string>
+    <string name="performance_integrated">Integrált (energiatakarékos)</string>
+    <string name="performance_discrete">Dedikált (nagy teljesítmény)</string>
+    <string name="performance_vsync">Függőleges szinkronizálás</string>
+    <string name="performance_vsync_note">A megjelenítést a kijelzőhöz igazítja. Kikapcsolása képtörést és nagyobb fogyasztást okozhat.</string>
+    <string name="performance_caches">Gyorsítótár-korlátok</string>
+    <string name="performance_image_cache">Borítóképek memóriatára</string>
+    <string name="performance_gpu_cache">Grafikus erőforrások tára</string>
+    <string name="performance_disk_cache">Borítóképek lemeztára</string>
+    <string name="performance_cache_note">Az alacsonyabb korlátok tárhelyet takarítanak meg, de több dekódolást okozhatnak. Ezek korlátok, nem lefoglalt memória.</string>
+    <string name="performance_reset">Teljesítménybeállítások visszaállítása</string>
+    <string name="performance_windows_gpu">Windows grafikai beállításai</string>
+    <string name="performance_windows_gpu_note">OpenGL esetén add hozzá a KittyTune.exe fájlt a Windows grafikai beállításaihoz, és válaszd a Nagy teljesítmény lehetőséget. A Windows felülírhatja az alkalmazás választását.</string>
+    <string name="performance_windows_gpu_error">A grafikai beállítások nem nyithatók meg. Nyisd meg kézzel: Gépház, Rendszer, Kijelző, Grafika.</string>
 </resources>
