@@ -44,6 +44,7 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
+import com.alananasss.kittytune.ui.common.Discord
 import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.IconButtonDefaults
@@ -211,7 +212,7 @@ internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: Strin
 
     // Misc
     MISC_GENERAL("settings_cat_general", "misc_general_sub", Icons.Rounded.Tune),
-    MISC_DISCORD("pref_discord_title", "misc_discord_sub", Icons.Rounded.Forum),
+    MISC_DISCORD("pref_discord_title", "misc_discord_sub", Icons.Rounded.Discord),
     MISC_CONTENT_FILTER("pref_content_filter_title", "pref_content_filter_subtitle", Icons.Rounded.Block),
     MISC_DRM(drmSettingsTitleKey, "misc_drm_sub", Icons.Rounded.Lock),
 }
@@ -357,7 +358,7 @@ private fun SettingsPageContent(
 
         // Misc subpages
         SettingsSubPage.MISC_GENERAL -> MiscGeneralPage()
-        SettingsSubPage.MISC_DISCORD -> MiscDiscordPage(navController, playerViewModel)
+        SettingsSubPage.MISC_DISCORD -> MiscDiscordPage(playerViewModel)
         SettingsSubPage.MISC_CONTENT_FILTER -> ContentFilterSettingsPage()
         SettingsSubPage.MISC_DRM -> DrmSettingsSection()
     }
@@ -1126,7 +1127,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             keywords = listOf("codec", "badge", "bitrate", "FLAC", "Opus", "AAC")),
         SettingsSearchItem(str("settings_cat_misc"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Tune, keywords = listOf("misc", "general", "options", "разное", "общие")),
         SettingsSearchItem(str("settings_cat_general"), str("misc_general_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_GENERAL)), Icons.Rounded.Tune, keywords = listOf("general", "language", "start screen", "update")),
-        SettingsSearchItem(str("pref_discord_title"), str("misc_discord_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DISCORD)), Icons.Rounded.Forum, keywords = listOf("discord", "rpc", "presence", "дискорд", "статус")),
+        SettingsSearchItem(str("pref_discord_title"), str("misc_discord_sub"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DISCORD)), Icons.Rounded.Discord, keywords = listOf("discord", "rpc", "presence", "дискорд", "статус")),
         SettingsSearchItem(str("pref_language"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_GENERAL)), Icons.Rounded.Translate, keywords = listOf("language", "lang", "locale", "langue", "язык", "локализация")),
         SettingsSearchItem(str("pref_start_screen"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_GENERAL)), Icons.Rounded.Home, keywords = listOf("start screen", "home", "library", "стартовый экран")),
         SettingsSearchItem(
@@ -1167,7 +1168,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             subtitle = null,
             category = SettingsCategory.MISC,
             place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_DISCORD)),
-            icon = Icons.Rounded.Forum,
+            icon = Icons.Rounded.Discord,
             keywords = listOf("discord", "rpc", "presence", "дискорд", "статус"),
             hasSwitch = true,
             switchState = discordRpc,

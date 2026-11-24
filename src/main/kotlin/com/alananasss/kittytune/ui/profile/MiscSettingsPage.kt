@@ -2,7 +2,7 @@ package com.alananasss.kittytune.ui.profile
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Forum
+import com.alananasss.kittytune.ui.common.Discord
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lock
@@ -10,7 +10,6 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.runtime.*
-import androidx.navigation.NavController
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.AppLanguage
@@ -22,10 +21,10 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 /** Settings → Other: the language, how the app starts and updates, and Discord. */
 @Composable
-fun MiscSettingsPage(navController: NavController, playerViewModel: PlayerViewModel) {
+fun MiscSettingsPage(playerViewModel: PlayerViewModel) {
     MiscGeneralPage()
-    MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum)
-    MiscDiscordPage(navController, playerViewModel)
+    MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Discord)
+    MiscDiscordPage(playerViewModel)
 }
 
 /**
@@ -164,13 +163,9 @@ fun MiscGeneralPage() {
 }
 
 /**
- * Other → Discord: Discord rich presence settings and login.
+ * Other → Discord: local Rich Presence settings.
  */
 @Composable
-fun MiscDiscordPage(navController: NavController, playerViewModel: PlayerViewModel) {
-    DiscordSettingsScreen(
-        onBackClick = null,
-        onNavigateToLogin = { navController.navigate("discord_login") },
-        playerViewModel = playerViewModel,
-    )
+fun MiscDiscordPage(playerViewModel: PlayerViewModel) {
+    DiscordSettingsScreen(playerViewModel)
 }

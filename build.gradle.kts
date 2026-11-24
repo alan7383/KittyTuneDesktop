@@ -84,7 +84,6 @@ dependencies {
     implementation(compose.materialIconsExtended)
     implementation(compose.components.resources)
 
-    implementation(project(":kizzy"))
     implementation(project(":shazamkit"))
     implementation(project(":innertube"))
 
@@ -1034,6 +1033,7 @@ tasks.register<Test>("headlessTest") {
             "*WindowsUpdateTest", "WindowsNativeDspTest", "AudioLineCloserTest", "PlaybackDrmSessionTest", "*HlsRetirementTest", "*SoundCloudDrmPipelineTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
+            "*DiscordPresenceTest", "TogetherDiscordPartyTest",
             "*AudioFxPresetTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest", "PlayingBarsTest", "*WslSidecarSetupTest", "*WslUninstallRenderTest", "*ProtectedTracksNoticeTest", "*ProtectedTracksCardsRenderTest", "*MixQueuePlannerTest", "*MixRenderTest", "*AudioPathRenderTest", "*LyricsSweepRenderTest", "*ShareCardTest",
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",

@@ -1,64 +1,50 @@
 package com.alananasss.kittytune.ui.profile
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.material3.ContainedLoadingIndicator
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
-import com.alananasss.kittytune.core.EscapableAlertDialog
-import com.alananasss.kittytune.core.str
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-
-import com.alananasss.kittytune.data.discord.DiscordRemoteAuth
+import com.alananasss.kittytune.core.EscapableAlertDialog
+import com.alananasss.kittytune.core.Prefs
+import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.discord.DiscordPresenceStatus
 import com.alananasss.kittytune.data.local.DiscordStatusDisplay
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.together.Together
+import com.alananasss.kittytune.data.together.TogetherLinks
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
-import com.alananasss.kittytune.ui.common.SettingsScaffold
-import com.alananasss.kittytune.ui.common.SettingsGroupTitle
-import com.alananasss.kittytune.ui.common.getSettingsShape
-
 import com.alananasss.kittytune.ui.player.PlayerViewModel
-import androidx.compose.material3.ButtonDefaults
 
 @Composable
-fun DiscordSettingsScreen(
-    onBackClick: (() -> Unit)? = null,
-    onNavigateToLogin: () -> Unit,
-    playerViewModel: PlayerViewModel? = null
-) {
+fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
     val prefs = remember { PlayerPreferences() }
-
-    var token by remember { mutableStateOf(prefs.getDiscordToken()) }
-    var isEnabled by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
-    var statusDisplay by remember { mutableStateOf(prefs.getDiscordStatusDisplay()) }
-    var listenAlongEnabled by remember { mutableStateOf(prefs.getDiscordListenAlongEnabled()) }
-    var autoLiveEnabled by remember { mutableStateOf(prefs.getDiscordAutoLiveEnabled()) }
-    var liveCode by remember { mutableStateOf(com.alananasss.kittytune.data.together.Together.personalLiveCode) }
-    val isLoggedIn = !token.isNullOrEmpty()
-
-    // The token is written by the QR login on another destination. If this section is still
-    // alive when that lands, pick it up straight away instead of waiting for a return trip
-    // through navigation to re-read it.
-    val authState by DiscordRemoteAuth.state.collectAsState()
-    LaunchedEffect(authState) {
-        if (authState is DiscordRemoteAuth.State.Success) {
-            token = prefs.getDiscordToken()
-            isEnabled = prefs.getDiscordRpcEnabled()
-        }
-    }
-
+    Prefs.flow.collectAsState().value
+    val enabled = prefs.getDiscordRpcEnabled()
+    val statusDisplay = prefs.getDiscordStatusDisplay()
+    val listenAlongEnabled = prefs.getDiscordListenAlongEnabled()
+    val status by playerViewModel.discordPresenceStatus.collectAsState()
+    val clipboard = LocalClipboardManager.current
     var showStatusDialog by remember { mutableStateOf(false) }
+    var logCopied by remember(status) { mutableStateOf(false) }
 
     if (showStatusDialog) {
         EscapableAlertDialog(
@@ -66,182 +52,113 @@ fun DiscordSettingsScreen(
             title = { Text(str("pref_discord_status_display")) },
             text = {
                 Column {
-                    StatusDisplayRadioButton(str("discord_status_activity"), DiscordStatusDisplay.ACTIVITY, statusDisplay) {
-                        statusDisplay = it
-                        prefs.setDiscordStatusDisplay(it)
-                        showStatusDialog = false
-                        playerViewModel?.updateDiscordPresence()
-                    }
-                    StatusDisplayRadioButton(str("discord_status_soundcloud"), DiscordStatusDisplay.SOUNDCLOUD, statusDisplay) {
-                        statusDisplay = it
-                        prefs.setDiscordStatusDisplay(it)
-                        showStatusDialog = false
-                        playerViewModel?.updateDiscordPresence()
-                    }
-                    StatusDisplayRadioButton(str("discord_status_artist"), DiscordStatusDisplay.ARTIST, statusDisplay) {
-                        statusDisplay = it
-                        prefs.setDiscordStatusDisplay(it)
-                        showStatusDialog = false
-                        playerViewModel?.updateDiscordPresence()
-                    }
-                    StatusDisplayRadioButton(str("discord_status_song"), DiscordStatusDisplay.SONG, statusDisplay) {
-                        statusDisplay = it
-                        prefs.setDiscordStatusDisplay(it)
-                        showStatusDialog = false
-                        playerViewModel?.updateDiscordPresence()
+                    DiscordStatusDisplay.entries.forEach { mode ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                prefs.setDiscordStatusDisplay(mode)
+                                showStatusDialog = false
+                            }.padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = mode == statusDisplay, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(str(mode.labelKey()))
+                        }
                     }
                 }
             },
-            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showStatusDialog = false }) { Text(str("btn_cancel")) } }
+            confirmButton = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showStatusDialog = false }) {
+                    Text(str("btn_cancel"))
+                }
+            },
         )
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        SettingsGroup(
-            title = str("discord_status_header"),
-            // Built for what is actually rendered: a fixed two-entry list left the account row
-            // with a bottom-of-group shape and a 2dp gap under it whenever the logout row was
-            // absent, because the group sized itself for an item nobody drew.
-            items = buildList {
-                add { shape: Shape ->
+    SettingsGroup(items = buildList {
+        add { shape ->
+            SettingsItem(
+                shape = shape,
+                title = str("discord_enable_rpc"),
+                subtitle = when {
+                    enabled && status == DiscordPresenceStatus.READY -> str("discord_desktop_ready")
+                    enabled -> str("discord_desktop_hint")
+                    else -> str("discord_enable_rpc_desc")
+                },
+                hasSwitch = true,
+                switchState = enabled,
+                onSwitchChange = prefs::setDiscordRpcEnabled,
+                highlightKey = "pref_discord",
+            )
+        }
+        if (enabled) {
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_discord_status_display"),
+                    subtitle = str(statusDisplay.labelKey()),
+                    onClick = { showStatusDialog = true },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_listen_along_title"),
+                    subtitle = str("discord_listen_along_desc"),
+                    hasSwitch = true,
+                    switchState = listenAlongEnabled,
+                    onSwitchChange = prefs::setDiscordListenAlongEnabled,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_auto_live_title"),
+                    subtitle = str("discord_auto_live_desc"),
+                    hasSwitch = true,
+                    switchState = prefs.getDiscordAutoLiveEnabled(),
+                    onSwitchChange = prefs::setDiscordAutoLiveEnabled,
+                )
+            }
+            if (listenAlongEnabled) {
+                val liveCode = Together.personalLiveCode
+                add { shape ->
                     SettingsItem(
                         shape = shape,
-                        title = if (isLoggedIn) str("discord_connected") else str("discord_not_connected"),
-                        // The row is tappable either way now — logging in, or scanning again to
-                        // swap accounts — so say which one it is instead of "token present".
-                        subtitle = if (isLoggedIn) str("setup_discord_change") else str("discord_connect_desc"),
-                        onClick = onNavigateToLogin
+                        title = str("together_copy_link"),
+                        subtitle = TogetherLinks.inviteUrl(liveCode),
+                        onClick = { TogetherLinks.copyInviteLink(liveCode) },
                     )
                 }
-                if (isLoggedIn) {
-                    add { shape: Shape ->
-                        SettingsItem(
-                            shape = shape,
-                            title = str("discord_logout"),
-                            onClick = {
-                                prefs.setDiscordToken(null)
-                                DiscordRemoteAuth.onDiscordLoggedOut(prefs)
-                                prefs.setDiscordRpcEnabled(false)
-                                token = null
-                                isEnabled = false
-                                playerViewModel?.closeDiscordRpc()
-                            }
-                        )
-                    }
-                }
-            }
-        )
-
-        // Stacked under the group, not layered over it: these two used to be siblings inside a
-        // Box, so the options drew on top of the account rows.
-        if (isLoggedIn) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                SettingsGroupTitle(str("discord_options_header"))
-
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    val animatedBottomRadius by animateDpAsState(
-                        targetValue = if (isEnabled) 4.dp else 24.dp,
-                        animationSpec = tween(400),
-                        label = "DiscordRpcCornerAnimation"
-                    )
-
+                add { shape ->
                     SettingsItem(
-                        shape = RoundedCornerShape(
-                            topStart = 24.dp,
-                            topEnd = 24.dp,
-                            bottomStart = animatedBottomRadius,
-                            bottomEnd = animatedBottomRadius
-                        ),
-                        title = str("discord_enable_rpc"),
-                        subtitle = str("discord_enable_rpc_desc"),
-                        hasSwitch = true,
-                        switchState = isEnabled,
-                        onSwitchChange = {
-                            isEnabled = it
-                            prefs.setDiscordRpcEnabled(it)
-                            playerViewModel?.updateDiscordPresence()
-                        }
+                        shape = shape,
+                        title = str("together_reset_link"),
+                        subtitle = str("together_reset_link_desc"),
+                        onClick = {
+                            TogetherLinks.copyInviteLink(Together.regeneratePersonalLiveCode())
+                            playerViewModel.updateDiscordPresence()
+                        },
                     )
-
-                    AnimatedVisibility(
-                        visible = isEnabled,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            val totalSubItems = if (listenAlongEnabled) 5 else 3
-                            SettingsItem(
-                                shape = getSettingsShape(totalSubItems + 1, 1),
-                                title = str("pref_discord_status_display"),
-                                subtitle = when (statusDisplay) {
-                                    DiscordStatusDisplay.ACTIVITY -> str("discord_status_activity")
-                                    DiscordStatusDisplay.SOUNDCLOUD -> str("discord_status_soundcloud")
-                                    DiscordStatusDisplay.ARTIST -> str("discord_status_artist")
-                                    DiscordStatusDisplay.SONG -> str("discord_status_song")
-                                },
-                                onClick = { showStatusDialog = true }
-                            )
-                            SettingsItem(
-                                shape = getSettingsShape(totalSubItems + 1, 2),
-                                title = str("discord_listen_along_title"),
-                                subtitle = str("discord_listen_along_desc"),
-                                hasSwitch = true,
-                                switchState = listenAlongEnabled,
-                                onSwitchChange = {
-                                    listenAlongEnabled = it
-                                    prefs.setDiscordListenAlongEnabled(it)
-                                    playerViewModel?.updateDiscordPresence()
-                                }
-                            )
-                            SettingsItem(
-                                shape = getSettingsShape(totalSubItems + 1, 3),
-                                title = str("discord_auto_live_title"),
-                                subtitle = str("discord_auto_live_desc"),
-                                hasSwitch = true,
-                                switchState = autoLiveEnabled,
-                                onSwitchChange = {
-                                    autoLiveEnabled = it
-                                    prefs.setDiscordAutoLiveEnabled(it)
-                                    if (it && playerViewModel?.isPlaying == true) {
-                                        playerViewModel.startLiveListenAlong()
-                                    } else {
-                                        playerViewModel?.updateDiscordPresence()
-                                    }
-                                }
-                            )
-                            if (listenAlongEnabled) {
-                                SettingsItem(
-                                    shape = getSettingsShape(totalSubItems + 1, 4),
-                                    title = str("together_copy_link"),
-                                    subtitle = com.alananasss.kittytune.data.together.TogetherLinks.inviteUrl(liveCode),
-                                    onClick = {
-                                        com.alananasss.kittytune.data.together.TogetherLinks.copyInviteLink(liveCode)
-                                    }
-                                )
-                                SettingsItem(
-                                    shape = getSettingsShape(totalSubItems + 1, 5),
-                                    title = str("together_reset_link"),
-                                    subtitle = str("together_reset_link_desc"),
-                                    onClick = {
-                                        liveCode = com.alananasss.kittytune.data.together.Together.regeneratePersonalLiveCode()
-                                        com.alananasss.kittytune.data.together.TogetherLinks.copyInviteLink(liveCode)
-                                        playerViewModel?.updateDiscordPresence()
-                                    }
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
-    }
+        add { shape ->
+            SettingsItem(
+                shape = shape,
+                title = str(if (logCopied) "sync_diagnostics_copied" else "sync_copy_diagnostics"),
+                onClick = {
+                    clipboard.setText(AnnotatedString(playerViewModel.discordConnectionLog()))
+                    logCopied = true
+                },
+            )
+        }
+    })
 }
 
-@Composable
-fun StatusDisplayRadioButton(text: String, mode: DiscordStatusDisplay, selected: DiscordStatusDisplay, onSelect: (DiscordStatusDisplay) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { onSelect(mode) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        RadioButton(selected = (mode == selected), onClick = null)
-        Spacer(Modifier.width(8.dp))
-        Text(text)
-    }
+private fun DiscordStatusDisplay.labelKey(): String = when (this) {
+    DiscordStatusDisplay.ACTIVITY -> "discord_status_activity"
+    DiscordStatusDisplay.SOUNDCLOUD -> "discord_status_soundcloud"
+    DiscordStatusDisplay.ARTIST -> "discord_status_artist"
+    DiscordStatusDisplay.SONG -> "discord_status_song"
 }

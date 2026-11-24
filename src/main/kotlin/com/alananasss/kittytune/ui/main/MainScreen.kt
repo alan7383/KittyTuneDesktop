@@ -868,13 +868,6 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
-                        composable("discord_login") {
-                            com.alananasss.kittytune.ui.profile.DiscordLoginScreen(
-                                onBackClick = { navController.popBackStack() },
-                                onLoginSuccess = { navController.popBackStack() },
-                                playerViewModel = playerViewModel
-                            )
-                        }
                         // The listening statistics screen existed but nothing navigated to it, so
                         // the events being recorded had nowhere to be seen (issue #33).
                         composable("listening_stats") {

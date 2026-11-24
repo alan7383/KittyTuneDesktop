@@ -17,6 +17,9 @@ import com.alananasss.kittytune.media.Player
 import com.alananasss.kittytune.media.Player as ExoPlayer
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.data.*
+import com.alananasss.kittytune.data.discord.DiscordPresenceStatus
+import com.alananasss.kittytune.data.discord.DiscordRPC
+import com.alananasss.kittytune.data.discord.discordActivity
 import com.alananasss.kittytune.data.sync.*
 import com.alananasss.kittytune.data.local.LocalPlaylist
 import com.alananasss.kittytune.data.local.LyricsAlignment
@@ -1594,7 +1597,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var playJob: Job? = null
     private var prefetchWarmJob: Job? = null
     private var discordJob: Job? = null
-    private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
+    private val discordRpc = DiscordRPC()
+    private var discordPresenceJob: Job? = null
+    internal val discordPresenceStatus get() = discordRpc.status
+    internal fun discordConnectionLog() = discordRpc.copyLog()
     var showLiveListenDialog by mutableStateOf(false)
     var pendingTogetherInviteCode by mutableStateOf<String?>(null)
     /** Consecutive engine failures on the current track, bounding the retry in onPlayerError. */
@@ -1960,7 +1966,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         applyRepeatMode()
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: repeat mode")
-        com.alananasss.kittytune.data.discord.DiscordRemoteAuth.syncDiscordAvatarFromPrefs(playerPrefs)
         fetchUserProfile()
         observeArtworkColors()
         observeAnimatedCovers()
@@ -1969,6 +1974,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         startTrimWatcher()
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("player vm: observers")
         com.alananasss.kittytune.data.together.Together.start(this)
+        startDiscordPresence()
         viewModelScope.launch {
             combine(Together.active, Together.rooms) { code, rooms ->
                 val party = code?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
@@ -2162,31 +2168,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
 
-    private fun initDiscordRpc() {
-        val token = playerPrefs.getDiscordToken()
-        val enabled = playerPrefs.getDiscordRpcEnabled()
-        com.alananasss.kittytune.data.discord.DiscordRemoteAuth.syncDiscordAvatarFromPrefs(playerPrefs)
-        if (enabled && !token.isNullOrEmpty()) {
-            if (discordRpc == null) {
-                try {
-                    discordRpc = com.alananasss.kittytune.data.DiscordRPC(token)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+    private fun startDiscordPresence() {
+        if (System.getProperty("kittytune.trainStartupCache") == "true") return
+        discordPresenceJob = viewModelScope.launch {
+            launch(Dispatchers.IO) { discordRpc.run(playerPrefs.discordRpcEnabledFlow()) }
+            launch {
+                combine(playerPrefs.discordSettingsFlow(), discordRpc.status, ::Pair)
+                    .collect { updateDiscordPresence() }
             }
-        } else {
-            closeDiscordRpc()
+            launch { discordRpc.avatar.collect { Together.discordAvatarUrl = it } }
         }
     }
 
-    fun closeDiscordRpc() {
+    internal fun stopDiscordPresence() {
+        discordPresenceJob?.cancel()
+        discordPresenceJob = null
         discordJob?.cancel()
         discordJob = null
-        try {
-            discordRpc?.closeRPC()
-        } catch (_: Exception) {
-        }
-        discordRpc = null
+        discordRpc.setActivity(null)
+        Together.discordAvatarUrl = null
     }
 
     private fun initMprisService() {
@@ -2295,40 +2295,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun updateDiscordPresence() {
+        if (discordPresenceJob == null) return
         val track = currentTrack
-        val token = playerPrefs.getDiscordToken()
-        val enabled = playerPrefs.getDiscordRpcEnabled()
+        discordJob?.cancel()
+        if (!playerPrefs.getDiscordRpcEnabled() || track == null) {
+            discordRpc.setActivity(null)
+            return
+        }
+        if (isPlaying && playerPrefs.getDiscordAutoLiveEnabled() &&
+            discordRpc.status.value == DiscordPresenceStatus.READY && Together.active.value == null
+        ) {
+            startLiveListenAlong()
+            return
+        }
 
-        if (enabled && !token.isNullOrEmpty() && track != null) {
-            if (isPlaying &&
-                playerPrefs.getDiscordAutoLiveEnabled() &&
-                com.alananasss.kittytune.data.together.Together.active.value == null
-            ) {
-                startLiveListenAlong()
-                return
-            }
-            initDiscordRpc()
-            val contextText = currentContext?.displayText
-            val playing = isPlaying
-            val pos = currentPosition
-            val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: track.durationMs ?: 0L
-            val liveCode = Together.active.value
-                ?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
-            val liveInviteUrl = liveCode?.let(TogetherLinks::inviteUrl)
-            val party = liveCode?.let { togetherDiscordParty(it, Together.rooms.value[it], Together.memberId) }
-            discordJob?.cancel()
-            discordJob = viewModelScope.launch(Dispatchers.IO) {
-                delay(500.milliseconds)
-                try {
-                    discordRpc?.updatePresence(track, contextText, playing, pos, effectiveDuration, liveInviteUrl, party)
-                } catch (e: Exception) {
-                    if (e !is kotlinx.coroutines.CancellationException) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-        } else {
-            closeDiscordRpc()
+        // Debounce playback/seek bursts and sample the final position once the player settles.
+        discordJob = viewModelScope.launch {
+            delay(500.milliseconds)
+            val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: 0L
+            val liveCode = Together.active.value?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
+            discordRpc.setActivity(discordActivity(
+                track = track,
+                contextName = currentContext?.displayText,
+                isPlaying = isPlaying,
+                positionMs = currentPosition,
+                durationMs = effectiveDuration,
+                mode = playerPrefs.getDiscordStatusDisplay(),
+                liveInviteUrl = liveCode?.let(TogetherLinks::inviteUrl),
+                party = liveCode?.let { togetherDiscordParty(it, Together.rooms.value[it], Together.memberId) },
+            ))
         }
     }
 
@@ -2336,7 +2331,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         remoteTicker?.cancel()
         remoteVolumeJob?.cancel()
         super.onCleared()
-        closeDiscordRpc()
+        stopDiscordPresence()
         try {
             mprisService?.close()
         } catch (_: Exception) {

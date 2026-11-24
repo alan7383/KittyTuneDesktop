@@ -7,7 +7,6 @@
 # Application entry point & all application classes
 -keep class com.alananasss.kittytune.MainKt { *; }
 -keep class com.alananasss.kittytune.** { *; }
--keep class com.my.kizzy.** { *; }
 -keep class com.alananasss.shazamkit.** { *; }
 -keep class com.zhuang.innertube.** { *; }
 

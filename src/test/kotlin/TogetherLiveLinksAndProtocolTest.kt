@@ -3,7 +3,7 @@ package com.alananasss.kittytune
 import com.alananasss.kittytune.core.LinuxDesktopIdentity
 import com.alananasss.kittytune.core.ProtocolHandlerInstaller
 import com.alananasss.kittytune.core.TogetherUriRequests
-import com.alananasss.kittytune.data.discord.DiscordRemoteAuth
+import com.alananasss.kittytune.data.discord.discordUserAvatarUrl
 import com.alananasss.kittytune.data.together.SharedListener
 import com.alananasss.kittytune.data.together.SharedTrack
 import com.alananasss.kittytune.data.together.Together
@@ -250,21 +250,22 @@ class TogetherLiveLinksAndProtocolTest {
     }
 
     @Test
-    fun testDiscordUsersMeAvatarParsing() {
+    fun testDiscordIpcUserAvatarParsing() {
+        val hash = "a_0123456789abcdef0123456789abcdef"
         assertEquals(
-            "https://cdn.discordapp.com/avatars/123456789012345678/a_1b2c3d4e.png?size=128",
-            DiscordRemoteAuth.parseDiscordUserAvatarUrl(
-                """{"id":"123456789012345678","username":"alan","avatar":"a_1b2c3d4e"}"""
+            "https://cdn.discordapp.com/avatars/123456789012345678/$hash.png?size=128",
+            discordUserAvatarUrl(
+                org.json.JSONObject("""{"id":"123456789012345678","avatar":"$hash"}"""),
             ),
         )
         assertNull(
-            DiscordRemoteAuth.parseDiscordUserAvatarUrl(
-                """{"id":"123456789012345678","username":"alan","avatar":null}"""
+            discordUserAvatarUrl(
+                org.json.JSONObject("""{"id":"123456789012345678","avatar":null}"""),
             )
         )
         assertNull(
-            DiscordRemoteAuth.parseDiscordUserAvatarUrl(
-                """{"id":"123456789012345678","username":"alan","avatar":""}"""
+            discordUserAvatarUrl(
+                org.json.JSONObject("""{"id":"123456789012345678","avatar":""}"""),
             )
         )
     }

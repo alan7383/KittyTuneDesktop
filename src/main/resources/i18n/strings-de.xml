@@ -1061,15 +1061,10 @@
 
     <!-- DISCORD -->
     <string name="pref_discord_title">Discord-Integration</string>
-    <string name="discord_login_title">Discord-Anmeldung</string>
-    <string name="discord_status_header">Status</string>
-    <string name="discord_connected">Verbunden</string>
-    <string name="discord_not_connected">Nicht verbunden</string>
-    <string name="discord_connect_desc">Melde dich an, um Rich Presence zu aktivieren</string>
-    <string name="discord_logout">Abmelden</string>
-    <string name="discord_options_header">Optionen</string>
     <string name="discord_enable_rpc">Rich Presence aktivieren</string>
     <string name="discord_enable_rpc_desc">Aktuelle Musik auf Discord anzeigen</string>
+    <string name="discord_desktop_ready">Discord Desktop ist verbunden.</string>
+    <string name="discord_desktop_hint">Öffne Discord Desktop auf diesem Computer, um zu teilen, was du gerade hörst.</string>
     <string name="pref_discord_status_display">Statusanzeige wählen</string>
     <string name="discord_status_activity">Aktivitätsname (KittyTune)</string>
     <string name="discord_status_soundcloud">Aktivitätsname (SoundCloud)</string>
@@ -1929,12 +1924,6 @@
     <string name="detail_updated">Aktualisiert am %1$s</string>
     <string name="dialog_upload_yaml_desc">Lyricsfile ist ein offenes YAML-basiertes Format für Songtexte: unformatiert, zeilensynchron und wortsynchron (Karaoke). Es ermöglicht präzises Hervorheben Wort für Wort.\n\nDu kannst eine .lyricsfile.yaml- oder .lrc-Datei von deinem Computer hochladen, um die Wortsynchronisation direkt in KittyTune zu testen!</string>
     <string name="dialog_upload_yaml_title">Songtext-Datei hochladen (YAML)</string>
-    <string name="discord_qr_confirm_on_phone">Bestätige nun die Anmeldung auf deinem Smartphone.</string>
-    <string name="discord_qr_connecting">Code wird generiert…</string>
-    <string name="discord_qr_expired">Dieser QR-Code ist abgelaufen.</string>
-    <string name="discord_qr_failed">Discord konnte nicht erreicht werden. Bitte versuche es erneut.</string>
-    <string name="discord_qr_instructions">Öffne Discord auf deinem Smartphone, gehe zu Einstellungen › QR-Code scannen und scanne diesen Code.</string>
-    <string name="discord_qr_retry">Neuer Code</string>
     <string name="edit_playlist_add_tags">Tags hinzufügen</string>
     <string name="edit_playlist_custom_genre">Benutzerdefiniertes Genre</string>
     <string name="edit_playlist_genre_custom">Benutzerdefiniert</string>
@@ -2225,13 +2214,9 @@
     <string name="search_tracks_hint">Titel filtern</string>
     <string name="search_yandex_notice">Yandex Music-Ergebnisse sind Katalogeinträge. Durch Klicken wird nach demselben Song auf einer abspielbaren Quelle gesucht.</string>
     <string name="settings_tab_sources">Quellen</string>
-    <string name="setup_discord_change">Konto wechseln</string>
-    <string name="setup_discord_connect">Konto verbinden</string>
     <string name="setup_discord_connected">Verbunden</string>
     <string name="setup_discord_disconnect">Trennen</string>
-    <string name="setup_discord_not_connected">Nicht verbunden</string>
     <string name="setup_discord_rpc">Discord Rich Presence</string>
-    <string name="setup_discord_rpc_desc">Zeige in deinem Discord-Profil, was du gerade hörst</string>
     <string name="setup_use_windows_color">Möchtest du die App mit deiner Windows-Akzentfarbe synchronisieren?</string>
     <string name="setup_windows_color">Windows-Farben erkannt</string>
     <string name="shortcut_key_then">dann</string>
@@ -3436,7 +3421,7 @@
     <string name="onboard_desktop_body">Wähle das Verhalten beim Schließen und die Wiederherstellung deiner Hörsitzung nach einem Neustart.</string>
     <string name="onboard_discord_label">Discord</string>
     <string name="onboard_discord_title">Gute Musik teilt man.</string>
-    <string name="onboard_discord_body">Verbinde auf Wunsch Discord, um deine aktuelle Musik im Profil anzuzeigen. Ohne Discord funktioniert deine Musik genauso gut.</string>
+    <string name="onboard_discord_body">KittyTune zeigt beim Hören deine Musik an, wenn Discord Desktop geöffnet ist. Du kannst das Teilen hier oder in den Einstellungen ausschalten.</string>
     <string name="onboard_protected_label">Geschützte Titel</string>
     <string name="onboard_protected_title">Optionale Installation</string>
     <string name="onboard_protected_body">Du kannst Musik hören, ohne hier etwas zu installieren. Die meisten Titel laufen direkt über SoundCloud. Mit der Installation kannst du manche geschützte Titel im Original hören. KittyTune kann auch auf YouTube nach einer passenden Version suchen.</string>
@@ -3453,8 +3438,6 @@
     <string name="onboard_update_body">KittyTune nach neuen Versionen suchen lassen.</string>
     <string name="onboard_keys_title">Auch mit der Tastatur</string>
     <string name="onboard_keys_body">Steuere die Wiedergabe mit den Medientasten. Musik, Liedtexte und Warteschlange stehen im Hauptfenster oder Miniplayer bereit.</string>
-    <string name="onboard_discord_privacy">Du bestimmst, was geteilt wird</string>
-    <string name="onboard_discord_privacy_body">Das Teilen deiner Höraktivität ist freiwillig. Du kannst es jederzeit in den Einstellungen ausschalten oder Discord trennen.</string>
     <string name="onboard_drm_what">Warum ist diese Installation nützlich?</string>
     <string name="onboard_drm_explanation">SoundCloud schützt manche Titel, darunter einige Mainstream-Veröffentlichungen, mit einem System namens DRM. Mit dieser Installation kannst du das Original auf SoundCloud hören.</string>
     <string name="onboard_drm_limits">Dein Abonnement bleibt erforderlich</string>

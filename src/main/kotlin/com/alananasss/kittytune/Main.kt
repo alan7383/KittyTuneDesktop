@@ -181,6 +181,9 @@ fun main(args: Array<String>) {
 
     application {
         val playerViewModel = remember { PlayerViewModel(AppInstance.application) }
+        androidx.compose.runtime.DisposableEffect(playerViewModel) {
+            onDispose { playerViewModel.stopDiscordPresence() }
+        }
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("PlayerViewModel created")
         val prefsForTray = remember { PlayerPreferences() }
         val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())

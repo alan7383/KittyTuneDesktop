@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit
  */
 object Prefs {
 
+    private val legacyDiscordLoginKeys = setOf("discord_token", "discord_avatar_url")
     private val file = File(AppDirs.dataDir, "prefs.json")
     private val backupFile = File(AppDirs.dataDir, "prefs.json.bak")
     // Compact on purpose: the file is rewritten after every change, and pretty-printing it only made each write bigger.
@@ -97,6 +98,12 @@ object Prefs {
     }
 
     init {
+        val stored = state.value
+        val migrated = stored - legacyDiscordLoginKeys
+        if (migrated.size != stored.size) {
+            state.value = migrated
+            scheduleSave()
+        }
         Runtime.getRuntime().addShutdownHook(Thread {
             flush()
         })
@@ -154,7 +161,7 @@ object Prefs {
     fun snapshot(): Map<String, JsonElement> = state.value
 
     fun restore(entries: Map<String, JsonElement>) {
-        state.value = entries
+        state.value = entries - legacyDiscordLoginKeys
         scheduleSave()
     }
 

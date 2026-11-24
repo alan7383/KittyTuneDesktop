@@ -22,7 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "KittyTuneWindows"
 include(":shazamkit")
-include(":kizzy")
 include(":innertube")
 // The Windows entry point can configure only the desktop modules; the website
 // remains available in the normal multi-project build.

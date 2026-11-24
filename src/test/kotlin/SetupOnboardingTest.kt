@@ -377,7 +377,7 @@ class SetupOnboardingTest {
             try {
                 settle()
                 repeat(SetupStep.entries.size) {
-                    val x = if (SetupStep.entries[it] in listOf(SetupStep.LIBRARY, SetupStep.DISCORD, SetupStep.PROTECTED)) 960f else 1090f
+                    val x = if (SetupStep.entries[it] in listOf(SetupStep.LIBRARY, SetupStep.PROTECTED)) 960f else 1090f
                     val position = if (SetupStep.entries[it] == SetupStep.ACCOUNT && !com.alananasss.kittytune.data.TokenManager.hasAccessToken()) Offset(975f, 408f) else Offset(x, 790f)
                     scene.sendPointerEvent(PointerEventType.Press, position)
                     scene.sendPointerEvent(PointerEventType.Release, position)

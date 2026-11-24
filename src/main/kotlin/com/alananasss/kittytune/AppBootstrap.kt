@@ -167,10 +167,6 @@ object AppBootstrap {
 
         com.alananasss.kittytune.data.together.Together.soundCloudAvatarUrl =
             com.alananasss.kittytune.data.TokenManager.activeAccountAvatarUrl()
-        if (!trainStartupCache) {
-            com.alananasss.kittytune.data.discord.DiscordRemoteAuth.syncDiscordAvatarFromPrefs()
-        }
-
         // A first launch gets protected tracks from the DRM settings and the assistant like everything else; the
         // "they are here" card is for people updating from a version without them. Decided before the setup
         // screens run, since finishing them is what marks the install as no longer new.

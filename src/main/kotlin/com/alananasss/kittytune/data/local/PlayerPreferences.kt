@@ -548,14 +548,11 @@ class PlayerPreferences {
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
         private const val KEY_WAVE_MODE = "wave_mode"
-        private const val KEY_DISCORD_TOKEN = "discord_token"
-        const val KEY_DISCORD_AVATAR_URL = "discord_avatar_url"
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
         private const val KEY_EARRAPE_WARNING = "has_seen_earrape_warning"
         private const val KEY_AUDIO_DEVICE = "audio_output_device"
 
-        private const val KEY_DISCORD_ASSET_LOGO = "discord_asset_logo"
         private const val KEY_DISCORD_STATUS_DISPLAY = "discord_status_display"
         private const val KEY_CUSTOM_FONT_ENABLED = "custom_font_enabled"
         private const val KEY_UI_SCALE = "ui_scale_preference"
@@ -819,23 +816,20 @@ class PlayerPreferences {
     }
     fun setDiscordStatusDisplay(display: DiscordStatusDisplay) = Prefs.putString(KEY_DISCORD_STATUS_DISPLAY, display.name)
 
-    fun getDiscordToken(): String? = Prefs.getString(KEY_DISCORD_TOKEN, null)
-    fun setDiscordToken(token: String?) = Prefs.putString(KEY_DISCORD_TOKEN, token)
-
-    fun getDiscordAvatarUrl(): String? = Prefs.getString(KEY_DISCORD_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
-    fun setDiscordAvatarUrl(avatarUrl: String?) = Prefs.putString(KEY_DISCORD_AVATAR_URL, avatarUrl?.takeIf { it.isNotBlank() })
-
-    fun getDiscordRpcEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_ENABLED, false)
+    fun getDiscordRpcEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_ENABLED, true)
     fun setDiscordRpcEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_ENABLED, enabled)
+    internal fun discordRpcEnabledFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_DISCORD_ENABLED, true)
+
+    internal fun discordSettingsFlow() = Prefs.flow.map { settings ->
+        listOf(KEY_DISCORD_ENABLED, KEY_DISCORD_STATUS_DISPLAY, KEY_DISCORD_LISTEN_ALONG, KEY_DISCORD_AUTO_LIVE)
+            .map(settings::get)
+    }.distinctUntilChanged()
 
     fun getDiscordListenAlongEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_LISTEN_ALONG, true)
     fun setDiscordListenAlongEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_LISTEN_ALONG, enabled)
 
     fun getDiscordAutoLiveEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_AUTO_LIVE, false)
     fun setDiscordAutoLiveEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_AUTO_LIVE, enabled)
-
-    fun getDiscordAssetLogo(): String? = Prefs.getString(KEY_DISCORD_ASSET_LOGO, null)
-    fun setDiscordAssetLogo(assetId: String?) = Prefs.putString(KEY_DISCORD_ASSET_LOGO, assetId)
 
     /** The line being sung, on one row above the player bar's transport (issue #66). */
     fun getWaveMode(): String = Prefs.getString(KEY_WAVE_MODE, "BALANCED") ?: "BALANCED"

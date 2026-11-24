@@ -1,10 +1,11 @@
 package com.alananasss.kittytune
 
+import com.alananasss.kittytune.data.discord.discordActivity
+import com.alananasss.kittytune.data.local.DiscordStatusDisplay
 import com.alananasss.kittytune.data.together.Together
+import com.alananasss.kittytune.data.together.TogetherLinks
 import com.alananasss.kittytune.data.together.togetherDiscordParty
-import com.my.kizzy.gateway.entities.presence.Activity
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
+import com.alananasss.kittytune.domain.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -33,10 +34,14 @@ class TogetherDiscordPartyTest {
         assertNotEquals(party.id, togetherDiscordParty("W4X8Y2Z6", null, "self").id)
         assertEquals(listOf(1, 16), togetherDiscordParty(code, null, "self").size)
 
-        val payload = Json.encodeToString(Activity.serializer(), Activity("KittyTune", party = party))
-        val partyJson = Json.parseToJsonElement(payload).jsonObject.getValue("party")
-        assertEquals(Json.parseToJsonElement("""{"id":"${party.id}","size":[3,16]}"""), partyJson)
-        val inactive = Json.encodeToString(Activity.serializer(), Activity("KittyTune"))
-        assertFalse(Json.parseToJsonElement(inactive).jsonObject.containsKey("party"))
+        val track = Track(1, "Song", null, 185_000, null)
+        val payload = discordActivity(
+            track, null, true, 0, 185_000, DiscordStatusDisplay.ACTIVITY, TogetherLinks.inviteUrl(code), party,
+        )
+        val partyJson = payload.getJSONObject("party")
+        assertEquals(party.id, partyJson.getString("id"))
+        assertEquals(listOf(3, 16), partyJson.getJSONArray("size").toList())
+        val inactive = discordActivity(track, null, true, 0, 185_000, DiscordStatusDisplay.ACTIVITY)
+        assertFalse(inactive.has("party"))
     }
 }

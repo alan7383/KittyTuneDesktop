@@ -38,6 +38,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.graphics.shapes.RoundedPolygon
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.Discord
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.getSettingsShape
@@ -46,15 +47,12 @@ import com.alananasss.kittytune.ui.profile.LocalMediaSettingsScreen
 import com.materialkolor.rememberDynamicColorScheme
 import com.materialkolor.PaletteStyle
 import com.alananasss.kittytune.ui.theme.parseMaterialKolorColorSpec
-import com.my.kizzy.rpc.KizzyRPC
-import com.my.kizzy.rpc.UserInfo
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.ui.login.LoginScreen
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.*
-import com.alananasss.kittytune.ui.profile.DiscordLoginScreen
 import com.alananasss.kittytune.ui.profile.DrmSetupWizard
 import com.alananasss.kittytune.ui.profile.DrmWizardStart
 
@@ -69,7 +67,7 @@ internal enum class SetupStep(val key: String, val icon: ImageVector) {
     ACCOUNT("account", Icons.Rounded.AccountCircle),
     DESKTOP("desktop", Icons.Rounded.DesktopWindows),
     LIBRARY("library", Icons.Rounded.FolderOpen),
-    DISCORD("discord", Icons.Rounded.Forum),
+    DISCORD("discord", Icons.Rounded.Discord),
     PROTECTED("protected", Icons.Rounded.LockOpen),
     READY("ready", Icons.Rounded.Celebration)
 }
@@ -106,23 +104,11 @@ fun SetupScreen(onSetupComplete: () -> Unit, onCancel: (() -> Unit)? = null, ini
     var profileError by remember { mutableStateOf(false) }
     var profileRevision by remember { mutableIntStateOf(0) }
     var accountChosen by remember { mutableStateOf(TokenManager.hasAccessToken() || TokenManager.isGuestMode()) }
-    var discordLogin by remember { mutableStateOf(false) }
-    var discordProfile by remember { mutableStateOf<Pair<String, UserInfo>?>(null) }
     var drmWizard by remember { mutableStateOf(false) }
     var customTheme by remember { mutableStateOf(false) }
     // Keep all choices above the external flows: returning never resets the step or its selections.
     observePreferences()
     val step = SetupStep.entries[index]
-    val discordToken = prefs.getDiscordToken()?.takeIf { it.isNotBlank() }
-    val visibleDiscordProfile = discordProfile?.takeIf { it.first == discordToken }?.second
-    LaunchedEffect(step, discordToken, discordLogin) {
-        if (step == SetupStep.DISCORD && discordToken != null && !discordLogin) {
-            val info = KizzyRPC.getUserInfo(discordToken).getOrNull()
-            if (info != null && prefs.getDiscordToken() == discordToken) {
-                discordProfile = discordToken to info
-            }
-        }
-    }
     LaunchedEffect(step, accountConnected, soundCloudLogin, profileRevision) {
         if (step == SetupStep.ACCOUNT && accountConnected && !soundCloudLogin) {
             profileError = false
@@ -142,7 +128,6 @@ fun SetupScreen(onSetupComplete: () -> Unit, onCancel: (() -> Unit)? = null, ini
         if (next != index) {
             direction = if (next > index) 1 else -1
             soundCloudLogin = false
-            discordLogin = false
             index = next
         }
     }
@@ -156,7 +141,7 @@ fun SetupScreen(onSetupComplete: () -> Unit, onCancel: (() -> Unit)? = null, ini
         }
     }
     val back: () -> Unit = {
-        if (soundCloudLogin) soundCloudLogin = false else if (discordLogin) discordLogin = false else if (index > 0) go(index - 1) else onCancel?.invoke()
+        if (soundCloudLogin) soundCloudLogin = false else if (index > 0) go(index - 1) else onCancel?.invoke()
     }
     com.alananasss.kittytune.core.BackHandler(enabled = !customTheme && !drmWizard && (index > 0 || onCancel != null)) { back() }
     val cs = MaterialTheme.colorScheme
@@ -260,23 +245,14 @@ fun SetupScreen(onSetupComplete: () -> Unit, onCancel: (() -> Unit)? = null, ini
                                     SetupStep.DESKTOP -> DesktopPage(prefs, direction)
                                     SetupStep.LIBRARY -> Reveal(3, direction) { LocalMediaSettingsScreen(horizontalPadding = 0.dp) }
                                     SetupStep.DISCORD -> Reveal(3, direction) {
-                                        AnimatedContent(discordLogin, transitionSpec = { swapInPlace() }, label = "setupDiscord") { loggingIn ->
-                                            if (loggingIn) {
-                                                DiscordLoginScreen(
-                                                    onBackClick = { discordLogin = false },
-                                                    onLoginSuccess = { discordLogin = false },
-                                                    embedded = true,
-                                                    onAccountConnected = { name, avatar ->
-                                                        val token = prefs.getDiscordToken()
-                                                        if (token != null && name != null) {
-                                                            discordProfile = token to UserInfo(name, name, avatar)
-                                                        }
-                                                    }
-                                                )
-                                            } else {
-                                                DiscordAccount(prefs, discordToken != null, visibleDiscordProfile, onConnect = { discordLogin = true })
-                                            }
-                                        }
+                                        SettingsItem(
+                                            shape = RoundedCornerShape(28.dp),
+                                            title = str("setup_discord_rpc"),
+                                            icon = Icons.Rounded.Discord,
+                                            hasSwitch = true,
+                                            switchState = prefs.getDiscordRpcEnabled(),
+                                            onSwitchChange = prefs::setDiscordRpcEnabled,
+                                        )
                                     }
                                     SetupStep.PROTECTED -> ProtectedPage(direction, onConfigure = { drmWizard = true })
                                     SetupStep.READY -> ReadyPage(direction)
@@ -296,7 +272,7 @@ fun SetupScreen(onSetupComplete: () -> Unit, onCancel: (() -> Unit)? = null, ini
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        AnimatedVisibility(step == SetupStep.DISCORD || step == SetupStep.PROTECTED || step == SetupStep.LIBRARY,
+                        AnimatedVisibility(step == SetupStep.PROTECTED || step == SetupStep.LIBRARY,
                             enter = fadeIn() + scaleIn(spring(dampingRatio = 0.6f, stiffness = 500f), initialScale = 0.8f),
                             exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.8f)) {
                             TextButton(modifier = Modifier.heightIn(min = 56.dp).testTag("setupSkip"), onClick = { go(index + 1) },
@@ -305,7 +281,7 @@ fun SetupScreen(onSetupComplete: () -> Unit, onCancel: (() -> Unit)? = null, ini
                             }
                         }
                         val last = step == SetupStep.READY
-                        Button(enabled = !soundCloudLogin && !discordLogin && (step != SetupStep.ACCOUNT || accountChosen),
+                        Button(enabled = !soundCloudLogin && (step != SetupStep.ACCOUNT || accountChosen),
                             onClick = { if (last) finish() else go(index + 1) }, shapes = ButtonDefaults.shapes(),
                             contentPadding = PaddingValues(start = 28.dp, end = 22.dp),
                             modifier = Modifier.testTag("setupNext").heightIn(min = 56.dp).animateContentSize(spring(dampingRatio = 0.7f, stiffness = 500f))) {
@@ -567,44 +543,6 @@ private fun SoundCloudAccountConfirmation(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DiscordAccount(prefs: PlayerPreferences, connected: Boolean, profile: UserInfo?, onConnect: () -> Unit) {
-    observePreferences()
-    val cs = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = cs.surfaceContainerHigh) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Box(Modifier.size(72.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(cs.secondaryContainer), contentAlignment = Alignment.Center) {
-                        Icon(painterResource("icons/discord.svg"), null, Modifier.size(34.dp), tint = cs.onSecondaryContainer)
-                        if (profile?.avatarUrl != null) coil3.compose.AsyncImage(
-                            model = profile.avatarUrl, contentDescription = null, modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop)
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(profile?.username ?: "Discord", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            if (connected) Icon(Icons.Rounded.CheckCircle, null, Modifier.size(16.dp), tint = cs.primary)
-                            Text(str(if (connected) "setup_discord_connected" else "setup_discord_not_connected"),
-                                style = MaterialTheme.typography.bodyMedium, color = if (connected) cs.primary else cs.onSurfaceVariant)
-                        }
-                    }
-                }
-                val label: @Composable RowScope.() -> Unit = {
-                    Icon(painterResource("icons/discord.svg"), null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(str(if (connected) "setup_discord_change" else "setup_discord_connect"))
-                }
-                if (connected) FilledTonalButton(onClick = onConnect, shapes = ButtonDefaults.shapes(), modifier = Modifier.heightIn(min = 48.dp), content = label)
-                else Button(onClick = onConnect, shapes = ButtonDefaults.shapes(), modifier = Modifier.heightIn(min = 48.dp), content = label)
-            }
-        }
-        if (connected) SettingsItem(shape = RoundedCornerShape(28.dp), title = str("setup_discord_rpc"), subtitle = str("setup_discord_rpc_desc"),
-            icon = Icons.Rounded.MusicNote, hasSwitch = true, switchState = prefs.getDiscordRpcEnabled(), onSwitchChange = { prefs.setDiscordRpcEnabled(it) })
     }
 }
 

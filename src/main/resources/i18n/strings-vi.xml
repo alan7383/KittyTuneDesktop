@@ -985,15 +985,10 @@
     <string name="error_not_enough_space">Không đủ dung lượng bộ nhớ</string>
     <!-- DISCORD -->
     <string name="pref_discord_title">Tích hợp Discord</string>
-    <string name="discord_login_title">Đăng nhập Discord</string>
-    <string name="discord_status_header">Trạng thái</string>
-    <string name="discord_connected">Đã kết nối</string>
-    <string name="discord_not_connected">Chưa kết nối</string>
-    <string name="discord_connect_desc">Đăng nhập để bật trạng thái hoạt động</string>
-    <string name="discord_logout">Đăng xuất</string>
-    <string name="discord_options_header">Tùy chọn</string>
     <string name="discord_enable_rpc">Bật Rich Presence</string>
     <string name="discord_enable_rpc_desc">Hiển thị bài hát đang nghe trên Discord</string>
+    <string name="discord_desktop_ready">Đã kết nối với Discord trên máy tính.</string>
+    <string name="discord_desktop_hint">Mở ứng dụng Discord trên máy tính này để chia sẻ nội dung bạn đang nghe.</string>
     <string name="pref_discord_status_display">Chọn cách hiển thị trạng thái</string>
     <string name="discord_status_activity">Tên hoạt động (KittyTune)</string>
     <string name="discord_status_soundcloud">Tên hoạt động (SoundCloud)</string>
@@ -1789,12 +1784,6 @@
     <string name="detail_updated">Cập nhật %1$s</string>
     <string name="dialog_upload_yaml_desc">Lyricsfile là định dạng dựa trên YAML mở dành cho lời bài hát: văn bản thường, khớp từng dòng và khớp từng từ (Karaoke). Định dạng này cho phép tô sáng chính xác từng từ.\n\nBạn có thể tải lên tệp .lyricsfile.yaml hoặc .lrc từ máy tính để thử nghiệm tính năng đồng bộ từng từ trực tiếp trong KittyTune!</string>
     <string name="dialog_upload_yaml_title">Tải lên tệp lời bài hát (YAML)</string>
-    <string name="discord_qr_confirm_on_phone">Bây giờ hãy xác nhận đăng nhập trên điện thoại của bạn.</string>
-    <string name="discord_qr_connecting">Đang tạo mã…</string>
-    <string name="discord_qr_expired">Mã QR này đã hết hạn.</string>
-    <string name="discord_qr_failed">Không thể kết nối với Discord. Vui lòng thử lại.</string>
-    <string name="discord_qr_instructions">Mở Discord trên điện thoại của bạn, vào Cài đặt › Quét mã QR, sau đó quét mã này.</string>
-    <string name="discord_qr_retry">Mã mới</string>
     <string name="edit_playlist_add_tags">Thêm thẻ</string>
     <string name="edit_playlist_custom_genre">Thể loại tùy chỉnh</string>
     <string name="edit_playlist_genre_custom">Tùy chỉnh</string>
@@ -2073,13 +2062,9 @@
     <string name="search_tracks_hint">Lọc bài hát</string>
     <string name="search_yandex_notice">Kết quả Yandex Music là mục danh mục. Nhấp vào một bài sẽ tìm kiếm bài hát đó trên nguồn có thể phát được.</string>
     <string name="settings_tab_sources">Nguồn nhạc</string>
-    <string name="setup_discord_change">Đổi tài khoản</string>
-    <string name="setup_discord_connect">Kết nối tài khoản</string>
     <string name="setup_discord_connected">Đã kết nối</string>
     <string name="setup_discord_disconnect">Ngắt kết nối</string>
-    <string name="setup_discord_not_connected">Chưa kết nối</string>
     <string name="setup_discord_rpc">Discord Rich Presence</string>
-    <string name="setup_discord_rpc_desc">Hiển thị bài hát bạn đang nghe trên trang cá nhân Discord</string>
     <string name="setup_use_windows_color">Bạn có muốn đồng bộ màu ứng dụng với màu chủ đạo của Windows?</string>
     <string name="setup_windows_color">Đã phát hiện màu nhấn Windows</string>
     <string name="shortcut_key_then">sau đó</string>
@@ -3297,7 +3282,7 @@
     <string name="onboard_desktop_body">Chọn hành vi khi đóng cửa sổ và cách khôi phục phiên nghe sau khi khởi động lại.</string>
     <string name="onboard_discord_label">Discord</string>
     <string name="onboard_discord_title">Chia sẻ những giai điệu hay.</string>
-    <string name="onboard_discord_body">Bạn có thể kết nối Discord để hiển thị bài đang nghe trên hồ sơ. Việc nghe nhạc vẫn hoạt động bình thường nếu không kết nối.</string>
+    <string name="onboard_discord_body">KittyTune hiển thị nội dung bạn đang nghe khi ứng dụng Discord trên máy tính đang mở. Bạn có thể tắt chia sẻ tại đây hoặc trong Cài đặt.</string>
     <string name="onboard_protected_label">Bài hát được bảo vệ</string>
     <string name="onboard_protected_title">Cài đặt tùy chọn</string>
     <string name="onboard_protected_body">Bạn có thể nghe nhạc mà không cần cài gì ở bước này. Hầu hết bài hát phát trực tiếp từ SoundCloud. Việc cài đặt giúp bạn nghe âm thanh gốc của một số bài được bảo vệ. KittyTune cũng có thể tìm bản tương ứng trên YouTube.</string>
@@ -3314,8 +3299,6 @@
     <string name="onboard_update_body">Cho phép KittyTune kiểm tra phiên bản mới.</string>
     <string name="onboard_keys_title">Điều khiển bằng bàn phím</string>
     <string name="onboard_keys_body">Dùng các phím đa phương tiện để điều khiển phát nhạc. Xem nhạc, lời bài hát và hàng đợi trong cửa sổ chính hoặc trình phát thu nhỏ.</string>
-    <string name="onboard_discord_privacy">Bạn quyết định nội dung chia sẻ</string>
-    <string name="onboard_discord_privacy_body">Chia sẻ hoạt động nghe là tùy chọn. Bạn có thể tắt hoặc ngắt kết nối Discord trong Cài đặt bất cứ lúc nào.</string>
     <string name="onboard_drm_what">Cài đặt này có ích gì?</string>
     <string name="onboard_drm_explanation">SoundCloud dùng hệ thống gọi là DRM để bảo vệ một số bài hát, gồm cả một số bản phát hành phổ biến. Sau khi cài đặt, bạn có thể nghe bản gốc trên SoundCloud.</string>
     <string name="onboard_drm_limits">Vẫn cần gói đăng ký phù hợp</string>
