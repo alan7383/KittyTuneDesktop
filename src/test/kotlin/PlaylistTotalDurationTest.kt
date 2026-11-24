@@ -100,12 +100,12 @@ class PlaylistTotalDurationTest {
         try {
             Strings.appLanguage = "ru"
 
-            assertEquals("1 ч.", formatPlaylistTotalDuration(hourMs))
-            assertEquals("7 ч. 23 мин.", formatPlaylistTotalDuration(7 * hourMs + 23 * 60 * 1000L))
-            assertEquals("11 дн. 16 ч.", formatPlaylistTotalDuration(280 * hourMs + 17 * 60 * 1000L))
-            assertEquals("1 мес. 15 дн.", formatPlaylistTotalDuration(45 * dayMs))
-            assertEquals("1 г.", formatPlaylistTotalDuration(365 * dayMs))
-            assertEquals("2 г. 3 мес.", formatPlaylistTotalDuration((2 * 365 + 90) * dayMs))
+            assertEquals("1 ч", formatPlaylistTotalDuration(hourMs))
+            assertEquals("7 ч 23 мин", formatPlaylistTotalDuration(7 * hourMs + 23 * 60 * 1000L))
+            assertEquals("11 дн 16 ч", formatPlaylistTotalDuration(280 * hourMs + 17 * 60 * 1000L))
+            assertEquals("1 мес 15 дн", formatPlaylistTotalDuration(45 * dayMs))
+            assertEquals("1 г", formatPlaylistTotalDuration(365 * dayMs))
+            assertEquals("2 г 3 мес", formatPlaylistTotalDuration((2 * 365 + 90) * dayMs))
         } finally {
             Strings.appLanguage = prev
         }

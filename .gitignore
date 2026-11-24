@@ -22,6 +22,8 @@ kotlin-js-store/
 !nix/tests/test_audio_env.py
 !nix/tests/test_manual_update.py
 !scripts/check-linux-dbus.py
+!scripts/fonts/*.py
+scripts/fonts/__pycache__/
 *.ps1
 !src/main/resources/updater/*.ps1
 !src/test/resources/smtc-probe.ps1
@@ -32,6 +34,7 @@ kotlin-js-store/
 !scripts/setup-cdm-sidecar.ps1
 /release/
 *.txt
+!src/main/resources/fonts/OFL-KittyTuneFlex.txt
 context_dump.txt
 *.msi
 *.dll

@@ -48,7 +48,7 @@ fun KittyTuneWebTheme(
         val customFamily = FontFamily(
             weights.map { fw ->
                 Font(
-                    identity = "GoogleSansFlex-${fw.weight}",
+                    identity = "KittyTuneFlex-${fw.weight}",
                     data = bytes,
                     weight = fw,
                     variationSettings = FontVariation.Settings(
@@ -66,7 +66,7 @@ fun KittyTuneWebTheme(
         val customFamilyRounded = FontFamily(
             weights.map { fw ->
                 Font(
-                    identity = "GoogleSansFlexRounded-${fw.weight}",
+                    identity = "KittyTuneFlexRounded-${fw.weight}",
                     data = bytes,
                     weight = fw,
                     variationSettings = FontVariation.Settings(

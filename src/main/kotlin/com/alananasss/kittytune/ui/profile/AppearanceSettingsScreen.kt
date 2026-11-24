@@ -219,7 +219,7 @@ private fun fontLabel(font: com.alananasss.kittytune.ui.theme.AppFont): String =
     else com.alananasss.kittytune.ui.theme.AppFonts.nameOf(font)
 
 /**
- * The typefaces on offer, each shown in itself: the default, the adjustable Google Sans Flex, a selection of
+ * The typefaces on offer, each shown in itself: the default, the adjustable KittyTune Flex, a selection of
  * installed fonts, the user's own, and a way to add one.
  */
 @Composable

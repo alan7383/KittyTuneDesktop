@@ -35,11 +35,11 @@ class QueueDurationLocalizationTest {
 
             // Russian
             Strings.appLanguage = "ru"
-            assertEquals("2 ч. 14 мин.", formatQueueDuration(twoHoursFourteenMinutesMs))
-            assertEquals("45 мин.", formatQueueDuration(fortyFiveMinutesMs))
+            assertEquals("2 ч 14 мин", formatQueueDuration(twoHoursFourteenMinutesMs))
+            assertEquals("45 мин", formatQueueDuration(fortyFiveMinutesMs))
             assertEquals("30 с", formatQueueDuration(thirtySecondsMs))
-            assertEquals("Осталось 2 ч. 14 мин.", str("queue_time_left", formatQueueDuration(twoHoursFourteenMinutesMs)))
-            assertEquals("Осталось 45 мин.", str("queue_time_left", formatQueueDuration(fortyFiveMinutesMs)))
+            assertEquals("Осталось 2 ч 14 мин", str("queue_time_left", formatQueueDuration(twoHoursFourteenMinutesMs)))
+            assertEquals("Осталось 45 мин", str("queue_time_left", formatQueueDuration(fortyFiveMinutesMs)))
 
             // German
             Strings.appLanguage = "de"
@@ -79,7 +79,7 @@ class QueueDurationLocalizationTest {
             assertEquals("2h 14min", makeTimeString(twoHoursFourteenMinutesMs))
 
             Strings.appLanguage = "ru"
-            assertEquals("2 ч. 14 мин.", makeTimeString(twoHoursFourteenMinutesMs))
+            assertEquals("2 ч 14 мин", makeTimeString(twoHoursFourteenMinutesMs))
 
             Strings.appLanguage = "de"
             assertEquals("2 Std. 14 Min.", makeTimeString(twoHoursFourteenMinutesMs))

@@ -937,7 +937,7 @@ object R {
     }
 
     object font {
-        const val google_sans_flex = "/fonts/google_sans_flex.ttf"
+        const val kittytune_flex = "/fonts/kittytune_flex.ttf"
     }
 }
 

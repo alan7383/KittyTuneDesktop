@@ -9,12 +9,13 @@ import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.platform.Font
+import com.alananasss.kittytune.R
 import com.alananasss.kittytune.data.local.LyricsFont
 
 val Typography = Typography()
 
 private val fontBytes: ByteArray by lazy {
-    object {}.javaClass.getResourceAsStream("/fonts/google_sans_flex.ttf")!!.readBytes()
+    object {}.javaClass.getResourceAsStream(R.font.kittytune_flex)!!.use { it.readBytes() }
 }
 
 @OptIn(ExperimentalTextApi::class)
@@ -38,7 +39,7 @@ fun getDynamicTypography(
         ).map { fw ->
             val adjustedWeight = (wght + (fw.weight - 400)).coerceIn(100, 1000)
             Font(
-                identity = "GoogleSansFlex-$fw-$adjustedWeight-$wdth-$slnt-$rond-$grad-$opsz",
+                identity = "KittyTuneFlex-$fw-$adjustedWeight-$wdth-$slnt-$rond-$grad-$opsz",
                 data = fontBytes,
                 weight = fw,
                 variationSettings = FontVariation.Settings(
@@ -67,7 +68,7 @@ fun getDynamicTypography(
         ).map { fw ->
             val adjustedWeight = (wght + (fw.weight - 400)).coerceIn(100, 1000)
             Font(
-                identity = "GoogleSansFlexRounded-$fw-$adjustedWeight-$wdth-$slnt-$grad-$opsz",
+                identity = "KittyTuneFlexRounded-$fw-$adjustedWeight-$wdth-$slnt-$grad-$opsz",
                 data = fontBytes,
                 weight = fw,
                 variationSettings = FontVariation.Settings(

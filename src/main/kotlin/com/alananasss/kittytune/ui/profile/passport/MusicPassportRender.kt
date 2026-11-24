@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.graphics.shapes.RoundedPolygon
+import com.alananasss.kittytune.R
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.stats.MusicPassport
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +69,7 @@ object MusicPassportRender {
 
     private val baseSansFont: Font by lazy {
         runCatching {
-            MusicPassportRender::class.java.getResourceAsStream("/fonts/google_sans_flex.ttf")?.use {
+            MusicPassportRender::class.java.getResourceAsStream(R.font.kittytune_flex)?.use {
                 Font.createFont(Font.TRUETYPE_FONT, it)
             }
         }.getOrNull()

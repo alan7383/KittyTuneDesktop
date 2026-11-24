@@ -14,7 +14,7 @@ import java.io.File
 /**
  * The typeface the whole app is set in.
  *
- * Stored as a short id: `default` (Compose's own sans), `flex` (the bundled variable Google Sans Flex, the one
+ * Stored as a short id: `default` (Compose's own sans), `flex` (the bundled variable KittyTune Flex, the one
  * the old "custom font" switch turned on, whose axes stay adjustable), `system:<family>` for an installed font,
  * or `file:<name>` for one the user added, copied into the app's data folder.
  */
@@ -86,7 +86,7 @@ object AppFonts {
     /** A display name for the picker and the settings row. */
     fun nameOf(font: AppFont): String = when (font) {
         AppFont.Default -> ""
-        AppFont.Flex -> "Google Sans Flex"
+        AppFont.Flex -> "KittyTune Flex"
         is AppFont.System -> font.family
         is AppFont.UserFile -> font.fileName.substringBeforeLast('.')
     }
