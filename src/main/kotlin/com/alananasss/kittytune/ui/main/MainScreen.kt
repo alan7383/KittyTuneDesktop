@@ -892,7 +892,6 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                                 },
                                 onOpenRecap = { id -> navController.navigate("recap/$id") },
                                 onOpenRecaps = { navController.navigate("recaps") },
-                                onOpenPassport = { navController.navigate("music_passport") },
                             )
                         }
                         composable("music_passport") {
@@ -1437,6 +1436,11 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
     // held by the window's edges, never floating over another app the way its desktop window does.
     // It is drawn here, above the app and under every menu, the full player and the dialogs.
     com.alananasss.kittytune.ui.pet.PetInAppOverlay(
+        onOpenSettings = { playerViewModel.navigateToPlaylistId = "pet_settings" },
+        onPlayPause = { playerViewModel.togglePlayPause() },
+    )
+    // Or on the player bar: a small cat on the bar's top edge, dancing, wandering or asleep.
+    com.alananasss.kittytune.ui.pet.PetBarOverlay(
         onOpenSettings = { playerViewModel.navigateToPlaylistId = "pet_settings" },
         onPlayPause = { playerViewModel.togglePlayPause() },
     )

@@ -126,7 +126,8 @@ object SyncService {
             // Findable for exactly as long as it is reachable. Announcing an address that nothing
             // answers on is the failure mode this whole beacon exists to remove (issue #33).
             SyncDiscovery.startResponder()
-        }.onFailure { System.err.println("Sync listener failed to start: ${it.message}") }
+            NetLog.i("sync", "Listening on port $port")
+        }.onFailure { NetLog.w("sync", "Listener failed to start on port $port", it) }
     }
 
     @Synchronized
@@ -155,8 +156,9 @@ object SyncService {
                 // Fingerprints, never the secrets themselves. A refused pairing is almost always a
                 // caller holding a code that was replaced since it was shown, and without this the
                 // only evidence was a 401 on the phone with nothing to compare it against (issue #33).
-                System.err.println(
-                    "Sync: refused a caller presenting ${fingerprint(presented)}, " +
+                NetLog.w(
+                    "sync",
+                    "Refused ${exchange.remoteAddress?.address?.hostAddress}: it presented ${fingerprint(presented)}, " +
                         "this device expects ${fingerprint(pairingSecret)}"
                 )
                 exchange.sendResponseHeaders(401, -1)
@@ -220,6 +222,7 @@ object SyncService {
         SyncApply.mergeAndApply(request.events)
         SyncPlayback.accept(request.playback)
         ConnectManager.importRelayUrl(request.relayUrl)
+        ConnectManager.importInternetControl(request.internetControl)
         SyncLog.setPeerMarks(request.deviceId, request.marks)
 
         // The caller hands over how to call it back, which is what makes the pairing mutual: after one
@@ -245,6 +248,7 @@ object SyncService {
             callback = selfPairing().takeIf { isRunning },
             playback = SyncPlayback.current(),
             relayUrl = ConnectManager.relayUrl.ifBlank { null },
+            internetControl = ConnectPlatform.internetControl,
         )
     }
 
@@ -369,4 +373,6 @@ data class SyncExchange(
     /** Latest queue/playhead, absent when talking to an older client. */
     val playback: PlaybackSnapshot? = null,
     val relayUrl: String? = null,
+    /** Whether Connect over the Internet is on there; a device that never chose follows it. */
+    val internetControl: Boolean? = null,
 )

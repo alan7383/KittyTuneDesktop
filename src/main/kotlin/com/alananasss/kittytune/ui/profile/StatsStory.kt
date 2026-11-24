@@ -46,7 +46,8 @@ internal fun StoryStats(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        // Start-aligned like the header and the recaps above: centred cards under a left-aligned page read as
+        // two layouts at once on a wide window.
     ) {
         if (header != null) item(key = "recaps") { header() }
         item {

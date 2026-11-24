@@ -55,6 +55,10 @@ import com.alananasss.kittytune.data.sync.SyncPeers
 import com.alananasss.kittytune.data.sync.SyncPlayback
 import com.alananasss.kittytune.data.sync.SyncScheduler
 import com.alananasss.kittytune.data.sync.SyncService
+import com.alananasss.kittytune.data.sync.NetLog
+import com.alananasss.kittytune.data.sync.WindowsFirewall
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Public
 import com.alananasss.kittytune.ui.common.QrCode
 import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
@@ -228,6 +232,8 @@ fun SyncDevicesPage() {
             },
         )
 
+        FirewallCard(onStatus = { status = it })
+
         Button(
             onClick = { pairing = true },
             shapes = ButtonDefaults.shapes(),
@@ -273,6 +279,7 @@ fun SyncOptionsPage() {
     var syncLikesEnabled by remember { mutableStateOf(playerPrefs.getSyncLikesEnabled()) }
     var syncListensEnabled by remember { mutableStateOf(playerPrefs.getSyncListensEnabled()) }
     val independent by ConnectManager.independent.collectAsState()
+    val internetControl by ConnectManager.internetControl.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -329,6 +336,21 @@ fun SyncOptionsPage() {
                 },
             )
         }
+
+        // Off by default: it reaches the other device through public brokers, which some will not want.
+        SettingsGroupTitle(str("connect_internet_section"))
+        SettingsItem(
+            shape = getSettingsShape(1, 0),
+            title = str("connect_internet_title"),
+            subtitle = str("connect_internet_sub"),
+            icon = Icons.Rounded.Public,
+            hasSwitch = true,
+            switchState = internetControl,
+            onSwitchChange = { enabled ->
+                ConnectManager.setInternetControl(enabled)
+                if (enabled) SyncScheduler.triggerImmediateSync("internet control enabled")
+            },
+        )
 
         SyncHistorySection()
     }
@@ -625,6 +647,10 @@ internal fun PairDeviceDialog(
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
 
+                // The phone has to be able to call in for everything after pairing, so the firewall is
+                // dealt with here, before it turns into "paired, but both show offline".
+                FirewallCard(onStatus = { error = it }, compact = true)
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                         clipboard.setText(AnnotatedString(code))
@@ -774,6 +800,12 @@ private fun AdvancedSection(
                 Text(str("sync_copy_code"))
             }
             TextButton(shapes = ButtonDefaults.shapes(), onClick = {
+                clipboard.setText(AnnotatedString(NetLog.dump()))
+                onStatus(str("sync_diagnostics_copied"))
+            }) {
+                Text(str("sync_copy_diagnostics"))
+            }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 SyncService.regeneratePairingSecret()
                 // Every device paired with the old secret is locked out now, so their entries go too
                 // rather than sitting in the list failing silently.
@@ -782,6 +814,66 @@ private fun AdvancedSection(
                 onStatus(str("sync_code_regenerated"))
             }) {
                 Text(str("sync_regenerate_code"))
+            }
+        }
+    }
+}
+
+/**
+ * Offers to let phones through Windows Firewall, shown only on Windows while KittyTune's rules are missing.
+ *
+ * Without them Windows drops the phone's calls on a Public network, or for good once its "allow access?"
+ * prompt was dismissed, and pairing "works" while both devices show each other offline.
+ */
+@Composable
+private fun FirewallCard(onStatus: (String) -> Unit, compact: Boolean = false) {
+    if (!WindowsFirewall.isWindows) return
+    val scope = rememberCoroutineScope()
+    var present by remember { mutableStateOf<Boolean?>(true) }
+    var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { present = WindowsFirewall.rulesPresent() }
+    if (present != false) return
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(if (compact) 12.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Security, null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    str("sync_firewall_card_title"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+            Text(
+                str("sync_firewall_card_body"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            FilledTonalButton(
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        val ok = WindowsFirewall.allow()
+                        busy = false
+                        present = WindowsFirewall.rulesPresent()
+                        onStatus(str(if (ok) "sync_firewall_done" else "sync_firewall_failed"))
+                        if (ok) ConnectManager.networkChanged()
+                    }
+                },
+                enabled = !busy,
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                if (busy) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(str("sync_firewall_allow"))
             }
         }
     }
