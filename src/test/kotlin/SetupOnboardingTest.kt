@@ -87,42 +87,44 @@ class SetupOnboardingTest {
 
     @Test fun `guest selection stays in setup and preserves previous choices`() {
         org.junit.Assume.assumeFalse(com.alananasss.kittytune.data.TokenManager.hasAccessToken())
-        val saved = Prefs.flow.value
-        val wasGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
-        try {
-            com.alananasss.kittytune.data.TokenManager.setGuestMode(false)
-            PlayerPreferences().setHasCompletedSetup(true)
-            val before = Prefs.flow.value
-            var completed = 0
-            val scene = ImageComposeScene(width = 1280, height = 900) {
-                KittyTuneTheme { SetupScreen(onSetupComplete = { completed++ }) }
-            }
+        SwingUtilities.invokeAndWait {
+            val saved = Prefs.flow.value
+            val wasGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
             try {
-                repeat(24) { scene.render(it * 16_000_000L).close() }
-                // Account follows Welcome and Appearance even when reconnecting.
-                scene.sendPointerEvent(PointerEventType.Press, Offset(1090f, 790f))
-                scene.sendPointerEvent(PointerEventType.Release, Offset(1090f, 790f))
-                repeat(24) { scene.render((it + 24) * 16_000_000L).close() }
-                assertEquals(0, completed, "Welcome must lead to Appearance, not enter the app")
-                scene.sendPointerEvent(PointerEventType.Press, Offset(1090f, 790f))
-                scene.sendPointerEvent(PointerEventType.Release, Offset(1090f, 790f))
-                repeat(24) { scene.render((it + 48) * 16_000_000L).close() }
-                assertEquals(0, completed, "Appearance must lead to Account")
-                scene.render(1_200_000_000L).use { image ->
-                    image.encodeToData(EncodedImageFormat.PNG)!!.use { data ->
-                        File("build/previews/setup-reconnect-account.png").writeBytes(data.bytes)
-                    }
+                com.alananasss.kittytune.data.TokenManager.setGuestMode(false)
+                PlayerPreferences().setHasCompletedSetup(true)
+                val before = Prefs.flow.value
+                var completed = 0
+                val scene = ImageComposeScene(width = 1280, height = 900, coroutineContext = Dispatchers.Main.immediate) {
+                    KittyTuneTheme { SetupScreen(onSetupComplete = { completed++ }) }
                 }
-                scene.sendPointerEvent(PointerEventType.Press, Offset(975f, 408f))
-                scene.sendPointerEvent(PointerEventType.Release, Offset(975f, 408f))
-                repeat(24) { scene.render((it + 80) * 16_000_000L).close() }
-                assertEquals(0, completed, "Selecting an account must not skip the rest of setup")
-                assertTrue(com.alananasss.kittytune.data.TokenManager.isGuestMode())
-                assertEquals(before, Prefs.flow.value)
-            } finally { scene.close() }
-        } finally {
-            Prefs.restore(saved)
-            com.alananasss.kittytune.data.TokenManager.setGuestMode(wasGuest)
+                try {
+                    repeat(24) { scene.render(it * 16_000_000L).close() }
+                    // Account follows Welcome and Appearance even when reconnecting.
+                    scene.sendPointerEvent(PointerEventType.Press, Offset(1090f, 790f))
+                    scene.sendPointerEvent(PointerEventType.Release, Offset(1090f, 790f))
+                    repeat(24) { scene.render((it + 24) * 16_000_000L).close() }
+                    assertEquals(0, completed, "Welcome must lead to Appearance, not enter the app")
+                    scene.sendPointerEvent(PointerEventType.Press, Offset(1090f, 790f))
+                    scene.sendPointerEvent(PointerEventType.Release, Offset(1090f, 790f))
+                    repeat(24) { scene.render((it + 48) * 16_000_000L).close() }
+                    assertEquals(0, completed, "Appearance must lead to Account")
+                    scene.render(1_200_000_000L).use { image ->
+                        image.encodeToData(EncodedImageFormat.PNG)!!.use { data ->
+                            File("build/previews/setup-reconnect-account.png").writeBytes(data.bytes)
+                        }
+                    }
+                    scene.sendPointerEvent(PointerEventType.Press, Offset(975f, 408f))
+                    scene.sendPointerEvent(PointerEventType.Release, Offset(975f, 408f))
+                    repeat(24) { scene.render((it + 80) * 16_000_000L).close() }
+                    assertEquals(0, completed, "Selecting an account must not skip the rest of setup")
+                    assertTrue(com.alananasss.kittytune.data.TokenManager.isGuestMode())
+                    assertEquals(before, Prefs.flow.value)
+                } finally { scene.close() }
+            } finally {
+                Prefs.restore(saved)
+                com.alananasss.kittytune.data.TokenManager.setGuestMode(wasGuest)
+            }
         }
     }
 
