@@ -1,35 +1,19 @@
 package com.alananasss.kittytune.ui.home
 
-import androidx.compose.material3.IconButtonDefaults
-
-import androidx.compose.material3.ButtonDefaults
-
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
-import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,29 +21,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
-import com.alananasss.kittytune.core.BackHandler
-import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
-import com.alananasss.kittytune.data.ChartsData
-import com.alananasss.kittytune.domain.User
-import com.alananasss.kittytune.ui.common.SquareCardShimmer
-import com.alananasss.kittytune.ui.common.ShimmerBox
+import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.TrackArtistClick
+import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.player.ArtworkPalette
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.profile.ArtistAvatar
-import java.awt.datatransfer.StringSelection
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,83 +70,129 @@ fun ChartsScreen(
     playerViewModel: PlayerViewModel,
     viewModel: ChartsViewModel = viewModel { ChartsViewModel(AppInstance.application) }
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
-    // Hide blocked tracks/artists (issue #41); playback uses this same visible
-    // list so the start index stays aligned with what is rendered.
-    val visibleTracks = rememberFilteredTracks(viewModel.chartEntries.map { it.track })
-    val chartEntries = remember(viewModel.chartEntries, visibleTracks) {
+    val entries = viewModel.chartEntries
+    val allTracks = remember(entries) { entries.map { it.track } }
+    val visibleTracks = rememberFilteredTracks(allTracks)
+    val chartEntries = remember(entries, visibleTracks) {
         val visibleIds = visibleTracks.map { it.id }.toSet()
-        viewModel.chartEntries.filter { it.track.id in visibleIds }
+        entries.filter { it.track.id in visibleIds }
     }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        str("home_charts"),
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-0.5).sp
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                scrollBehavior = scrollBehavior
+    ChartsContent(
+        kind = viewModel.chartKind,
+        genre = viewModel.chartGenre,
+        country = viewModel.chartCountry,
+        entries = chartEntries,
+        isLoading = viewModel.isChartLoading,
+        currentTrack = playerViewModel.uiCurrentTrack,
+        onKindChange = { viewModel.loadChart(it, viewModel.chartGenre) },
+        onGenreChange = { viewModel.loadChart(viewModel.chartKind, it) },
+        onCountryChange = viewModel::selectChartCountry,
+        onRetry = { viewModel.loadChart(viewModel.chartKind, viewModel.chartGenre) },
+        onPlayFrom = { index ->
+            playerViewModel.playPlaylist(
+                tracks = visibleTracks,
+                startIndex = index,
+                context = PlaybackContext(displayText = str(viewModel.chartKind.labelKey()), navigationId = "charts"),
             )
         },
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        onArtistClick = playerViewModel::navigateToTrackArtist,
+        onBackClick = onBackClick,
+    )
+}
+
+@Composable
+internal fun ChartsContent(
+    kind: ChartKind,
+    genre: ChartGenre,
+    country: ChartCountry,
+    entries: List<ChartEntry>,
+    isLoading: Boolean,
+    currentTrack: Track?,
+    onKindChange: (ChartKind) -> Unit,
+    onGenreChange: (ChartGenre) -> Unit,
+    onCountryChange: (ChartCountry) -> Unit,
+    onRetry: () -> Unit,
+    onPlayFrom: (Int) -> Unit,
+    onArtistClick: TrackArtistClick,
+    onBackClick: () -> Unit,
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(kind, genre, country) { listState.scrollToItem(0) }
+    val chartWidth = Modifier.widthIn(max = 920.dp).fillMaxWidth()
+    val colors = MaterialTheme.colorScheme
+    Scaffold(
+        topBar = {
+            Column(
+                modifier = Modifier.fillMaxWidth().background(colors.surfaceContainerLow).padding(horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = chartWidth.heightIn(min = 60.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = str("btn_back"))
+                    }
+                    Text(
+                        text = str("home_charts"),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                SongChart(
+                    kind = kind,
+                    genre = genre,
+                    genres = ChartsViewModel.chartGenres,
+                    onKindChange = onKindChange,
+                    onGenreChange = onGenreChange,
+                    country = country,
+                    onCountryChange = onCountryChange,
+                    modifier = chartWidth.padding(bottom = 10.dp),
+                )
+            }
+        },
+        containerColor = colors.surfaceContainerLow,
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            state = listState,
+            contentPadding = PaddingValues(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // ── The song chart ──
-            // First, because it is what someone opening "Charts" came for: songs in order. The
-            // country playlists below it are the older, per-country cut of the same idea.
-            item {
-                SongChart(
-                    kind = viewModel.chartKind,
-                    genre = viewModel.chartGenre,
-                    genres = ChartsViewModel.chartGenres,
-                    onKindChange = { viewModel.loadChart(it, viewModel.chartGenre) },
-                    onGenreChange = { viewModel.loadChart(viewModel.chartKind, it) },
-                    country = viewModel.chartCountry,
-                    onCountryChange = { viewModel.selectChartCountry(it) },
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                )
-            }
-
-            if (viewModel.isChartLoading && chartEntries.isEmpty()) {
-                items(6) {
-                    Box(Modifier.fillMaxWidth().height(72.dp)) { ShimmerBox(Modifier.fillMaxWidth().height(64.dp)) }
-                }
-            } else if (chartEntries.isNotEmpty()) {
-                items(chartEntries.size) { index ->
-                    val entry = chartEntries[index]
-                    ChartTrackRow(
-                        track = entry.track,
-                        rank = entry.rank,
-                        currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
-                        onClick = {
-                            // A chart is a queue: pressing a song plays the chart from there, so the
-                            // songs either side of it are what comes next.
-                            playerViewModel.playPlaylist(
-                                tracks = chartEntries.map { it.track },
-                                startIndex = index,
-                                context = PlaybackContext(
-                                    displayText = str(
-                                        viewModel.chartKind.labelKey()
-                                    ),
-                                    navigationId = "charts",
-                                ),
+            when {
+                isLoading -> item { ChartLoadingRows(chartWidth) }
+                entries.isEmpty() -> item { EmptyChart(onRetry, chartWidth) }
+                else -> {
+                    val firstRow = if (entries.first().rank == 1) 1 else 0
+                    if (firstRow > 0) {
+                        item(key = "chart-lead") {
+                            ChartLeadTrack(
+                                entry = entries.first(),
+                                currentTrack = currentTrack,
+                                onClick = { onPlayFrom(0) },
+                                onArtistClick = onArtistClick,
+                                modifier = chartWidth.padding(bottom = 9.dp),
                             )
-                        },
-                        onArtistClick = playerViewModel::navigateToTrackArtist,
-                    )
+                        }
+                    }
+                    val rowCount = entries.size - firstRow
+                    items(count = rowCount, key = { entries[it + firstRow].rank }) { row ->
+                        val index = row + firstRow
+                        val entry = entries[index]
+                        ChartTrackRow(
+                            track = entry.track,
+                            rank = entry.rank,
+                            currentlyPlayingTrack = currentTrack,
+                            onClick = { onPlayFrom(index) },
+                            onArtistClick = onArtistClick,
+                            modifier = chartWidth,
+                            shape = getSettingsShape(rowCount, row),
+                        )
+                    }
                 }
             }
         }

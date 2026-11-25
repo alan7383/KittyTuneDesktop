@@ -16,6 +16,7 @@
     import kotlinx.coroutines.async
     import kotlinx.coroutines.awaitAll
     import kotlinx.coroutines.coroutineScope
+    import kotlinx.coroutines.ensureActive
     import kotlinx.coroutines.launch
     
     data class ArtistRanking(
@@ -137,7 +138,8 @@
         var chartKind by mutableStateOf(ChartKind.COUNTRY)
         var chartGenre by mutableStateOf(chartGenres.first())
         var chartCountry by mutableStateOf(ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage))
-        val chartEntries = mutableStateListOf<ChartEntry>()
+        var chartEntries by mutableStateOf(emptyList<ChartEntry>())
+            private set
         var isChartLoading by mutableStateOf(false)
 
         init {
@@ -154,18 +156,16 @@
          * already decided.
          */
         fun loadChart(kind: ChartKind, genre: ChartGenre) {
+            chartJob?.cancel()
             chartKind = kind
             chartGenre = genre
-
-            // A switch made mid-flight is cancelled, not raced: when only kind and genre were compared, a slow answer for
-            // the country picked before this one could land after the new one and put the old country's songs back.
-            chartJob?.cancel()
+            isChartLoading = true
             val country = chartCountry
+            val countryCode = currentCountryCode()
             chartJob = viewModelScope.launch {
-                isChartLoading = true
-                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), country)
-                chartEntries.clear()
-                chartEntries.addAll(entries)
+                val entries = fetchChart(api, kind, genre, CHART_LENGTH, countryCode, country)
+                ensureActive()
+                chartEntries = entries
                 isChartLoading = false
             }
         }

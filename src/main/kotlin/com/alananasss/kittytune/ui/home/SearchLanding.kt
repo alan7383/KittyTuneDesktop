@@ -22,11 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.NewReleases
-import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +62,7 @@ import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.ScrollableLazyRow
+import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter
 import com.alananasss.kittytune.ui.player.PlaybackContext
@@ -123,7 +128,7 @@ fun SearchLanding(
                 ) {
                     LandingDoorCard(
                         title = str("explorer_charts"),
-                        icon = Icons.Rounded.TrendingUp,
+                        icon = Icons.AutoMirrored.Rounded.TrendingUp,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenCharts,
@@ -184,8 +189,9 @@ internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewMode
     // and play positions map over the same visible list so the index still hits the right song.
     val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
     val blockedArtistIds by BlockManager.blockedArtistIdsFlow.collectAsState()
-    val entries = remember(vm.chartPreview.toList(), blockedTrackIds, blockedArtistIds) {
-        vm.chartPreview.filter { !BlockManager.isBlocked(it.track) }
+    val chart = vm.chartPreview
+    val entries = remember(chart, blockedTrackIds, blockedArtistIds) {
+        chart.filter { !BlockManager.isBlocked(it.track) }
     }
     ChartPreviewSection(
         kind = vm.chartPreviewKind,
@@ -535,56 +541,68 @@ internal fun ChartPreviewSection(
     onArtistClick: TrackArtistClick,
     onSeeAll: () -> Unit,
 ) {
-    // One card on the page's own inset, like My Wave and the statistics around it, with the title as the way in,
-    // an arrow after its words where the eye is, instead of a "see all" at the far right of the row.
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth().padding(horizontal = CONTENT_PADDING),
     ) {
-    Column(Modifier.padding(top = 8.dp, bottom = 10.dp)) {
-        com.alananasss.kittytune.ui.profile.ArtistSectionTitle(str("chart_section_title"), onOpen = onSeeAll)
-
-        SongChart(
-            kind = kind,
-            genre = ChartsViewModel.chartGenres.first(),
-            genres = ChartsViewModel.chartGenres,
-            onKindChange = onKindChange,
-            onGenreChange = {},
-            // The landing previews one genre; choosing between them belongs to the chart itself.
-            showGenreRow = false,
-            compactKinds = true,
-            isSwitching = isLoading && entries.isNotEmpty(),
-            modifier = Modifier.padding(horizontal = CONTENT_PADDING - 6.dp),
-        )
-
-        Spacer(Modifier.height(6.dp))
-
-        if (entries.isEmpty() && isLoading) {
-            repeat(3) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .clickable(role = Role.Button, onClickLabel = str("btn_see_all"), onClick = onSeeAll)
+                    .padding(start = 4.dp, end = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = str("chart_section_title"),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = CONTENT_PADDING, vertical = 3.dp)
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                )
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+            SongChart(
+                kind = kind,
+                genre = ChartsViewModel.chartGenres.first(),
+                genres = ChartsViewModel.chartGenres,
+                onKindChange = onKindChange,
+                onGenreChange = {},
+                showGenreRow = false,
+            )
+            when {
+                isLoading -> ChartLoadingRows()
+                entries.isEmpty() -> EmptyChart(onRetry = { onKindChange(kind) })
+                else -> {
+                    val firstRow = if (entries.first().rank == 1) 1 else 0
+                    if (firstRow > 0) {
+                        ChartLeadTrack(entries.first(), currentTrack, { onPlayFrom(0) }, onArtistClick)
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        for (index in firstRow until entries.size) {
+                            val entry = entries[index]
+                            ChartTrackRow(
+                                track = entry.track,
+                                rank = entry.rank,
+                                currentlyPlayingTrack = currentTrack,
+                                onClick = { onPlayFrom(index) },
+                                onArtistClick = onArtistClick,
+                                shape = getSettingsShape(entries.size - firstRow, index - firstRow),
+                            )
+                        }
+                    }
+                }
             }
         }
-
-        if (entries.isNotEmpty()) {
-            entries.forEachIndexed { index, entry ->
-                ChartTrackRow(
-                    track = entry.track,
-                    rank = entry.rank,
-                    currentlyPlayingTrack = currentTrack,
-                    onClick = { onPlayFrom(index) },
-                    onArtistClick = onArtistClick,
-                )
-            }
-        }
-    }
     }
 }
 

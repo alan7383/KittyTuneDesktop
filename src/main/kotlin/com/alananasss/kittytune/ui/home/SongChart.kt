@@ -8,60 +8,77 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
-import com.alananasss.kittytune.ui.common.TrackArtistClick
-import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.ShimmerBox
+import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.ui.common.pressScale
-import com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter
+import java.text.NumberFormat
 
-/**
- * A song chart: the songs in order, with their place in the order.
- *
- * Two choices, both of which the server decides: which list (`top` is the biggest songs, `trending`
- * is the ones climbing) and which genre. The rank is the row's identity here, so it is set in the
- * accent colour and never shares a column with the play count — a chart you have to count down to
- * read is a list.
- */
 @Composable
-fun SongChart(
+internal fun SongChart(
     kind: ChartKind,
     genre: ChartGenre,
     genres: List<ChartGenre>,
@@ -71,251 +88,361 @@ fun SongChart(
     showGenreRow: Boolean = true,
     country: ChartCountry? = null,
     onCountryChange: (ChartCountry) -> Unit = {},
-    /**
-     * A switch is in flight, so the list below is about to be replaced.
-     *
-     * Without this the segmented button flips and the rows underneath stay put for as long as the
-     * request takes, which is indistinguishable from the switch doing nothing.
-     */
-    isSwitching: Boolean = false,
-    /** The lists as small chips that scroll, for a preview on a page; the chart's own page stretches them across. */
-    compactKinds: Boolean = false,
 ) {
-    Column(modifier = modifier) {
-        Box {
-            if (compactKinds) {
-                val kindScrollState = rememberScrollState()
-                Row(
-                    Modifier.fillMaxWidth()
-                        .horizontalScroll(kindScrollState)
-                        .horizontalMouseSwipe(kindScrollState)
-                        .fadedHorizontalEdges(kindScrollState, fadeLength = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    ChartKind.entries.forEach { option ->
-                        FilterChip(
-                            selected = option == kind,
-                            onClick = { onKindChange(option) },
-                            label = { Text(str(option.labelKey()), maxLines = 1) },
-                        )
-                    }
-                }
-            } else ExpressiveConnectedButtonGroup(
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val stacked = maxWidth < 540.dp
+            ExpressiveConnectedButtonGroup(
                 options = ChartKind.entries,
                 selectedOption = kind,
-                onOptionSelected = onKindChange,
+                onOptionSelected = { if (it != kind) onKindChange(it) },
+                modifier = Modifier.selectableGroup(),
                 fillMaxWidth = true,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                uncheckedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                iconSpacing = 8.dp,
+                iconProvider = if (stacked) null else { option -> ChartKindIcon(option) },
                 labelProvider = { option ->
-                    Text(
-                        text = str(option.labelKey()),
-                        maxLines = 1,
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (stacked) ChartKindIcon(option)
+                        Text(
+                            text = str(option.labelKey()),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            minLines = if (stacked) 2 else 1,
+                            maxLines = if (stacked) 2 else 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 },
             )
-            if (isSwitching) {
-                LinearWavyProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .height(2.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent,
-                )
-            }
         }
 
         if (country != null && kind == ChartKind.COUNTRY) {
-            Spacer(Modifier.padding(top = 4.dp))
-            val countryRowState = androidx.compose.foundation.lazy.rememberLazyListState()
-            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                state = countryRowState,
-                showsArrows = false,
-                fadeLength = 24.dp,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // The listener's own country first, then the rest in their usual order.
-                items(ChartCountry.entries.sortedBy { if (it == ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage)) 0 else 1 }) { option ->
-                    FilterChip(
-                        selected = option == country,
-                        onClick = { onCountryChange(option) },
-                        // The name alone: Windows draws a flag emoji as two letters ("RU", "US"), which read as a stray code.
-                        label = { Text(str("chart_country_${option.code.lowercase()}"), maxLines = 1) },
-                        shape = FilterChipDefaults.shape,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ),
-                    )
-                }
+            val deviceCountry = ChartCountry.forDevice(Strings.resolvedLanguage)
+            val countries = remember(deviceCountry) {
+                listOf(deviceCountry) + ChartCountry.entries.filterNot { it == deviceCountry }
             }
+            ChartFilter(
+                options = countries,
+                selectedOption = country,
+                icon = Icons.Rounded.Public,
+                label = { str("chart_country_${it.code.lowercase()}") },
+                onSelect = onCountryChange,
+            )
         }
 
         if (showGenreRow && kind == ChartKind.TOP) {
-            // Only for the curated Top 50. The trending feed has no genre to pick — asking it for one
-            // returns an empty chart — so a genre row shown there would be a control that does
-            // nothing, which is worse than no control.
-            Spacer(Modifier.padding(top = 4.dp))
-            val genreRowState = androidx.compose.foundation.lazy.rememberLazyListState()
-            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                state = genreRowState,
-                showsArrows = false,
-                fadeLength = 24.dp,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(genres) { option ->
-                    val selected = option == genre
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onGenreChange(option) },
-                        label = { Text(str("chart_genre_${option.id}"), maxLines = 1) },
-                        shape = FilterChipDefaults.shape,
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ),
-                    )
-                }
+            ChartFilter(
+                options = genres,
+                selectedOption = genre,
+                icon = Icons.Rounded.Tune,
+                label = { str(if (it.id == "all") "genre_all_music" else "chart_genre_${it.id}") },
+                onSelect = onGenreChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartKindIcon(kind: ChartKind) {
+    val icon = when (kind) {
+        ChartKind.COUNTRY -> Icons.Rounded.Public
+        ChartKind.TOP -> Icons.Rounded.Equalizer
+        ChartKind.TRENDING -> Icons.AutoMirrored.Rounded.TrendingUp
+    }
+    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+}
+
+@Composable
+private fun <T> ChartFilter(
+    options: List<T>,
+    selectedOption: T,
+    icon: ImageVector,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        FilledTonalButton(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(label(selectedOption), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Rounded.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 360.dp).widthIn(min = 200.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            options.forEach { option ->
+                val isSelected = option == selectedOption
+                DropdownMenuItem(
+                    text = { Text(label(option), fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
+                    modifier = Modifier.semantics { selected = isSelected },
+                    trailingIcon = if (isSelected) {
+                        { Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    } else null,
+                    onClick = {
+                        expanded = false
+                        if (!isSelected) onSelect(option)
+                    },
+                )
             }
         }
     }
 }
 
-/**
- * One row of a chart.
- *
- * The top three are the ones a listener looks for, so they are set in the accent colour and given the
- * emphasised title; from fourth down the rank steps back to a supporting tone, which is what turns a
- * column of fifty numbers into a podium with a long tail behind it.
- */
 @Composable
-fun ChartTrackRow(
+internal fun ChartLeadTrack(
+    entry: ChartEntry,
+    currentTrack: Track?,
+    onClick: () -> Unit,
+    onArtistClick: TrackArtistClick,
+    modifier: Modifier = Modifier,
+) {
+    val track = entry.track
+    val isCurrent = currentTrack?.id == track.id
+    val colors = MaterialTheme.colorScheme
+    val interaction = remember { MutableInteractionSource() }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val compact = maxWidth < 440.dp
+        val shape = RoundedCornerShape(26.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .pressScale(interaction, pressedScale = 0.985f)
+                .clip(shape)
+                .background(colors.primaryContainer)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = ripple(),
+                    role = Role.Button,
+                    onClickLabel = str("btn_play"),
+                    onClick = onClick,
+                )
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ChartArtwork(
+                track = track,
+                size = if (compact) 72.dp else 106.dp,
+                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 28.dp, bottomStart = 18.dp, bottomEnd = 28.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    text = "#${entry.rank}",
+                    modifier = Modifier.clip(CircleShape).background(colors.primary).padding(horizontal = 10.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.onPrimary,
+                )
+                Text(
+                    text = track.title ?: str("untitled_track"),
+                    style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onPrimaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                ChartTrackCredits(track, onArtistClick, colors.onPrimaryContainer)
+            }
+            Box(
+                modifier = Modifier.size(if (compact) 36.dp else 48.dp).clip(CircleShape).background(colors.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                ChartPlayIcon(isCurrent, colors.onPrimary)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ChartTrackRow(
     track: Track,
     rank: Int,
     currentlyPlayingTrack: Track?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onArtistClick: TrackArtistClick? = null,
+    shape: Shape = RoundedCornerShape(16.dp),
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val onPodium = rank <= 3
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-
-    val rankColor by animateColorAsState(
+    val colors = MaterialTheme.colorScheme
+    val container by animateColorAsState(
         targetValue = when {
-            isCurrent -> MaterialTheme.colorScheme.primary
-            onPodium -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
+            isCurrent -> colors.secondaryContainer
+            hovered -> colors.surfaceContainerHighest
+            else -> colors.surfaceContainerHigh
         },
-        label = "chartRankColor",
+        label = "chartTrackContainer",
     )
-    val titleColor by animateColorAsState(
-        targetValue = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        label = "chartTitleColor",
-    )
-
+    val content = if (isCurrent) colors.onSecondaryContainer else colors.onSurface
+    val supporting = if (isCurrent) colors.onSecondaryContainer else colors.onSurfaceVariant
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .pressScale(interactionSource, pressedScale = 0.99f)
+            .clip(shape)
+            .background(container)
             .hoverable(interactionSource)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
-            )
-            // The same interaction source the hover and the press scale read, so the row does not
-            // answer a click the pointer was never over.
+            .pointerHoverIcon(PointerIcon.Hand)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
+                indication = ripple(),
+                role = Role.Button,
+                onClickLabel = str("btn_play"),
                 onClick = onClick,
             )
-            .pressScale(interactionSource)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "$rank",
-            style = if (onPodium) {
-                MaterialTheme.typography.titleLarge
-            } else {
-                MaterialTheme.typography.titleSmall
-            },
-            fontWeight = FontWeight.Bold,
-            color = rankColor,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(34.dp),
-        )
-
-        Box(contentAlignment = Alignment.Center) {
-            AsyncImage(
-                model = track.thumbnailUrl,
-                contentDescription = null,
-                error = rememberDefaultAvatarPainter(),
-                fallback = rememberDefaultAvatarPainter(),
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp)),
+        Box(
+            modifier = Modifier.size(36.dp).clip(CircleShape)
+                .background(if (onPodium) colors.tertiaryContainer else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = rank.toString(),
+                style = if (onPodium) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (onPodium) colors.onTertiaryContainer else supporting,
             )
-
-            when {
-                isCurrent -> Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.GraphicEq,
-                        contentDescription = str("player_playing_now"),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                // A chart is a queue: pressing a song means playing the chart from there, so the cover
-                // offers that on hover rather than hiding it behind a menu.
-                hovered -> Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
         }
-
-        Spacer(Modifier.width(12.dp))
-
+        ChartArtwork(track, size = 44.dp, shape = RoundedCornerShape(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title ?: str("untitled_track"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (onPodium || isCurrent) FontWeight.Bold else FontWeight.Medium,
+                color = content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (isCurrent || onPodium) FontWeight.Bold else FontWeight.Medium,
-                color = titleColor,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ArtistLinkText(
-                    track = track,
-                    onArtistClick = onArtistClick,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = " • ${formatCompactNumber(track.playbackCount.toLong())} ${str("playback_count_formatted")}",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            ChartTrackCredits(track, onArtistClick, supporting)
+        }
+        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+            if (isCurrent || hovered) ChartPlayIcon(isCurrent, content)
+        }
+    }
+}
+
+@Composable
+private fun ChartArtwork(track: Track, size: Dp, shape: Shape) {
+    val hasArtwork = !track.artworkUrl.isNullOrBlank() || !track.user?.avatarUrl.isNullOrBlank()
+    val colors = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier.size(size).clip(shape).background(colors.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(size * 0.4f),
+            tint = colors.onSurfaceVariant,
+        )
+        if (hasArtwork) {
+            AsyncImage(
+                model = track.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartTrackCredits(track: Track, onArtistClick: TrackArtistClick?, color: Color) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        ArtistLinkText(
+            track = track,
+            onArtistClick = onArtistClick,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            hoverColor = color,
+        )
+        if (track.playbackCount > 0) {
+            val locale = Strings.locale()
+            val count = remember(track.playbackCount, locale) {
+                NumberFormat.getCompactNumberInstance(locale, NumberFormat.Style.SHORT)
+                    .apply { maximumFractionDigits = 1 }
+                    .format(track.playbackCount)
             }
+            Text(
+                text = "$count ${str("playback_count_formatted")}",
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartPlayIcon(isCurrent: Boolean, color: Color) {
+    Icon(
+        imageVector = if (isCurrent) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
+        contentDescription = if (isCurrent) str("player_playing_now") else null,
+        tint = color,
+    )
+}
+
+@Composable
+internal fun ChartLoadingRows(modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        ShimmerBox(Modifier.fillMaxWidth().height(122.dp))
+        Spacer(Modifier.height(6.dp))
+        repeat(4) {
+            ShimmerBox(Modifier.fillMaxWidth().height(60.dp))
+        }
+    }
+}
+
+@Composable
+internal fun EmptyChart(onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = str("no_tracks_found"),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onRetry) { Text(str("btn_retry")) }
         }
     }
 }

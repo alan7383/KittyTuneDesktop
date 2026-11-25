@@ -35,6 +35,7 @@ import com.alananasss.kittytune.utils.Logger
     import kotlinx.coroutines.async
     import kotlinx.coroutines.coroutineScope
     import kotlinx.coroutines.delay
+    import kotlinx.coroutines.ensureActive
     import kotlinx.coroutines.flow.first
     import kotlinx.coroutines.launch
     import kotlinx.coroutines.withContext
@@ -239,7 +240,9 @@ import com.alananasss.kittytune.utils.Logger
         private var recentSearchesJob: Job? = null
 
         /** Enough of the chart to preview on the landing; the whole thing lives on the Charts screen. */
-        val chartPreview = mutableStateListOf<ChartEntry>()
+        var chartPreview by mutableStateOf(emptyList<ChartEntry>())
+            private set
+        private var chartPreviewJob: Job? = null
         var chartPreviewKind by mutableStateOf(ChartKind.COUNTRY)
             private set
         var isChartPreviewLoading by mutableStateOf(false)
@@ -353,9 +356,10 @@ import com.alananasss.kittytune.utils.Logger
         }
 
         fun loadChartPreview(kind: ChartKind = chartPreviewKind) {
+            chartPreviewJob?.cancel()
             chartPreviewKind = kind
-            viewModelScope.launch {
-                isChartPreviewLoading = true
+            isChartPreviewLoading = true
+            chartPreviewJob = viewModelScope.launch {
                 val entries = fetchChart(
                     api = api,
                     kind = kind,
@@ -365,11 +369,9 @@ import com.alananasss.kittytune.utils.Logger
                     countryCode = "US",
                     country = ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage),
                 )
-                if (kind == chartPreviewKind) {
-                    chartPreview.clear()
-                    chartPreview.addAll(entries)
-                    isChartPreviewLoading = false
-                }
+                ensureActive()
+                chartPreview = entries
+                isChartPreviewLoading = false
             }
         }
 

@@ -6,6 +6,7 @@ import com.alananasss.kittytune.data.network.SoundCloudApi
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.google.gson.Gson
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -75,6 +76,8 @@ internal suspend fun fetchChart(
         .filter { it.id > 0L }
         .distinctBy { it.id }
         .mapIndexed { index, track -> ChartEntry(rank = index + 1, track = track, score = 0.0) }
+} catch (e: CancellationException) {
+    throw e
 } catch (e: Exception) {
     e.printStackTrace()
     emptyList()
