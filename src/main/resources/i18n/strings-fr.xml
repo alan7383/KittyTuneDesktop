@@ -3723,4 +3723,16 @@
     <string name="pet_status_hinting">A une idée</string>
     <string name="pet_status_grumpy">Pas fan</string>
     <string name="pet_status_surprised">Surpris</string>
+    <string name="performance_in_use">Carte utilisée : %s</string>
+    <string name="performance_cpu">Processeur (sans carte graphique)</string>
+    <string name="performance_unknown">Non indiqué par le pilote</string>
+    <string name="performance_gpu_mismatch">Vous avez demandé %s, mais une autre carte est utilisée. Essayez les paramètres graphiques Windows ci-dessous.</string>
+    <string name="performance_named_gpu_note">Choisissez une carte et redémarrez. En mode de compatibilité, choisissez-la dans les paramètres Windows ci-dessous.</string>
+    <string name="performance_detection_failed">Impossible de lister les cartes. Utilisez les paramètres graphiques Windows ci-dessous.</string>
+    <string name="performance_gpu_missing">%s est indisponible. Choisissez une autre carte ou Automatique.</string>
+    <string name="performance_gpu_other">Choisissez ces cartes dans Windows : %s</string>
+    <string name="performance_detecting">Recherche des cartes graphiques…</string>
+    <string name="performance_windows_rendering">Graphiques Windows</string>
+    <string name="performance_compatible_rendering">Mode de compatibilité</string>
+    <string name="performance_macos_rendering">Graphiques macOS</string>
 </resources>

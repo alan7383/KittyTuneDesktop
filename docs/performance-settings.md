@@ -1,5 +1,11 @@
 # Performance settings
 
+Windows graphics choices now use the detected adapter names. DXGI lists cards and their OS preference order through the existing JNA dependency; this does not run a helper process or poll hardware. Selection stores a stable PCI/name identity, then resolves it again at startup. Missing, duplicate or unaddressable cards are not silently replaced with another named card. Only choices representable by the renderer's existing adapter preference are selectable; other cards require Windows graphics settings. This is a preference request, not arbitrary adapter-ID binding.
+
+The graphics page reads the renderer's actual device name separately and warns if the requested card is not used, including CPU fallback. OpenGL adapter routing still belongs to Windows/the driver, so that selection remains in Windows settings. No driver compatibility checks or renderer fallback are disabled. GPU inventory is loaded off the UI thread, only when needed. No migration or native renderer replacement is included.
+
+The new regression cases cover mapping, duplicate/missing devices, persistence, reset, real Windows DXGI enumeration and screenshots at 100%, 125% and 150% display scales. Screenshot fixtures do not verify physical GPU routing. Check results are pending for this follow-up.
+
 Settings → Performance controls rendering and cache budgets without changing the player layout, artwork quality or audio effects. Changes take effect after restarting KittyTune. The initial settings retain the app's existing defaults.
 
 **Presets** offers Resource saver for smaller caches, Balanced for KittyTune's defaults, and Smooth browsing for larger caches and fewer artwork reloads. Each preset selects automatic graphics and enables vertical sync. Use **Graphics** and **Cache limits** to adjust the settings individually.
