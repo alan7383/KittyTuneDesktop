@@ -25,8 +25,8 @@ fun makeTimeString(duration: Long): String {
 
 /**
  * Localized duration string formatted for remaining queue time:
- * - hours and minutes: e.g. "2h 14min", "2 ч 14 мин", "2 Std. 14 Min."
- * - minutes only: e.g. "45 min", "45 мин", "45 Min."
+ * - hours and minutes: e.g. "2h 14min", "2 ч 14 м", "2 Std. 14 Min."
+ * - minutes only: e.g. "45 min", "45 м", "45 Min."
  * - seconds under a minute: e.g. "30s", "30 с", "30 Sek."
  */
 fun formatQueueDuration(durationMs: Long): String {

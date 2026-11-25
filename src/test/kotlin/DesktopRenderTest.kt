@@ -110,8 +110,8 @@ class DesktopRenderTest {
                 HomeStatsDays.Day(start.plusDays(index.toLong()), minutes * 60_000L)
             }
             val stats = HomeStatsSummary(days.sumOf { it.listenedMs }, 245, 31, null, days)
-            assertEquals("13 ч 0 мин", listenedLabel(stats.listenedMs))
-            assertEquals("42 мин", listenedLabel(42 * 60_000L))
+            assertEquals("13 ч 0 м", listenedLabel(stats.listenedMs))
+            assertEquals("42 м", listenedLabel(42 * 60_000L))
             val scene = ImageComposeScene(width = 476, height = 194) {
                 SoundTuneTheme(
                     themeMode = AppThemeMode.DARK, dynamicColor = false, pureBlack = false,

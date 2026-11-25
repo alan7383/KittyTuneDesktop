@@ -5,7 +5,7 @@ Letters with an identical Latin outline share it. The remaining outlines are
 drawn here from strokes, bowls, and the components of this typeface.
 """
 
-from math import cos, pi, radians, sin, tan
+from math import cos, hypot, pi, radians, sin, tan
 from unicodedata import decomposition
 
 from cyrillic_outlines import Letter, Outline, Pen, source_outline
@@ -104,86 +104,213 @@ class Design:
         return outline.transform(sx=self.scales[cap], shear=self.slant, dx=-self.slant * height / 2)
 
 
-def legs(p, count, floor=False):
+def legs(p, count, floor=False, stem_scale=1.0):
+    stem_w = p.v * stem_scale
+    corner_r = min(stem_w * .32 * p.roundness, p.h * .46)
     for index in range(count):
-        x = p.left + index * (p.width - p.v) / (count - 1)
-        p.stem(x)
-    y = p.bottom + p.h / 2 if floor else p.top - p.h / 2
-    p.bar(p.left + .35 * p.v, y, p.right - .35 * p.v)
+        x = p.left + index * (p.width - stem_w) / (count - 1)
+        if floor:
+            p.stem(x, bottom=max(0.0, p.bottom * .08), top=p.tip, weight=stem_scale, bottom_r=corner_r)
+        else:
+            p.stem(x, bottom=p.bottom, top=p.top, weight=stem_scale, top_r=corner_r)
+    bar_radius = min(p.h * .50 * p.roundness, p.v * .32 * p.roundness)
+    y = max(0, p.bottom * .08) + p.h / 2 if floor else p.top - p.h / 2
+    p.bar(p.left + .35 * stem_w, y, p.right - .35 * stem_w, radius=bar_radius)
 
 
-def tail(p, x, depth=350, direction=1):
-    half = p.v * .49
-    p.polygon([(x - half, .55 * p.h), (x + half, .55 * p.h),
-               (x + half + direction * .28 * p.v, -depth),
-               (x - half + direction * .28 * p.v, -depth)])
+def tail(p, x, depth=350, direction=1, width_scale=1.0):
+    half = p.v * .45 * width_scale
+    foot_r = min(p.roundness * half * .85, p.radius * .70)
+    p.polygon([(x - half, .52 * p.h), (x + half, .52 * p.h),
+               (x + half + direction * .24 * p.v, -depth),
+               (x - half + direction * .24 * p.v, -depth)], radius=foot_r)
+
+
+def cyrillic_i(p):
+    """Unified N-mirrored single-contour Cyrillic и with native Google Sans Flex joins."""
+    l, r, b, h, tip = p.left, p.right, p.bottom, p.top, p.tip
+    w = p.width
+    v = min(p.v, w * .32)
+    wt = min(max((p.v - 170.0) / 230.0, 0.0), 1.0)
+    top_cap_r = v * .50 * p.roundness
+    top_drop = tip - top_cap_r
+    bot_rise = b + top_cap_r
+    diag_w = min(v * (.85 - .08 * wt), max(36.0, (w - 1.55 * v) * .62))
+    ax, ay = l + v * .76, b + v * .42
+    bx, by = r - v * .76, h - v * .42
+    dx, dy = bx - ax, by - ay
+    dist = max(hypot(dx, dy), 1.0)
+    nx, ny = -dy / dist, dx / dist
+    ox, oy = nx * diag_w * .5, ny * diag_w * .5
+    crotch_low = min(h * .36, max(p.h * .65, (ay + oy) + (l + v - (ax + ox)) * dy / max(dx, 1.0)))
+    crotch_high = max(h * .64, min(h - p.h * .65, (by - oy) + (r - v - (bx - ox)) * dy / max(dx, 1.0)))
+    notch = min(h * .22, v * .65)
+    t_round = p.roundness
+    diag_sh_x = min(v * (1.14 + .24 * t_round), (w - v) * .46)
+    diag_sh_y = min(top_cap_r * .58, h * .10)
+    corner_x1 = v * (.55 + .40 * t_round)
+    corner_x2 = v * (.50 + .16 * t_round)
+    notch_in = 4.0 * t_round + 2.0
+    p.outline.contours.append([
+        (l + v * .5, b, True), (l, b, False), (l, bot_rise, True),
+        (l, top_drop, True), (l, tip, False), (l + v * .5, tip, True),
+        (l + v, tip, False), (l + v, top_drop, True),
+        (l + v, crotch_low + notch, True), (l + v - notch_in, crotch_low, True),
+        (r - diag_sh_x, tip - diag_sh_y, True),
+        (r - corner_x1, tip, False), (r - corner_x2, tip, True),
+        (r, tip, False), (r, top_drop, True),
+        (r, bot_rise, True), (r, b, False), (r - v * .5, b, True),
+        (r - v, b, False), (r - v, bot_rise, True),
+        (r - v, crotch_high - notch, True), (r - v + notch_in, crotch_high, True),
+        (l + diag_sh_x, b + diag_sh_y, True),
+        (l + corner_x1, b, False),
+    ])
 
 
 def el(p):
-    l, r, b, h, w = p.left, p.right, p.bottom, p.top, p.width
-    shoulder = l + w * .365
-    bend = min(p.radius, .42 * p.h, w * .10)
-    foot = b + .95 * p.h
+    """Architectural Google Sans Cyrillic Л/л with constant-thickness monotonic left arch."""
+    l, r, b, h, tip, w = p.left, p.right, p.bottom, p.top, p.tip, p.width
+    v = min(p.v, w * .32)
+    hbar = min(p.h * .94, h * .23)
+    diag_w = min(v * .92, w * .30)
+    shoulder = l + max(w * .34, v * 1.10)
+    bend = min(v * .32 * p.roundness, hbar * .46, w * .10)
+    stem_cap = v * .50 * p.roundness
+    foot_r = min(v * .32 * p.roundness, hbar * .36)
+    foot_h = min(b + max(hbar * .52, diag_w * .32), h * .14)
+    span = shoulder - l
+    outer_ctrl = (shoulder - span * .26, h * .38)
+    inner_ctrl = (shoulder - span * .26 + diag_w * 1.02, h * .38 - diag_w * .14)
+    foot_inner = l + diag_w * 1.06
     p.outline.contours.append([
-        (l + bend, b, True), (l, b, False), (l, b + bend, True),
-        (l, foot - bend, True), (l, foot, False), (l + bend, foot, True),
-        (l + w * .22, foot, False), (shoulder - p.v * .45, h * .59, False),
-        (shoulder, h - bend, True), (shoulder, h, False), (shoulder + bend, h, True),
+        (l + foot_r, b, True), (l, b, False), (l, b + foot_r, True),
+        (l, foot_h - foot_r, True), (l, foot_h, False), (l + foot_r * .9, foot_h, True),
+        outer_ctrl + (False,),
+        (shoulder - span * .02, h - bend, True),
+        (shoulder, h, False), (shoulder + bend, h, True),
         (r - bend, h, True), (r, h, False), (r, h - bend, True),
-        (r, b + bend, True), (r, b, False), (r - bend, b, True),
-        (r - p.v + bend, b, True), (r - p.v, b, False), (r - p.v, b + bend, True),
-        (r - p.v, h - p.h, True), (shoulder + p.v * .76, h - p.h, True),
-        (shoulder + p.v * .36, h * .26, False), (l + w * .29, b, False),
+        (r, b + stem_cap, True), (r, b, False), (r - v * .5, b, True),
+        (r - v, b, False), (r - v, b + stem_cap, True),
+        (r - v, h - hbar, True),
+        (shoulder + diag_w * .86, h - hbar, True),
+        inner_ctrl + (False,),
+        (foot_inner, b + foot_r * .45, True),
+        (foot_inner - diag_w * .24, b, False),
     ])
 
 
-def angled_branches(p, axis, side):
-    span = p.right - axis if side > 0 else axis - p.left
-    reach = lambda x: axis + side * x
-    offset = min(span * .42, p.v * 1.32)
-    mid = p.top * .515
+def angled_branches(p, axis, side, y_mid=None, span_scale=1.0, thickness_scale=1.0):
+    """Native Google Sans K/k-style two-piece polygon arm + lower leg flush inside [bottom..tip]."""
+    span = (p.right - axis if side > 0 else axis - p.left) * span_scale
+    reach = lambda dx: axis + side * dx
+    mid_y = p.top * .47 if y_mid is None else y_mid
+    v = min(p.v * thickness_scale, span * .48)
+    arm_foot = min(v * 1.02, span * .39)
+    leg_foot = min(v * 1.02, span * .39)
+    arm_r = min(arm_foot * .49, v * .44 * p.roundness)
+    leg_r = min(leg_foot * .49, v * .44 * p.roundness)
+    join_half = max(p.h * thickness_scale * .55, min(v * .60, p.top * .22))
+    upper_x = max(span - v * .05, arm_foot + v * .15)
+    lower_x = max(span, leg_foot + v * .15)
+    arm_start_x = -v * .08
+    arm_lo_y = mid_y - join_half
+    arm_top_end_l = upper_x - arm_foot
     p.polygon([
-        (axis - side * .26 * p.v, mid), (reach(span - offset), p.top),
-        (reach(span), p.top), (axis + side * .51 * p.v, mid),
-        (reach(span + .06 * p.v), p.bottom), (reach(span - offset), p.bottom),
-    ])
+        (reach(arm_start_x), arm_lo_y),
+        (reach(arm_start_x), mid_y + join_half),
+        (reach(arm_top_end_l), p.tip),
+        (reach(upper_x), p.tip),
+    ], radius=arm_r)
+    branch_lo_x = max(span * .12, v * .18)
+    t_lo = min(max((branch_lo_x - arm_start_x) / max(arm_top_end_l - arm_start_x, 1.0), 0.0), .62)
+    branch_lo_y = arm_lo_y + t_lo * (p.tip - arm_lo_y)
+    branch_x = min(lower_x - v * .25, branch_lo_x + arm_foot * .56)
+    t_hi = min(max((branch_x - arm_start_x) / max(arm_top_end_l - arm_start_x, 1.0), 0.10), .70)
+    branch_y = (mid_y + branch_lo_y) * .5 + t_hi * (p.tip - mid_y) * .52
+    p.polygon([
+        (reach(branch_lo_x), branch_lo_y),
+        (reach(branch_x), branch_y),
+        (reach(lower_x), p.bottom),
+        (reach(lower_x - leg_foot), p.bottom),
+    ], radius=leg_r)
 
 
 def che_curve(p, l, r, pen=None):
     pen = p if pen is None else pen
-    h = p.top
+    h, tip = p.top, p.tip
+    bowl_low = h * .38
     pen.stroke(
-        (l, h - pen.roundness * pen.h * .43), (l, h * .68),
-        ((l, h * .39), ((l + r) / 2, h * .35), (r, h * .52)),
-        cap=pen.roundness * .89,
+        (l, tip - pen.v * .48 * pen.roundness), (l, h * .63),
+        ((l, bowl_low - p.h * .02), (r - (r - l) * .16, bowl_low - p.h * .05), (r, h * .45)),
+        weight=.92,
+        cap=pen.roundness * .95,
     )
 
 
 def che(p):
     p.stem(p.right - p.v)
-    che_curve(p, p.left + p.v / 2, p.right - p.v * .7)
+    che_curve(p, p.left + p.v * .48, p.right - p.v * .62)
 
 
 def ze(p, reversed=False):
-    l, r, c, h = p.left, p.right, p.mid, p.top
-    inset = min(p.v * .53, p.width * .15)
-    pen = Pen(p.outline, p.v * .94, min(p.h, h * .256), p.roundness)
-    upper, lower = h - .49 * pen.h, .47 * pen.h
-    mid = h * .519
-    x, waist = r - inset, c - p.width * .145
-    pen.stroke(
-        (l + inset * .48, h * .796),
-        ((l + p.width * .36, upper + .12 * h), (x, upper + .09 * h), (x, h * .75)),
-        ((x, h * .605), (r - p.width * .30, mid), (waist, mid)),
-        cap=p.roundness * .87,
-    )
-    pen.stroke(
-        (waist, mid),
-        ((r - p.width * .23, mid), (r - inset * .80, h * .43), (r - inset * .80, h * .273)),
-        ((r - inset * .80, lower - .12 * h), (l + p.width * .38, lower - .15 * h),
-         (l + inset * .36, .224 * h)),
-        cap=p.roundness * .87,
-    )
+    """Single-contour Google Sans 3-aligned Cyrillic З/з with true waist taper and circular bowls."""
+    l, r, h, w = p.left, p.right, p.top, p.width
+    ov = p.curve_ov
+    v_s = min(p.v * .92, w * .34)
+    h_s = min(p.h * .90, h * .22)
+    h_mid = min(p.h * .84, h * .19)
+    mid_y = h * .515
+    t_out, b_out = h + ov, -ov
+    top_r = r - w * .045
+    bot_r = r
+    in_top_r = max(l + w * .38, top_r - v_s * .94)
+    in_bot_r = max(l + w * .38, bot_r - v_s * .96)
+    bar_l = max(l + w * .35, min(l + w * .44, in_top_r - v_s * .35))
+    bar_b, bar_t = mid_y - h_mid * .5, mid_y + h_mid * .5
+    waist_x = min(in_top_r - v_s * .05, bar_l + (in_top_r - bar_l) * .45)
+    top_cx = l + w * .47
+    bot_cx = l + w * .49
+    in_t = t_out - h_s
+    in_b = b_out + h_s
+    y_tr = h * .75
+    y_br = h * .265
+    waist_r = min(top_r - w * .06, l + w * .76)
+    tip_r = min(v_s * .34 * p.roundness, h_s * .44)
+    tip_bot_l = l + w * .01
+    tip_bot_y = h * .225
+    tip_top_l = l + w * .04
+    tip_top_y = h * .77
+    in_tip_bx = l + w * .175
+    in_tip_by = h * .265
+    in_tip_tx = l + w * .195
+    in_tip_ty = h * .73
+    # Closed single contour tracing outer lower -> tips/counters -> upper -> right waist
+    p.outline.contours.append([
+        (bot_cx, b_out, True),
+        (l + w * .19, b_out, False), (tip_bot_l, tip_bot_y - tip_r, True),
+        (tip_bot_l, tip_bot_y + tip_r * .4, True), (l + w * .06, in_tip_by + tip_r * .8, False),
+        (in_tip_bx, in_tip_by, True),
+        (in_tip_bx + w * .09, in_b, False), (bot_cx, in_b, True),
+        (bot_cx + (in_bot_r - bot_cx) * .46, in_b, False),
+        (in_bot_r, in_b + (bar_b - in_b) * .28, False), (in_bot_r, (in_b + bar_b) * .5, True),
+        (in_bot_r, bar_b - (in_b - bar_b) * .26, False),
+        (waist_x + (in_bot_r - waist_x) * .55, bar_b, False), (waist_x, bar_b, True),
+        (bar_l + tip_r, bar_b, True), (bar_l, bar_b, False), (bar_l, bar_b + tip_r, True),
+        (bar_l, bar_t - tip_r, True), (bar_l, bar_t, False), (bar_l + tip_r, bar_t, True),
+        (waist_x, bar_t, True),
+        (waist_x + (in_top_r - waist_x) * .55, bar_t, False),
+        (in_top_r, bar_t + (in_t - bar_t) * .24, False), (in_top_r, (bar_t + in_t) * .5, True),
+        (in_top_r, in_t - (in_t - bar_t) * .26, False),
+        (top_cx + (in_top_r - top_cx) * .46, in_t, False), (top_cx, in_t, True),
+        (in_tip_tx + w * .08, in_t, False), (in_tip_tx, in_tip_ty, True),
+        (tip_top_l + w * .06, tip_top_y - tip_r, False), (tip_top_l, tip_top_y, True),
+        (tip_top_l, tip_top_y + tip_r * 1.4, False), (top_cx * .48, t_out, False), (top_cx, t_out, True),
+        (top_cx + (top_r - top_cx) * .48, t_out, False), (top_r, y_tr + (t_out - y_tr) * .52, False), (top_r, y_tr, True),
+        (top_r, mid_y + h * .10, False), (waist_r, mid_y + h * .01, True),
+        (waist_r, mid_y - h * .01, True),
+        (bot_r, mid_y - h * .10, False), (bot_r, y_br, True),
+        (bot_r, b_out + (y_br - b_out) * .48, False), (bot_cx + (bot_r - bot_cx) * .48, b_out, False),
+    ])
     if reversed:
         p.outline = p.outline.transform(sx=-1, dx=p.outline.advance)
 
@@ -198,25 +325,26 @@ def add_shape(p, shape, x, y=0, sx=1, sy=1):
 
 def stem_bowl(p, stem, bowl_top=None):
     p.stem(stem)
-    p.bowl(stem, p.bottom, p.right, p.top * .62 if bowl_top is None else bowl_top)
+    p.bowl(stem, p.bottom * .55, p.right, p.top * .62 if bowl_top is None else bowl_top)
 
 
 def open_e(p):
-    """An oval spine and a shorter arm, with an aperture at both ends of the arm."""
+    """Clean C-like oval spine with Google Sans center arm for Є/Э/є/э."""
     l, c, r, h = p.left, p.mid, p.right, p.top
-    pen = Pen(p.outline, p.v * .96, min(p.h, h * .261), p.roundness)
-    x = l + pen.v / 2
-    high, mid, low = h + 27 - pen.h / 2, h * .506, -27 + pen.h / 2
+    pen = Pen(p.outline, p.v * .95, min(p.h, h * .255), p.roundness)
+    x = l + pen.v * .48
+    ov = p.v * .038 * p.roundness + 8
+    high, mid, low = h + ov - pen.h * .48, h * .505, -ov + pen.h * .48
     pen.stroke(
-        (r - .12 * p.width, h * .810),
-        ((r - .23 * p.width, high - .013 * h), (c + .13 * p.width, high), (c, high)),
-        ((l + .237 * p.width, high), (x, h * .749), (x, mid)),
-        ((x, h * .254), (l + .242 * p.width, low), (c, low)),
-        ((c + .16 * p.width, low), (r - .19 * p.width, low + .07 * h),
-         (r - .099 * p.width, .198 * h)),
-        cap=p.roundness * .76,
+        (r - .11 * p.width, h * .80),
+        ((r - .22 * p.width, high), (c + .12 * p.width, high), (c, high)),
+        ((l + .22 * p.width, high), (x, h * .75), (x, mid)),
+        ((x, h * .25), (l + .22 * p.width, low), (c, low)),
+        ((c + .14 * p.width, low), (r - .20 * p.width, low),
+         (r - .10 * p.width, h * .20)),
+        cap=p.roundness * .90,
     )
-    p.bar(x, mid, l + p.width * .64, thickness=min(p.h * .92, h * .176))
+    p.bar(x, mid, l + p.width * .66, thickness=min(p.h * .92, h * .18))
 
 
 def oval_counter(outline):
@@ -229,194 +357,335 @@ def modern_letters(d):
         def put(characters, drawing):
             d.put(characters[0 if cap else 1], drawing)
 
-        p = d.letter(cap, 870 if cap else 675, right=78)
-        l, r, h, b = p.left, p.right, p.top, p.bottom
-        p.polygon([(l, b), (l, h), (r, h), (r, h - p.h),
-                   (l + p.v, h - p.h), (l + p.v, b)])
+        p = d.letter(cap, 880 if cap else 690, right=78)
+        l, r, h = p.left, p.right, p.top
+        corner_r = min(p.v * .32 * p.roundness, p.h * .46)
+        bar_r = min(p.h * .50 * p.roundness, p.v * .32 * p.roundness)
+        p.stem(l, top=h, top_r=corner_r)
+        p.bar(l + .35 * p.v, h - p.h / 2, r, radius=bar_r)
         put("Гг", p)
 
-        p = d.letter(cap, 930 if cap else 720, right=77)
-        l, r, h, b = p.left, p.right, p.top, p.bottom
-        p.polygon([(l, b), (l, h), (r - p.v, h), (r - p.v, h + 205),
-                   (r, h + 205), (r, h - p.h), (l + p.v, h - p.h), (l + p.v, b)])
+        p = d.letter(cap, 930 if cap else 730, right=77)
+        l, r, h = p.left, p.right, p.top
+        corner_r = min(p.v * .32 * p.roundness, p.h * .46)
+        bar_r = min(p.h * .50 * p.roundness, p.v * .32 * p.roundness)
+        p.stem(l, top=h, top_r=corner_r)
+        p.bar(l + .35 * p.v, h - p.h / 2, r, radius=bar_r)
+        p.stem(r - p.v * .60, bottom=h - p.h, top=h + (175 if cap else 135), weight=.60)
         put("Ґґ", p)
 
-        p = d.letter(cap, 1050 if cap else 865)
+        p = d.letter(cap, 1065 if cap else 885)
         legs(p, 2)
         put("Пп", p)
 
-        p = d.letter(cap, 1068 if cap else 842)
+        p = d.letter(cap, 1080 if cap else 885, growth=.62 if cap else 1.02)
         p.stem(p.left)
         p.stem(p.right - p.v)
-        p.bar(p.left + .38 * p.v, p.top * .51, p.right - .38 * p.v)
+        p.bar(p.left + .45 * p.v, p.top * .505, p.right - .45 * p.v,
+              thickness=None if cap else min(p.h * .92, p.top * .22))
         if not cap:
             put("Нн", p)
 
-        p = d.letter(cap, 1085 if cap else 875)
-        p.stem(p.left)
-        p.stem(p.right - p.v)
-        p.polygon([
-            (p.left + .44 * p.v, p.bottom),
-            (p.left + .42 * p.v, p.bottom + 1.50 * p.h),
-            (p.right - .49 * p.v, p.top),
-            (p.right - .42 * p.v, p.top - 1.50 * p.h),
-        ], radius=.36 * p.radius)
-        put("Ии", p)
+        if cap:
+            put("Ии", mirror(d.get("N")))
+        else:
+            p = d.letter(False, 910, growth=.85)
+            cyrillic_i(p)
+            put("Ии", p)
 
-        p = d.letter(cap, 1090 if cap else 865)
+        p = d.letter(cap, 1095 if cap else 885)
         legs(p, 2, floor=True)
-        tail(p, p.right - p.v * .39, 344 if cap else 275, 0)
-        p.outline.advance += p.v * .13
+        tail(p, p.right - p.v * .38, 290 if cap else 235, 0, width_scale=.84)
         put("Цц", p)
 
-        p = d.letter(cap, 1040 if cap else 835)
+        p = d.letter(cap, 1055 if cap else 855)
         legs(p, 2, floor=True)
-        tail(p, p.mid, 342 if cap else 280, 0)
+        tail(p, p.mid, 295 if cap else 240, 0, width_scale=.86)
         put("Џџ", p)
 
-        p = d.letter(cap, 1465 if cap else 1195, growth=1.28)
-        legs(p, 3, floor=True)
+        p = d.letter(cap, 1520 if cap else 1245, growth=1.22)
+        legs(p, 3, floor=True, stem_scale=.90)
         put("Шш", p)
 
-        p = d.letter(cap, 1485 if cap else 1215, growth=1.28)
-        legs(p, 3, floor=True)
-        tail(p, p.right - p.v * .39, 344 if cap else 280, 0)
-        p.outline.advance += p.v * .13
+        p = d.letter(cap, 1540 if cap else 1265, growth=1.22)
+        legs(p, 3, floor=True, stem_scale=.90)
+        tail(p, p.right - p.v * .38, 290 if cap else 235, 0, width_scale=.84)
         put("Щщ", p)
 
-        p = d.letter(cap, 1085 if cap else 905, left=54)
+        p = d.letter(cap, 1040 if cap else 885, left=56, growth=.82 if cap else .85)
         el(p)
         put("Лл", p)
 
-        p = d.letter(cap, 1190 if cap else 995, left=55, right=64, growth=.93)
+        p = d.letter(cap, 1150 if cap else 960, left=55, right=64, growth=.90)
         el(p)
-        extension = p.v * .23
-        l, r, b, y = p.left - extension, p.right + extension, p.bottom, p.bottom + p.h
-        foot = min(p.v * .86, p.width * .22)
-        depth = 345 if cap else 278
-        p.polygon([(l, -depth), (l, y), (r, y), (r, -depth), (r - foot, -depth),
-                   (r - foot, b), (l + foot, b), (l + foot, -depth)])
-        p.outline = p.outline.transform(dx=extension)
-        p.outline.advance += extension * 2
+        ext_l, ext_r = p.v * .18, p.v * .18
+        l, r, b = p.left - ext_l, p.right + ext_r, max(0.0, p.bottom * .08)
+        y = b + min(p.h * .80, p.top * .16)
+        foot = min(p.v * .74, p.width * .17)
+        depth = 290 if cap else 240
+        p.bar(l, (b + y) * .5, r, thickness=y - b, radius=min((y - b) * .35 * p.roundness, 32.0))
+        p.stem(l, bottom=-depth, top=y, weight=foot / p.v)
+        p.stem(r - foot, bottom=-depth, top=y, weight=foot / p.v)
+        p.outline = p.outline.transform(dx=ext_l)
+        p.outline.advance += ext_l + ext_r
         put("Дд", p)
 
-        p = d.letter(cap, 1595 if cap else 1350, left=34, right=34, growth=.84)
-        p.stem(p.mid - p.v / 2)
-        angled_branches(p, p.mid, -1)
-        angled_branches(p, p.mid, 1)
+        p = d.letter(cap, 1550 if cap else 1310, left=36, right=36, growth=1.10)
+        p.stem(p.mid - p.v * .43, weight=.86)
+        angled_branches(p, p.mid, -1, thickness_scale=.84)
+        angled_branches(p, p.mid, 1, thickness_scale=.84)
         put("Жж", p)
 
         if not cap:
-            p = d.letter(cap, 895, right=24)
+            p = d.letter(cap, 885, right=35, growth=1.04)
             p.stem(p.left)
-            angled_branches(p, p.left + .61 * p.v, 1)
+            angled_branches(p, p.left + .54 * p.v, 1)
             put("Кк", p)
 
-            p = d.letter(cap, 1108, growth=1.07)
-            l, r, b, h = p.left, p.right, p.bottom, p.top
-            v = min(p.v, p.width * .365)
-            p.polygon([
-                (l, b), (l, h), (l + v * 1.02, h), (p.mid, h * .388),
-                (r - v * 1.02, h), (r, h), (r, b), (r - v, b),
-                (r - v, h * .624), (p.mid + v * .32, h * .168),
-                (p.mid - v * .32, h * .168), (l + v, h * .624), (l + v, b),
+            # Google Sans Flex M-aligned lowercase м reaching baseline cleanly.
+            p = d.letter(cap, 1140, growth=1.04)
+            l, r, b, h, tip = p.left, p.right, p.bottom, p.top, p.tip
+            v = min(p.v * .92, p.width * .28)
+            wt = min(max((p.v - 160.0) / 240.0, 0.0), 1.0)
+            cap_r = v * .50 * p.roundness
+            bot_r = min(cap_r, v * .28 * p.roundness)
+            top_diag = min(v * 1.44, p.width * .39)
+            apex_half = min(v * .31, p.width * .125)
+            valley_y = h * (.18 + .15 * wt)
+            notch_y = h * (.80 - .26 * wt)
+            p.outline.contours.append([
+                (l + v * .5, b, True), (l, b, False), (l, b + cap_r, True),
+                (l, tip - cap_r, True), (l, tip, False), (l + top_diag * .48, tip, True),
+                (l + top_diag * .68, tip, False), (l + top_diag * .94, tip - cap_r * .38, True),
+                (p.mid - 4, valley_y, True), (p.mid + 4, valley_y, True),
+                (r - top_diag * .94, tip - cap_r * .38, True),
+                (r - top_diag * .68, tip, False), (r - top_diag * .48, tip, True),
+                (r, tip, False), (r, tip - cap_r, True),
+                (r, b + cap_r, True), (r, b, False), (r - v * .5, b, True),
+                (r - v, b, False), (r - v, b + cap_r, True),
+                (r - v, notch_y, True),
+                (p.mid + apex_half, b + bot_r, True),
+                (p.mid, b, False),
+                (p.mid - apex_half, b + bot_r, True),
+                (l + v, notch_y, True),
+                (l + v, b + cap_r, True),
+                (l + v, b, False),
             ])
             put("Мм", p)
 
-            p = d.letter(cap, 855, left=48, right=45)
-            p.bar(p.left, p.top - .5 * p.h, p.right)
-            p.stem(p.mid - .5 * p.v)
+            p = d.letter(cap, 910, left=44, right=44)
+            p.bar(p.left, p.top - .5 * p.h, p.right, radius=p.h * .50 * p.roundness)
+            p.stem(p.mid - .5 * p.v, top=p.top - .25 * p.h)
             put("Тт", p)
 
-        p = d.letter(cap, 875 if cap else 735, left=85 if cap else 65, right=82 if cap else 64)
-        ze(p)
-        put("Зз", p)
-
-        p = d.letter(cap, 960 if cap else 795, right=84)
-        stem_bowl(p, p.left, p.top * .605 + p.h * .08)
-        p.bar(p.left + p.v * .30, p.top - p.h / 2, p.right - p.width * .105)
         if cap:
+            put("Зз", d.get("3").transform())
+        else:
+            p = d.letter(cap, 800, left=72, right=68, growth=.80)
+            ze(p)
+            put("Зз", p)
+
+        if cap:
+            p = d.letter(cap, 1005, right=80)
+            corner_r = min(p.v * .32 * p.roundness, p.h * .46)
+            p.stem(p.left, top=p.top, top_r=corner_r)
+            p.bowl(p.left, p.bottom * .55, p.right, p.top * .62 + p.h * .07)
+            p.bar(p.left + p.v * .32, p.top - p.h / 2, p.right - p.width * .065,
+                  radius=min(p.h * .50 * p.roundness, p.v * .32 * p.roundness))
             put("Бб", p)
         else:
-            p = d.letter(cap, 1035, left=75, right=75, growth=.42)
-            b, h, l, r, mid = -29, p.top, p.left, p.right, p.mid
-            p.oval(l, b, r, h + 18)
-            neck = l + .54 * p.v
-            p.stroke(
-                (neck, h * .53),
-                ((neck - .10 * p.v, h + 12), (l + .20 * p.width, h + 265), (mid + 43, h + 348)),
-                ((mid + .20 * p.width, h + 371), (r - .17 * p.width, h + 382),
-                 (r - .085 * p.width, h + 445)),
-                weight=.95, cap=p.roundness * .8,
+            p = d.letter(cap, 1048, left=72, right=72, growth=.78)
+            l, r, h, w = p.left, p.right, p.top, p.width
+            ov = p.curve_ov
+            p.oval(l, -ov, r, h + ov, wall=.95)
+            pen = Pen(p.outline, p.v * .88, min(p.h * .92, h * .24), p.roundness)
+            asc_y = 1432 + 10 * min(max((p.v - 170.0) / 230.0, 0.0), 1.0) - pen.h * .50
+            end_x = r - pen.v * .46 - w * .04
+            pen.stroke(
+                (l + pen.v * .50, h * .49),
+                ((l + pen.v * .48, h * 1.00), (l + w * .22, asc_y), (min(end_x, l + w * .44), asc_y)),
+                (end_x, asc_y),
+                weight=1.0,
+                cap=p.roundness * .95,
             )
             put("Бб", p)
 
-            p = d.letter(cap, 845, right=83, growth=.76)
-            native = d.get("B", False)
-            p.outline = native.transform(sx=p.outline.advance / native.advance, sy=p.top / 1432)
+            # Native Google Sans B-matched lowercase в at x-height with 2-handle circular bowls.
+            p = d.letter(cap, 910, left=126, right=78, growth=.85)
+            l, r, h, w = p.left, p.right, p.top, p.width
+            v_s = p.v * .92
+            r_c = min(v_s * .54 * p.roundness, h * .20)
+            y_mid = h * .52
+            r_top = r - w * .065
+            waist_x = l + v_s + (r - l - v_s) * .58
+            h_outer = min(p.h * .86, h * .185)
+            h_mid = min(p.h * .80, h * .175)
+            wall_bot = min(p.v * .90, w * .28, max(w * .14, (r - l - v_s) * .45))
+            wall_top = min(p.v * .88, (r_top - l - v_s) * .45)
+            sh_top = l + w * .42
+            sh_bot = l + w * .44
+            y_tc = (y_mid + h) * .51
+            y_bc = y_mid * .49
+            p.outline.contours.append([
+                (l + r_c, 0, True), (l, 0, False), (l, r_c, True),
+                (l, h - r_c, True), (l, h, False), (l + r_c, h, True),
+                (sh_top, h, True),
+                (sh_top + (r_top - sh_top) * .42, h, False),
+                (r_top, y_tc + (h - y_tc) * .54, False),
+                (r_top, y_tc, True),
+                (r_top, y_mid + (y_tc - y_mid) * .35, False),
+                (waist_x, y_mid + h * .015, True),
+                (waist_x, y_mid - h * .015, True),
+                (r, y_mid - (y_mid - y_bc) * .38, False),
+                (r, y_bc, True),
+                (r, y_bc * .46, False),
+                (sh_bot + (r - sh_bot) * .42, 0, False),
+                (sh_bot, 0, True),
+            ])
+            c_l = l + v_s
+            top_mid = y_mid - h_mid * .5
+            bot_mid = y_mid + h_mid * .5
+            in_rb = r - wall_bot
+            in_rt = r_top - wall_top
+            sh_in_b = min(sh_bot, c_l + max(0.0, (in_rb - c_l) * .40))
+            sh_in_t = min(sh_top, c_l + max(0.0, (in_rt - c_l) * .40))
+            mid_b_h = (h_outer + top_mid) * .5
+            mid_t_h = (bot_mid + h - h_outer) * .5
+            p.outline.contours.append([
+                (c_l, h_outer, True), (sh_in_b, h_outer, True),
+                (sh_in_b + (in_rb - sh_in_b) * .44, h_outer, False),
+                (in_rb, mid_b_h - (mid_b_h - h_outer) * .54, False),
+                (in_rb, mid_b_h, True),
+                (in_rb, mid_b_h + (top_mid - mid_b_h) * .54, False),
+                (sh_in_b + (in_rb - sh_in_b) * .44, top_mid, False),
+                (sh_in_b, top_mid, True), (c_l, top_mid, True),
+            ])
+            p.outline.contours.append([
+                (c_l, bot_mid, True), (sh_in_t, bot_mid, True),
+                (sh_in_t + (in_rt - sh_in_t) * .44, bot_mid, False),
+                (in_rt, mid_t_h - (mid_t_h - bot_mid) * .54, False),
+                (in_rt, mid_t_h, True),
+                (in_rt, mid_t_h + (h - h_outer - mid_t_h) * .54, False),
+                (sh_in_t + (in_rt - sh_in_t) * .44, h - h_outer, False),
+                (sh_in_t, h - h_outer, True), (c_l, h - h_outer, True),
+            ])
             put("Вв", p)
 
-        p = d.letter(cap, 910 if cap else 775, right=82)
+        p = d.letter(cap, 955 if cap else 805, right=82)
         stem_bowl(p, p.left)
         put("Ьь", p)
 
-        p = d.letter(cap, 1075 if cap else 875, left=46, right=77)
-        stem = p.left + p.width * .19
-        stem_bowl(p, stem)
-        p.bar(p.left, p.top - p.h / 2, stem + p.v * .69)
+        p = d.letter(cap, 1135 if cap else 945, left=44, right=77, growth=.85)
+        corner_r = min(p.v * .32 * p.roundness, p.h * .46)
+        stem = p.left + max(p.width * .23, p.v * .65)
+        p.stem(stem, top=p.top, top_r=corner_r)
+        p.bowl(stem, p.bottom * .55, p.right, p.top * .62)
+        p.bar(p.left, p.top - p.h / 2, stem + p.v * .72,
+              radius=min(p.h * .50 * p.roundness, p.v * .32 * p.roundness))
         put("Ъъ", p)
 
-        p = d.letter(cap, 1320 if cap else 1130, growth=1.10)
-        p.stem(p.right - p.v)
-        p.stem(p.left)
-        p.bowl(p.left, p.bottom, p.right - p.width * .235 - p.v * .55, p.top * .64)
+        p = d.letter(cap, 1410 if cap else 1205, growth=1.15)
+        stem_w = .92
+        p.stem(p.right - p.v * stem_w, weight=stem_w)
+        p.stem(p.left, weight=stem_w)
+        p.bowl(p.left, p.bottom * .55, p.right - p.width * .24 - p.v * .48, p.top * .63)
         put("Ыы", p)
 
-        p = d.letter(cap, 1060 if cap else 820)
+        p = d.letter(cap, 1090 if cap else 890, growth=.82)
         che(p)
         put("Чч", p)
 
-        p = d.letter(cap, 1380 if cap else 1215, left=81, right=81, growth=.72)
-        low, high = (p.top * .105, p.top * .885) if cap else (-30, p.top + 29)
-        min_gap = p.top * (.149 if cap else .165)
-        wall = min(p.v, max(p.v * .40, (p.width - p.v) / 2 - min_gap))
-        Pen(p.outline, wall, min(p.h, (high - low) * .31), p.roundness).oval(p.left, low, p.right, high)
-        p.stem(p.mid - p.v / 2, p.bottom if cap else -431, p.top if cap else 1432)
+        p = d.letter(cap, 1445 if cap else 1255, left=76, right=76, growth=.68)
+        low, high = (p.top * .10, p.top * .90) if cap else (-p.curve_ov, p.top + p.curve_ov)
+        min_gap = p.top * (.165 if cap else .175)
+        wall = min(p.v * .85, max(p.v * .42, (p.width - p.v) / 2 - min_gap))
+        Pen(p.outline, wall, min(p.h * .92, (high - low) * .28), p.roundness).oval(p.left, low, p.right, high)
+        p.stem(p.mid - p.v / 2, p.bottom if cap else -431, p.tip if cap else 1432 + p.v * .045 * p.roundness)
         put("Фф", p)
 
         if cap:
-            p = d.letter(cap, 1090, left=35, right=37, growth=.51)
-            l, r, h = p.left, p.right, p.top
-            p.stroke(
-                (r - p.v * .49, h - p.h * .19 - p.roundness * p.h * .24),
-                (p.mid - p.v * .13, h * .317),
-                ((p.mid - p.width * .26, -15), (l + p.v * .61, p.h * .24), (l + p.v * .58, p.h * .65)),
-                weight=1.03,
-            )
-            p.polygon([(l, h), (l + p.v * 1.12, h), (p.mid + p.v * .21, h * .40),
-                       (p.mid - p.v * .79, h * .35)])
+            # Unified seamless Y/y-aligned uppercase У bounded inside [l..r] and [bottom..tip].
+            p = d.letter(cap, 1110, left=38, right=42, growth=.88)
+            l, r, h, b, tip, w = p.left, p.right, p.top, p.bottom, p.tip, p.width
+            v_a = min(p.v, w * .34)
+            arm_foot = min(v_a * 1.12, w * .34)
+            cap_r = min(arm_foot * .48, v_a * .45 * p.roundness)
+            h_bar = min(p.h * .94, h * .22)
+            fork_y = h * .38
+            inner_vy = h * .55
+            tail_l = max(l + w * .04, l + v_a * .08)
+            tail_r = min(cap_r, h_bar * .48)
+            p.outline.contours.append([
+                (tail_l + tail_r, b, True),
+                (tail_l, b, False), (tail_l, b + tail_r, True),
+                (tail_l, b + h_bar - tail_r, True),
+                (tail_l, b + h_bar, False), (tail_l + tail_r, b + h_bar, True),
+                (tail_l + w * .18, b + h_bar, False),
+                (p.mid - v_a * .34, fork_y + h_bar * .34, True),
+                (l + cap_r * .3, tip - cap_r, True),
+                (l, tip, False), (l + cap_r, tip, True),
+                (l + arm_foot - cap_r, tip, True),
+                (l + arm_foot, tip, False), (l + arm_foot + v_a * .08, tip - cap_r, True),
+                (p.mid - 4, inner_vy, True), (p.mid + 4, inner_vy, True),
+                (r - arm_foot - v_a * .08, tip - cap_r, True),
+                (r - arm_foot, tip, False), (r - arm_foot + cap_r, tip, True),
+                (r - cap_r, tip, True),
+                (r, tip, False), (r - cap_r * .3, tip - cap_r, True),
+                (p.mid + v_a * .38, fork_y, True),
+                (p.mid + w * .06, b + h_bar * .12, False),
+                (tail_l + w * .30, b, False),
+            ])
             put("Уу", p)
 
-        p = d.letter(cap, 1280 if cap else 936, left=86 if cap else 71, right=63, growth=.37)
-        open_e(p)
-        put("Ээ", mirror(p.outline))
-        put("Єє", p)
+        if cap:
+            c_base = d.get("C")
+            l_c, b_c, r_c, t_c = c_base.bounds()
+            p = d.letter(cap, 1)
+            p.outline = c_base.transform()
+            p.bar(l_c + p.v * .55, (b_c + t_c) / 2, l_c + (r_c - l_c) * .63,
+                  thickness=min(p.h, (t_c - b_c) * .18),
+                  radius=min(p.h * .50 * p.roundness, p.v * .32 * p.roundness))
+            put("Єє", p)
+            put("Ээ", mirror(p.outline))
+        else:
+            c_base = d.get("c")
+            l_c, b_c, r_c, t_c = c_base.bounds()
+            p = d.letter(cap, 1)
+            p.outline = c_base.transform()
+            p.bar(l_c + p.v * .55, (b_c + t_c) / 2, l_c + (r_c - l_c) * .64,
+                  thickness=min(p.h * .92, (t_c - b_c) * .18),
+                  radius=min(p.h * .46 * p.roundness, p.v * .32 * p.roundness))
+            put("Єє", p)
+            put("Ээ", mirror(p.outline))
 
         p = d.letter(cap, 1)
         o = d.get("O" if cap else "o")
-        p.stem(p.left)
-        origin = p.left + p.v * .55 + (382 if cap else 295)
-        add_shape(p, o, origin, sx=.94)
-        p.bar(p.left + p.v * .35, p.top * .51, origin + o.bounds()[0] * .94 + p.v * .46)
-        p.outline.advance = origin + o.advance * .94
+        p.stem(p.left, weight=.94)
+        origin = p.left + p.v * .50 + (310 if cap else 255)
+        add_shape(p, o, origin, sx=.91)
+        p.bar(p.left + p.v * .35, p.top * .505, origin + o.bounds()[0] * .91 + p.v * .45, thickness=p.h * .90)
+        p.outline.advance = origin + o.advance * .91
         put("Юю", p)
 
         if cap:
             put("Яя", mirror(d.get("R")))
         else:
-            p = d.letter(cap, 850, left=35, right=124, growth=.74)
-            native = d.get("R", False)
-            put("Яя", mirror(native.transform(sx=p.outline.advance / native.advance, sy=p.top / 1432)))
+            # Native Google Sans R-mirrored lowercase я with flush baseline leg and open bowl.
+            p = d.letter(cap, 900, left=42, right=126, growth=.96)
+            l, r, b, h = p.left, p.right, p.bottom, p.top
+            p.stem(r - p.v)
+            bowl_p = d.letter(cap, 1)
+            bowl_p.bowl(0, h * .36, p.width, h, bar_scale=.80, wall_scale=.86)
+            p.outline.add(bowl_p.outline.transform(sx=-1, dx=r))
+            leg_foot = min(p.v * .98, p.width * .30)
+            leg_r = min(leg_foot * .49, p.v * .44 * p.roundness)
+            p.polygon([
+                (p.mid - p.v * .04, h * .43),
+                (p.mid + leg_foot * .84, h * .43),
+                (l + leg_foot, b),
+                (l, b),
+            ], radius=leg_r)
+            put("Яя", p)
 
         if cap:
             p = d.letter(cap, 1306, left=86, right=95, growth=.11)
@@ -455,13 +724,14 @@ def ornament(d, cap, source, form, place=1):
         tail(p, x - p.v * .37, 344 if cap else 272, 0)
         p.outline.advance += .12 * p.v
     elif form == "tail":
-        step = p.v * .43
-        depth = 340 if cap else 273
-        p.polygon([(x - p.v * .81, .44 * p.h), (x - .08 * p.v, .44 * p.h),
-                   (x - .08 * p.v, -.11 * p.h), (x + step, -.11 * p.h),
-                   (x + step - .88 * p.v, -depth), (x - .92 * p.v, -depth),
-                   (x - .55 * p.v, -.28 * p.h), (x - p.v * .81, -.28 * p.h)])
-        p.outline.advance += .30 * p.v
+        step = p.v * .40
+        depth = 320 if cap else 255
+        p.polygon([(x - p.v * .76, .42 * p.h), (x - .08 * p.v, .42 * p.h),
+                   (x - .08 * p.v, -.12 * p.h), (x + step, -.12 * p.h),
+                   (x + step - .82 * p.v, -depth), (x - .86 * p.v, -depth),
+                   (x - .52 * p.v, -.28 * p.h), (x - p.v * .76, -.28 * p.h)],
+                  radius=min(p.v * .32 * p.roundness, 36.0))
+        p.outline.advance += .28 * p.v
     elif form == "cedilla":
         p.stroke((x + p.v * .12, b + p.h * .33), (x - p.v * .08, b - 96),
                  ((x + 200, b - 92), (x + 161, b - 404), (x - 100, b - 286)),
@@ -496,8 +766,9 @@ def serbian_letters(d, cap, put):
         p = d.letter(cap, 1)
         p.outline = d.get(base[0 if cap else 1]).transform()
         _, _, r, _ = p.outline.bounds()
-        p.bowl(r - p.v, p.bottom, r + (705 if cap else 600), p.top * .63)
-        p.outline.advance += 705 if cap else 600
+        bowl_w = (705 if cap else 600) + max(0.0, p.v - 170.0) * .45
+        p.bowl(r - p.v, p.bottom, r + bowl_w, p.top * .63)
+        p.outline.advance += bowl_w
         put(letters, p)
 
     for letters, hook in (("Ђђ", True), ("Ћћ", False)):
@@ -1471,13 +1742,20 @@ def marks_and_symbols(d):
     p.stroke((-242, 202), ((-206, 446), (206, 446), (242, 202)), weight=.72)
     d.put("\u0311", p)
 
-    p = d.letter(True, 936, left=142, right=84)
-    p.stem(p.left)
-    bowl = d.letter(True, 1)
-    bowl.bowl(p.left, p.top * .394, p.right, p.top)
-    p.outline.add(bowl.outline)
-    p.bar(p.left - 85, p.top * .45, p.right - p.width * .35)
-    p.bar(p.left - 85, p.top * .22, p.right - p.width * .31)
+    # Native P-aligned Ruble sign (₽) preserving exact Google Sans bowl geometry.
+    p = d.letter(True, 1)
+    base = d.get("P").transform()
+    l_p, _, r_p, _ = base.bounds()
+    ext = min(135.0, p.v * .62 + 25.0)
+    p.outline = base.transform(dx=ext)
+    p.outline.advance = base.advance + ext
+    y_bot = base.contours[0][15][1]
+    y_top = base.contours[0][18][1]
+    thick = min(p.h * .92, y_bot * .52)
+    bar_r = min((y_top - y_bot) * .50 * p.roundness, p.v * .32 * p.roundness)
+    low_r = min(thick * .50 * p.roundness, p.v * .32 * p.roundness)
+    p.bar(l_p, (y_bot + y_top) * .5, l_p + ext + p.v * .92, thickness=y_top - y_bot, radius=bar_r)
+    p.bar(l_p, y_bot * .44, l_p + ext + p.v + (r_p - l_p) * .36, thickness=thick, radius=low_r)
     d.put("₽", p)
 
 def raised_letters(d):
@@ -1517,6 +1795,9 @@ def accent_letters(d):
             # Native accents are drawn above the x-height. Match their existing
             # position on the Latin bases before raising them to the cap line.
             top -= d.profiles[False][0]
+        if accent == "\u0306":
+            wt = min(max((d.profiles[True][1] - 170.0) / 230.0, 0.0), 1.0)
+            top -= (28 + 46 * wt) if cap else (8 + 20 * wt)
         glyph.add(mark.transform(dx=x, dy=top))
         d.put(character, glyph)
 

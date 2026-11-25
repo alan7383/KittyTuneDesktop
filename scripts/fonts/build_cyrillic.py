@@ -221,8 +221,8 @@ def layout_variations(font, model, designs, glyphs, added):
     # Tighten the spaces made by the Cyrillic overhangs and diagonals.
     kern_pairs = {}
     for leading, trailing, adjustment in (
-            ("ГҐ", "АаДдЛлОоСсЕеу", -106), ("УЎ", "АаДдЛлОоя", -81),
-            ("Т", "ДдЛля", -119), ("Р", "ДЛЖ", -58), ("Ф", "ДЛ", -57),
+            ("ГҐ", "АаДдЛлОоСсЕеуяёю", -106), ("УЎ", "АаДдЛлОояю", -81),
+            ("Т", "ДдЛляюэ", -119), ("Р", "ДЛЖ", -58), ("Ф", "ДЛ", -57),
             ("Л", "ТУ", -43)):
         for left in leading:
             for right in trailing:

@@ -101,7 +101,7 @@ class PlaylistTotalDurationTest {
             Strings.appLanguage = "ru"
 
             assertEquals("1 ч", formatPlaylistTotalDuration(hourMs))
-            assertEquals("7 ч 23 мин", formatPlaylistTotalDuration(7 * hourMs + 23 * 60 * 1000L))
+            assertEquals("7 ч 23 м", formatPlaylistTotalDuration(7 * hourMs + 23 * 60 * 1000L))
             assertEquals("11 дн 16 ч", formatPlaylistTotalDuration(280 * hourMs + 17 * 60 * 1000L))
             assertEquals("1 мес 15 дн", formatPlaylistTotalDuration(45 * dayMs))
             assertEquals("1 г", formatPlaylistTotalDuration(365 * dayMs))

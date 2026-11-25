@@ -59,7 +59,7 @@ class Pen:
         self.v = vertical
         self.h = horizontal
         self.roundness = roundness
-        self.radius = vertical * roundness * .46
+        self.radius = vertical * roundness * .50
 
     def polygon(self, vertices, radius=None, hole=False):
         """The same on/off-curve points describe each corner at every master."""
@@ -73,8 +73,8 @@ class Pen:
         for i, (x, y) in enumerate(vertices):
             before = vertices[i - 1]
             after = vertices[(i + 1) % len(vertices)]
-            r = min(radius, .45 * hypot(x - before[0], y - before[1]),
-                    .45 * hypot(x - after[0], y - after[1]))
+            r = min(radius, .495 * hypot(x - before[0], y - before[1]),
+                    .495 * hypot(x - after[0], y - after[1]))
             contour.extend([
                 (*offset((x, y), before, r), True),
                 (x, y, False),
@@ -154,10 +154,15 @@ class Pen:
             lx, ly, _ = left
             rx, ry, _ = right
             dx, dy = lx - rx, ly - ry
-            return ((lx + rx) / 2 + dy * distance, (ly + ry) / 2 - dx * distance, False)
+            ox, oy = dy * .5 * distance, -dx * .5 * distance
+            return [
+                (lx + ox, ly + oy, False),
+                ((lx + rx) / 2 + ox, (ly + ry) / 2 + oy, True),
+                (rx + ox, ry + oy, False),
+            ]
 
-        self.outline.contours.append(left + [end_cap(left[-1], right[-1], cap)] +
-                                     right[::-1] + [end_cap(right[0], left[0], cap)])
+        self.outline.contours.append(left + end_cap(left[-1], right[-1], cap) +
+                                     right[::-1] + end_cap(right[0], left[0], cap))
 
 
 class Letter(Pen):
@@ -172,40 +177,82 @@ class Letter(Pen):
         self.right = left + self.width
         self.mid = left + self.width / 2
         self.top = height
-        self.bottom = -vertical * roundness * .048
+        overshoot = vertical * roundness * .054
+        self.curve_ov = 28 + 9 * min(max(vertical / 400, 0), 1)
+        self.tip = height + overshoot
+        self.bottom = -overshoot
         super().__init__(Outline(self.right + right), vertical, horizontal, roundness)
 
-    def stem(self, x, bottom=None, top=None):
-        self.box(x, self.bottom if bottom is None else bottom,
-                 x + self.v, self.top if top is None else top)
+    def stem(self, x, bottom=None, top=None, weight=1, top_r=None, bottom_r=None):
+        w = self.v * weight
+        y0 = self.bottom if bottom is None else bottom
+        y1 = self.tip if top is None else top
+        default_r = w * self.roundness * .50
+        if top_r is None and bottom_r is None:
+            self.box(x, y0, x + w, y1, radius=default_r)
+            return
+        rt = default_r if top_r is None else top_r
+        rb = default_r if bottom_r is None else bottom_r
+        radii = (rb, rt, rt, rb)
+        verts = [(x, y0), (x, y1), (x + w, y1), (x + w, y0)]
+        contour = []
+        for i, (vx, vy) in enumerate(verts):
+            before = verts[i - 1]
+            after = verts[(i + 1) % 4]
+            r = min(radii[i], .495 * hypot(vx - before[0], vy - before[1]),
+                    .495 * hypot(vx - after[0], vy - after[1]))
+            def step(pt):
+                dx, dy = pt[0] - vx, pt[1] - vy
+                d = hypot(dx, dy)
+                return (vx + dx * r / d, vy + dy * r / d) if d else (vx, vy)
+            contour.extend([(*step(before), True), (vx, vy, False), (*step(after), True)])
+        self.outline.contours.append(contour)
 
-    def bar(self, x0, y, x1, thickness=None):
+    def bar(self, x0, y, x1, thickness=None, radius=None):
         half = (self.h if thickness is None else thickness) / 2
-        self.box(x0, y - half, x1, y + half)
+        r = half * self.roundness if radius is None else radius
+        self.box(x0, y - half, x1, y + half, radius=r)
 
-    def diagonal(self, x0, y0, x1, y1, weight=1):
-        self.stroke((x0, y0), (x1, y1), weight=weight)
+    def diagonal(self, x0, y0, x1, y1, weight=1, cap=None):
+        self.stroke((x0, y0), (x1, y1), weight=weight, cap=cap)
 
-    def bowl(self, left, bottom, right, top):
-        """A straight spine with a full, closed bowl to its right."""
+    def bowl(self, left, bottom, right, top, bar_scale=1.0, wall_scale=1.0):
+        """A straight spine with a circular 2-handle Google Sans bowl to its right."""
         width = right - left
         height = top - bottom
-        radius = min(self.radius, width * .15, height * .24)
+        corner_r = min(self.v * self.roundness * .34, width * .18, height * .26)
         middle = (top + bottom) / 2
-        edge = left + min(self.v, width * .44)
-        wall = min(self.v, width * .31, max(width * .14, width * .73 - self.v))
-        horizontal = min(self.h, height * .30)
-        shoulder = left + width * .55
+        edge = left + min(self.v * .84 * wall_scale, width * .38)
+        wall = min(self.v * .96 * wall_scale, width * .30, max(width * .15, width * .72 - self.v * wall_scale))
+        horizontal = min(self.h * bar_scale, height * .26)
+        shoulder = left + width * .38
+        bowl_ov = self.v * .035 * self.roundness + 8
+        b_out = bottom - bowl_ov * .45
+        t_out = top + bowl_ov * .45
         self.outline.contours.append([
-            (left, bottom + radius, True), (left, top - radius, True),
-            (left, top, False), (left + radius, top, True),
-            (shoulder, top, True), (right, top, False), (right, middle, True),
-            (right, bottom, False), (shoulder, bottom, True),
-            (left + radius, bottom, True), (left, bottom, False),
+            (left, bottom + corner_r, True), (left, top - corner_r, True),
+            (left, top, False), (left + corner_r, top, True),
+            (shoulder, t_out, True),
+            (shoulder + (right - shoulder) * .42, t_out, False),
+            (right, middle + (t_out - middle) * .54, False),
+            (right, middle, True),
+            (right, middle - (middle - b_out) * .54, False),
+            (shoulder + (right - shoulder) * .42, b_out, False),
+            (shoulder, b_out, True),
+            (left + corner_r, bottom, True), (left, bottom, False),
         ])
+        in_r = right - wall
+        in_b = bottom + horizontal
+        in_t = top - horizontal
+        sh_in = min(shoulder, edge + max(0.0, (in_r - edge) * .42))
         self.outline.contours.append([
-            (edge, bottom + horizontal, True), (shoulder, bottom + horizontal, True),
-            (right - wall, bottom + horizontal, False), (right - wall, middle, True),
-            (right - wall, top - horizontal, False), (shoulder, top - horizontal, True),
-            (edge, top - horizontal, True),
+            (edge, in_b, True),
+            (sh_in, in_b, True),
+            (sh_in + (in_r - sh_in) * .44, in_b, False),
+            (in_r, middle - (middle - in_b) * .54, False),
+            (in_r, middle, True),
+            (in_r, middle + (in_t - middle) * .54, False),
+            (sh_in + (in_r - sh_in) * .44, in_t, False),
+            (sh_in, in_t, True),
+            (edge, in_t, True),
         ])
