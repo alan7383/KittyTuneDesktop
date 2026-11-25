@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.*
@@ -26,14 +25,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.TrackArtistClick
-import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.player.ArtworkPalette
 import com.alananasss.kittytune.ui.player.PlaybackContext
@@ -63,40 +60,47 @@ fun rememberDominantColor(url: String?, defaultColor: Color = MaterialTheme.colo
 }
 
 @Composable
-fun ChartsScreen(
-    onBackClick: () -> Unit,
-    onPlaylistClick: (Long) -> Unit,
-    onNavigate: (String) -> Unit,
-    playerViewModel: PlayerViewModel,
-    viewModel: ChartsViewModel = viewModel { ChartsViewModel(AppInstance.application) }
-) {
+internal fun rememberVisibleChartEntries(viewModel: ChartsViewModel): List<ChartEntry> {
+    val clientReady by SessionManager.isClientIdValid.collectAsState()
+    LaunchedEffect(viewModel, clientReady) { viewModel.ensureChartLoaded() }
+
     val entries = viewModel.chartEntries
-    val allTracks = remember(entries) { entries.map { it.track } }
+    val allTracks = remember(entries) { entries.map(ChartEntry::track) }
     val visibleTracks = rememberFilteredTracks(allTracks)
-    val chartEntries = remember(entries, visibleTracks) {
+    return remember(entries, visibleTracks) {
         val visibleIds = visibleTracks.map { it.id }.toSet()
         entries.filter { it.track.id in visibleIds }
     }
+}
+
+@Composable
+internal fun ChartsScreen(
+    viewModel: ChartsViewModel,
+    playerViewModel: PlayerViewModel,
+) {
+    val entries = rememberVisibleChartEntries(viewModel)
+    val tracks = remember(entries) { entries.map(ChartEntry::track) }
     ChartsContent(
         kind = viewModel.chartKind,
         genre = viewModel.chartGenre,
         country = viewModel.chartCountry,
-        entries = chartEntries,
+        entries = entries,
         isLoading = viewModel.isChartLoading,
         currentTrack = playerViewModel.uiCurrentTrack,
+        isPlaying = playerViewModel.isPlaying,
         onKindChange = { viewModel.loadChart(it, viewModel.chartGenre) },
         onGenreChange = { viewModel.loadChart(viewModel.chartKind, it) },
         onCountryChange = viewModel::selectChartCountry,
         onRetry = { viewModel.loadChart(viewModel.chartKind, viewModel.chartGenre) },
         onPlayFrom = { index ->
             playerViewModel.playPlaylist(
-                tracks = visibleTracks,
+                tracks = tracks,
                 startIndex = index,
                 context = PlaybackContext(displayText = str(viewModel.chartKind.labelKey()), navigationId = "charts"),
             )
         },
         onArtistClick = playerViewModel::navigateToTrackArtist,
-        onBackClick = onBackClick,
+        onOptionClick = { track -> playerViewModel.showTrackOptions(track) },
     )
 }
 
@@ -114,26 +118,22 @@ internal fun ChartsContent(
     onRetry: () -> Unit,
     onPlayFrom: (Int) -> Unit,
     onArtistClick: TrackArtistClick,
-    onBackClick: () -> Unit,
+    isPlaying: Boolean = false,
+    onOptionClick: ((Track) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(kind, genre, country) { listState.scrollToItem(0) }
-    val chartWidth = Modifier.widthIn(max = 920.dp).fillMaxWidth()
-    val colors = MaterialTheme.colorScheme
-    Scaffold(
-        topBar = {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val twoColumns = maxWidth >= 1140.dp
+        val columnWidth = if (twoColumns) (maxWidth - 60.dp) / 2 else maxWidth.coerceAtMost(920.dp)
+        val showRowMetadata = columnWidth >= 560.dp
+        val contentWidth = if (maxWidth >= 1020.dp) Modifier.fillMaxWidth() else Modifier.widthIn(max = 920.dp).fillMaxWidth()
+        Column(Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier.fillMaxWidth().background(colors.surfaceContainerLow).padding(horizontal = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Row(
-                    modifier = chartWidth.heightIn(min = 60.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = str("btn_back"))
-                    }
+                Box(contentWidth.heightIn(min = 56.dp), contentAlignment = Alignment.CenterStart) {
                     Text(
                         text = str("home_charts"),
                         style = MaterialTheme.typography.headlineMedium,
@@ -150,47 +150,102 @@ internal fun ChartsContent(
                     onGenreChange = onGenreChange,
                     country = country,
                     onCountryChange = onCountryChange,
-                    modifier = chartWidth.padding(bottom = 10.dp),
+                    modifier = contentWidth.padding(bottom = 12.dp),
+                    trailingFallback = if (entries.isNotEmpty()) {
+                        {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                            ) {
+                                Text(
+                                    text = str("playlist_num_tracks", entries.size),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                )
+                            }
+                        }
+                    } else null,
                 )
             }
-        },
-        containerColor = colors.surfaceContainerLow,
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.padding(innerPadding),
-            state = listState,
-            contentPadding = PaddingValues(start = 20.dp, top = 4.dp, end = 20.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            when {
-                isLoading -> item { ChartLoadingRows(chartWidth) }
-                entries.isEmpty() -> item { EmptyChart(onRetry, chartWidth) }
-                else -> {
-                    val firstRow = if (entries.first().rank == 1) 1 else 0
-                    if (firstRow > 0) {
-                        item(key = "chart-lead") {
-                            ChartLeadTrack(
-                                entry = entries.first(),
-                                currentTrack = currentTrack,
-                                onClick = { onPlayFrom(0) },
-                                onArtistClick = onArtistClick,
-                                modifier = chartWidth.padding(bottom = 9.dp),
-                            )
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                state = listState,
+                contentPadding = PaddingValues(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                when {
+                    isLoading -> item {
+                        if (twoColumns) {
+                            Row(contentWidth, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                ChartLoadingRows(Modifier.weight(1f))
+                                ChartLoadingRows(Modifier.weight(1f))
+                            }
+                        } else {
+                            ChartLoadingRows(contentWidth)
                         }
                     }
-                    val rowCount = entries.size - firstRow
-                    items(count = rowCount, key = { entries[it + firstRow].rank }) { row ->
-                        val index = row + firstRow
+                    entries.isEmpty() -> item { EmptyChart(onRetry, contentWidth) }
+                    twoColumns && entries.size > 6 -> {
+                        val split = (entries.size + 1) / 2
+                        val rightCount = entries.size - split
+                        items(count = split, key = { entries[it].rank }) { rowIdx ->
+                            val leftEntry = entries[rowIdx]
+                            val rightIndex = rowIdx + split
+                            val rightEntry = entries.getOrNull(rightIndex)
+                            Row(
+                                modifier = contentWidth,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                ChartTrackRow(
+                                    track = leftEntry.track,
+                                    rank = leftEntry.rank,
+                                    currentlyPlayingTrack = currentTrack,
+                                    onClick = { onPlayFrom(rowIdx) },
+                                    index = rowIdx,
+                                    totalCount = split,
+                                    isPlaying = isPlaying,
+                                    showExtraMetadata = showRowMetadata,
+                                    onOptionClick = onOptionClick?.let { cb -> { cb(leftEntry.track) } },
+                                    onArtistClick = onArtistClick,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (rightEntry != null) {
+                                    ChartTrackRow(
+                                        track = rightEntry.track,
+                                        rank = rightEntry.rank,
+                                        currentlyPlayingTrack = currentTrack,
+                                        onClick = { onPlayFrom(rightIndex) },
+                                        index = rowIdx,
+                                        totalCount = rightCount,
+                                        isPlaying = isPlaying,
+                                        showExtraMetadata = showRowMetadata,
+                                        onOptionClick = onOptionClick?.let { cb -> { cb(rightEntry.track) } },
+                                        onArtistClick = onArtistClick,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                } else {
+                                    Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                    else -> items(count = entries.size, key = { entries[it].rank }) { index ->
                         val entry = entries[index]
                         ChartTrackRow(
                             track = entry.track,
                             rank = entry.rank,
                             currentlyPlayingTrack = currentTrack,
                             onClick = { onPlayFrom(index) },
+                            index = index,
+                            totalCount = entries.size,
+                            isPlaying = isPlaying,
+                            showExtraMetadata = showRowMetadata,
+                            onOptionClick = onOptionClick?.let { cb -> { cb(entry.track) } },
                             onArtistClick = onArtistClick,
-                            modifier = chartWidth,
-                            shape = getSettingsShape(rowCount, row),
+                            modifier = contentWidth,
                         )
                     }
                 }

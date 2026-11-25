@@ -208,6 +208,21 @@ class SearchLandingTest {
     }
 
     @Test
+    fun testPreviewAndFullChartUseTheSameRanking() {
+        val main = source("ui/main/MainScreen.kt")
+        val homeRoute = main.substringAfter("composable(\"home\")").substringBefore("composable(\"genres\")")
+        val chartsRoute = main.substringAfter("composable(\"charts\")").substringBefore("composable(\"new_releases\")")
+        assertTrue(homeRoute.contains("chartsViewModel = chartsViewModel"))
+        assertTrue(chartsRoute.contains("viewModel = chartsViewModel"))
+
+        val preview = source("ui/home/SearchLanding.kt")
+        assertTrue(preview.contains("rememberVisibleChartEntries(viewModel)"))
+        assertTrue(preview.contains("chart.take(CHART_PREVIEW_LENGTH)"))
+        assertTrue(source("ui/home/ChartsScreen.kt").contains("rememberVisibleChartEntries(viewModel)"))
+        assertTrue(!source("ui/home/HomeViewModel.kt").contains("fetchChart("))
+    }
+
+    @Test
     fun testChartPodiumIsEmphasised() {
         val chart = source("ui/home/SongChart.kt")
         assertTrue(

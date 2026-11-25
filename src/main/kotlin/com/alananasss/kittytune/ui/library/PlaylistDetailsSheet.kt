@@ -347,42 +347,18 @@ fun UserSection(
     count: Int? = null
 ) {
     Column(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { onViewAll() }
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
-                Icon(icon, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (count != null && count > 0) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = String.format("%,d", count),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-            }
-            Text(
-                text = str("btn_see_all"),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+        com.alananasss.kittytune.ui.common.InlineSectionHeader(
+            title = title,
+            countText = if (count != null && count > 0) String.format("%,d", count) else null,
+            icon = icon,
+            iconTint = MaterialTheme.colorScheme.onSurface,
+            iconSize = 18.dp,
+            titleStyle = MaterialTheme.typography.titleMedium,
+            actionTooltip = str("btn_see_all"),
+            arrowSize = 20.dp,
+            onAction = onViewAll,
+            modifier = Modifier.padding(vertical = 4.dp),
+        )
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
             users.take(6).forEach { user ->

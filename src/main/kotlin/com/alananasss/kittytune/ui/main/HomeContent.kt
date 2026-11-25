@@ -165,6 +165,7 @@ import com.alananasss.kittytune.ui.home.SearchFilter
 import com.alananasss.kittytune.ui.home.SearchSource
 import com.alananasss.kittytune.ui.home.YandexNotice
 import com.alananasss.kittytune.core.Strings
+import com.alananasss.kittytune.ui.home.ChartsViewModel
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.util.Calendar
 
@@ -180,6 +181,7 @@ private val LocalVerifiedFilterOn = compositionLocalOf { false }
 @Composable
 fun HomeContent(
     homeViewModel: HomeViewModel,
+    chartsViewModel: ChartsViewModel,
     playerViewModel: PlayerViewModel,
     navController: NavController,
 ) {
@@ -210,7 +212,7 @@ fun HomeContent(
             HomeMode.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularWavyProgressIndicator()
             }
-            HomeMode.FEED -> HomeFeed(vm, playerViewModel, navController)
+            HomeMode.FEED -> HomeFeed(vm, chartsViewModel, playerViewModel, navController)
         }
     }
 }
@@ -849,21 +851,14 @@ private fun AllPlatformsResults(
     ) {
         groups.forEach { (source, tracks) ->
             item(key = "all-head-${source.name}") {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        searchSourceName(source),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(
-                        onClick = { vm.onSearchSourceChanged(source) },
-                        shapes = ButtonDefaults.shapes(),
-                    ) { Text(str("search_all_show_source")) }
-                }
+                com.alananasss.kittytune.ui.common.InlineSectionHeader(
+                    title = searchSourceName(source),
+                    titleStyle = MaterialTheme.typography.titleMedium,
+                    actionTooltip = str("search_all_show_source"),
+                    arrowSize = 22.dp,
+                    onAction = { vm.onSearchSourceChanged(source) },
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                )
             }
             items(tracks.take(ALL_PER_SOURCE), key = { "all-${source.name}-${it.id}" }) { track ->
                 SearchTrackRow(track, playerViewModel)
@@ -1913,42 +1908,15 @@ private fun SectionHeader(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onSeeAll: () -> Unit,
 ) {
-    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val arrowShift by animateDpAsState(if (hovered) 3.dp else 0.dp, label = "sectionArrow")
-    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Tip(str("search_see_all")) {
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .hoverable(interaction)
-                    .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onSeeAll)
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .padding(start = 4.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                )
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = str("search_see_all"),
-                    tint = if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 2.dp).offset(x = arrowShift).size(20.dp),
-                )
-            }
-        }
-    }
+    com.alananasss.kittytune.ui.common.InlineSectionHeader(
+        title = title,
+        icon = icon,
+        titleStyle = MaterialTheme.typography.titleSmall,
+        actionTooltip = str("search_see_all"),
+        arrowSize = 20.dp,
+        onAction = onSeeAll,
+        modifier = Modifier.padding(vertical = 4.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

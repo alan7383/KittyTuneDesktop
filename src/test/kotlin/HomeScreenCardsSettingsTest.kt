@@ -87,14 +87,8 @@ class HomeScreenCardsSettingsTest {
             homeContentSource.contains("if (showHomeMyWave)"),
             "HomeContent must conditionally render MyWaveCard",
         )
-        assertTrue(
-            homeContentSource.contains("if (showHomeCharts)"),
-            "HomeContent must conditionally render HomeChartSection",
-        )
-        assertTrue(
-            homeContentSource.contains("LaunchedEffect(showHomeCharts)"),
-            "HomeContent must not load the chart preview while the section is hidden",
-        )
+        val guardedChart = Regex("""if \(showHomeCharts\) \{\s*item\(key = "chart"\) \{\s*[\w.]*HomeChartSection\(""")
+        assertTrue(guardedChart.containsMatchIn(homeContentSource), "The chart must only be composed and loaded when enabled")
     }
 
     @Test

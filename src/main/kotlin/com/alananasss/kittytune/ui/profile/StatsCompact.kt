@@ -84,8 +84,19 @@ internal fun CompactStats(
                     artists(Modifier)
                 }
             }
-            item { HabitsLine(report) }
-            item(key = "games") { GamesPlaytimeCard(report.window) }
+            item(key = "habits-games") {
+                if (isWide) {
+                    MorphingGrid(columns = 2, spacing = 12.dp) {
+                        HabitsLine(report, modifier = Modifier)
+                        GamesPlaytimeCard(report.window)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HabitsLine(report)
+                        GamesPlaytimeCard(report.window)
+                    }
+                }
+            }
         }
     }
 }
@@ -207,19 +218,29 @@ private fun CompactRow(
     }
 }
 
-/** The habits as one line of chips. */
+/** The habits as a grid/flow of chips inside a surface when paired side-by-side. */
 @Composable
-private fun HabitsLine(report: ListeningReport) {
+private fun HabitsLine(report: ListeningReport, modifier: Modifier = Modifier) {
     val chips = buildList {
         add(str("listening_stats_completion_rate") + ": ${(report.completionRate * 100).roundToInt()} %")
         add(str("listening_stats_skip_rate") + ": ${(report.skipRate * 100).roundToInt()} %")
         add(str("listening_stats_streak") + ": ${report.longestStreakDays}")
         report.peakHour?.let { add(str("listening_stats_peak_hour", hourLabel(it))) }
     }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        chips.forEach { text ->
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            chips.forEach { text ->
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+                    Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                }
             }
         }
     }

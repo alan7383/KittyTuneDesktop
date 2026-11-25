@@ -71,6 +71,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.alananasss.kittytune.core.AppInstance
+import com.alananasss.kittytune.ui.home.ChartsViewModel
 import com.alananasss.kittytune.ui.home.HomeViewModel
 import com.alananasss.kittytune.ui.library.LibraryViewModel
 import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -138,6 +139,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
     com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: composition start")
     com.alananasss.kittytune.ui.debug.TraceRecompositions("MainScreen")
     val homeViewModel: HomeViewModel = viewModel { HomeViewModel(AppInstance.application) }
+    val chartsViewModel: ChartsViewModel = viewModel { ChartsViewModel(AppInstance.application) }
     val libraryViewModel: LibraryViewModel = viewModel { LibraryViewModel(AppInstance.application) }
     com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: view models created")
     LaunchedEffect(playerViewModel) { playerViewModel.resetAccountProfile() }
@@ -774,6 +776,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                         composable("home") {
                             HomeContent(
                                 homeViewModel = homeViewModel,
+                                chartsViewModel = chartsViewModel,
                                 playerViewModel = playerViewModel,
                                 navController = navController,
                             )
@@ -1123,17 +1126,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                         }
                         composable("charts") {
                             com.alananasss.kittytune.ui.home.ChartsScreen(
-                                onBackClick = { navController.popBackStack() },
-                                onPlaylistClick = { playlistId ->
-                                    navController.navigate("playlist_detail/$playlistId")
-                                },
-                                onNavigate = { route ->
-                                    when {
-                                        route.startsWith("profile:") -> navController.navigate("profile/${route.removePrefix("profile:")}")
-                                        route.startsWith("station_artist:") -> navController.navigate("playlist_detail/$route")
-                                        else -> navController.navigate(route)
-                                    }
-                                },
+                                viewModel = chartsViewModel,
                                 playerViewModel = playerViewModel
                             )
                         }

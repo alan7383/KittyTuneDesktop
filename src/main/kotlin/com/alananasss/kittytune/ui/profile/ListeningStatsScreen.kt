@@ -141,7 +141,7 @@ fun ListeningStatsScreen(
 }
 
 @Composable
-private fun StatsHeader(
+internal fun StatsHeader(
     report: ListeningReport?,
     period: ReportPeriod,
     periodOffset: Int,
@@ -158,6 +158,7 @@ private fun StatsHeader(
     var styleMenu by remember { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     val isNarrow = maxWidth < 560.dp
+    val combineControls = maxWidth >= 780.dp
     Column(Modifier.fillMaxWidth().padding(start = if (isNarrow) 16.dp else 24.dp, end = if (isNarrow) 8.dp else 16.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -211,112 +212,214 @@ private fun StatsHeader(
             }
         }
         Spacer(Modifier.height(12.dp))
-        com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
-            options = ReportPeriod.entries,
-            selectedOption = period,
-            onOptionSelected = onSelect,
-            modifier = Modifier.widthIn(max = 560.dp),
-            fillMaxWidth = true,
-            contentPadding = if (isNarrow) PaddingValues(horizontal = 6.dp) else null,
-            labelProvider = { value ->
-                Text(
-                    str(
-                        when (value) {
-                            ReportPeriod.WEEK -> "listening_stats_period_week_short"
-                            ReportPeriod.MONTH -> "listening_stats_period_month_short"
-                            ReportPeriod.YEAR -> "listening_stats_period_year_short"
-                            ReportPeriod.ALL_TIME -> "listening_stats_period_all"
-                        }
-                    ),
-                    style = if (isNarrow) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            },
-        )
-
-        if (period != ReportPeriod.ALL_TIME) {
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+        if (combineControls) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                FilledTonalIconButton(
-                    onClick = onPrevious,
-                    enabled = canGoBack,
-                    shapes = IconButtonDefaults.shapes(),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
-                    ),
-                    modifier = Modifier.size(36.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = str("listening_stats_previous_period"),
-                        modifier = Modifier.size(18.dp)
+                    PeriodSelectorGroup(
+                        period = period,
+                        isNarrow = false,
+                        onSelect = onSelect,
+                        modifier = Modifier.widthIn(min = 380.dp, max = 560.dp),
                     )
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .then(if (periodOffset != 0) Modifier.clickable { onReset() } else Modifier)
-                        .padding(vertical = 2.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    val headline = if (report != null) periodHeadline(period, periodOffset, report) else ""
-                    val subtitle = if (report != null && periodOffset == -1 && period != ReportPeriod.WEEK) {
-                        spanLabel(period, report)
-                    } else null
-                    Text(
-                        text = headline,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center
-                    )
-                    if (subtitle != null) {
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center
+                    Spacer(Modifier.weight(1f))
+                    if (period != ReportPeriod.ALL_TIME) {
+                        PeriodNavigatorBar(
+                            report = report,
+                            period = period,
+                            periodOffset = periodOffset,
+                            canGoBack = canGoBack,
+                            canGoForward = canGoForward,
+                            onPrevious = onPrevious,
+                            onNext = onNext,
+                            onReset = onReset,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier.widthIn(min = 260.dp, max = 380.dp),
                         )
+                    } else if (report != null) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.DateRange,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(
+                                    text = spanLabel(ReportPeriod.ALL_TIME, report),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
                 }
-
-                FilledTonalIconButton(
-                    onClick = onNext,
-                    enabled = canGoForward,
-                    shapes = IconButtonDefaults.shapes(),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
-                    ),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowForward,
-                        contentDescription = str("listening_stats_next_period"),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            }
+        } else {
+            PeriodSelectorGroup(
+                period = period,
+                isNarrow = isNarrow,
+                onSelect = onSelect,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (period != ReportPeriod.ALL_TIME) {
+                Spacer(Modifier.height(8.dp))
+                PeriodNavigatorBar(
+                    report = report,
+                    period = period,
+                    periodOffset = periodOffset,
+                    canGoBack = canGoBack,
+                    canGoForward = canGoForward,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                    onReset = onReset,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
+    }
+}
+
+@Composable
+private fun PeriodSelectorGroup(
+    period: ReportPeriod,
+    isNarrow: Boolean,
+    onSelect: (ReportPeriod) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+        options = ReportPeriod.entries,
+        selectedOption = period,
+        onOptionSelected = onSelect,
+        modifier = modifier,
+        fillMaxWidth = true,
+        contentPadding = if (isNarrow) PaddingValues(horizontal = 6.dp) else null,
+        labelProvider = { value ->
+            Text(
+                str(
+                    when (value) {
+                        ReportPeriod.WEEK -> "listening_stats_period_week_short"
+                        ReportPeriod.MONTH -> "listening_stats_period_month_short"
+                        ReportPeriod.YEAR -> "listening_stats_period_year_short"
+                        ReportPeriod.ALL_TIME -> "listening_stats_period_all"
+                    }
+                ),
+                style = if (isNarrow) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+            )
+        },
+    )
+}
+
+@Composable
+private fun PeriodNavigatorBar(
+    report: ListeningReport?,
+    period: ReportPeriod,
+    periodOffset: Int,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onReset: () -> Unit,
+    containerColor: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        FilledTonalIconButton(
+            onClick = onPrevious,
+            enabled = canGoBack,
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+            ),
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = str("listening_stats_previous_period"),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(8.dp))
+                .then(if (periodOffset != 0) Modifier.clickable { onReset() } else Modifier)
+                .padding(vertical = 2.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val headline = if (report != null) periodHeadline(period, periodOffset, report) else ""
+            val subtitle = if (report != null && periodOffset == -1 && period != ReportPeriod.WEEK) {
+                spanLabel(period, report)
+            } else null
+            Text(
+                text = headline,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
+        }
+
+        FilledTonalIconButton(
+            onClick = onNext,
+            enabled = canGoForward,
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+            ),
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = str("listening_stats_next_period"),
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 
@@ -388,17 +491,15 @@ internal fun StatsCard(
 ) {
     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    if (subtitle != null) {
-                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if (action != null) {
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = action) { Text(str("listening_stats_show_all")) }
-                }
-            }
+            com.alananasss.kittytune.ui.common.InlineSectionHeader(
+                title = title,
+                subtitle = subtitle,
+                titleStyle = MaterialTheme.typography.titleMedium,
+                titleFontWeight = FontWeight.SemiBold,
+                actionTooltip = str("listening_stats_show_all"),
+                arrowSize = 22.dp,
+                onAction = action,
+            )
             Spacer(Modifier.height(12.dp))
             content()
         }

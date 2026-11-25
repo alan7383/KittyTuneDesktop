@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SportsEsports
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialShapes
@@ -44,7 +42,7 @@ import com.alananasss.kittytune.ui.game.GamePlaytime
  * the all-time total underneath.
  */
 @Composable
-internal fun GamesPlaytimeCard(window: ReportWindow, modifier: Modifier = Modifier) {
+internal fun GamesPlaytimeCard(window: ReportWindow, modifier: Modifier = Modifier, columns: Int = 1) {
     val scheme = MaterialTheme.colorScheme
     val version = GamePlaytime.version
     val inPeriod = remember(window.startMs, window.endMs, version) { GamePlaytime.totals(window.startMs, window.endMs) }
@@ -62,15 +60,15 @@ internal fun GamesPlaytimeCard(window: ReportWindow, modifier: Modifier = Modifi
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(str("stats_games_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        if (allTime > 0) str("stats_games_all_time", formatDurationShort(allTime)) else str("stats_games_empty"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
+                    com.alananasss.kittytune.ui.common.InlineSectionHeader(
+                        title = str("stats_games_title"),
+                        subtitle = if (allTime > 0) str("stats_games_all_time", formatDurationShort(allTime)) else str("stats_games_empty"),
+                        titleStyle = MaterialTheme.typography.titleMedium,
+                        titleFontWeight = FontWeight.SemiBold,
+                        actionTooltip = str("stats_games_play"),
+                        arrowSize = 22.dp,
+                        onAction = { ArcadeLauncher.open() },
                     )
-                }
-                FilledTonalButton(onClick = { ArcadeLauncher.open() }, shapes = ButtonDefaults.shapes()) {
-                    Text(str("stats_games_play"))
                 }
             }
             if (total > 0) {
@@ -82,9 +80,20 @@ internal fun GamesPlaytimeCard(window: ReportWindow, modifier: Modifier = Modifi
                 )
                 Spacer(Modifier.height(12.dp))
                 val top = inPeriod.values.maxOrNull() ?: 1L
+                val sorted = inPeriod.entries.sortedByDescending { it.value }
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    inPeriod.entries.sortedByDescending { it.value }.forEach { (game, ms) ->
-                        GameRow(game, ms, ms.toFloat() / top)
+                    sorted.chunked(columns.coerceAtLeast(1)).forEach { rowGames ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            rowGames.forEach { (game, ms) ->
+                                Box(Modifier.weight(1f)) { GameRow(game, ms, ms.toFloat() / top) }
+                            }
+                            repeat((columns - rowGames.size).coerceAtLeast(0)) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }

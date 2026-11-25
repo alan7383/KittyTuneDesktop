@@ -1557,19 +1557,15 @@ fun ProfileTrackItem(
 
 @Composable
 fun ProfileSectionTitle(title: String, showMore: Boolean = false, onMoreClick: () -> Unit = {}) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = title, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-        if (showMore) {
-            TextButton(shape = RoundedCornerShape(12.dp), onClick = onMoreClick) {
-                Text(str("btn_see_all"), fontWeight = FontWeight.Bold)
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
-            }
-        }
-    }
+    com.alananasss.kittytune.ui.common.InlineSectionHeader(
+        title = title,
+        titleStyle = MaterialTheme.typography.titleLarge,
+        titleFontWeight = FontWeight.Bold,
+        actionTooltip = str("btn_see_all"),
+        arrowSize = 24.dp,
+        onAction = if (showMore) onMoreClick else null,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 @Composable

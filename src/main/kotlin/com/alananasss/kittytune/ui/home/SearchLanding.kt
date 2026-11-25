@@ -9,26 +9,30 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import com.alananasss.kittytune.ui.common.InlineSectionHeader
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,21 +52,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
-import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.ScrollableLazyRow
-import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter
 import com.alananasss.kittytune.ui.player.PlaybackContext
@@ -184,36 +183,33 @@ fun SearchLanding(
  * page, where it was a thing to scroll past on the way to typing (issue #66).
  */
 @Composable
-internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewModel, onOpenCharts: () -> Unit) {
-    // Content filtering (issue #41): chart entries whose track (or artist) is blocked are hidden,
-    // and play positions map over the same visible list so the index still hits the right song.
-    val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
-    val blockedArtistIds by BlockManager.blockedArtistIdsFlow.collectAsState()
-    val chart = vm.chartPreview
-    val entries = remember(chart, blockedTrackIds, blockedArtistIds) {
-        chart.filter { !BlockManager.isBlocked(it.track) }
-    }
+internal fun HomeChartSection(viewModel: ChartsViewModel, playerViewModel: PlayerViewModel, onOpenCharts: () -> Unit) {
+    val chart = rememberVisibleChartEntries(viewModel)
+    val entries = remember(chart) { chart.take(CHART_PREVIEW_LENGTH) }
+    val tracks = remember(entries) { entries.map(ChartEntry::track) }
     ChartPreviewSection(
-        kind = vm.chartPreviewKind,
+        kind = viewModel.chartKind,
         entries = entries,
-        isLoading = vm.isChartPreviewLoading,
+        isLoading = viewModel.isChartLoading,
         currentTrack = playerViewModel.uiCurrentTrack,
-        onKindChange = { vm.loadChartPreview(it) },
+        isPlaying = playerViewModel.isPlaying,
+        onKindChange = { viewModel.loadChart(it, viewModel.chartGenre) },
         onPlayFrom = { index ->
             playerViewModel.playPlaylist(
-                tracks = entries.map { it.track },
+                tracks = tracks,
                 startIndex = index,
                 context = PlaybackContext(
                     displayText = str(
-                        vm.chartPreviewKind.labelKey()
+                        viewModel.chartKind.labelKey()
                     ),
                     navigationId = "charts",
                 ),
             )
         },
         onArtistClick = playerViewModel::navigateToTrackArtist,
+        onOptionClick = { track -> playerViewModel.showTrackOptions(track) },
         onSeeAll = onOpenCharts,
-        )
+    )
 }
 
 /**
@@ -268,28 +264,27 @@ private const val FROM_YOUR_ARTISTS_COUNT = 16
  */
 @Composable
 private fun LandingHeader(title: String, action: Pair<String, () -> Unit>?) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = CONTENT_PADDING, end = CONTENT_PADDING - 8.dp, top = 4.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        if (action != null) {
-            TextButton(shapes = ButtonDefaults.shapes(), onClick = action.second) {
-                Text(
-                    text = action.first,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+    InlineSectionHeader(
+        title = title,
+        titleStyle = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(start = CONTENT_PADDING, end = CONTENT_PADDING, top = 4.dp, bottom = 8.dp),
+        inlineTrailingAction = if (action != null) {
+            {
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = action.second,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.heightIn(min = 32.dp),
+                ) {
+                    Text(
+                        text = action.first,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
-        }
-    }
+        } else null,
+    )
 }
 
 /**
@@ -540,37 +535,16 @@ internal fun ChartPreviewSection(
     onPlayFrom: (Int) -> Unit,
     onArtistClick: TrackArtistClick,
     onSeeAll: () -> Unit,
+    isPlaying: Boolean = false,
+    onOptionClick: ((Track) -> Unit)? = null,
 ) {
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = CONTENT_PADDING),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .clickable(role = Role.Button, onClickLabel = str("btn_see_all"), onClick = onSeeAll)
-                    .padding(start = 4.dp, end = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = str("chart_section_title"),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = CONTENT_PADDING)) {
+        val widePreview = maxWidth >= 940.dp
+        val showRowMetadata = if (widePreview) maxWidth * 0.60f >= 560.dp else maxWidth >= 680.dp
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             SongChart(
                 kind = kind,
                 genre = ChartsViewModel.chartGenres.first(),
@@ -578,27 +552,80 @@ internal fun ChartPreviewSection(
                 onKindChange = onKindChange,
                 onGenreChange = {},
                 showGenreRow = false,
+                leadingContent = {
+                    InlineSectionHeader(
+                        title = str("chart_section_title"),
+                        titleStyle = MaterialTheme.typography.headlineSmall,
+                        actionTooltip = str("btn_see_all"),
+                        arrowSize = 26.dp,
+                        onAction = onSeeAll,
+                    )
+                },
             )
             when {
-                isLoading -> ChartLoadingRows()
-                entries.isEmpty() -> EmptyChart(onRetry = { onKindChange(kind) })
-                else -> {
-                    val firstRow = if (entries.first().rank == 1) 1 else 0
-                    if (firstRow > 0) {
-                        ChartLeadTrack(entries.first(), currentTrack, { onPlayFrom(0) }, onArtistClick)
+                isLoading -> if (widePreview) {
+                    com.alananasss.kittytune.ui.common.MorphingGrid(
+                        columns = 2,
+                        spacing = 12.dp,
+                        weights = listOf(0.40f, 0.60f),
+                    ) {
+                        ChartLoadingRows()
+                        ChartLoadingRows()
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        for (index in firstRow until entries.size) {
-                            val entry = entries[index]
-                            ChartTrackRow(
-                                track = entry.track,
-                                rank = entry.rank,
-                                currentlyPlayingTrack = currentTrack,
-                                onClick = { onPlayFrom(index) },
-                                onArtistClick = onArtistClick,
-                                shape = getSettingsShape(entries.size - firstRow, index - firstRow),
-                            )
+                } else {
+                    ChartLoadingRows()
+                }
+                entries.isEmpty() -> EmptyChart(onRetry = { onKindChange(kind) })
+                widePreview && entries.size >= 2 -> {
+                    val leader = entries.first()
+                    val tail = entries.drop(1)
+                    com.alananasss.kittytune.ui.common.MorphingGrid(
+                        columns = 2,
+                        spacing = 12.dp,
+                        weights = listOf(0.40f, 0.60f),
+                    ) {
+                        ChartLeaderCard(
+                            track = leader.track,
+                            currentlyPlayingTrack = currentTrack,
+                            onClick = { onPlayFrom(0) },
+                            isPlaying = isPlaying,
+                            onOptionClick = onOptionClick?.let { cb -> { cb(leader.track) } },
+                            onArtistClick = onArtistClick,
+                            modifier = Modifier.fillMaxHeight(),
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            tail.forEachIndexed { idx, entry ->
+                                val playIdx = idx + 1
+                                ChartTrackRow(
+                                    track = entry.track,
+                                    rank = entry.rank,
+                                    currentlyPlayingTrack = currentTrack,
+                                    onClick = { onPlayFrom(playIdx) },
+                                    index = idx,
+                                    totalCount = tail.size,
+                                    isPlaying = isPlaying,
+                                    showExtraMetadata = showRowMetadata,
+                                    onOptionClick = onOptionClick?.let { cb -> { cb(entry.track) } },
+                                    onArtistClick = onArtistClick,
+                                )
+                            }
                         }
+                    }
+                }
+                else -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    entries.forEachIndexed { index, entry ->
+                        ChartTrackRow(
+                            track = entry.track,
+                            rank = entry.rank,
+                            currentlyPlayingTrack = currentTrack,
+                            onClick = { onPlayFrom(index) },
+                            index = index,
+                            totalCount = entries.size,
+                            isPlaying = isPlaying,
+                            showExtraMetadata = showRowMetadata,
+                            onOptionClick = onOptionClick?.let { cb -> { cb(entry.track) } },
+                            onArtistClick = onArtistClick,
+                        )
                     }
                 }
             }
@@ -723,6 +750,7 @@ private const val COLLAPSED_RECENT_SEARCHES = 3
 
 /** One shared left/right inset, so every section starts on the same line. */
 private val CONTENT_PADDING = 20.dp
+private const val CHART_PREVIEW_LENGTH = 5
 
 /** Gap between sections, and the height a recent-search row is pinned to. */
 private val SECTION_GAP = 14.dp

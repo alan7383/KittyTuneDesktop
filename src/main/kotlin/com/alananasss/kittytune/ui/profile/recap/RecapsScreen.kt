@@ -107,25 +107,14 @@ fun RecapCarouselSection(
     val next = viewModel.upcoming.firstOrNull()
 
     Column(modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text(str("recaps_section"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(
-                    str("recaps_subtitle"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            FilledTonalButton(
-                onClick = onSeeAll,
-                shapes = ButtonDefaults.shapes(),
-                contentPadding = ButtonDefaults.SmallContentPadding,
-            ) {
-                Text(str("recaps_see_all"))
-                Spacer(Modifier.width(4.dp))
-                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
-        }
+        com.alananasss.kittytune.ui.common.InlineSectionHeader(
+            title = str("recaps_section"),
+            subtitle = str("recaps_subtitle"),
+            titleStyle = MaterialTheme.typography.titleLarge,
+            actionTooltip = str("recaps_see_all"),
+            arrowSize = 24.dp,
+            onAction = onSeeAll,
+        )
         Spacer(Modifier.height(12.dp))
 
         if (summaries.isEmpty()) {

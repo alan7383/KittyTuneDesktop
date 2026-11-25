@@ -35,7 +35,6 @@ import com.alananasss.kittytune.utils.Logger
     import kotlinx.coroutines.async
     import kotlinx.coroutines.coroutineScope
     import kotlinx.coroutines.delay
-    import kotlinx.coroutines.ensureActive
     import kotlinx.coroutines.flow.first
     import kotlinx.coroutines.launch
     import kotlinx.coroutines.withContext
@@ -239,15 +238,6 @@ import com.alananasss.kittytune.utils.Logger
         val recentSearches = mutableStateListOf<String>()
         private var recentSearchesJob: Job? = null
 
-        /** Enough of the chart to preview on the landing; the whole thing lives on the Charts screen. */
-        var chartPreview by mutableStateOf(emptyList<ChartEntry>())
-            private set
-        private var chartPreviewJob: Job? = null
-        var chartPreviewKind by mutableStateOf(ChartKind.COUNTRY)
-            private set
-        var isChartPreviewLoading by mutableStateOf(false)
-            private set
-
         /** Newest songs from the artists whose work is already in the liked list. */
         val likedArtistUpdates = mutableStateListOf<Track>()
 
@@ -355,26 +345,6 @@ import com.alananasss.kittytune.utils.Logger
             searchJob = viewModelScope.launch { performSearch(query) }
         }
 
-        fun loadChartPreview(kind: ChartKind = chartPreviewKind) {
-            chartPreviewJob?.cancel()
-            chartPreviewKind = kind
-            isChartPreviewLoading = true
-            chartPreviewJob = viewModelScope.launch {
-                val entries = fetchChart(
-                    api = api,
-                    kind = kind,
-                    genre = ChartsViewModel.chartGenres.first(),
-                    limit = CHART_PREVIEW_LENGTH,
-                    // The landing previews one market; picking another belongs to the chart screen.
-                    countryCode = "US",
-                    country = ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage),
-                )
-                ensureActive()
-                chartPreview = entries
-                isChartPreviewLoading = false
-            }
-        }
-
         /**
          * Newest songs from artists already present in the liked list.
          *
@@ -421,9 +391,6 @@ import com.alananasss.kittytune.utils.Logger
         }
 
         companion object {
-            /** How many songs the landing's chart preview shows. */
-            const val CHART_PREVIEW_LENGTH = 5
-
             /** How many of the first search results have their stream looked up ahead of a press. */
             private const val WARMED_RESULTS = 2
 
@@ -461,16 +428,12 @@ import com.alananasss.kittytune.utils.Logger
                 isLoading = false
             }
 
-            // The history is local, so it can be read straight away. The chart is not: asking for it
-            // with no network only produces a failed request and a spinner that never resolves, so it
-            // waits for the same ready signal the rest of the feed does.
             observeRecentSearches()
 
             viewModelScope.launch {
                 SessionManager.isClientIdValid.collect { isReady ->
                     if (isReady && !isOfflineMode) {
                         loadData()
-                        loadChartPreview()
                     }
                 }
             }

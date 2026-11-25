@@ -42,16 +42,14 @@ internal fun StoryStats(
     header: (@Composable () -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        // Start-aligned like the header and the recaps above: centred cards under a left-aligned page read as
-        // two layouts at once on a wide window.
-    ) {
-        if (header != null) item(key = "recaps") { header() }
-        item {
-            StoryCard(Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer)), scheme.onPrimaryContainer, index = 0) {
+    val storyCards = buildList<@Composable (Modifier) -> Unit> {
+        add { cardModifier ->
+            StoryCard(
+                background = Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer)),
+                contentColor = scheme.onPrimaryContainer,
+                index = 0,
+                modifier = cardModifier,
+            ) {
                 Text(str("stats_story_you_listened"), style = MaterialTheme.typography.titleMedium)
                 Text(
                     formatDurationShort(report.totalListenMs),
@@ -71,8 +69,13 @@ internal fun StoryStats(
             }
         }
         report.topArtists.firstOrNull()?.let { artist ->
-            item {
-                StoryCard(Brush.linearGradient(listOf(scheme.secondaryContainer, scheme.primaryContainer)), scheme.onSecondaryContainer, index = 1) {
+            add { cardModifier ->
+                StoryCard(
+                    background = Brush.linearGradient(listOf(scheme.secondaryContainer, scheme.primaryContainer)),
+                    contentColor = scheme.onSecondaryContainer,
+                    index = 1,
+                    modifier = cardModifier,
+                ) {
                     Text(str("stats_story_top_artist"), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -101,8 +104,13 @@ internal fun StoryStats(
             }
         }
         report.topTracks.firstOrNull()?.let { track ->
-            item {
-                StoryCard(Brush.linearGradient(listOf(scheme.tertiaryContainer, scheme.secondaryContainer)), scheme.onTertiaryContainer, index = 2) {
+            add { cardModifier ->
+                StoryCard(
+                    background = Brush.linearGradient(listOf(scheme.tertiaryContainer, scheme.secondaryContainer)),
+                    contentColor = scheme.onTertiaryContainer,
+                    index = 2,
+                    modifier = cardModifier,
+                ) {
                     Text(str("stats_story_top_track"), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -122,8 +130,13 @@ internal fun StoryStats(
             }
         }
         report.peakHour?.let { hour ->
-            item {
-                StoryCard(Brush.linearGradient(listOf(scheme.surfaceContainerHighest, scheme.primaryContainer)), scheme.onSurface, index = 3) {
+            add { cardModifier ->
+                StoryCard(
+                    background = Brush.linearGradient(listOf(scheme.surfaceContainerHighest, scheme.primaryContainer)),
+                    contentColor = scheme.onSurface,
+                    index = 3,
+                    modifier = cardModifier,
+                ) {
                     Text(str("stats_story_when"), style = MaterialTheme.typography.titleMedium)
                     Text(hourLabel(hour), style = MaterialTheme.typography.displayLarge.copy(fontSize = 64.sp, lineHeight = 70.sp), fontWeight = FontWeight.Black)
                     report.busiestWeekday?.let {
@@ -132,8 +145,13 @@ internal fun StoryStats(
                 }
             }
         }
-        item {
-            StoryCard(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)), scheme.onPrimary, index = 4) {
+        add { cardModifier ->
+            StoryCard(
+                background = Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)),
+                contentColor = scheme.onPrimary,
+                index = 4,
+                modifier = cardModifier,
+            ) {
                 Text(str("stats_story_habits"), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -143,7 +161,32 @@ internal fun StoryStats(
                 }
             }
         }
-        item(key = "games") { GamesPlaytimeCard(report.window, Modifier.widthIn(max = 880.dp)) }
+        add { cardModifier -> GamesPlaytimeCard(report.window, cardModifier) }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val columns = if (maxWidth >= 960.dp) 2 else 1
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (header != null) item(key = "recaps") { header() }
+            if (columns == 2 && storyCards.size % 2 == 1) {
+                item(key = "story-hero") { storyCards.first()(Modifier) }
+                item(key = "story-grid") {
+                    com.alananasss.kittytune.ui.common.MorphingGrid(columns = 2, spacing = 16.dp) {
+                        storyCards.drop(1).forEach { it(Modifier) }
+                    }
+                }
+            } else {
+                item(key = "story-grid") {
+                    com.alananasss.kittytune.ui.common.MorphingGrid(columns = columns, spacing = 16.dp) {
+                        storyCards.forEach { it(Modifier) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -157,12 +200,17 @@ private fun BigFigure(value: String, label: String) {
 
 /** One recap card: a gradient, big type, and a short rise-in as it first appears. */
 @Composable
-private fun StoryCard(background: Brush, contentColor: Color, index: Int, content: @Composable ColumnScope.() -> Unit) {
+private fun StoryCard(
+    background: Brush,
+    contentColor: Color,
+    index: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(420, delayMillis = 70 * index)) }
     Box(
-        Modifier
-            .widthIn(max = 880.dp)
+        modifier
             .fillMaxWidth()
             .graphicsLayer {
                 alpha = appear.value

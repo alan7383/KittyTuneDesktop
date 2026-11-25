@@ -57,6 +57,7 @@ internal fun OverviewStats(
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 760.dp
+        val isExtraWide = maxWidth >= 1100.dp
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
@@ -70,18 +71,36 @@ internal fun OverviewStats(
                     HoursCard(report, Modifier)
                 }
             }
-            if (report.topTracks.isNotEmpty()) {
+            if (report.topTracks.isNotEmpty() && isExtraWide) {
                 item {
-                    StatsCard(
-                        title = str("listening_stats_top_tracks"),
-                        action = if (report.topTracks.size > TOP_SHOWN) ({ onOpen(StatsList.TRACKS) }) else null,
-                    ) {
-                        val top = report.topTracks.first().listenMs
-                        report.topTracks.take(TOP_SHOWN).forEachIndexed { index, track ->
-                            RankedTrackRow(index + 1, track, share = track.listenMs.toFloat() / top) { onTrackClick(track.trackId) }
+                    MorphingGrid(columns = 2, spacing = 16.dp, weights = listOf(1.2f, 1f)) {
+                        StatsCard(
+                            title = str("listening_stats_top_tracks"),
+                            action = if (report.topTracks.size > TOP_SHOWN) ({ onOpen(StatsList.TRACKS) }) else null,
+                        ) {
+                            val top = report.topTracks.first().listenMs
+                            report.topTracks.take(TOP_SHOWN).forEachIndexed { index, track ->
+                                RankedTrackRow(index + 1, track, share = track.listenMs.toFloat() / top) { onTrackClick(track.trackId) }
+                            }
+                        }
+                        HabitsGrid(report, columns = 2)
+                    }
+                }
+            } else {
+                if (report.topTracks.isNotEmpty()) {
+                    item {
+                        StatsCard(
+                            title = str("listening_stats_top_tracks"),
+                            action = if (report.topTracks.size > TOP_SHOWN) ({ onOpen(StatsList.TRACKS) }) else null,
+                        ) {
+                            val top = report.topTracks.first().listenMs
+                            report.topTracks.take(TOP_SHOWN).forEachIndexed { index, track ->
+                                RankedTrackRow(index + 1, track, share = track.listenMs.toFloat() / top) { onTrackClick(track.trackId) }
+                            }
                         }
                     }
                 }
+                item { HabitsGrid(report, columns = if (isWide) 4 else 2) }
             }
             if (report.topArtists.isNotEmpty()) {
                 item {
@@ -103,8 +122,7 @@ internal fun OverviewStats(
                     }
                 }
             }
-            item { HabitsGrid(report, isWide) }
-            item(key = "games") { GamesPlaytimeCard(report.window) }
+            item(key = "games") { GamesPlaytimeCard(report.window, columns = if (isWide) 2 else 1) }
         }
     }
 }
@@ -498,14 +516,14 @@ private const val TOP_ARTISTS_SHOWN = 12
 // ─── Habits ──────────────────────────────────────────────────────
 
 @Composable
-internal fun HabitsGrid(report: ListeningReport, isWide: Boolean) {
+internal fun HabitsGrid(report: ListeningReport, columns: Int, modifier: Modifier = Modifier) {
     val tiles: List<@Composable (Modifier) -> Unit> = listOf(
         { m -> HabitTile(Icons.Rounded.CheckCircle, "${(report.completionRate * 100).roundToInt()} %", str("listening_stats_completion_rate"), str("listening_stats_completion_rate_desc"), m) },
         { m -> HabitTile(Icons.Rounded.SkipNext, "${(report.skipRate * 100).roundToInt()} %", str("listening_stats_skip_rate"), str("listening_stats_skips_of", report.skips), m) },
         { m -> HabitTile(Icons.Rounded.Timer, formatDuration(report.averageListenMs), str("listening_stats_avg_play"), str("listening_stats_avg_play_desc"), m) },
         { m -> HabitTile(Icons.Rounded.LocalFireDepartment, report.longestStreakDays.toString(), str("listening_stats_streak"), str("listening_stats_active_days", report.activeDays), m) },
     )
-    MorphingGrid(columns = if (isWide) 4 else 2, spacing = 12.dp) {
+    MorphingGrid(columns = columns, spacing = 12.dp, modifier = modifier) {
         tiles.forEach { tile -> tile(Modifier) }
     }
 }

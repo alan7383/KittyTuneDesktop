@@ -52,6 +52,7 @@ import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
+import com.alananasss.kittytune.ui.home.ChartsViewModel
 import com.alananasss.kittytune.ui.home.HomeViewModel
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.util.Calendar
@@ -69,6 +70,7 @@ import java.util.Calendar
 @Composable
 internal fun HomeFeed(
     vm: HomeViewModel,
+    chartsViewModel: ChartsViewModel,
     playerViewModel: PlayerViewModel,
     navController: NavController,
 ) {
@@ -96,10 +98,6 @@ internal fun HomeFeed(
         history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
             .distinctBy { it.id }
     }
-    LaunchedEffect(showHomeCharts) {
-        if (showHomeCharts && vm.chartPreview.isEmpty() && !vm.isChartPreviewLoading) vm.loadChartPreview()
-    }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 8.dp, bottom = 24.dp),
@@ -139,7 +137,11 @@ internal fun HomeFeed(
 
         if (showHomeCharts) {
             item(key = "chart") {
-                com.alananasss.kittytune.ui.home.HomeChartSection(vm, playerViewModel, onOpenCharts = { navController.navigate("charts") })
+                com.alananasss.kittytune.ui.home.HomeChartSection(
+                    viewModel = chartsViewModel,
+                    playerViewModel = playerViewModel,
+                    onOpenCharts = { navController.navigate("charts") },
+                )
             }
         }
 

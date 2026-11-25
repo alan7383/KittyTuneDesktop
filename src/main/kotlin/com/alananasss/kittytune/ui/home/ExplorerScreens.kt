@@ -586,20 +586,15 @@ fun GenreDetailScreen(
 
 @Composable
 fun SectionTitle(title: String, showMore: Boolean = false, onMoreClick: (() -> Unit)? = null) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        if (showMore && onMoreClick != null) {
-            TextButton(shapes = ButtonDefaults.shapes(), onClick = onMoreClick) { Text(str("btn_see_all")) }
-        }
-    }
+    com.alananasss.kittytune.ui.common.InlineSectionHeader(
+        title = title,
+        titleStyle = MaterialTheme.typography.titleLarge,
+        titleFontWeight = FontWeight.Bold,
+        actionTooltip = str("btn_see_all"),
+        arrowSize = 24.dp,
+        onAction = if (showMore && onMoreClick != null) onMoreClick else null,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 @Composable

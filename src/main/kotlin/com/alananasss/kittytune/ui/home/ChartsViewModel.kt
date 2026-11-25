@@ -125,7 +125,7 @@
     data class ChartEntry(val rank: Int, val track: Track, val score: Double)
 
     class ChartsViewModel(application: Application) : AndroidViewModel(application) {
-        private val api = RetrofitClient.create()
+        private val api by lazy { RetrofitClient.create() }
         private val gson = Gson()
 
         var selectedCountryIndex by mutableStateOf(0)
@@ -136,17 +136,23 @@
 
         // ── The song chart ──
         var chartKind by mutableStateOf(ChartKind.COUNTRY)
+            private set
         var chartGenre by mutableStateOf(chartGenres.first())
+            private set
         var chartCountry by mutableStateOf(ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage))
+            private set
         var chartEntries by mutableStateOf(emptyList<ChartEntry>())
             private set
-        var isChartLoading by mutableStateOf(false)
-
-        init {
-            loadChart(ChartKind.COUNTRY, chartGenres.first())
-        }
+        var isChartLoading by mutableStateOf(true)
+            private set
 
         private var chartJob: kotlinx.coroutines.Job? = null
+
+        internal fun ensureChartLoaded() {
+            if (chartJob?.isActive != true && chartEntries.isEmpty()) {
+                loadChart(chartKind, chartGenre)
+            }
+        }
 
         /**
          * Loads the ranked song list.
@@ -161,7 +167,7 @@
             chartGenre = genre
             isChartLoading = true
             val country = chartCountry
-            val countryCode = currentCountryCode()
+            val countryCode = country.code
             chartJob = viewModelScope.launch {
                 val entries = fetchChart(api, kind, genre, CHART_LENGTH, countryCode, country)
                 ensureActive()
@@ -173,12 +179,6 @@
         fun selectChartCountry(country: ChartCountry) {
             chartCountry = country
             loadChart(chartKind, chartGenre)
-        }
-
-        /** The picked country as SoundCloud's own chart playlists spell it; SoundCloud only keeps curated charts for US and UK. */
-        fun currentCountryCode(): String = when (chartCountry) {
-            ChartCountry.UK -> "UK"
-            else -> "US"
         }
 
         fun loadCountryCharts(index: Int) {
