@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -118,7 +119,13 @@ object Prefs {
     }
 
     private fun put(key: String, value: JsonElement?) {
-        state.value = if (value == null) state.value - key else state.value + (key to value)
+        state.update { if (value == null) it - key else it + (key to value) }
+        scheduleSave()
+    }
+
+    /** Replaces a group in one update so observers see the whole selection at once. */
+    internal fun replaceEntries(keys: Collection<String>, replacements: Map<String, JsonElement>) {
+        state.update { it - keys + replacements }
         scheduleSave()
     }
 

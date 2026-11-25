@@ -148,7 +148,13 @@ class SettingsSearchTest {
             val index = buildSettingsSearchIndex("Windows", emptyList())
             val renderer = searchSettings(index, "direct3d").first().entry
             assertEquals("performance_renderer", renderer.highlightKey)
-            assertEquals(SettingsPlace(SettingsCategory.PERFORMANCE), renderer.place)
+            assertEquals(SettingsSubPage.PERFORMANCE_GRAPHICS.place, renderer.place)
+            val preset = searchSettings(index, "smooth browsing").first().entry
+            assertEquals("performance_preset_smooth", preset.highlightKey)
+            assertEquals(SettingsSubPage.PERFORMANCE_PRESETS.place, preset.place)
+            val cache = searchSettings(index, "artwork disk cache").first().entry
+            assertEquals("performance_disk_cache", cache.highlightKey)
+            assertEquals(SettingsSubPage.PERFORMANCE_CACHES.place, cache.place)
             assertEquals("storage_backup_restore", searchSettings(index, "restore backup").first().entry.highlightKey)
             assertEquals("proxy_port", searchSettings(index, "proxy port").first().entry.highlightKey)
             assertEquals("tidal_audio_quality", searchSettings(index, "tidal audio quality").first().entry.highlightKey)

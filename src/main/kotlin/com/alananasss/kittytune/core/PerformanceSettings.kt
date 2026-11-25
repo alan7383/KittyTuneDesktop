@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.core
 
+import kotlinx.serialization.json.JsonPrimitive
+
 enum class PerformanceRenderer { AUTO, DIRECT3D, OPENGL, SOFTWARE_COMPAT, METAL }
 enum class PerformanceGpu { AUTO, INTEGRATED, DISCRETE }
 
@@ -11,6 +13,18 @@ data class PerformanceOptions(
     val gpuCacheMiB: Int = 64,
     val diskCacheMiB: Int = 256,
 )
+
+internal enum class PerformancePreset(val titleKey: String, val options: PerformanceOptions) {
+    RESOURCE_SAVER("performance_preset_saver", PerformanceOptions(imageCacheMiB = 16, gpuCacheMiB = 32, diskCacheMiB = 128)),
+    BALANCED("performance_preset_balanced", PerformanceOptions()),
+    SMOOTH_BROWSING("performance_preset_smooth", PerformanceOptions(imageCacheMiB = 64, gpuCacheMiB = 128, diskCacheMiB = 512));
+
+    val descriptionKey: String get() = "${titleKey}_sub"
+
+    companion object {
+        fun matching(options: PerformanceOptions): PerformancePreset? = entries.firstOrNull { it.options == options }
+    }
+}
 
 object PerformanceSettings {
     const val RENDERER = "performance_renderer"
@@ -97,8 +111,25 @@ object PerformanceSettings {
         active = options
     }
 
+    internal fun applyPreset(preset: PerformancePreset) {
+        val options = preset.options
+        val replacements = if (preset == PerformancePreset.BALANCED) {
+            emptyMap()
+        } else {
+            mapOf(
+                RENDERER to JsonPrimitive(options.renderer.name),
+                GPU to JsonPrimitive(options.gpu.name),
+                VSYNC to JsonPrimitive(options.vsync),
+                IMAGE_CACHE to JsonPrimitive(options.imageCacheMiB),
+                GPU_CACHE to JsonPrimitive(options.gpuCacheMiB),
+                DISK_CACHE to JsonPrimitive(options.diskCacheMiB),
+            )
+        }
+        Prefs.replaceEntries(keys, replacements)
+    }
+
     fun reset() {
-        keys.forEach(Prefs::remove)
+        applyPreset(PerformancePreset.BALANCED)
         Prefs.flush()
     }
 }

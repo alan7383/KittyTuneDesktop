@@ -70,6 +70,37 @@ class PerformanceSettingsTest {
         assertEquals("false", props["skiko.vsync.enabled"])
     }
 
+    @Test fun presetsApplyWholeProfilesAndManualEditsAreRecognized() {
+        val original = Prefs.snapshot()
+        val active = PerformanceSettings.active
+        try {
+            Prefs.putString("performance_test_unrelated", "keep")
+            for (preset in PerformancePreset.entries) {
+                Prefs.putString(PerformanceSettings.RENDERER, PerformanceRenderer.SOFTWARE_COMPAT.name)
+                Prefs.putString(PerformanceSettings.GPU, PerformanceGpu.DISCRETE.name)
+                Prefs.putBoolean(PerformanceSettings.VSYNC, false)
+                assertNull(PerformancePreset.matching(PerformanceSettings.read()))
+
+                PerformanceSettings.applyPreset(preset)
+
+                val saved = PerformanceSettings.read()
+                assertEquals(preset.options, saved)
+                assertEquals(preset, PerformancePreset.matching(saved))
+                assertEquals(active, PerformanceSettings.active)
+                assertEquals("keep", Prefs.getString("performance_test_unrelated", null))
+                if (preset == PerformancePreset.BALANCED) {
+                    assertFalse(PerformanceSettings.keys.any(Prefs::contains))
+                }
+
+                Prefs.putInt(PerformanceSettings.DISK_CACHE, 1024)
+                assertNull(PerformancePreset.matching(PerformanceSettings.read()))
+            }
+        } finally {
+            Prefs.restore(original)
+            Prefs.flush()
+        }
+    }
+
     @Test fun preferencesApplyOnlyAtStartupAndResetPreservesOtherSettings() {
         val original = Prefs.snapshot()
         val properties = System.getProperties().clone() as java.util.Properties

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.alananasss.kittytune.core.PerformancePreset
 import com.alananasss.kittytune.core.PerformanceSettings
 import com.alananasss.kittytune.audio.providers.AudioProviderOrderItem
 import com.alananasss.kittytune.audio.ai.AiDetectionManager
@@ -504,15 +505,22 @@ internal fun buildSettingsSearchCatalog(os: String): List<SettingsSearchEntry> =
         control("sleep_timer_fade_title", "sleep_timer_fade_subtitle")
         control("label_duration", highlightKey = "sleep_fade_duration", aliasKeys = listOf("sleep_timer_fade_title"))
     }
-    controls(SettingsPlace(SettingsCategory.PERFORMANCE)) {
-        control("performance_vsync", "performance_vsync_note")
+    controls(PERFORMANCE_PRESETS.place) {
+        for (preset in PerformancePreset.entries) {
+            control(preset.titleKey, preset.descriptionKey)
+        }
         control("performance_reset")
+    }
+    controls(PERFORMANCE_GRAPHICS.place) {
+        control("performance_vsync", "performance_vsync_note")
         control("performance_renderer", "performance_renderer_note",
             aliases = PerformanceSettings.renderers(os).map { it.name },
             aliasKeys = listOf("performance_software"))
         control("performance_gpu", "performance_gpu_note",
             aliasKeys = listOf("performance_integrated", "performance_discrete"))
         if (windows) control("performance_windows_gpu", "performance_windows_gpu_note")
+    }
+    controls(PERFORMANCE_CACHES.place) {
         control("performance_image_cache", "performance_cache_note")
         control("performance_gpu_cache", "performance_cache_note")
         control("performance_disk_cache", "performance_cache_note")

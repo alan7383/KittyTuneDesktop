@@ -225,6 +225,11 @@ internal enum class SettingsSubPage(
     AUDIO_KARAOKE(SettingsCategory.AUDIO, "karaoke_settings_title", "karaoke_settings_sub", Icons.Rounded.Mic),
     AUDIO_SLEEP_TIMER(SettingsCategory.AUDIO, "sleep_timer_title", "settings_audio_sleep_sub", Icons.Rounded.Timer),
 
+    // Performance
+    PERFORMANCE_PRESETS(SettingsCategory.PERFORMANCE, "performance_presets", "performance_presets_sub", Icons.Rounded.Tune),
+    PERFORMANCE_GRAPHICS(SettingsCategory.PERFORMANCE, "performance_graphics", "performance_graphics_sub", Icons.Rounded.DesktopWindows),
+    PERFORMANCE_CACHES(SettingsCategory.PERFORMANCE, "performance_caches", "performance_caches_sub", Icons.Rounded.Memory),
+
     // Sources
     SOURCES_SERVICES(SettingsCategory.SOURCES, "sources_services_title", "sources_services_sub", Icons.Rounded.CloudQueue),
     SOURCES_ORDER(SettingsCategory.SOURCES, "sources_playback_title", "sources_order_sub", Icons.Rounded.SwapVert),
@@ -283,9 +288,11 @@ private fun SettingsPageContent(
 ) {
     when (location.subPage) {
         null -> when (location.category) {
-            SettingsCategory.PERFORMANCE -> PerformanceSettingsScreen()
             SettingsCategory.CREDITS -> CreditsContent(Modifier.fillMaxSize())
-            else -> CategoryFolderGroup(location.category, onOpen)
+            else -> {
+                CategoryFolderGroup(location.category, onOpen)
+                if (location.category == SettingsCategory.PERFORMANCE) PerformanceRestartNotice(showHint = false)
+            }
         }
         // Interface subpages
         SettingsSubPage.THEMES -> ThemesSettingsPage(onOpenCustomTheme = { onOpen(SettingsSubPage.CUSTOM_THEME) })
@@ -317,6 +324,11 @@ private fun SettingsPageContent(
         SettingsSubPage.AUDIO_TRANSITIONS -> AudioTransitionsPage(playerViewModel)
         SettingsSubPage.AUDIO_KARAOKE -> KaraokeSettingsPage(playerViewModel)
         SettingsSubPage.AUDIO_SLEEP_TIMER -> AudioSleepTimerPage()
+
+        // Performance subpages
+        SettingsSubPage.PERFORMANCE_PRESETS -> PerformancePresetsPage()
+        SettingsSubPage.PERFORMANCE_GRAPHICS -> PerformanceGraphicsPage()
+        SettingsSubPage.PERFORMANCE_CACHES -> PerformanceCachesPage()
 
         // Sources subpages
         SettingsSubPage.SOURCES_SERVICES -> SourcesServicesPage(navController)
