@@ -143,6 +143,24 @@ class SettingsSearchTest {
     }
 
     @Test
+    fun testPerformanceControlsKeepTheirOldSearchTermsAndNewLabels() {
+        withLanguage("en") {
+            val index = buildSettingsSearchIndex("Windows", emptyList())
+            val queries = mapOf(
+                "performance_image_cache" to listOf("artwork memory cache", "covers kept in memory"),
+                "performance_gpu_cache" to listOf("graphics resource cache", "memory for drawing"),
+                "performance_disk_cache" to listOf("artwork disk cache", "covers saved on disk"),
+                "performance_vsync" to listOf("vsync", "vertical synchronization", "keep motion in step with the screen"),
+                "performance_gpu" to listOf("gpu", "preferred gpu", "graphics card"),
+                "performance_renderer" to listOf("renderer", "drawing mode"),
+            )
+            for ((key, terms) in queries) for (term in terms) {
+                assertEquals(key, searchSettings(index, term).first().entry.highlightKey, term)
+            }
+        }
+    }
+
+    @Test
     fun testSearchReachesControlsAcrossPagesAndProviderRoutes() {
         withLanguage("en") {
             val index = buildSettingsSearchIndex("Windows", emptyList())
