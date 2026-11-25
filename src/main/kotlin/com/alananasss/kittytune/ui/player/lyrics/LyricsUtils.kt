@@ -494,11 +494,16 @@ object LyricsUtils {
                 val words = mutableListOf<LyricWord>()
                 val wordsData = lineMap["words"] as? List<Map<String, Any>>
                 if (wordsData != null) {
-                    for (wordMap in wordsData) {
-                        val wordText = wordMap["text"] as? String ?: continue
-                        val wordStartMs = (wordMap["start_ms"] as? Number)?.toLong() ?: continue
-                        val wordEndMs = (wordMap["end_ms"] as? Number)?.toLong() ?: endMs
-                        words.add(LyricWord(wordText, wordStartMs, wordEndMs))
+                    val tempWords = wordsData.mapNotNull { wordMap ->
+                        val wordText = wordMap["text"] as? String ?: return@mapNotNull null
+                        val wordStartMs = (wordMap["start_ms"] as? Number)?.toLong() ?: return@mapNotNull null
+                        val wordEndMs = (wordMap["end_ms"] as? Number)?.toLong()
+                        ParsedYamlWord(wordText, wordStartMs, wordEndMs)
+                    }
+                    for (i in tempWords.indices) {
+                        val word = tempWords[i]
+                        val inferredEnd = word.explicitEndMs ?: tempWords.getOrNull(i + 1)?.startMs ?: endMs
+                        words.add(LyricWord(word.text, word.startMs, inferredEnd.coerceAtLeast(word.startMs)))
                     }
                 }
                 val singer = when ((lineMap["singer"] as? String)?.lowercase() ?: (lineMap["singer"] as? Number)?.toString()) {
@@ -614,6 +619,62 @@ object LyricsUtils {
             LyricLine(current.text, current.startTime, nextTime, updatedWords, singer = current.singer)
         }
     }
+
+    data class ParsedLrcLibLyrics(
+        val lines: List<LyricLine>,
+        val plain: String?,
+        val rawContent: String?,
+    )
+
+    /** Drops per-word timings so phrase-synced providers cannot render broken word highlighting. */
+    fun stripWordTimings(lines: List<LyricLine>): List<LyricLine> =
+        if (lines.none { it.words.isNotEmpty() }) {
+            lines
+        } else {
+            lines.map { if (it.words.isEmpty()) it else it.copy(words = emptyList()) }
+        }
+
+    /**
+     * Parses an LrcLib response strictly as line-by-line or plain lyrics.
+     *
+     * LrcLib only provides phrase-level timings; word entries inside community `lyricsfile` YAML
+     * payloads (or enhanced LRC tags) are ignored/stripped so LrcLib never masquerades as word-synced.
+     */
+    fun parseLrcLibPayload(
+        syncedLyrics: String?,
+        lyricsfile: String?,
+        plainLyrics: String?,
+        totalDurationMs: Long,
+    ): ParsedLrcLibLyrics {
+        val syncedRaw = syncedLyrics?.takeIf { it.isNotBlank() }
+        val syncedLines = syncedRaw?.let { parseLyricsContent(it, totalDurationMs) }.orEmpty()
+        val yamlRaw = lyricsfile?.takeIf { it.isNotBlank() }
+        val plain = plainLyrics?.takeIf { it.isNotBlank() }
+            ?: yamlRaw?.let { extractPlainLyricsFromYaml(it) }
+
+        val lines: List<LyricLine>
+        val chosenRaw: String?
+        if (syncedLines.isNotEmpty()) {
+            lines = stripWordTimings(syncedLines)
+            chosenRaw = syncedRaw
+        } else {
+            val yamlLines = yamlRaw?.let { parseLyricsContent(it, totalDurationMs) }.orEmpty()
+            if (yamlLines.isNotEmpty()) {
+                lines = stripWordTimings(yamlLines)
+                chosenRaw = yamlRaw
+            } else {
+                lines = emptyList()
+                chosenRaw = plain ?: syncedRaw
+            }
+        }
+        return ParsedLrcLibLyrics(lines = lines, plain = plain, rawContent = chosenRaw)
+    }
+
+    private data class ParsedYamlWord(
+        val text: String,
+        val startMs: Long,
+        val explicitEndMs: Long?,
+    )
 
     private data class ParsedLineTemp(
         val text: String,

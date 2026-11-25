@@ -52,10 +52,11 @@ object LyricsCache {
                     com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.extractPlainLyricsFromYaml(p)
                 } else p
             }?.takeIf { it.isNotBlank() }
+            val stripLrcLibWords = provider.equals("LRCLIB", ignoreCase = true)
             val rawLines: List<LyricLine>? = lines
             val cleanLines = (rawLines ?: emptyList()).map { line ->
                 var updated = line
-                if (updated.words == null) {
+                if (updated.words == null || (stripLrcLibWords && updated.words.isNotEmpty())) {
                     updated = updated.copy(words = emptyList())
                 }
                 if (updated.singer == null) {
@@ -70,9 +71,10 @@ object LyricsCache {
     /**
      * Raised whenever resolving changes enough that old answers are wrong rather than just old: 2 dropped
      * YouTube Music, which had won with another song's words, and started telling fake timings and
-     * watermark lines apart. Older entries miss and are resolved again.
+     * watermark lines apart; 3 stopped treating LrcLib `lyricsfile` word timings as word-by-word sync.
+     * Older entries miss and are resolved again.
      */
-    private const val CURRENT_SCHEMA = 2
+    private const val CURRENT_SCHEMA = 3
 
     // 24 entries is enough for upcoming + recently-played; anything older reloads from disk in
     // <5 ms. The previous 64 was wasteful for word-synced / enhanced lyrics (TTML, QRC) which can

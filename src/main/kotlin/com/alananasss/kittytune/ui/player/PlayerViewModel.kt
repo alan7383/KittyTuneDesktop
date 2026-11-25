@@ -2998,21 +2998,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     (altTitle != null && LyricsMatcher.isAcceptable(altTitle, result.artistName, target))
                 if (!isAcceptable) return@mapNotNull null
 
-                val fileLines = result.lyricsfile
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) }
-                    .orEmpty()
-                val synced = result.syncedLyrics
-                val lines = if (fileLines.isEmpty() && !synced.isNullOrBlank()) {
-                    LyricsUtils.parseLyricsContent(synced, trackDurationMs)
-                } else {
-                    fileLines
-                }
-                val plain = result.plainLyrics
-                    ?: result.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
+                val parsed = LyricsUtils.parseLrcLibPayload(
+                    syncedLyrics = result.syncedLyrics,
+                    lyricsfile = result.lyricsfile,
+                    plainLyrics = result.plainLyrics,
+                    totalDurationMs = trackDurationMs,
+                )
                 LyricsCandidate(
-                    lines = lines,
-                    plain = plain,
+                    lines = parsed.lines,
+                    plain = parsed.plain,
                     provider = "LRCLIB",
                     matchScore = LyricsMatcher.score(candTitle, result.artistName, result.duration, target),
                     titleSimilarity = titleSim,
@@ -3208,22 +3202,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private suspend fun processLyricsResponse(response: LrcLibResponse?, trackDuration: Long) {
-        val fileLines = response?.lyricsfile?.takeIf { it.isNotBlank() }?.let { LyricsUtils.parseLyricsContent(it, trackDuration) }.orEmpty()
-        val synced = response?.syncedLyrics
-        val resultLines = when {
-            response == null -> emptyList()
-            fileLines.isNotEmpty() -> fileLines
-            !synced.isNullOrBlank() -> LyricsUtils.parseLyricsContent(synced, trackDuration)
-            else -> emptyList()
+        val parsed = if (response != null) {
+            LyricsUtils.parseLrcLibPayload(
+                syncedLyrics = response.syncedLyrics,
+                lyricsfile = response.lyricsfile,
+                plainLyrics = response.plainLyrics,
+                totalDurationMs = trackDuration,
+            )
+        } else {
+            LyricsUtils.ParsedLrcLibLyrics(emptyList(), null, null)
         }
+        val resultLines = parsed.lines
 
         withContext(Dispatchers.Main) {
             lyricsLines.clear()
             lyricsLines.addAll(resultLines)
 
-            val plain = response?.plainLyrics
-                ?: response?.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
-            rawPlainLyrics = (plain ?: if (resultLines.isNotEmpty()) {
+            rawPlainLyrics = (parsed.plain ?: if (resultLines.isNotEmpty()) {
                 resultLines.joinToString("\n") { it.text }
             } else {
                 response?.syncedLyrics
@@ -3374,7 +3369,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             var finalPlain: String? = null
 
             if (result.rawContent != null) {
-                finalLines = LyricsUtils.parseLyricsContent(result.rawContent, duration)
+                val parsedLines = LyricsUtils.parseLyricsContent(result.rawContent, duration)
+                finalLines = if (result.provider.equals("LRCLIB", ignoreCase = true)) {
+                    LyricsUtils.stripWordTimings(parsedLines)
+                } else {
+                    parsedLines
+                }
                 if (finalLines.isEmpty()) {
                     finalPlain = LyricsUtils.extractPlainLyricsFromYaml(result.rawContent)
                         ?: result.rawContent.takeUnless {
@@ -3386,16 +3386,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     "LRCLIB" -> {
                         try {
                             val lrcData = LrcLibClient.api.getLyricsById(result.id.toLong())
-                            val fileLines = lrcData.lyricsfile?.takeIf { it.isNotBlank() }?.let { LyricsUtils.parseLyricsContent(it, duration) }.orEmpty()
-                            val synced = lrcData.syncedLyrics
-                            val lines = if (fileLines.isEmpty() && !synced.isNullOrBlank()) {
-                                LyricsUtils.parseLyricsContent(synced, duration)
-                            } else {
-                                fileLines
-                            }
-                            finalLines = lines
-                            finalPlain = lrcData.plainLyrics
-                                ?: lrcData.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
+                            val parsed = LyricsUtils.parseLrcLibPayload(
+                                syncedLyrics = lrcData.syncedLyrics,
+                                lyricsfile = lrcData.lyricsfile,
+                                plainLyrics = lrcData.plainLyrics,
+                                totalDurationMs = duration,
+                            )
+                            finalLines = parsed.lines
+                            finalPlain = parsed.plain
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }

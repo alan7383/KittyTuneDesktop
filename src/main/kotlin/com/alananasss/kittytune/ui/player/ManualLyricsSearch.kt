@@ -167,28 +167,23 @@ internal object ManualLyricsSearch {
 
     private suspend fun searchLrcLib(query: String, track: LyricsSearchTrack): List<UnifiedLyricResult> =
         LrcLibClient.api.searchLyrics(query).map { hit ->
-            val parsedFileLines = hit.lyricsfile?.takeIf { it.isNotBlank() }?.let { LyricsUtils.parseLyricsContent(it, track.durationMs) }.orEmpty()
-            val raw = if (parsedFileLines.isNotEmpty()) {
-                hit.lyricsfile
-            } else {
-                hit.syncedLyrics?.takeIf { it.isNotBlank() }
-                    ?: hit.plainLyrics?.takeIf { it.isNotBlank() }
-                    ?: hit.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
-            }
-            val (lineSync, wordSync) = raw?.let { timingsOf(it, track.durationMs) } ?: (false to false)
-            val plainPreview = hit.plainLyrics
-                ?: hit.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
-                ?: raw?.takeUnless { LyricsUtils.isYamlContent(it) }
+            val parsed = LyricsUtils.parseLrcLibPayload(
+                syncedLyrics = hit.syncedLyrics,
+                lyricsfile = hit.lyricsfile,
+                plainLyrics = hit.plainLyrics,
+                totalDurationMs = track.durationMs,
+            )
+            val plainPreview = parsed.plain ?: parsed.rawContent?.takeUnless { LyricsUtils.isYamlContent(it) }
             UnifiedLyricResult(
                 id = hit.id.toString(),
                 name = hit.trackName?.takeIf { it.isNotBlank() } ?: hit.name,
                 artistName = hit.artistName,
                 albumName = hit.albumName,
                 durationSec = hit.duration,
-                hasLineSync = lineSync || parsedFileLines.isNotEmpty(),
-                hasWordSync = wordSync || parsedFileLines.any { it.words.size > 1 },
+                hasLineSync = parsed.lines.isNotEmpty(),
+                hasWordSync = false,
                 provider = "LRCLIB",
-                rawContent = raw,
+                rawContent = parsed.rawContent,
                 previewText = plainPreview?.let { cleanPreview(it) }.orEmpty(),
             )
         }
