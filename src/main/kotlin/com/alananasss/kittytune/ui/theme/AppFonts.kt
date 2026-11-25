@@ -61,6 +61,11 @@ object AppFonts {
     fun userFonts(): List<String> =
         userDir.listFiles { f -> f.extension.lowercase() in setOf("ttf", "otf") }?.map { it.name }?.sorted().orEmpty()
 
+    fun pickerOptions(): List<AppFont> =
+        listOf(AppFont.Default, AppFont.Flex) +
+            availableSystemFonts().map { AppFont.System(it) } +
+            userFonts().map { AppFont.UserFile(it) }
+
     /** Copies [source] into the fonts folder; returns its stored name, or null when it is not a usable font. */
     fun import(source: File): String? {
         if (source.extension.lowercase() !in setOf("ttf", "otf")) return null

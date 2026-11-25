@@ -141,6 +141,7 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
                 SettingsItem(
                     shape = getSettingsShape(totalVisibleItems, 12),
                     title = str("pref_sc_sync_title"),
+                    highlightKey = "pref_sc_sync_title",
                     subtitle = str("pref_sc_sync_sub"),
                     hasSwitch = true,
                     switchState = scHistorySyncEnabled,
@@ -154,6 +155,7 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
             SettingsItem(
                 shape = getSettingsShape(totalVisibleItems, if (!isGuest) 13 else 12),
                 title = str("pref_seek_wheel_step"),
+                highlightKey = "pref_seek_wheel_step",
                 subtitle = str(
                     "pref_seek_wheel_step_value",
                     seekWheelSeconds.let { s ->
@@ -448,6 +450,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
             SettingsItem(
                 shape = getSettingsShape(5, 0),
                 title = str("pref_audio_device_title"),
+                highlightKey = "pref_audio_device_title",
                 subtitle = if (currentDevice.isEmpty()) {
                     systemDefaultSinkDesc ?: str("pref_audio_device_default")
                 } else {
@@ -459,6 +462,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
             SettingsItem(
                 shape = getSettingsShape(5, 1),
                 title = str("pref_quality"),
+                highlightKey = "pref_quality",
                 subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
                 onClick = { showQualityDialog = true }
             )
@@ -735,6 +739,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                         bottomEnd = 24.dp
                     ),
                     title = str("label_duration"),
+                    highlightKey = "crossfade_duration",
                     subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
                     onClick = { showCrossfadeDurationDialog = true }
                 )
@@ -793,18 +798,21 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                     SettingsItem(
                         shape = RoundedCornerShape(4.dp),
                         title = str(com.alananasss.kittytune.R.string.automix_overlap_mode),
+                        highlightKey = "automix_overlap_mode",
                         subtitle = automixOverlapLabel,
                         onClick = { showAutomixOverlapDialog = true }
                     )
                     SettingsItem(
                         shape = RoundedCornerShape(4.dp),
                         title = str(com.alananasss.kittytune.R.string.automix_start_offset),
+                        highlightKey = "automix_start_offset",
                         subtitle = automixStartOffsetLabel,
                         onClick = { showAutomixStartOffsetDialog = true }
                     )
                     SettingsItem(
                         shape = RoundedCornerShape(4.dp),
                         title = str(com.alananasss.kittytune.R.string.automix_tempo_match),
+                        highlightKey = "automix_tempo_match",
                         subtitle = str(com.alananasss.kittytune.R.string.automix_tempo_match_desc),
                         hasSwitch = true,
                         switchState = automixTempoMatch,
@@ -816,6 +824,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                     SettingsItem(
                         shape = RoundedCornerShape(4.dp),
                         title = str(com.alananasss.kittytune.R.string.automix_harmonic_mix),
+                        highlightKey = "automix_harmonic_mix",
                         subtitle = str(com.alananasss.kittytune.R.string.automix_harmonic_mix_desc),
                         hasSwitch = true,
                         switchState = automixHarmonicMix,
@@ -827,6 +836,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                     SettingsItem(
                         shape = RoundedCornerShape(4.dp),
                         title = str(com.alananasss.kittytune.R.string.automix_dynamic_mix),
+                        highlightKey = "automix_dynamic_mix",
                         subtitle = str(com.alananasss.kittytune.R.string.automix_dynamic_mix_desc),
                         hasSwitch = true,
                         switchState = automixDynamicMix,
@@ -838,6 +848,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                     SettingsItem(
                         shape = RoundedCornerShape(4.dp),
                         title = str(com.alananasss.kittytune.R.string.automix_bass_ducking),
+                        highlightKey = "automix_bass_ducking",
                         subtitle = str(com.alananasss.kittytune.R.string.automix_bass_ducking_desc),
                         hasSwitch = true,
                         switchState = automixBassDucking,
@@ -854,6 +865,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                             bottomEnd = 24.dp
                         ),
                         title = str(com.alananasss.kittytune.R.string.automix_debug),
+                        highlightKey = "automix_debug",
                         subtitle = str(com.alananasss.kittytune.R.string.automix_debug_desc),
                         hasSwitch = true,
                         switchState = automixDebugOverlay,
@@ -924,6 +936,7 @@ fun AudioSleepTimerPage() {
                     bottomEnd = fadeBottomRadius
                 ),
                 title = str("sleep_timer_fade_title"),
+                highlightKey = "sleep_timer_fade_title",
                 subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
                 hasSwitch = true,
                 switchState = fadeEnabled,
@@ -946,6 +959,7 @@ fun AudioSleepTimerPage() {
                         bottomEnd = 24.dp
                     ),
                     title = str("label_duration"),
+                    highlightKey = "sleep_fade_duration",
                     subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
                     onClick = { showFadeDurationDialog = true }
                 )

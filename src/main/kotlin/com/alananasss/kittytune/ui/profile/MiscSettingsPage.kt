@@ -90,6 +90,7 @@ fun MiscGeneralPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("onboard_replay"),
+                    highlightKey = "onboard_replay",
                     subtitle = str("onboard_replay_body"),
                     icon = Icons.AutoMirrored.Rounded.MenuBook,
                     onClick = { com.alananasss.kittytune.ui.setup.SetupLauncher.requested = true },
@@ -99,6 +100,7 @@ fun MiscGeneralPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_language"),
+                    highlightKey = "pref_language",
                     subtitle = languages.first { it.first == appLanguage }.second,
                     icon = Icons.Rounded.Translate,
                     onClick = { showLanguageDialog = true },
@@ -108,6 +110,7 @@ fun MiscGeneralPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_start_screen"),
+                    highlightKey = "pref_start_screen",
                     subtitle = startDestinations.first { it.first == startDestination }.second,
                     icon = Icons.Rounded.Home,
                     onClick = { showStartDialog = true },

@@ -1083,6 +1083,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_font_title"),
+                                highlightKey = "pref_lyrics_font_title",
                                 icon = Icons.Rounded.TextFields,
                                 subtitle = when (playerViewModel.lyricsFont) {
                                     com.alananasss.kittytune.data.local.LyricsFont.APPLE -> str("pref_lyrics_font_apple")
@@ -1097,6 +1098,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_autoscroll"),
+                                highlightKey = "pref_lyrics_autoscroll",
                                 icon = Icons.Rounded.KeyboardDoubleArrowDown,
                                 subtitle = str("pref_lyrics_autoscroll_sub"),
                                 hasSwitch = true,
@@ -1108,6 +1110,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_autoscroll_speed"),
+                                highlightKey = "pref_lyrics_autoscroll_speed",
                                 icon = Icons.Rounded.Speed,
                                 subtitle = autoScrollSpeedLabel(playerViewModel.plainAutoScrollSpeed),
                                 onClick = { showAutoScrollSpeedDialog = true }
@@ -1118,6 +1121,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_wheel_step"),
+                                highlightKey = "pref_lyrics_wheel_step",
                                 icon = Icons.Rounded.Mouse,
                                 subtitle = str("pref_lyrics_wheel_step_value", wheelLinesLabel(playerViewModel.lyricsWheelLines)),
                                 onClick = { showWheelStepDialog = true }
@@ -1133,6 +1137,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_word_sync"),
+                                highlightKey = "pref_lyrics_word_sync",
                                 icon = Icons.Rounded.Mic,
                                 subtitle = str("pref_lyrics_word_sync_sub"),
                                 hasSwitch = true,
@@ -1144,6 +1149,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_apple_effect"),
+                                highlightKey = "pref_lyrics_apple_effect",
                                 icon = Icons.Rounded.AutoAwesome,
                                 subtitle = str("pref_lyrics_apple_effect_sub"),
                                 hasSwitch = true,
@@ -1155,6 +1161,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_duet_title"),
+                                highlightKey = "pref_lyrics_duet_title",
                                 icon = Icons.Rounded.Groups,
                                 subtitle = str("pref_lyrics_duet_desc"),
                                 hasSwitch = true,
@@ -1207,6 +1214,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_romanization"),
+                                highlightKey = "pref_lyrics_romanization",
                                 icon = Icons.Rounded.Abc,
                                 subtitle = str("pref_lyrics_romanization_sub"),
                                 hasSwitch = true,
@@ -1218,6 +1226,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_translation_title"),
+                                highlightKey = "pref_lyrics_translation_title",
                                 icon = Icons.Rounded.Translate,
                                 subtitle = str("pref_lyrics_translation_sub"),
                                 hasSwitch = true,
@@ -1232,6 +1241,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_translation_lang"),
+                                highlightKey = "pref_lyrics_translation_lang",
                                 icon = Icons.Rounded.Language,
                                 subtitle = targetLang.uppercase(),
                                 onClick = { showLangDialog = true }
@@ -1249,6 +1259,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_lrc_bounce_title"),
+                                    highlightKey = "pref_lyrics_lrc_bounce_title",
                                     icon = Icons.Rounded.Animation,
                                     subtitle = str("pref_lyrics_lrc_bounce_desc"),
                                     hasSwitch = true,
@@ -1260,6 +1271,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_bounce_factor_title"),
+                                    highlightKey = "pref_lyrics_bounce_factor_title",
                                     icon = Icons.Rounded.Height,
                                     subtitle = "${(playerViewModel.lyricsBounceFactor * 100).toInt()}%",
                                     onClick = { showBounceFactorDialog = true }
@@ -1269,6 +1281,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_glow_factor_title"),
+                                    highlightKey = "pref_lyrics_glow_factor_title",
                                     icon = Icons.Rounded.LightMode,
                                     subtitle = "${(playerViewModel.lyricsGlowFactor * 100).toInt()}%",
                                     onClick = { showGlowFactorDialog = true }
@@ -1278,6 +1291,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_fill_transition_title"),
+                                    highlightKey = "pref_lyrics_fill_transition_title",
                                     icon = Icons.Rounded.Gradient,
                                     subtitle = "${playerViewModel.lyricsFillTransitionWidth.toInt()} dp",
                                     onClick = { showFillTransitionDialog = true }
@@ -1287,6 +1301,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_active_scale_title"),
+                                    highlightKey = "pref_lyrics_active_scale_title",
                                     icon = Icons.Rounded.ZoomOutMap,
                                     subtitle = "${(playerViewModel.lyricsActiveScale * 100).toInt()}%",
                                     onClick = { showActiveScaleDialog = true }
@@ -1296,6 +1311,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_reset_typography"),
+                                    highlightKey = "pref_lyrics_reset_typography",
                                     icon = Icons.Rounded.RestartAlt,
                                     subtitle = str("pref_lyrics_reset_typography_desc"),
                                     onClick = { playerViewModel.resetAllLyricsTypography() }
@@ -1383,6 +1399,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_local"),
+                                highlightKey = "pref_lyrics_local",
                                 icon = Icons.Rounded.FolderOpen,
                                 subtitle = str("pref_lyrics_local_sub"),
                                 hasSwitch = true,
@@ -1397,6 +1414,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_provider_title"),
+                                highlightKey = "pref_lyrics_provider_title",
                                 icon = Icons.Rounded.CloudQueue,
                                 subtitle = if (provider == com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY) str("pref_lyrics_provider_max_quality") else str("pref_lyrics_provider_open_source"),
                                 onClick = { showProviderDialog = true }
@@ -1406,6 +1424,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_order", "Provider Priority Order"),
+                                highlightKey = "pref_lyrics_order",
                                 icon = Icons.Rounded.SwapVert,
                                 subtitle = str("pref_lyrics_order_sub", "Order in which providers are searched"),
                                 onClick = { showProviderOrderDialog = true }
@@ -1415,6 +1434,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_paxsenix_key", "Paxsenix API Key"),
+                                highlightKey = "pref_lyrics_paxsenix_key",
                                 icon = Icons.Rounded.Key,
                                 subtitle = if (paxsenixKeyInput.isNotBlank()) "••••••••" else str("pref_lyrics_paxsenix_key_sub", "Required for Apple Music, Spotify and Paxsenix Musixmatch"),
                                 onClick = { showPaxsenixKeyDialog = true }
@@ -1520,6 +1540,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_ui_style_title"),
+                    highlightKey = "pref_lyrics_ui_style_title",
                     icon = Icons.Rounded.AutoAwesome,
                     subtitle = if (isClassic) str("pref_lyrics_ui_style_classic") else str("pref_lyrics_ui_style_enhanced"),
                     onClick = onStyleClick,
@@ -1529,6 +1550,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_line_blur_title"),
+                    highlightKey = "pref_lyrics_line_blur_title",
                     icon = Icons.Rounded.BlurOn,
                     subtitle = str("pref_lyrics_line_blur_desc"),
                     hasSwitch = true,
@@ -1540,6 +1562,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_display_style"),
+                    highlightKey = "pref_lyrics_display_style",
                     icon = Icons.Rounded.Subtitles,
                     subtitle = displayStyleLabel(displayStyle),
                     onClick = onDisplayStyleClick,
@@ -1549,6 +1572,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_align"),
+                    highlightKey = "pref_lyrics_align",
                     icon = Icons.Rounded.FormatAlignCenter,
                     subtitle = when (alignment) {
                         LyricsAlignment.LEFT -> str("align_left")
@@ -1562,6 +1586,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_size"),
+                    highlightKey = "pref_lyrics_size",
                     icon = Icons.Rounded.FormatSize,
                     subtitle = "${fontSize.roundToInt()} sp",
                     onClick = onFontSizeClick,
@@ -1572,6 +1597,7 @@ private fun LyricsModeGroup(
                     SettingsItem(
                         shape = shape,
                         title = str("pref_lyrics_line_spacing_title"),
+                        highlightKey = "pref_lyrics_line_spacing_title",
                         icon = Icons.Rounded.FormatLineSpacing,
                         subtitle = "${spacing.lineSpacing.toInt()} dp",
                         onClick = spacing.onLineSpacingClick,
@@ -1581,6 +1607,7 @@ private fun LyricsModeGroup(
                     SettingsItem(
                         shape = shape,
                         title = str("pref_lyrics_horizontal_margin_title"),
+                        highlightKey = "pref_lyrics_horizontal_margin_title",
                         icon = Icons.Rounded.SwapHoriz,
                         subtitle = "${spacing.horizontalMargin.toInt()} dp",
                         onClick = spacing.onHorizontalMarginClick,
@@ -1590,6 +1617,7 @@ private fun LyricsModeGroup(
                     SettingsItem(
                         shape = shape,
                         title = str("pref_lyrics_vertical_offset_title"),
+                        highlightKey = "pref_lyrics_vertical_offset_title",
                         icon = Icons.Rounded.VerticalAlignCenter,
                         subtitle = "${(spacing.verticalOffset * 100).toInt()}%",
                         onClick = spacing.onVerticalOffsetClick,

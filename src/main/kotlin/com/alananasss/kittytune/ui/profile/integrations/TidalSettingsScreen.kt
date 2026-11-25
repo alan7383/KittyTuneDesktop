@@ -201,6 +201,7 @@ fun TidalSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("provider_enabled_title"),
+                                highlightKey = "provider_enabled_title",
                                 subtitle = str("provider_enabled_desc"),
                                 icon = Icons.Rounded.PowerSettingsNew,
                                 hasSwitch = true,
@@ -215,6 +216,7 @@ fun TidalSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("tidal_web_login"),
+                                highlightKey = "tidal_web_login",
                                 subtitle = if (cookieConfigured) {
                                     str("tidal_cookie_configured")
                                 } else {
@@ -233,6 +235,7 @@ fun TidalSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("tidal_audio_quality"),
+                                highlightKey = "tidal_audio_quality",
                                 subtitle = qualityLabel,
                                 icon = Icons.Rounded.GraphicEq,
                                 onClick = { showQualityDialog = true }
@@ -247,6 +250,7 @@ fun TidalSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("tidal_resolver_endpoints"),
+                                highlightKey = "tidal_resolver_endpoints",
                                 subtitle = desc,
                                 icon = Icons.Rounded.Link,
                                 onClick = { showResolverEndpointsDialog = true }
@@ -261,6 +265,7 @@ fun TidalSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("tidal_cookie_title"),
+                                highlightKey = "tidal_cookie_title",
                                 subtitle = desc,
                                 icon = Icons.Rounded.Key,
                                 onClick = { showCookieDialog = true }
@@ -271,6 +276,7 @@ fun TidalSettingsScreen(
                                 SettingsItem(
                                     shape = shape,
                                     title = str("tidal_clear_cookie"),
+                                    highlightKey = "tidal_clear_cookie",
                                     subtitle = str("tidal_cookie_configured"),
                                     icon = Icons.Rounded.Delete,
                                     onClick = {

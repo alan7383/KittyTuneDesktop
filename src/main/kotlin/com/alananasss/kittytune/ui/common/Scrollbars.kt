@@ -22,6 +22,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,20 +58,23 @@ fun ScrollableLazyColumn(
 ) {
     val barOverlap = rememberPlayerBarOverlap()
     val clearance = barOverlap.clearance()
-    Box(modifier = modifier.then(barOverlap.modifier)) {
-        androidx.compose.foundation.lazy.LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .fadedVerticalEdges(state, fadeLength = fadeLength, enabled = fadeEdges),
-            state = state,
-            contentPadding = contentPadding.plusBottom(clearance),
-            reverseLayout = reverseLayout,
-            verticalArrangement = verticalArrangement,
-            horizontalAlignment = horizontalAlignment,
-            flingBehavior = flingBehavior,
-            userScrollEnabled = userScrollEnabled,
-            content = content
-        )
+    val viewport = rememberSettingsScrollViewport(state, barOverlap, reverseLayout)
+    Box(modifier = modifier.then(barOverlap.modifier).then(viewport?.modifier ?: Modifier)) {
+        CompositionLocalProvider(LocalSettingsScrollViewport provides viewport) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .fadedVerticalEdges(state, fadeLength = fadeLength, enabled = fadeEdges),
+                state = state,
+                contentPadding = contentPadding.plusBottom(clearance),
+                reverseLayout = reverseLayout,
+                verticalArrangement = verticalArrangement,
+                horizontalAlignment = horizontalAlignment,
+                flingBehavior = flingBehavior,
+                userScrollEnabled = userScrollEnabled,
+                content = content
+            )
+        }
         VerticalScrollbar(
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(top = 4.dp, bottom = 4.dp + clearance, start = 2.dp, end = 2.dp),
             adapter = rememberScrollbarAdapter(scrollState = state)
@@ -125,17 +129,20 @@ fun ScrollableColumn(
 ) {
     val barOverlap = rememberPlayerBarOverlap()
     val clearance = barOverlap.clearance()
-    Box(modifier = modifier.then(barOverlap.modifier)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(state)
-                .fadedVerticalEdges(state, fadeLength = fadeLength, enabled = fadeEdges)
-                .padding(contentPadding.plusBottom(clearance)),
-            verticalArrangement = verticalArrangement,
-            horizontalAlignment = horizontalAlignment,
-            content = content
-        )
+    val viewport = rememberSettingsScrollViewport(state, barOverlap)
+    Box(modifier = modifier.then(barOverlap.modifier).then(viewport?.modifier ?: Modifier)) {
+        CompositionLocalProvider(LocalSettingsScrollViewport provides viewport) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(state)
+                    .fadedVerticalEdges(state, fadeLength = fadeLength, enabled = fadeEdges)
+                    .padding(contentPadding.plusBottom(clearance)),
+                verticalArrangement = verticalArrangement,
+                horizontalAlignment = horizontalAlignment,
+                content = content
+            )
+        }
         if (!hideScrollbar) {
             VerticalScrollbar(
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(top = 4.dp, bottom = 4.dp + clearance, start = 2.dp, end = 2.dp),

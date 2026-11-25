@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,8 @@ import com.alananasss.kittytune.data.local.*
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
+import com.alananasss.kittytune.ui.common.LocalSettingsHighlight
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.pressScale
@@ -77,6 +80,14 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     var showFontDialog by remember { mutableStateOf(false) }
     var showFontAxesDialog by remember { mutableStateOf(false) }
     var showScaleDialog by remember { mutableStateOf(false) }
+    val highlight = LocalSettingsHighlight.current
+    LaunchedEffect(highlight) {
+        when (highlight?.key) {
+            "font_add", "dialog_font_settings_title" -> showFontDialog = true
+            "dialog_font_weight", "dialog_font_width", "dialog_font_slant", "dialog_font_roundness" -> showFontAxesDialog = true
+            else -> if (highlight?.key?.startsWith(FONT_SEARCH_PREFIX) == true) showFontDialog = true
+        }
+    }
     if (showIconDialog) AppIconDialog(prefs, appIconVariant) { showIconDialog = false }
     if (showFontAxesDialog) FontAxesDialog(prefs) { showFontAxesDialog = false }
     if (showScaleDialog) UiScaleDialog(prefs, uiScale) { showScaleDialog = false }
@@ -120,7 +131,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     )
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        SettingsGroupTitle(str("theme_presets_title"))
+        SettingsGroupTitle(str("theme_presets_title"), Modifier.settingHighlight("theme_presets_title"))
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp)) {
                 // One compact row: the mode, with AMOLED as a theme of its own rather than a switch under Dark.
@@ -136,7 +147,9 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 16.dp),
                     fillMaxWidth = true,
                     iconProvider = { Icon(it.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    labelProvider = { Text(str(it.labelKey), maxLines = 1, softWrap = false) },
+                    labelProvider = {
+                        Text(str(it.labelKey), Modifier.settingHighlight(it.labelKey), maxLines = 1, softWrap = false)
+                    },
                 )
                 ThemePresetRow(
                     selectedSeed = if (followsCover) null else keyColor,
@@ -162,6 +175,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_themed_title_bar"),
+                    highlightKey = "pref_themed_title_bar",
                     subtitle = str("pref_themed_title_bar_sub"),
                     hasSwitch = true,
                     switchState = themedTitleBar,
@@ -175,6 +189,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_zoom_level"),
+                    highlightKey = "pref_zoom_level",
                     subtitle = str("pref_zoom_level_sub"),
                     trailingText = "${(uiScale * 100).toInt()} %",
                     onClick = { showScaleDialog = true },
@@ -184,6 +199,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_font"),
+                    highlightKey = "pref_font",
                     subtitle = fontLabel(appFont),
                     icon = Icons.Rounded.TextFields,
                     onClick = { showFontDialog = true },
@@ -193,6 +209,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_app_icon"),
+                    highlightKey = "pref_app_icon",
                     subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.let { com.alananasss.kittytune.core.AppIconVariants.localizedLabel(it) } ?: str("app_icon_default"),
                     icon = Icons.Rounded.Apps,
                     onClick = { showIconDialog = true },
@@ -230,15 +247,8 @@ private fun FontPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val fonts = com.alananasss.kittytune.ui.theme.AppFonts
-    var userFonts by remember { mutableStateOf(fonts.userFonts()) }
-    val systemFonts = remember { fonts.availableSystemFonts() }
+    var options by remember { mutableStateOf(fonts.pickerOptions()) }
     var rejected by remember { mutableStateOf(false) }
-    val options = buildList {
-        add(com.alananasss.kittytune.ui.theme.AppFont.Default)
-        add(com.alananasss.kittytune.ui.theme.AppFont.Flex)
-        systemFonts.forEach { add(com.alananasss.kittytune.ui.theme.AppFont.System(it)) }
-        userFonts.forEach { add(com.alananasss.kittytune.ui.theme.AppFont.UserFile(it)) }
-    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(str("pref_font")) },
@@ -255,7 +265,8 @@ private fun FontPickerDialog(
                     }
                     val selected = font == current
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                        Modifier.fillMaxWidth().settingHighlight(fontSearchKey(font), RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                             .clickable { onSelect(font) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -268,7 +279,11 @@ private fun FontPickerDialog(
                             Text("Aa Бб 123 — KittyTune", style = MaterialTheme.typography.bodySmall.copy(fontFamily = family), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (font == com.alananasss.kittytune.ui.theme.AppFont.Flex) {
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { onSelect(font); onTuneFlex() }) {
+                            IconButton(
+                                shapes = IconButtonDefaults.shapes(),
+                                modifier = Modifier.settingHighlight("dialog_font_settings_title", CircleShape),
+                                onClick = { onSelect(font); onTuneFlex() },
+                            ) {
                                 Icon(Icons.Rounded.Tune, contentDescription = str("dialog_font_settings_title"))
                             }
                         }
@@ -280,11 +295,11 @@ private fun FontPickerDialog(
                         val stored = fonts.import(picked)
                         rejected = stored == null
                         if (stored != null) {
-                            userFonts = fonts.userFonts()
+                            options = fonts.pickerOptions()
                             onSelect(com.alananasss.kittytune.ui.theme.AppFont.UserFile(stored))
                         }
                     },
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp).settingHighlight("font_add", CircleShape),
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -495,7 +510,14 @@ private fun ThemePresetRow(
     onSelect: (ThemePreset) -> Unit,
     onCustom: () -> Unit,
 ) {
+    val state = rememberLazyListState()
+    val highlight = LocalSettingsHighlight.current
+    LaunchedEffect(highlight) {
+        val index = themePresets.indexOfFirst { it.labelKey == highlight?.key }
+        if (index >= 0) state.scrollToItem(index)
+    }
     com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+        state = state,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         fadeColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -504,6 +526,7 @@ private fun ThemePresetRow(
             val preset = themePresets[index]
             ThemePresetCard(
                 label = str(preset.labelKey),
+                highlightKey = preset.labelKey,
                 seed = preset.seed,
                 style = preset.style,
                 isSelected = selectedSeed == preset.seed,
@@ -545,6 +568,7 @@ private fun CustomThemeCard(onClick: () -> Unit) {
 @Composable
 private fun ThemePresetCard(
     label: String,
+    highlightKey: String,
     seed: Int,
     style: PaletteStyle,
     isSelected: Boolean,
@@ -570,7 +594,8 @@ private fun ThemePresetCard(
             shape = RoundedCornerShape(18.dp),
             color = scheme.surfaceContainer,
             border = BorderStroke(if (isSelected) 2.dp else 1.dp, ring),
-            modifier = Modifier.size(width = 96.dp, height = 72.dp).pressScale(interaction),
+            modifier = Modifier.size(width = 96.dp, height = 72.dp).pressScale(interaction)
+                .settingHighlight(highlightKey, RoundedCornerShape(18.dp)),
         ) {
             Box(Modifier.fillMaxSize().padding(10.dp)) {
                 Canvas(Modifier.fillMaxSize()) {
@@ -878,19 +903,19 @@ private fun FontAxesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
                     item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(900f, 110f, 0f, 50f) }) { Text(str("font_preset_chunky")) } }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Column {
+                Column(Modifier.settingHighlight("dialog_font_weight")) {
                     Text(str("dialog_font_weight", wght.toInt()), style = MaterialTheme.typography.labelLarge)
                     Slider(value = wght, onValueChange = { wght = it; prefs.setFontWght(it.toInt()) }, valueRange = 100f..1000f)
                 }
-                Column {
+                Column(Modifier.settingHighlight("dialog_font_width")) {
                     Text(str("dialog_font_width", wdth.toInt()), style = MaterialTheme.typography.labelLarge)
                     Slider(value = wdth, onValueChange = { wdth = it; prefs.setFontWdth(it) }, valueRange = 25f..151f)
                 }
-                Column {
+                Column(Modifier.settingHighlight("dialog_font_slant")) {
                     Text(str("dialog_font_slant", slnt.toInt()), style = MaterialTheme.typography.labelLarge)
                     Slider(value = slnt, onValueChange = { slnt = it; prefs.setFontSlnt(it) }, valueRange = -10f..0f)
                 }
-                Column {
+                Column(Modifier.settingHighlight("dialog_font_roundness")) {
                     Text(str("dialog_font_roundness", rond.toInt()), style = MaterialTheme.typography.labelLarge)
                     Slider(value = rond, onValueChange = { rond = it; prefs.setFontRond(it) }, valueRange = 0f..100f)
                 }

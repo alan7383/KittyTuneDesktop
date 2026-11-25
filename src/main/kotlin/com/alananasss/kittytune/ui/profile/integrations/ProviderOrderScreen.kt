@@ -27,6 +27,8 @@ import com.alananasss.kittytune.audio.providers.AudioProviderOrderItem
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.SettingsScaffold
+import com.alananasss.kittytune.ui.common.LocalSettingsHighlight
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.common.SettingsSwitch
 import androidx.compose.ui.draw.alpha
 import sh.calvin.reorderable.ReorderableItem
@@ -73,6 +75,11 @@ fun ProviderOrderScreen(
     }
 
     val listState = rememberLazyListState()
+    val highlight = LocalSettingsHighlight.current
+    LaunchedEffect(highlight) {
+        val index = currentList.indexOfFirst { "provider_order_${it.name}" == highlight?.key }
+        if (index >= 0) listState.scrollToItem(index)
+    }
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState,
         onMove = { from, to ->
@@ -130,6 +137,7 @@ fun ProviderOrderScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .settingHighlight("provider_order_${item.name}", RoundedCornerShape(16.dp))
                                 .shadow(elevation, RoundedCornerShape(16.dp))
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(backgroundColor)
@@ -245,6 +253,7 @@ fun ProviderOrderScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
+                    .settingHighlight("provider_order_reset")
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Restore,

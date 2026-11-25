@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.data.zapret.Reachability
 import com.alananasss.kittytune.data.zapret.ServiceCheck
 import com.alananasss.kittytune.data.zapret.ZapretInstall
@@ -117,11 +118,11 @@ fun ZapretSection() {
                                 color = MaterialTheme.colorScheme.primary
                             )
                         } else {
-                            Text(str("zapret_detect"))
+                            Text(str("zapret_detect"), Modifier.settingHighlight("zapret_detect"))
                         }
                     }
                     FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { useFolder(pickFolder(str("zapret_folder"), folder)) }) {
-                        Text(str("zapret_choose"))
+                        Text(str("zapret_choose"), Modifier.settingHighlight("zapret_choose"))
                     }
                 }
                 StatusLine(
@@ -135,12 +136,12 @@ fun ZapretSection() {
                     Button(shapes = ButtonDefaults.shapes(), onClick = ::runCheck, enabled = !isChecking) {
                         Icon(Icons.Rounded.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(str(if (isChecking) "zapret_checking" else "zapret_check"))
+                        Text(str(if (isChecking) "zapret_checking" else "zapret_check"), Modifier.settingHighlight("zapret_check"))
                     }
                     val blocked = checks.orEmpty().filter { it.reachability == Reachability.BLOCKED && !it.isCovered }
                     if (install != null && blocked.isNotEmpty()) {
                         FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { add(blocked.map { it.service }) }) {
-                            Text(str("zapret_add_blocked", blocked.size))
+                            Text(str("zapret_add_blocked", blocked.size), Modifier.settingHighlight("zapret_add_blocked"))
                         }
                     }
                     if (isChecking) LoadingIndicator(Modifier.size(32.dp))
@@ -167,7 +168,7 @@ fun ZapretSection() {
                                 own = emptyList()
                                 checks?.let { checks = ZapretManager.check() }
                             }
-                        }) { Text(str("zapret_remove_own")) }
+                        }) { Text(str("zapret_remove_own"), Modifier.settingHighlight("zapret_remove_own")) }
                     }
                 }
             }

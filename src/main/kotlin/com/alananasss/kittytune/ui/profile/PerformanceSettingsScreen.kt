@@ -50,12 +50,12 @@ internal fun PerformanceSettingsScreen() {
                 Prefs.putString(PerformanceSettings.GPU, it)
             }
         },
-        { shape -> SettingsItem(shape = shape, title = str("performance_vsync"), subtitle = str("performance_vsync_note"),
+        { shape -> SettingsItem(shape = shape, title = str("performance_vsync"), highlightKey = "performance_vsync", subtitle = str("performance_vsync_note"),
             hasSwitch = true, switchState = options.vsync, onSwitchChange = { Prefs.putBoolean(PerformanceSettings.VSYNC, it) }) },
     ))
     if (os.startsWith("Windows", true)) {
         SettingsGroup(items = listOf({ shape ->
-            SettingsItem(shape = shape, title = str("performance_windows_gpu"), subtitle = str("performance_windows_gpu_note"), onClick = {
+            SettingsItem(shape = shape, title = str("performance_windows_gpu"), highlightKey = "performance_windows_gpu", subtitle = str("performance_windows_gpu_note"), onClick = {
                 openError = runCatching { ProcessBuilder("explorer.exe", "ms-settings:display-advancedgraphics").start() }.isFailure
             })
         }))
@@ -74,7 +74,7 @@ internal fun PerformanceSettingsScreen() {
             PerformanceSettings.diskCacheSizes.map { it.toString() to "$it MiB" }, "performance_cache_note") {
             Prefs.putInt(PerformanceSettings.DISK_CACHE, it.toInt())
         } },
-        { shape -> SettingsItem(shape = shape, title = str("performance_reset"), onClick = { PerformanceSettings.reset() }) },
+        { shape -> SettingsItem(shape = shape, title = str("performance_reset"), highlightKey = "performance_reset", onClick = { PerformanceSettings.reset() }) },
     ))
 }
 
@@ -89,7 +89,7 @@ private fun PerformanceChoice(
     onSelect: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    SettingsItem(shape = shape, title = str(titleKey), subtitle = str(subtitleKey),
+    SettingsItem(shape = shape, title = str(titleKey), subtitle = str(subtitleKey), highlightKey = titleKey,
         trailingText = choices.firstOrNull { it.first == value }?.second,
         enabled = enabled, onClick = { expanded = true })
     if (expanded) {

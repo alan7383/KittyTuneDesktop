@@ -255,6 +255,7 @@ private fun PlayerShapeSection(
             Column {
                 Text(
                     text = str("player_shape_title"),
+                    modifier = Modifier.settingHighlight("player_shape_title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -276,7 +277,7 @@ private fun PlayerShapeSection(
                     subtitle = str("player_shape_default_desc"),
                     icon = Icons.Rounded.Splitscreen,
                     isSelected = currentStyle == PlayerBarStyle.DEFAULT,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("player_shape_default", RoundedCornerShape(18.dp)),
                     onClick = { onSelect(PlayerBarStyle.DEFAULT) }
                 )
 
@@ -285,7 +286,7 @@ private fun PlayerShapeSection(
                     subtitle = str("player_shape_rounded_desc"),
                     icon = Icons.Rounded.RoundedCorner,
                     isSelected = currentStyle == PlayerBarStyle.ROUNDED,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("player_shape_rounded", RoundedCornerShape(18.dp)),
                     onClick = { onSelect(PlayerBarStyle.ROUNDED) }
                 )
 
@@ -294,7 +295,7 @@ private fun PlayerShapeSection(
                     subtitle = str("player_shape_floating_desc"),
                     icon = Icons.Rounded.Layers,
                     isSelected = currentStyle == PlayerBarStyle.FLOATING,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("player_shape_floating", RoundedCornerShape(18.dp)),
                     onClick = { onSelect(PlayerBarStyle.FLOATING) }
                 )
             }
@@ -408,6 +409,7 @@ private fun PlayerSlidersSection(
             Column {
                 Text(
                     text = str("pref_slider_style"),
+                    modifier = Modifier.settingHighlight("pref_slider_style"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -428,7 +430,7 @@ private fun PlayerSlidersSection(
                     title = str("slider_style_bar"),
                     style = PlayerSliderStyle.BAR,
                     isSelected = sliderStyle == PlayerSliderStyle.BAR,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("slider_style_bar", RoundedCornerShape(16.dp)),
                     onClick = { onSliderStyleSelected(PlayerSliderStyle.BAR) }
                 )
 
@@ -436,7 +438,7 @@ private fun PlayerSlidersSection(
                     title = str("slider_style_wavy"),
                     style = PlayerSliderStyle.WAVY,
                     isSelected = sliderStyle == PlayerSliderStyle.WAVY,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("slider_style_wavy", RoundedCornerShape(16.dp)),
                     onClick = { onSliderStyleSelected(PlayerSliderStyle.WAVY) }
                 )
 
@@ -444,7 +446,7 @@ private fun PlayerSlidersSection(
                     title = str("slider_style_slim"),
                     style = PlayerSliderStyle.SLIM,
                     isSelected = sliderStyle == PlayerSliderStyle.SLIM,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("slider_style_slim", RoundedCornerShape(16.dp)),
                     onClick = { onSliderStyleSelected(PlayerSliderStyle.SLIM) }
                 )
 
@@ -452,7 +454,7 @@ private fun PlayerSlidersSection(
                     title = str("slider_style_squiggly"),
                     style = PlayerSliderStyle.SQUIGGLY,
                     isSelected = sliderStyle == PlayerSliderStyle.SQUIGGLY,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).settingHighlight("slider_style_squiggly", RoundedCornerShape(16.dp)),
                     onClick = { onSliderStyleSelected(PlayerSliderStyle.SQUIGGLY) }
                 )
             }
@@ -531,14 +533,16 @@ private fun PlayerSlidersSection(
                     onVolumeOrientationChanged(true)
                 }
             }
-            Text(str("volume_style_title"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(str("volume_style_title"), Modifier.settingHighlight("volume_style_title"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 (listOf<PlayerSliderStyle?>(null) + PlayerSliderStyle.entries).forEach { option ->
                     VolumeStyleChip(
                         label = option?.let { str(sliderStyleKey(it)) } ?: str("volume_style_same"),
                         style = option ?: sliderStyle,
                         isSelected = volumeStyle == option,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).settingHighlight(
+                            option?.let { "volume_${sliderStyleKey(it)}" } ?: "volume_style_same"
+                        ),
                     ) { onVolumeStyleSelected(option) }
                 }
             }
@@ -817,6 +821,7 @@ private fun PlayerAdvancedSection(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .settingHighlight("pref_seek_wheel", RoundedCornerShape(16.dp))
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
                     .padding(16.dp)
@@ -941,6 +946,7 @@ private fun ScreensaverSection(
                     ) {
                         Text(
                             text = str("screensaver_timeout_title"),
+                            modifier = Modifier.settingHighlight("screensaver_timeout_title"),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1071,6 +1077,7 @@ private fun CoverFeatherSection(
                     ) {
                         Text(
                             text = str("full_player_cover_feather_amount"),
+                            modifier = Modifier.settingHighlight("full_player_cover_feather_amount"),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1223,6 +1230,7 @@ private fun menuTileIcon(id: String): ImageVector = when (id) {
 internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.alananasss.kittytune.ui.main.MenuTiles.Tile>) {
     val prefs = remember { PlayerPreferences() }
     var hidden by remember(menu) { mutableStateOf(prefs.getHiddenMenuTiles(menu)) }
+    val groupKey = if (menu == PlayerPreferences.MENU_TRACK) "menu_tiles_track" else "menu_tiles_playlist"
     val items = catalogue.map { tile ->
         ButtonConfigItem(
             key = tile.id,
@@ -1242,13 +1250,13 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
                 Column(Modifier.weight(1f)) {
                     Text(
                         title,
-                        modifier = Modifier.settingHighlight(if (menu == PlayerPreferences.MENU_TRACK) "menu_tiles_track" else "menu_tiles_playlist"),
+                        modifier = Modifier.settingHighlight(groupKey),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(str("menu_tiles_desc"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), modifier = Modifier.settingHighlight("${groupKey}_reset"), onClick = {
                     prefs.resetMenuTiles(menu)
                     hidden = emptySet()
                 }) { Text(str("menu_tiles_reset")) }
@@ -1259,6 +1267,7 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
                         shape = groupRowShape(items.size, index),
                         title = item.label,
                         subtitle = item.desc,
+                        highlightKey = "${groupKey}_${item.key}",
                         mark = item.mark,
                         hasSwitch = true,
                         switchState = item.enabled,
@@ -1291,7 +1300,11 @@ private fun FloatingBarSection() {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(str("floating_bar_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(shapes = ButtonDefaults.shapes(), onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) }) { Text(str("btn_reset")) }
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier.settingHighlight("floating_bar_reset"),
+                    onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) },
+                ) { Text(str("btn_reset")) }
             }
             // A live miniature of the bar with the chosen corner and width.
             Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest), contentAlignment = Alignment.Center) {
@@ -1302,11 +1315,12 @@ private fun FloatingBarSection() {
                     modifier = Modifier.fillMaxWidth(look.widthPercent / 100f * 0.92f).height(36.dp),
                 ) {}
             }
-            FloatingSlider(str("floating_bar_corner"), "${look.cornerDp} dp", look.cornerDp.toFloat(), 0f..40f) { update(look.copy(cornerDp = it.toInt())) }
-            FloatingSlider(str("floating_bar_width"), "${look.widthPercent} %", look.widthPercent.toFloat(), 50f..100f) { update(look.copy(widthPercent = it.toInt())) }
-            FloatingSlider(str("floating_bar_margin"), "${look.marginDp} dp", look.marginDp.toFloat(), 4f..40f) { update(look.copy(marginDp = it.toInt())) }
+            FloatingSlider("floating_bar_corner", "${look.cornerDp} dp", look.cornerDp.toFloat(), 0f..40f) { update(look.copy(cornerDp = it.toInt())) }
+            FloatingSlider("floating_bar_width", "${look.widthPercent} %", look.widthPercent.toFloat(), 50f..100f) { update(look.copy(widthPercent = it.toInt())) }
+            FloatingSlider("floating_bar_margin", "${look.marginDp} dp", look.marginDp.toFloat(), 4f..40f) { update(look.copy(marginDp = it.toInt())) }
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { update(look.copy(isTranslucent = !look.isTranslucent)) }.padding(vertical = 6.dp),
+                Modifier.fillMaxWidth().settingHighlight("floating_bar_translucent", RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp)).clickable { update(look.copy(isTranslucent = !look.isTranslucent)) }.padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
@@ -1320,10 +1334,10 @@ private fun FloatingBarSection() {
 }
 
 @Composable
-private fun FloatingSlider(title: String, value: String, current: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
-    Column {
+private fun FloatingSlider(titleKey: String, value: String, current: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Column(Modifier.settingHighlight(titleKey)) {
         Row {
-            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(str(titleKey), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(value, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
         com.alananasss.kittytune.ui.common.Slider(value = current, onValueChange = onChange, valueRange = range, modifier = Modifier.fillMaxWidth())

@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.ProxyConfig
 import com.alananasss.kittytune.data.network.ProxyManager
@@ -247,6 +248,7 @@ fun ProxySettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("proxy_enable"),
+                                highlightKey = "proxy_enable",
                                 subtitle = if (isEnabled) {
                                     val port = portText.toIntOrNull() ?: 8080
                                     str("proxy_status_enabled", proxyType, host.ifBlank { "127.0.0.1" }, port)
@@ -300,6 +302,7 @@ fun ProxySettingsScreen(
                             Spacer(Modifier.width(10.dp))
                             Text(
                                 text = str("proxy_import_clipboard"),
+                                modifier = Modifier.settingHighlight("proxy_import_clipboard"),
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.labelLarge
                             )
@@ -482,6 +485,7 @@ fun ProxySettingsScreen(
                             ) {
                                 Text(
                                     text = str("proxy_type"),
+                                    modifier = Modifier.settingHighlight("proxy_type"),
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -537,7 +541,7 @@ fun ProxySettingsScreen(
                                         selectedProfileId = null
                                         saveAndApply(newHost = it, newProfileId = null)
                                     },
-                                    label = { Text(str("proxy_host")) },
+                                    label = { Text(str("proxy_host"), Modifier.settingHighlight("proxy_host")) },
                                     placeholder = { Text(str("proxy_host_hint")) },
                                     singleLine = true,
                                     leadingIcon = {
@@ -571,7 +575,7 @@ fun ProxySettingsScreen(
                                             saveAndApply(newPortText = it, newProfileId = null)
                                         }
                                     },
-                                    label = { Text(str("proxy_port")) },
+                                    label = { Text(str("proxy_port"), Modifier.settingHighlight("proxy_port")) },
                                     placeholder = { Text(str("proxy_port_hint")) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -598,7 +602,7 @@ fun ProxySettingsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         PresetChip(
-                                            label = str("proxy_preset_v2ray"),
+                                            labelKey = "proxy_preset_v2ray",
                                             modifier = Modifier.weight(1f),
                                             onClick = {
                                                 host = "127.0.0.1"
@@ -610,7 +614,7 @@ fun ProxySettingsScreen(
                                             }
                                         )
                                         PresetChip(
-                                            label = str("proxy_preset_tor"),
+                                            labelKey = "proxy_preset_tor",
                                             modifier = Modifier.weight(1f),
                                             onClick = {
                                                 host = "127.0.0.1"
@@ -628,7 +632,7 @@ fun ProxySettingsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         PresetChip(
-                                            label = str("proxy_preset_http"),
+                                            labelKey = "proxy_preset_http",
                                             modifier = Modifier.weight(1f),
                                             onClick = {
                                                 host = "127.0.0.1"
@@ -640,7 +644,7 @@ fun ProxySettingsScreen(
                                             }
                                         )
                                         PresetChip(
-                                            label = str("proxy_preset_socks"),
+                                            labelKey = "proxy_preset_socks",
                                             modifier = Modifier.weight(1f),
                                             onClick = {
                                                 host = "127.0.0.1"
@@ -660,6 +664,7 @@ fun ProxySettingsScreen(
                         SettingsItem(
                             shape = RoundedCornerShape(24.dp),
                             title = str("proxy_auth_enable"),
+                            highlightKey = "proxy_auth_enable",
                             subtitle = str("proxy_auth_enable_desc"),
                             icon = Icons.Rounded.Key,
                             hasSwitch = true,
@@ -694,7 +699,7 @@ fun ProxySettingsScreen(
                                             username = it
                                             saveAndApply(newUsername = it)
                                         },
-                                        label = { Text(str("proxy_username")) },
+                                        label = { Text(str("proxy_username"), Modifier.settingHighlight("proxy_username")) },
                                         singleLine = true,
                                         leadingIcon = {
                                             Icon(Icons.Rounded.Person, contentDescription = null)
@@ -709,7 +714,7 @@ fun ProxySettingsScreen(
                                             password = it
                                             saveAndApply(newPassword = it)
                                         },
-                                        label = { Text(str("proxy_password")) },
+                                        label = { Text(str("proxy_password"), Modifier.settingHighlight("proxy_password")) },
                                         singleLine = true,
                                         visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                                         leadingIcon = {
@@ -762,6 +767,7 @@ fun ProxySettingsScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = str("proxy_profile_save_as"),
+                                    modifier = Modifier.settingHighlight("proxy_profile_save_as"),
                                     fontWeight = FontWeight.SemiBold,
                                     style = MaterialTheme.typography.labelLarge,
                                     maxLines = 1
@@ -825,6 +831,7 @@ fun ProxySettingsScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = str("proxy_test_connection"),
+                                        modifier = Modifier.settingHighlight("proxy_test_connection"),
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelLarge,
                                         maxLines = 1
@@ -932,7 +939,7 @@ fun ProxySettingsScreen(
 
 @Composable
 private fun PresetChip(
-    label: String,
+    labelKey: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -940,10 +947,10 @@ private fun PresetChip(
         onClick = onClick,
         shape = RoundedCornerShape(14.dp),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-        modifier = modifier.height(38.dp)
+        modifier = modifier.height(38.dp).settingHighlight(labelKey, RoundedCornerShape(14.dp))
     ) {
         Text(
-            text = label,
+            text = str(labelKey),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1

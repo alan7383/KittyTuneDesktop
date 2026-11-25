@@ -109,7 +109,8 @@ import com.alananasss.kittytune.data.local.BlockedContent
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
-import com.alananasss.kittytune.ui.common.SettingsHighlightManager
+import com.alananasss.kittytune.ui.common.LocalSettingsHighlight
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.common.SettingsItem
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -177,20 +178,13 @@ fun ContentFilterSettingsPage() {
     var artistToUnblock by remember { mutableStateOf<BlockedContent?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
 
-    // Synchronize active tab with settings search highlights
-    LaunchedEffect(Unit) {
-        val currentKey = SettingsHighlightManager.highlightKey
-        if (currentKey != null) {
-            when {
-                currentKey.startsWith("ai_") || currentKey.startsWith("block_model") || currentKey == "block_section_ai" -> {
-                    selectedTab = 0
-                }
-                currentKey == "blocked_content_list" || currentKey == "block_section_tracks" -> {
-                    selectedTab = 1
-                }
-                currentKey == "block_section_artists" -> {
-                    selectedTab = 2
-                }
+    val highlight = LocalSettingsHighlight.current
+    LaunchedEffect(highlight) {
+        if (highlight != null) {
+            selectedTab = when (highlight.key) {
+                "block_section_tracks", "block_clear_all_tracks" -> 1
+                "block_section_artists", "block_clear_all_artists" -> 2
+                else -> 0
             }
         }
     }
@@ -856,6 +850,7 @@ fun ContentFilterSettingsPage() {
                     ) {
                         Text(
                             text = str("block_tab_tracks"),
+                            modifier = Modifier.settingHighlight("block_section_tracks"),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -880,6 +875,7 @@ fun ContentFilterSettingsPage() {
                     ) {
                         Text(
                             text = str("block_tab_artists"),
+                            modifier = Modifier.settingHighlight("block_section_artists"),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -944,7 +940,7 @@ fun ContentFilterSettingsPage() {
                                 onSelectGpuClick = { showGpuSelectionDialog = true },
                             )
 
-                            SettingsGroupTitle(str("block_section_ai"))
+                            SettingsGroupTitle(str("block_section_ai"), Modifier.settingHighlight("block_section_ai"))
 
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1234,7 +1230,7 @@ fun ContentFilterSettingsPage() {
                                             modifier = Modifier.size(18.dp),
                                         )
                                         Spacer(Modifier.width(6.dp))
-                                        Text(str("block_clear_all_title"))
+                                        Text(str("block_clear_all_title"), Modifier.settingHighlight("block_clear_all_tracks"))
                                     }
                                 }
                             }
@@ -1372,7 +1368,7 @@ fun ContentFilterSettingsPage() {
                                             modifier = Modifier.size(18.dp),
                                         )
                                         Spacer(Modifier.width(6.dp))
-                                        Text(str("block_clear_all_title"))
+                                        Text(str("block_clear_all_title"), Modifier.settingHighlight("block_clear_all_artists"))
                                     }
                                 }
                             }
@@ -1962,6 +1958,7 @@ private fun AiModelCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = str("block_model_card_title"),
+                        modifier = Modifier.settingHighlight("block_model_card_title"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -2059,6 +2056,7 @@ private fun AiModelCard(
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = str("block_model_delete_btn"),
+                            modifier = Modifier.settingHighlight("block_model_delete_btn"),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                         )
                     }
@@ -2127,6 +2125,7 @@ private fun AiModelCard(
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = "${str("block_model_download_btn")} (${formatModelSize(currentModel.totalBytes)})",
+                                modifier = Modifier.settingHighlight("block_model_download_btn"),
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                             )
                         }

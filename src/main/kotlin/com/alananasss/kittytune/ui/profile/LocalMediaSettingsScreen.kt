@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.data.LocalMediaRepository
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.SettingsGroup
@@ -84,6 +85,7 @@ fun LocalMediaSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_local_enable"),
+                                highlightKey = "pref_local_enable",
                                 subtitle = str("pref_local_enable_sub"),
                                 hasSwitch = true,
                                 switchState = isEnabled,
@@ -136,6 +138,7 @@ fun LocalMediaSettingsScreen(
                                         SettingsItem(
                                             shape = shape,
                                             title = str("pref_local_no_folder"),
+                                            highlightKey = "pref_local_no_folder",
                                             titleColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
@@ -212,6 +215,7 @@ fun LocalMediaSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_local_add"),
+                                highlightKey = "pref_local_add",
                                 onClick = { openFolderPicker() },
                                 titleColor = MaterialTheme.colorScheme.primary
                             )
@@ -255,6 +259,7 @@ fun LocalMediaSettingsScreen(
                                         .fillMaxWidth()
                                         .padding(horizontal = horizontalPadding)
                                         .height(56.dp)
+                                        .settingHighlight("pref_local_scan", androidx.compose.foundation.shape.CircleShape)
                                 ) {
                                     if (isScanning) {
                                         CircularWavyProgressIndicator(

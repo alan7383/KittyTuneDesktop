@@ -96,6 +96,7 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_discord_status_display"),
+                    highlightKey = "pref_discord_status_display",
                     subtitle = str(statusDisplay.labelKey()),
                     onClick = { showStatusDialog = true },
                 )
@@ -104,6 +105,7 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
                 SettingsItem(
                     shape = shape,
                     title = str("discord_listen_along_title"),
+                    highlightKey = "discord_listen_along_title",
                     subtitle = str("discord_listen_along_desc"),
                     hasSwitch = true,
                     switchState = listenAlongEnabled,
@@ -114,6 +116,7 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
                 SettingsItem(
                     shape = shape,
                     title = str("discord_auto_live_title"),
+                    highlightKey = "discord_auto_live_title",
                     subtitle = str("discord_auto_live_desc"),
                     hasSwitch = true,
                     switchState = prefs.getDiscordAutoLiveEnabled(),
@@ -126,6 +129,7 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
                     SettingsItem(
                         shape = shape,
                         title = str("together_copy_link"),
+                        highlightKey = "together_copy_link",
                         subtitle = TogetherLinks.inviteUrl(liveCode),
                         onClick = { TogetherLinks.copyInviteLink(liveCode) },
                     )
@@ -134,6 +138,7 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
                     SettingsItem(
                         shape = shape,
                         title = str("together_reset_link"),
+                        highlightKey = "together_reset_link",
                         subtitle = str("together_reset_link_desc"),
                         onClick = {
                             TogetherLinks.copyInviteLink(Together.regeneratePersonalLiveCode())
@@ -147,6 +152,7 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
             SettingsItem(
                 shape = shape,
                 title = str(if (logCopied) "sync_diagnostics_copied" else "sync_copy_diagnostics"),
+                highlightKey = "sync_copy_diagnostics",
                 onClick = {
                     clipboard.setText(AnnotatedString(playerViewModel.discordConnectionLog()))
                     logCopied = true

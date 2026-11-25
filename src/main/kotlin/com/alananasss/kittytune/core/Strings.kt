@@ -100,6 +100,8 @@ object Strings {
         }
     }
 
+    internal fun english(key: String): String = table("en")[key] ?: key
+
     /** Equivalent of stringResource(R.string.key, args...) with Android positional format support. */
     fun get(key: String, vararg args: Any?): String {
         val pattern = get(key)

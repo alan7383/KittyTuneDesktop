@@ -322,6 +322,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("provider_enabled_title"),
+                                highlightKey = "provider_enabled_title",
                                 subtitle = str("provider_enabled_desc"),
                                 icon = Icons.Rounded.PowerSettingsNew,
                                 hasSwitch = true,
@@ -336,6 +337,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_web_login"),
+                                highlightKey = "deezer_web_login",
                                 subtitle = if (cookieConfigured) {
                                     str("deezer_cookie_configured")
                                 } else {
@@ -354,6 +356,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_cookie_title"),
+                                highlightKey = "deezer_cookie_title",
                                 subtitle = if (cookieConfigured) {
                                     str("deezer_cookie_configured")
                                 } else {
@@ -367,6 +370,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_resolver_url"),
+                                highlightKey = "deezer_resolver_url",
                                 subtitle = str("deezer_resolver_url_desc", resolverUrl),
                                 icon = Icons.Rounded.Link,
                                 onClick = { showResolverDialog = true }
@@ -376,6 +380,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_proxy_mode"),
+                                highlightKey = "deezer_proxy_mode",
                                 subtitle = proxyModeLabel,
                                 icon = Icons.Rounded.VpnLock,
                                 onClick = { showProxyModeDialog = true }
@@ -385,6 +390,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_audio_quality"),
+                                highlightKey = "deezer_audio_quality",
                                 subtitle = qualityLabel,
                                 icon = Icons.Rounded.GraphicEq,
                                 onClick = { showQualityDialog = true }
@@ -394,6 +400,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_fast_mode"),
+                                highlightKey = "deezer_fast_mode",
                                 subtitle = str("deezer_fast_mode_desc"),
                                 icon = Icons.Rounded.Speed,
                                 hasSwitch = true,
@@ -408,6 +415,7 @@ fun DeezerSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("deezer_use_account"),
+                                highlightKey = "deezer_use_account",
                                 subtitle = str("deezer_use_account_desc"),
                                 icon = Icons.Rounded.AccountCircle,
                                 hasSwitch = true,
@@ -423,6 +431,7 @@ fun DeezerSettingsScreen(
                                 SettingsItem(
                                     shape = shape,
                                     title = str("deezer_reset_resolver"),
+                                    highlightKey = "deezer_reset_resolver",
                                     subtitle = DeezerAudioProvider.DEFAULT_RESOLVER_URL,
                                     icon = Icons.Rounded.Restore,
                                     onClick = {
@@ -437,6 +446,7 @@ fun DeezerSettingsScreen(
                                 SettingsItem(
                                     shape = shape,
                                     title = str("deezer_clear_proxy"),
+                                    highlightKey = "deezer_clear_proxy",
                                     subtitle = str("deezer_proxy_disabled"),
                                     icon = Icons.Rounded.Delete,
                                     onClick = {
@@ -453,6 +463,7 @@ fun DeezerSettingsScreen(
                                 SettingsItem(
                                     shape = shape,
                                     title = str("deezer_clear_cookie"),
+                                    highlightKey = "deezer_clear_cookie",
                                     subtitle = str("deezer_cookie_configured"),
                                     icon = Icons.Rounded.Delete,
                                     onClick = {

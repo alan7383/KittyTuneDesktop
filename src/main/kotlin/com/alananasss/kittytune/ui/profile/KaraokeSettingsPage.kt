@@ -91,10 +91,12 @@ import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.local.KaraokeEngineMode
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.LocalSettingsHighlight
 import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.Slider
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.io.File
 import java.text.SimpleDateFormat
@@ -119,6 +121,15 @@ fun KaraokeSettingsPage(
 ) {
     val prefs = remember { PlayerPreferences() }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val highlight = LocalSettingsHighlight.current
+    LaunchedEffect(highlight) {
+        when (highlight?.key) {
+            "karaoke_tab_stems", "karaoke_cache_clear_btn", "karaoke_cache_title" -> selectedTab = 1
+            "karaoke_tab_voice_boost", "karaoke_acapella_title", "karaoke_enable_vocal_boost_title",
+            "label_vocal_boost_level" -> selectedTab = 2
+            "karaoke_tab_model" -> selectedTab = 0
+        }
+    }
 
     var engineMode by remember { mutableStateOf(prefs.karaokeEngineMode) }
     var gpuEnabled by remember { mutableStateOf(prefs.karaokeGpuAccelerationEnabled) }
@@ -179,6 +190,7 @@ fun KaraokeSettingsPage(
                 when (index) {
                     0 -> Text(
                         text = str("karaoke_tab_model"),
+                        modifier = Modifier.settingHighlight("karaoke_tab_model"),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -189,6 +201,7 @@ fun KaraokeSettingsPage(
                     ) {
                         Text(
                             text = str("karaoke_tab_stems"),
+                            modifier = Modifier.settingHighlight("karaoke_tab_stems"),
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -209,6 +222,7 @@ fun KaraokeSettingsPage(
                     }
                     2 -> Text(
                         text = str("karaoke_tab_voice_boost"),
+                        modifier = Modifier.settingHighlight("karaoke_tab_voice_boost"),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -393,6 +407,7 @@ fun KaraokeSettingsPage(
                                             Column {
                                                 Text(
                                                     text = str("karaoke_cache_title"),
+                                                    modifier = Modifier.settingHighlight("karaoke_cache_title"),
                                                     style = MaterialTheme.typography.titleMedium,
                                                     fontWeight = FontWeight.Bold,
                                                 )
@@ -416,7 +431,7 @@ fun KaraokeSettingsPage(
                                             ) {
                                                 Icon(Icons.Rounded.DeleteSweep, null, modifier = Modifier.size(16.dp))
                                                 Spacer(Modifier.width(6.dp))
-                                                Text(str("karaoke_cache_clear_btn"))
+                                                Text(str("karaoke_cache_clear_btn"), Modifier.settingHighlight("karaoke_cache_clear_btn"))
                                             }
                                         }
                                     }
@@ -622,6 +637,7 @@ fun KaraokeSettingsPage(
                                         Column {
                                             Text(
                                                 text = str("karaoke_acapella_title"),
+                                                modifier = Modifier.settingHighlight("karaoke_acapella_title"),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
                                             )
@@ -814,6 +830,7 @@ fun KaraokeSettingsPage(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = str("karaoke_enable_vocal_boost_title"),
+                                                modifier = Modifier.settingHighlight("karaoke_enable_vocal_boost_title"),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                             )
@@ -846,7 +863,7 @@ fun KaraokeSettingsPage(
                                             if (!playerViewModel.effectsState.isVocalBoostEnabled) playerViewModel.toggleVocalBoost()
                                         },
                                         valueRange = 0f..1f,
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().settingHighlight("label_vocal_boost_level"),
                                     )
 
                                     val presets = remember {
@@ -1234,6 +1251,7 @@ private fun KaraokeModelCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "HTDemucs v4 (Isolation Vocale & Karaoke)",
+                        modifier = Modifier.settingHighlight("karaoke_engine_select_title"),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -1268,7 +1286,8 @@ private fun KaraokeModelCard(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                 onOptionSelected = { opt -> onEngineModeChange(opt.first) },
                 labelProvider = { opt ->
-                    Text(opt.second, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    val key = if (opt.first == KaraokeEngineMode.DSP) "karaoke_engine_dsp_title" else "karaoke_engine_roformer_title"
+                    Text(opt.second, Modifier.settingHighlight(key), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -1494,7 +1513,7 @@ private fun KaraokeQuickStart(playerViewModel: PlayerViewModel) {
             ) {
                 Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(str("karaoke_isolate_now"))
+                Text(str("karaoke_isolate_now"), Modifier.settingHighlight("karaoke_isolate_now"))
             }
             if (!modelReady) {
                 Text(

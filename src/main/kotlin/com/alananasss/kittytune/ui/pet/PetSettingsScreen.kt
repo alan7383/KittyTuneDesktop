@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -108,6 +109,9 @@ import com.alananasss.kittytune.ui.common.clearance
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
+import com.alananasss.kittytune.ui.common.LocalSettingsHighlight
+import com.alananasss.kittytune.ui.common.ScrollableLazyColumn
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.ui.common.ScrollableLazyRow
@@ -238,12 +242,11 @@ private fun PetSettingsContent(
     val raresSeen = remember(settings) { PetConfig.raresSeen() }
     val rares = PetActivity.rares
 
-    // the settings pane already draws the title and the back arrow
-    run {
-        com.alananasss.kittytune.ui.common.ScrollableLazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp)
-        ) {
+    val groups = buildList<PetSettingsGroup> {
+            fun item(vararg targets: String, content: @Composable () -> Unit) {
+                add(PetSettingsGroup(targets.toSet(), content))
+            }
+
             // ---------------- hero
             item {
                 Column(
@@ -308,30 +311,32 @@ private fun PetSettingsContent(
 
             // ---------------- look
             item { SectionTitle(str("pet_section_look")) }
-            item {
+            item("pet_settings_name", "pet_settings_color", "pet_settings_pattern", "pet_settings_eyes", "pet_editor_open") {
                 SettingsGroup(
                     items = listOf(
                         { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_name"),
+                                highlightKey = "pet_settings_name",
                                 subtitle = settings.name,
                                 icon = Icons.Rounded.Badge,
                                 onClick = { editingName = true }
                             )
                         },
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_color"), colorLabel(settings)) {
+                            OptionBlock(shape, "pet_settings_color", colorLabel(settings)) {
                                 ColorSwatches(settings = settings, onSelect = { onChange(settings.copy(colorId = it)) })
                             }
                         },
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_pattern"), str(settings.pattern.label)) {
+                            OptionBlock(shape, "pet_settings_pattern", str(settings.pattern.label)) {
                                 PreviewRow(patternOptions(settings), settings.pattern, { str(it.label) }, { settings.copy(pattern = it) }) {
                                     onChange(settings.copy(pattern = it))
                                 }
                                 Spacer(Modifier.height(12.dp))
-                                FilledTonalButton(onClick = onEditCoat, shapes = ButtonDefaults.shapes()) {
+                                FilledTonalButton(onClick = onEditCoat, shapes = ButtonDefaults.shapes(),
+                                    modifier = Modifier.settingHighlight("pet_editor_open", CircleShape)) {
                                     Icon(Icons.Rounded.Brush, null)
                                     Spacer(Modifier.width(8.dp))
                                     Text(str("pet_editor_open"))
@@ -339,7 +344,7 @@ private fun PetSettingsContent(
                             }
                         },
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_eyes"), eyeLabel(settings.eyeColor)) {
+                            OptionBlock(shape, "pet_settings_eyes", eyeLabel(settings.eyeColor)) {
                                 EyeSwatches(settings.eyeColor) { onChange(settings.copy(eyeColor = it)) }
                             }
                         },
@@ -348,7 +353,7 @@ private fun PetSettingsContent(
             }
 
             // ---------------- photo (experimental)
-            item {
+            item("pet_photo_card_title") {
                 Surface(
                     onClick = onPhoto,
                     shape = RoundedCornerShape(24.dp),
@@ -356,6 +361,7 @@ private fun PetSettingsContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .settingHighlight("pet_photo_card_title", RoundedCornerShape(24.dp))
                 ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -398,18 +404,18 @@ private fun PetSettingsContent(
 
             // ---------------- accessories
             item { SectionTitle(str("pet_section_accessories")) }
-            item {
+            item("pet_settings_hat", "pet_settings_neck") {
                 SettingsGroup(
                     items = listOf(
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_hat"), str(settings.hat.label)) {
+                            OptionBlock(shape, "pet_settings_hat", str(settings.hat.label)) {
                                 PreviewRow(PetHat.entries, settings.hat, { str(it.label) }, { settings.copy(hat = it) }) {
                                     onChange(settings.copy(hat = it))
                                 }
                             }
                         },
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_neck"), str(settings.neck.label)) {
+                            OptionBlock(shape, "pet_settings_neck", str(settings.neck.label)) {
                                 PreviewRow(PetNeck.entries, settings.neck, { str(it.label) }, { settings.copy(neck = it) }) {
                                     onChange(settings.copy(neck = it))
                                 }
@@ -421,11 +427,11 @@ private fun PetSettingsContent(
 
             // ---------------- room
             item { SectionTitle(str("pet_section_room")) }
-            item {
+            item("pet_settings_wall", "pet_settings_room_decor", "pet_settings_holidays", "pet_settings_seasonal") {
                 SettingsGroup(
                     items = listOf(
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_wall"), str(settings.wall.label)) {
+                            OptionBlock(shape, "pet_settings_wall", str(settings.wall.label)) {
                                 WallChips(settings.wall) { onChange(settings.copy(wall = it)) }
                             }
                         },
@@ -433,6 +439,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_room_decor"),
+                                highlightKey = "pet_settings_room_decor",
                                 subtitle = str("pet_settings_room_decor_sub"),
                                 icon = Icons.Rounded.Chair,
                                 hasSwitch = true,
@@ -445,6 +452,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_holidays"),
+                                highlightKey = "pet_settings_holidays",
                                 subtitle = str("pet_settings_holidays_sub"),
                                 icon = Icons.Rounded.Cake,
                                 hasSwitch = true,
@@ -457,6 +465,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_seasonal"),
+                                highlightKey = "pet_settings_seasonal",
                                 subtitle = str("pet_settings_seasonal_sub"),
                                 icon = Icons.Rounded.AcUnit,
                                 hasSwitch = true,
@@ -471,13 +480,14 @@ private fun PetSettingsContent(
 
             // ---------------- widget
             item { SectionTitle(str("pet_desk_window_section")) }
-            item {
+            item("pet_settings_show_name", "pet_settings_show_hearts", "pet_settings_show_status", "pet_desk_tap", "pet_settings_speed") {
                 SettingsGroup(
                     items = listOf(
                         { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_show_name"),
+                                highlightKey = "pet_settings_show_name",
                                 icon = Icons.Rounded.Label,
                                 hasSwitch = true,
                                 switchState = settings.showName,
@@ -489,6 +499,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_show_hearts"),
+                                highlightKey = "pet_settings_show_hearts",
                                 icon = Icons.Rounded.Favorite,
                                 hasSwitch = true,
                                 switchState = settings.showHearts,
@@ -500,6 +511,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_show_status"),
+                                highlightKey = "pet_settings_show_status",
                                 icon = Icons.Rounded.ChatBubble,
                                 hasSwitch = true,
                                 switchState = settings.showStatus,
@@ -508,7 +520,7 @@ private fun PetSettingsContent(
                             )
                         },
                         { shape ->
-                            OptionBlock(shape, str("pet_desk_tap"), null) {
+                            OptionBlock(shape, "pet_desk_tap", null) {
                                 ExpressiveConnectedButtonGroup(
                                     options = PetTap.entries,
                                     selectedOption = settings.tap,
@@ -518,7 +530,7 @@ private fun PetSettingsContent(
                             }
                         },
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_speed"), null) {
+                            OptionBlock(shape, "pet_settings_speed", null) {
                                 ExpressiveConnectedButtonGroup(
                                     options = PetSpeed.entries,
                                     selectedOption = settings.speed,
@@ -533,11 +545,12 @@ private fun PetSettingsContent(
 
             // ---------------- behaviour
             item { SectionTitle(str("pet_section_behaviour")) }
-            item {
+            item("pet_settings_personality", "pet_settings_sad_after", "pet_settings_sleep_after", "pet_settings_night_sleep",
+                "pet_settings_events", "pet_settings_exclusives", "pet_settings_rares") {
                 SettingsGroup(
                     items = listOf(
                         { shape ->
-                            OptionBlock(shape, str("pet_settings_personality"), str(settings.personality.label)) {
+                            OptionBlock(shape, "pet_settings_personality", str(settings.personality.label)) {
                                 PersonalityChips(settings.personality) { onChange(settings.copy(personality = it)) }
                             }
                         },
@@ -545,6 +558,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_sad_after"),
+                                highlightKey = "pet_settings_sad_after",
                                 subtitle = str("pet_hours_format", fmtHours(settings.sadHours)),
                                 icon = Icons.Rounded.SentimentDissatisfied,
                                 hasSlider = true,
@@ -560,6 +574,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_sleep_after"),
+                                highlightKey = "pet_settings_sleep_after",
                                 subtitle = str("pet_hours_format", fmtHours(settings.sleepHours)),
                                 icon = Icons.Rounded.Bedtime,
                                 hasSlider = true,
@@ -575,6 +590,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_night_sleep"),
+                                highlightKey = "pet_settings_night_sleep",
                                 subtitle = str("pet_settings_night_sleep_sub"),
                                 icon = Icons.Rounded.Nightlight,
                                 hasSwitch = true,
@@ -587,6 +603,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_events"),
+                                highlightKey = "pet_settings_events",
                                 subtitle = str("pet_settings_events_sub"),
                                 icon = Icons.Rounded.Event,
                                 hasSwitch = true,
@@ -599,6 +616,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_exclusives"),
+                                highlightKey = "pet_settings_exclusives",
                                 subtitle = str("pet_desk_exclusives_sub"),
                                 icon = Icons.Rounded.LibraryMusic,
                                 hasSwitch = true,
@@ -611,6 +629,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_rares"),
+                                highlightKey = "pet_settings_rares",
                                 subtitle = str("pet_settings_rares_sub"),
                                 icon = Icons.Rounded.Diamond,
                                 hasSwitch = true,
@@ -648,7 +667,7 @@ private fun PetSettingsContent(
 
             // ---------------- actions
             item { SectionTitle(str("pet_section_more")) }
-            item {
+            item("pet_desk_placement", "pet_visibility", "pet_settings_replay", "pet_settings_reset") {
                 val home = PetWindowState.placement
                 val homeIcon = placementIcon(home)
                 SettingsGroup(
@@ -659,6 +678,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_desk_placement"),
+                                highlightKey = "pet_desk_placement",
                                 subtitle = str(placementTitle(home)),
                                 icon = homeIcon,
                                 onClick = { showPlacementDialog = true }
@@ -682,6 +702,7 @@ private fun PetSettingsContent(
                                     }
                                 ),
                                 icon = homeIcon,
+                                highlightKey = "pet_visibility",
                                 hasSwitch = true,
                                 switchState = PetWindowState.visible,
                                 onSwitchChange = { PetWindowState.show(it) },
@@ -692,6 +713,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_replay"),
+                                highlightKey = "pet_settings_replay",
                                 subtitle = str("pet_settings_replay_sub"),
                                 icon = Icons.Rounded.Replay,
                                 onClick = onReplayTutorial
@@ -701,6 +723,7 @@ private fun PetSettingsContent(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pet_settings_reset"),
+                                highlightKey = "pet_settings_reset",
                                 subtitle = str("pet_settings_reset_sub"),
                                 icon = Icons.Rounded.RestartAlt,
                                 onClick = { confirmReset = true }
@@ -709,7 +732,20 @@ private fun PetSettingsContent(
                     )
                 )
             }
-        }
+    }
+
+    val listState = rememberLazyListState()
+    val highlight = LocalSettingsHighlight.current
+    LaunchedEffect(highlight) {
+        val index = groups.indexOfFirst { highlight?.key in it.targets }
+        if (index >= 0) listState.scrollToItem(index)
+    }
+    ScrollableLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
+    ) {
+        items(groups) { group -> group.content() }
     }
 
     if (editingName) {
@@ -762,6 +798,8 @@ private fun PetSettingsContent(
         )
     }
 }
+
+private class PetSettingsGroup(val targets: Set<String>, val content: @Composable () -> Unit)
 
 @Composable
 private fun SectionTitle(text: String) {
@@ -867,13 +905,13 @@ private fun personalityIcon(p: PetPersonality): ImageVector = when (p) {
 @Composable
 private fun OptionBlock(
     shape: androidx.compose.ui.graphics.Shape,
-    title: String,
+    titleKey: String,
     value: String?,
     content: @Composable () -> Unit,
 ) {
     Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(str(titleKey), Modifier.settingHighlight(titleKey), style = MaterialTheme.typography.titleMedium)
             if (value != null) {
                 Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

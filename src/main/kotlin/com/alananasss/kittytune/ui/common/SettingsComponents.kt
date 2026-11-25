@@ -20,24 +20,9 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.surfaceColorAtElevation
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -135,40 +120,7 @@ fun SettingsItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
-    val isHighlighted = SettingsHighlightManager.isHighlighted(highlightKey)
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val highlightAlpha = remember { Animatable(0f) }
-    var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-
-    val primaryColor = MaterialTheme.colorScheme.primary
     val baseColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val highlightOverlay = remember(primaryColor) { primaryColor.copy(alpha = 0.26f) }
-    val highlightedBaseColor = remember(highlightOverlay, baseColor) { highlightOverlay.compositeOver(baseColor) }
-
-    LaunchedEffect(isHighlighted) {
-        if (isHighlighted) {
-            // Short 50ms delay for initial layout pass to settle coordinates
-            delay(50)
-            try {
-                bringIntoViewRequester.bringIntoViewCentered(itemCoordinates)
-            } catch (_: Exception) {}
-
-            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
-            delay(1200)
-            highlightAlpha.animateTo(0f, tween(500, easing = FastOutSlowInEasing))
-            SettingsHighlightManager.clearHighlight(highlightKey)
-        }
-    }
-
-    val animatedContainerColor = if (highlightAlpha.value > 0f) {
-        lerp(baseColor, highlightedBaseColor, highlightAlpha.value)
-    } else {
-        baseColor
-    }
 
     val onToggleOrClick = {
         if (enabled) {
@@ -190,8 +142,8 @@ fun SettingsItem(
 
     val isClickable = (onClick != null || hasSwitch) && enabled
     val cardColors = CardDefaults.cardColors(
-        containerColor = animatedContainerColor,
-        disabledContainerColor = animatedContainerColor,
+        containerColor = baseColor,
+        disabledContainerColor = baseColor,
         contentColor = MaterialTheme.colorScheme.onSurface,
         disabledContentColor = MaterialTheme.colorScheme.onSurface,
     )
@@ -290,8 +242,7 @@ fun SettingsItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(if (enabled) 1f else 0.42f)
-                .bringIntoViewRequester(bringIntoViewRequester)
-                .onGloballyPositioned { itemCoordinates = it },
+                .settingHighlight(highlightKey, shape),
             interactionSource = interactionSource
         ) {
             content()
@@ -303,8 +254,7 @@ fun SettingsItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(if (enabled) 1f else 0.42f)
-                .bringIntoViewRequester(bringIntoViewRequester)
-                .onGloballyPositioned { itemCoordinates = it },
+                .settingHighlight(highlightKey, shape),
         ) {
             content()
         }
@@ -404,51 +354,17 @@ fun SplitSettingsItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
-    val isHighlighted = SettingsHighlightManager.isHighlighted(highlightKey)
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val highlightAlpha = remember { Animatable(0f) }
-    var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-
-    val primaryColor = MaterialTheme.colorScheme.primary
     val baseColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val highlightOverlay = remember(primaryColor) { primaryColor.copy(alpha = 0.26f) }
-    val highlightedBaseColor = remember(highlightOverlay, baseColor) { highlightOverlay.compositeOver(baseColor) }
-
-    LaunchedEffect(isHighlighted) {
-        if (isHighlighted) {
-            // Short 50ms delay for initial layout pass to settle coordinates
-            delay(50)
-            try {
-                bringIntoViewRequester.bringIntoViewCentered(itemCoordinates)
-            } catch (_: Exception) {}
-
-            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
-            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
-            delay(1200)
-            highlightAlpha.animateTo(0f, tween(500, easing = FastOutSlowInEasing))
-            SettingsHighlightManager.clearHighlight(highlightKey)
-        }
-    }
-
-    val animatedContainerColor = if (highlightAlpha.value > 0f) {
-        lerp(baseColor, highlightedBaseColor, highlightAlpha.value)
-    } else {
-        baseColor
-    }
 
     Card(
         onClick = { if (enabled) onClick() },
         enabled = enabled,
-        colors = CardDefaults.cardColors(containerColor = animatedContainerColor),
+        colors = CardDefaults.cardColors(containerColor = baseColor),
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (enabled) 1f else 0.42f)
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .onGloballyPositioned { itemCoordinates = it }
+            .settingHighlight(highlightKey, shape)
     ) {
         Row(
             modifier = Modifier

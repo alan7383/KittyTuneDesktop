@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.drm.CdmSidecar
@@ -198,6 +199,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
             SettingsItem(
                 shape = shape,
                 title = str("pref_drm_test"),
+                highlightKey = "pref_drm_test",
                 subtitle = when {
                     testing -> str("pref_drm_testing")
                     result == true -> str("pref_drm_windows_test_ok")
@@ -231,6 +233,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
             SettingsItem(
                 shape = shape,
                 title = str(if (nativeReady) "pref_drm_native_redo_title" else "pref_drm_native_setup_title"),
+                highlightKey = "pref_drm_native_setup",
                 subtitle = str(if (nativeReady) "pref_drm_native_redo_desc" else "pref_drm_native_setup_desc"),
                 icon = Icons.Rounded.Download,
                 onClick = { onOpenWizard(DrmWizardStart.NATIVE) },
@@ -240,6 +243,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
             SettingsItem(
                 shape = shape,
                 title = str("pref_drm_native_remove_title"),
+                highlightKey = "pref_drm_native_remove_title",
                 subtitle = str("pref_drm_native_remove_desc"),
                 icon = Icons.Rounded.DeleteSweep,
                 titleColor = MaterialTheme.colorScheme.error,
@@ -259,6 +263,7 @@ internal fun WindowsDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
             SettingsItem(
                 shape = shape,
                 title = str("pref_drm_wsl_cleanup_title"),
+                highlightKey = "pref_drm_wsl_cleanup_title",
                 subtitle = if (cleaningWsl) str("pref_drm_wsl_cleanup_running") else str("pref_drm_wsl_cleanup_desc"),
                 icon = Icons.Rounded.DeleteSweep,
                 enabled = !cleaningWsl,
@@ -354,6 +359,7 @@ private fun DrmHelpGroup(onOpenWizard: (DrmWizardStart) -> Unit) {
             SettingsItem(
                 shape = shape,
                 title = str("pref_drm_tour_title"),
+                highlightKey = "pref_drm_tour_title",
                 subtitle = str("pref_drm_tour_desc"),
                 icon = Icons.Rounded.Replay,
                 onClick = { onOpenWizard(DrmWizardStart.INTRO) },
@@ -446,7 +452,7 @@ private fun WidevineDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
                         OutlinedTextField(
                             value = path,
                             onValueChange = { path = it },
-                            label = { Text(str("pref_drm_cdm_path")) },
+                label = { Text(str("pref_drm_cdm_path"), Modifier.settingHighlight("pref_drm_cdm_path")) },
                             placeholder = { Text("libwidevinecdm.so") },
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
@@ -460,6 +466,7 @@ private fun WidevineDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
                     SettingsItem(
                         shape = shape,
                         title = str("pref_drm_autodetect"),
+                        highlightKey = "pref_drm_autodetect",
                         subtitle = str("pref_drm_autodetect_desc"),
                         icon = Icons.Rounded.Search,
                         enabled = !searching,
@@ -491,6 +498,7 @@ private fun WidevineDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
                     SettingsItem(
                         shape = shape,
                         title = str("pref_drm_browse"),
+                        highlightKey = "pref_drm_browse",
                         subtitle = str("pref_drm_browse_desc"),
                         icon = Icons.Rounded.FolderOpen,
                         enabled = !searching,
@@ -511,6 +519,7 @@ private fun WidevineDrmSection(onOpenWizard: (DrmWizardStart) -> Unit) {
                     SettingsItem(
                         shape = shape,
                         title = str("pref_drm_test"),
+                        highlightKey = "pref_drm_test",
                         subtitle = status ?: str("pref_drm_test_desc"),
                         icon = Icons.Rounded.PlayCircle,
                         titleColor = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
@@ -590,6 +599,7 @@ private fun ProtectedTracksSwitch(shape: Shape, ready: Boolean = true) {
     SettingsItem(
         shape = shape,
         title = str("pref_drm_attempt_title"),
+        highlightKey = "pref_drm_attempt_title",
         // Greyed out until the module is installed: turning it on would promise something the app
         // cannot do yet, and the row above already says what is missing.
         subtitle = str(if (ready) "pref_drm_attempt_desc" else "pref_drm_attempt_needs_module"),
@@ -692,6 +702,7 @@ private fun drmLogRow(report: String?, onClick: () -> Unit): List<@Composable (S
         SettingsItem(
             shape = shape,
             title = str("pref_drm_log_title"),
+            highlightKey = "pref_drm_log_title",
             subtitle = str("pref_drm_log_desc"),
             icon = Icons.Rounded.Description,
             onClick = onClick,

@@ -480,6 +480,7 @@ fun QobuzSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("provider_enabled_title"),
+                                highlightKey = "provider_enabled_title",
                                 subtitle = str("provider_enabled_desc"),
                                 icon = Icons.Rounded.PowerSettingsNew,
                                 hasSwitch = true,
@@ -494,6 +495,7 @@ fun QobuzSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("qobuz_country"),
+                                highlightKey = "qobuz_country",
                                 subtitle = str("qobuz_country_desc"),
                                 icon = Icons.Rounded.Language,
                                 onClick = { showCountryDialog = true }
@@ -509,6 +511,7 @@ fun QobuzSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("qobuz_custom_instances"),
+                                highlightKey = "qobuz_custom_instances",
                                 subtitle = desc,
                                 icon = Icons.Rounded.Link,
                                 onClick = { showInstancesDialog = true }
@@ -524,6 +527,7 @@ fun QobuzSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("qobuz_audio_quality"),
+                                highlightKey = "qobuz_audio_quality",
                                 subtitle = qualityLabel,
                                 icon = Icons.Rounded.GraphicEq,
                                 onClick = { showQualityDialog = true }
@@ -533,6 +537,7 @@ fun QobuzSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("qobuz_account"),
+                                highlightKey = "qobuz_account",
                                 subtitle = if (qobuzToken != null)
                                     str("qobuz_account_desc_connected")
                                 else

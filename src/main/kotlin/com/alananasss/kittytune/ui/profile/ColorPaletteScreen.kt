@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
@@ -271,6 +272,7 @@ private fun PresetSwatchesCard(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = str("theme_preset_accents_title"),
+                    modifier = Modifier.settingHighlight("theme_preset_accents_title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -438,6 +440,7 @@ private fun CustomSeedPickerCard(
         ) {
             Text(
                 text = str("pref_custom_seed_title"),
+                modifier = Modifier.settingHighlight("pref_custom_seed_title"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -463,7 +466,7 @@ private fun CustomSeedPickerCard(
                         val normalized = input.trim().take(9)
                         onHexChange(normalized)
                     },
-                    modifier = Modifier.weight(1f).trackTextInput(),
+                    modifier = Modifier.weight(1f).trackTextInput().settingHighlight("color_hex_label", RoundedCornerShape(16.dp)),
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     label = { Text(str("color_hex_label")) },
@@ -519,7 +522,7 @@ private fun CustomSeedPickerCard(
 
             // 2. Saturation Slider (Riff active/inactive split track)
             RiffTrackSlider(
-                label = str("color_saturation_label"),
+                labelKey = "color_saturation_label",
                 value = saturation,
                 valueText = "${(saturation * 100).roundToInt()}%",
                 activeColor = MaterialTheme.colorScheme.primary,
@@ -534,7 +537,7 @@ private fun CustomSeedPickerCard(
 
             // 3. Brightness Slider (Riff active/inactive split track)
             RiffTrackSlider(
-                label = str("color_brightness_label"),
+                labelKey = "color_brightness_label",
                 value = brightness,
                 valueText = "${(brightness * 100).roundToInt()}%",
                 activeColor = MaterialTheme.colorScheme.primary,
@@ -591,6 +594,7 @@ private fun RiffHueSlider(
         ) {
             Text(
                 text = str("color_hue_label"),
+                modifier = Modifier.settingHighlight("color_hue_label"),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -706,7 +710,7 @@ private fun RiffHueSlider(
  */
 @Composable
 private fun RiffTrackSlider(
-    label: String,
+    labelKey: String,
     value: Float, // 0f..1f
     valueText: String,
     activeColor: Color,
@@ -742,7 +746,8 @@ private fun RiffTrackSlider(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = label,
+                text = str(labelKey),
+                modifier = Modifier.settingHighlight(labelKey),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -895,6 +900,7 @@ internal fun ColorEngineCard(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = str("pref_color_style_title"),
+                    modifier = Modifier.settingHighlight("pref_color_style_title"),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -932,6 +938,7 @@ internal fun ColorEngineCard(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = str("pref_color_spec_title"),
+                    modifier = Modifier.settingHighlight("pref_color_spec_title"),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface

@@ -21,6 +21,7 @@ import com.alananasss.kittytune.data.isUserLocalMedia
 import com.alananasss.kittytune.data.WaveformRepository
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.data.BackupManager
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.data.cache.AudioCache
@@ -100,6 +101,7 @@ fun StorageCachePage() {
                 SettingsItem(
                     shape = shape,
                     title = str("storage_cache_audio"),
+                    highlightKey = "storage_cache_audio",
                     subtitle = str("storage_cache_audio_sub"),
                     icon = Icons.Rounded.OfflineBolt,
                     hasSwitch = true,
@@ -114,13 +116,14 @@ fun StorageCachePage() {
                 SettingsItem(
                     shape = shape,
                     title = str("storage_cache_limit"),
+                    highlightKey = "storage_cache_limit",
                     subtitle = str("storage_cache_used", formatBytes(audioCacheBytes), formatBytes(cacheLimitMb.toLong() * 1024 * 1024)),
                     icon = Icons.Rounded.DataUsage,
                     onClick = { showLimitDialog = true },
                 )
             }
             add { shape ->
-                CleanableRow(shape, str("storage_cache_audio_size"), formatBytes(audioCacheBytes + analysisCacheBytes), Icons.Rounded.GraphicEq) {
+                CleanableRow(shape, "storage_cache_audio_size", formatBytes(audioCacheBytes + analysisCacheBytes), Icons.Rounded.GraphicEq) {
                     scope.launch {
                         withContext(Dispatchers.IO) {
                             AudioCache.clear()
@@ -131,7 +134,7 @@ fun StorageCachePage() {
                 }
             }
             add { shape ->
-                CleanableRow(shape, str("storage_cache_images"), formatBytes(imageCacheBytes), Icons.Rounded.Image) {
+                CleanableRow(shape, "storage_cache_images", formatBytes(imageCacheBytes), Icons.Rounded.Image) {
                     scope.launch {
                         withContext(Dispatchers.IO) {
                             AppDirs.imageCacheDir.listFiles()?.forEach { it.deleteRecursively() }
@@ -197,6 +200,7 @@ fun StorageDownloadsPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("storage_downloaded_music"),
+                    highlightKey = "storage_downloaded_music",
                     subtitle = str("storage_downloaded_summary", downloaded.size, formatBytes(downloadsBytes)),
                     icon = Icons.Rounded.DownloadDone,
                     onClick = { showDownloadsDialog = true },
@@ -206,6 +210,7 @@ fun StorageDownloadsPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_storage_location"),
+                    highlightKey = "pref_storage_location",
                     subtitle = downloadLocation,
                     icon = Icons.Rounded.FolderOpen,
                     onClick = {
@@ -220,6 +225,7 @@ fun StorageDownloadsPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("pref_storage_downloads_clear"),
+                    highlightKey = "pref_storage_downloads_clear",
                     icon = Icons.Rounded.DeleteSweep,
                     titleColor = MaterialTheme.colorScheme.error,
                     onClick = if (downloaded.isNotEmpty()) ({ confirmDeleteAll = true }) else null,
@@ -244,6 +250,7 @@ fun StorageBackupPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("storage_backup_create"),
+                    highlightKey = "storage_backup_create",
                     subtitle = str("storage_backup_create_sub"),
                     icon = Icons.Rounded.Backup,
                     onClick = {
@@ -259,6 +266,7 @@ fun StorageBackupPage() {
                 SettingsItem(
                     shape = shape,
                     title = str("storage_backup_restore"),
+                    highlightKey = "storage_backup_restore",
                     subtitle = str("storage_backup_restore_sub"),
                     icon = Icons.Rounded.Restore,
                     onClick = {
@@ -278,15 +286,15 @@ fun StorageBackupPage() {
 }
 
 @Composable
-private fun CleanableRow(shape: androidx.compose.ui.graphics.Shape, title: String, size: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClear: () -> Unit) {
-    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+private fun CleanableRow(shape: androidx.compose.ui.graphics.Shape, titleKey: String, size: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClear: () -> Unit) {
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().settingHighlight(titleKey, shape)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 76.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(42.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer) }
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                Text(str(titleKey), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                 Text(size, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onClear) { Text(str("storage_clear")) }

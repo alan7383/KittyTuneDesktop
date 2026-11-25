@@ -937,25 +937,33 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
-                        composable("provider_order") {
-                            com.alananasss.kittytune.ui.profile.integrations.ProviderOrderScreen(
-                                onBackClick = { navController.popBackStack() }
-                            )
+                        composable("provider_order") { entry ->
+                            com.alananasss.kittytune.ui.profile.SettingsSearchDestination(entry) {
+                                com.alananasss.kittytune.ui.profile.integrations.ProviderOrderScreen(
+                                    onBackClick = { navController.popBackStack() }
+                                )
+                            }
                         }
-                        composable("qobuz_settings") {
-                            com.alananasss.kittytune.ui.profile.integrations.QobuzSettingsScreen(
-                                onBackClick = { navController.popBackStack() }
-                            )
+                        composable("qobuz_settings") { entry ->
+                            com.alananasss.kittytune.ui.profile.SettingsSearchDestination(entry) {
+                                com.alananasss.kittytune.ui.profile.integrations.QobuzSettingsScreen(
+                                    onBackClick = { navController.popBackStack() }
+                                )
+                            }
                         }
-                        composable("tidal_settings") {
-                            com.alananasss.kittytune.ui.profile.integrations.TidalSettingsScreen(
-                                onBackClick = { navController.popBackStack() }
-                            )
+                        composable("tidal_settings") { entry ->
+                            com.alananasss.kittytune.ui.profile.SettingsSearchDestination(entry) {
+                                com.alananasss.kittytune.ui.profile.integrations.TidalSettingsScreen(
+                                    onBackClick = { navController.popBackStack() }
+                                )
+                            }
                         }
-                        composable("deezer_settings") {
-                            com.alananasss.kittytune.ui.profile.integrations.DeezerSettingsScreen(
-                                onBackClick = { navController.popBackStack() }
-                            )
+                        composable("deezer_settings") { entry ->
+                            com.alananasss.kittytune.ui.profile.SettingsSearchDestination(entry) {
+                                com.alananasss.kittytune.ui.profile.integrations.DeezerSettingsScreen(
+                                    onBackClick = { navController.popBackStack() }
+                                )
+                            }
                         }
                         composable("equalizer") {
                             com.alananasss.kittytune.ui.player.EqualizerScreen(

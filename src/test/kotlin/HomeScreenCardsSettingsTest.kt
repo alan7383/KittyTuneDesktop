@@ -1,4 +1,6 @@
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.ui.profile.SettingsSubPage
+import com.alananasss.kittytune.ui.profile.buildSettingsSearchCatalog
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
@@ -127,24 +129,10 @@ class HomeScreenCardsSettingsTest {
 
     @Test
     fun `settings search catalog includes home screen cards items`() {
-        val settingsSource = File("src/main/kotlin/com/alananasss/kittytune/ui/profile/SettingsScreen.kt").readText()
-
-        assertTrue(
-            settingsSource.contains("highlightKey = \"pref_home_listening_stats\""),
-            "getSearchableSettings must include pref_home_listening_stats",
-        )
-        assertTrue(
-            settingsSource.contains("highlightKey = \"pref_home_your_mix\""),
-            "getSearchableSettings must include pref_home_your_mix",
-        )
-        assertTrue(
-            settingsSource.contains("highlightKey = \"pref_home_my_wave\""),
-            "getSearchableSettings must include pref_home_my_wave",
-        )
-        assertTrue(
-            settingsSource.contains("highlightKey = \"pref_home_charts\""),
-            "getSearchableSettings must include pref_home_charts",
-        )
+        val themeTargets = buildSettingsSearchCatalog("Windows").filter { it.place == SettingsSubPage.THEMES.place }
+            .map { it.highlightKey }.toSet()
+        assertTrue(themeTargets.containsAll(listOf("pref_home_listening_stats", "pref_home_your_mix",
+            "pref_home_my_wave", "pref_home_charts")))
     }
 
     @Test

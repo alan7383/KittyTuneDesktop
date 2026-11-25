@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.profile
 
 import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.ui.common.settingHighlight
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -237,6 +238,7 @@ fun SyncDevicesPage() {
         Button(
             onClick = { pairing = true },
             shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.settingHighlight("sync_pair_device", CircleShape),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         ) {
             Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
@@ -254,7 +256,7 @@ fun SyncDevicesPage() {
         }
 
         if (devices.isNotEmpty()) {
-            SettingsGroupTitle(str("sync_devices"))
+            SettingsGroupTitle(str("sync_devices"), Modifier.settingHighlight("sync_devices"))
             devices.forEachIndexed { index, device ->
                 DeviceRow(
                     device = device,
@@ -290,6 +292,7 @@ fun SyncOptionsPage() {
             SettingsItem(
                 shape = getSettingsShape(3, 0),
                 title = str("sync_listens_title"),
+                highlightKey = "sync_listens_title",
                 subtitle = str("sync_listens_sub"),
                 icon = Icons.Rounded.BarChart,
                 hasSwitch = true,
@@ -307,6 +310,7 @@ fun SyncOptionsPage() {
             SettingsItem(
                 shape = getSettingsShape(3, 1),
                 title = str("sync_likes_title"),
+                highlightKey = "sync_likes_title",
                 subtitle = str("sync_likes_sub"),
                 icon = Icons.Rounded.Favorite,
                 hasSwitch = true,
@@ -326,6 +330,7 @@ fun SyncOptionsPage() {
             SettingsItem(
                 shape = getSettingsShape(3, 2),
                 title = str("sync_playback_title"),
+                highlightKey = "sync_playback_title",
                 subtitle = str("sync_playback_sub"),
                 icon = Icons.Rounded.SyncAlt,
                 hasSwitch = true,
@@ -342,6 +347,7 @@ fun SyncOptionsPage() {
         SettingsItem(
             shape = getSettingsShape(1, 0),
             title = str("connect_internet_title"),
+            highlightKey = "connect_internet_title",
             subtitle = str("connect_internet_sub"),
             icon = Icons.Rounded.Public,
             hasSwitch = true,
@@ -456,6 +462,7 @@ private fun StatusCard(
                         onClick = onSyncNow,
                         enabled = !isSyncing && canDial,
                         shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.settingHighlight("sync_now", CircleShape),
                     ) {
                         Text(str("sync_now"))
                     }
@@ -753,7 +760,7 @@ private fun AdvancedSection(
                 deviceName = it
                 SyncLog.deviceName = it
             },
-            label = { Text(str("sync_device_name")) },
+            label = { Text(str("sync_device_name"), Modifier.settingHighlight("sync_device_name")) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().trackTextInput(),
         )
@@ -766,6 +773,7 @@ private fun AdvancedSection(
             SettingsItem(
                 shape = getSettingsShape(3, 0),
                 title = str("sync_listener"),
+                highlightKey = "sync_listener",
                 subtitle = str("sync_listener_sub"),
                 hasSwitch = true,
                 switchState = listenerOn,
@@ -777,11 +785,13 @@ private fun AdvancedSection(
             SettingsItem(
                 shape = getSettingsShape(3, 1),
                 title = str("sync_address"),
+                highlightKey = "sync_address",
                 subtitle = "${SyncService.localAddress()}:${SyncService.port}",
             )
             SettingsItem(
                 shape = getSettingsShape(3, 2),
                 title = str("sync_events_held_title"),
+                highlightKey = "sync_events_held_title",
                 subtitle = str("sync_events_held", SyncLog.size()),
             )
         }
@@ -797,13 +807,13 @@ private fun AdvancedSection(
                 clipboard.setText(AnnotatedString(code))
                 onStatus(str("sync_code_copied"))
             }) {
-                Text(str("sync_copy_code"))
+                Text(str("sync_copy_code"), Modifier.settingHighlight("sync_copy_code"))
             }
             TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 clipboard.setText(AnnotatedString(NetLog.dump()))
                 onStatus(str("sync_diagnostics_copied"))
             }) {
-                Text(str("sync_copy_diagnostics"))
+                Text(str("sync_copy_diagnostics"), Modifier.settingHighlight("sync_copy_diagnostics"))
             }
             TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 SyncService.regeneratePairingSecret()
@@ -813,7 +823,7 @@ private fun AdvancedSection(
                 generation++
                 onStatus(str("sync_code_regenerated"))
             }) {
-                Text(str("sync_regenerate_code"))
+                Text(str("sync_regenerate_code"), Modifier.settingHighlight("sync_regenerate_code"))
             }
         }
     }
@@ -873,7 +883,7 @@ private fun FirewallCard(onStatus: (String) -> Unit, compact: Boolean = false) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(str("sync_firewall_allow"))
+                Text(str("sync_firewall_allow"), Modifier.settingHighlight("sync_firewall_allow"))
             }
         }
     }

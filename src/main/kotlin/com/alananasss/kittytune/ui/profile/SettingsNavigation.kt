@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 internal data class SettingsPlace(val category: SettingsCategory, val pages: List<SettingsSubPage> = emptyList()) {
     val subPage: SettingsSubPage? get() = pages.lastOrNull()
     val depth: Int get() = pages.size
+    val titleKeys: List<String> get() = (listOf(category.titleKey) + pages.map { it.titleKey }).distinct()
     fun parent(): SettingsPlace = copy(pages = pages.dropLast(1))
 }
 
