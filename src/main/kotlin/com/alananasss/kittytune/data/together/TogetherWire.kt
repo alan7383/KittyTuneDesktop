@@ -206,6 +206,7 @@ sealed interface TogetherMessage {
         override val from: String,
         override val sentAt: Long,
         val reactionId: String?,
+        val byName: String? = null,
     ) : TogetherMessage
 
     /** Taking over as host. The earliest claim wins, ties by member id. */

@@ -446,6 +446,8 @@ fun PlayerBar(
                         modifier = Modifier
                             .height(42.dp)
                             .weight(playPauseWeight)
+                            // The pet walks up to this button and waits by it when the music stops.
+                            .onGloballyPositioned { com.alananasss.kittytune.ui.pet.PetBarAnchor.reportPlayButton(it) }
                             .clip(RoundedCornerShape(50))
                             .background(if (isPlayPauseHovered) playHoverColor else MaterialTheme.colorScheme.primary)
                             .hoverable(playPauseInteractionSource)

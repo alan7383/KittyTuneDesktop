@@ -342,6 +342,7 @@ cd KittyTuneDesktop
 
 * Based on KittyTune for Android.
 * Built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform), [MaterialKolor](https://github.com/jordond/MaterialKolor), and [FFmpeg](https://ffmpeg.org/).
+* Together reactions use artwork by Twitter, Inc. and other Twemoji contributors. [Twemoji](https://github.com/jdecked/twemoji/tree/v17.0.3) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 KittyTune Desktop is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
 

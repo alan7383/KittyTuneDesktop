@@ -46,6 +46,10 @@ class TogetherReactionsTest {
         val payload = TogetherWire.seal(room, message)
         assertEquals(message, TogetherWire.open(room, payload))
         assertNull(TogetherWire.open(otherRoom, payload))
+
+        val named = message.copy(byName = "Maya")
+        assertEquals("Maya", named.toJson().get("byName").asString)
+        assertEquals(named, TogetherWire.open(room, TogetherWire.seal(room, named)))
     }
 
     @Test
@@ -61,6 +65,7 @@ class TogetherReactionsTest {
             Together.handle(room, message)
             Together.handle(room, TogetherMessage.ClaimHost("host", now))
             Together.startListening(room)
+            Together.handle(room, TogetherMessage.Hello("friend", now, "Maya", isListening = true))
             Together.handle(otherRoom, message)
             Together.handle(room, message, isSnapshot = true)
             Together.handle(room, message.copy(from = Together.memberId))
@@ -68,16 +73,18 @@ class TogetherReactionsTest {
             Together.handle(room, message.copy(reactionId = null))
             Together.handle(room, message)
             Together.handle(room, message)
-            Together.handle(room, message.copy(reactionId = "fire"))
+            Together.handle(room, message.copy(from = "new-listener", reactionId = "fire", byName = " Ana\nRose "))
+            Together.handle(room, message.copy(from = "legacy-listener"))
             Together.stopListening()
             Together.handle(room, message)
 
             yield()
             assertEquals(
                 listOf(
-                    TogetherReactionEvent(room, TogetherReaction.DROOLING),
-                    TogetherReactionEvent(room, TogetherReaction.DROOLING),
-                    TogetherReactionEvent(room, TogetherReaction.FIRE),
+                    TogetherReactionEvent(room, TogetherReaction.DROOLING, "Maya"),
+                    TogetherReactionEvent(room, TogetherReaction.DROOLING, "Maya"),
+                    TogetherReactionEvent(room, TogetherReaction.FIRE, "Ana Rose"),
+                    TogetherReactionEvent(room, TogetherReaction.DROOLING, null),
                 ),
                 received,
             )

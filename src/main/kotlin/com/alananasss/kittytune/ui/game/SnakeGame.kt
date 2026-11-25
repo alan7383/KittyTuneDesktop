@@ -54,11 +54,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.MusicOff
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -78,6 +81,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -130,7 +134,8 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-internal enum class SnakeGameMode { PLAYLIST, WAVE }
+/** PLAYLIST and WAVE serve covers; CLASSIC serves plain treats and needs no songs at all. */
+internal enum class SnakeGameMode { PLAYLIST, WAVE, CLASSIC }
 
 internal data class SnakeGameRequest(
     val title: String,
@@ -147,11 +152,12 @@ internal object SnakeGameLauncher {
     var pending by mutableStateOf<SnakeGameRequest?>(null)
         private set
 
-    internal var keyHandler: ((KeyEvent) -> Boolean)? = null
+    /** The same slot as every arcade game's: only one game is on screen at a time. */
+    internal var keyHandler: ((KeyEvent) -> Boolean)?
+        get() = GameInput.keyHandler
+        set(value) { GameInput.keyHandler = value }
 
-    fun handleKeyEvent(event: KeyEvent): Boolean {
-        return keyHandler?.invoke(event) ?: false
-    }
+    fun handleKeyEvent(event: KeyEvent): Boolean = GameInput.handle(event)
 
     fun launch(request: SnakeGameRequest) {
         if (request.mode == SnakeGameMode.PLAYLIST && request.tracks.isEmpty()) return
@@ -165,6 +171,19 @@ internal object SnakeGameLauncher {
 
     fun bestScore(): Int = prefs.getInt(KEY_BEST, 0)
 
+    /**
+     * Whether a swallowed cover plays its song. Off by default: the snake is a game first, and starting it must not
+     * replace what is playing. Tests flip the state directly; [changePlayMusic] also remembers the choice.
+     */
+    var playMusic by mutableStateOf(runCatching { prefs.getBoolean(KEY_MUSIC, false) }.getOrDefault(false))
+
+    fun changePlayMusic(on: Boolean) {
+        playMusic = on
+        prefs.putBoolean(KEY_MUSIC, on)
+    }
+
+    private const val KEY_MUSIC = "play_music"
+
     fun saveBestScore(score: Int) = prefs.putInt(KEY_BEST, score)
 }
 
@@ -176,7 +195,8 @@ internal enum class SnakeDirection { UP, DOWN, LEFT, RIGHT }
 
 internal data class SnakeCell(val x: Int, val y: Int)
 
-internal data class SnakeFood(val track: Track, val cell: SnakeCell)
+/** Something to eat: a cover (its song plays when music is on) or, with no track, a plain treat. */
+internal data class SnakeFood(val track: Track?, val cell: SnakeCell)
 
 /**
  * The snake itself. Pure state, no UI: the screen ticks it and reads the state back.
@@ -185,6 +205,8 @@ internal class SnakeEngine(
     val cols: Int,
     val rows: Int,
     tracks: List<Track>,
+    /** The wave never runs dry: more songs are appended while it plays, so an empty board is not a win. */
+    private val endless: Boolean = false,
 ) {
     var phase by mutableStateOf(SnakePhase.IDLE)
     var snake by mutableStateOf(listOf<SnakeCell>())
@@ -193,12 +215,25 @@ internal class SnakeEngine(
     var score by mutableStateOf(0)
     var speedMs by mutableStateOf(START_SPEED_MS)
     var lastEaten by mutableStateOf<Track?>(null)
+    /** The snake one step ago, so the screen can glide between steps instead of jumping cell to cell. */
+    var previous: List<SnakeCell> = emptyList()
+        private set
 
     private val turns = ArrayDeque<SnakeDirection>()
     // The menu is eaten in list order: the track that is already playing is not on the board,
     // so the first bite is the NEXT track of the list, then the one after it, and so on.
-    private val pool = tracks
+    private val pool = tracks.toMutableList()
     private var poolIndex = 0
+
+    /** Tracks still waiting to be put on the board. */
+    val remaining: Int get() = pool.size - poolIndex
+
+    /** More songs for an endless menu; an empty board gets its next cover at once. */
+    fun append(tracks: List<Track>) {
+        val known = pool.map { it.id }.toHashSet()
+        pool += tracks.filter { it.id !in known }
+        if (foods.size < FOODS_ON_BOARD) spawnFood()?.let { foods = foods + it }
+    }
 
     init {
         placeSnake()
@@ -215,11 +250,12 @@ internal class SnakeEngine(
             SnakeCell(startX, startY),
             SnakeCell(startX - 1, startY),
         )
+        previous = snake
     }
 
     private fun spawnInitialFoods() {
         foods = emptyList()
-        repeat(min(FOODS_ON_BOARD, pool.size)) { spawnFood()?.let { foods = foods + it } }
+        repeat(if (pool.isEmpty() && endless) FOODS_ON_BOARD else min(FOODS_ON_BOARD, pool.size)) { spawnFood()?.let { foods = foods + it } }
     }
 
     /** A fresh run on the same menu: the board is restocked in list order, the snake goes home. */
@@ -256,17 +292,14 @@ internal class SnakeEngine(
         if (turns.isNotEmpty()) direction = turns.removeFirst()
 
         val head = snake.first()
+        // The edges wrap round: leaving on one side comes back on the other, only biting yourself ends the run.
         val newHead = when (direction) {
-            SnakeDirection.UP -> SnakeCell(head.x, head.y - 1)
-            SnakeDirection.DOWN -> SnakeCell(head.x, head.y + 1)
-            SnakeDirection.LEFT -> SnakeCell(head.x - 1, head.y)
-            SnakeDirection.RIGHT -> SnakeCell(head.x + 1, head.y)
+            SnakeDirection.UP -> SnakeCell(head.x, (head.y - 1 + rows) % rows)
+            SnakeDirection.DOWN -> SnakeCell(head.x, (head.y + 1) % rows)
+            SnakeDirection.LEFT -> SnakeCell((head.x - 1 + cols) % cols, head.y)
+            SnakeDirection.RIGHT -> SnakeCell((head.x + 1) % cols, head.y)
         }
-
-        if (newHead.x !in 0 until cols || newHead.y !in 0 until rows) {
-            phase = SnakePhase.OVER
-            return
-        }
+        previous = snake
 
         val food = foods.firstOrNull { it.cell == newHead }
         if (food == null) {
@@ -287,12 +320,14 @@ internal class SnakeEngine(
             speedMs = (speedMs - SPEED_STEP_MS).coerceAtLeast(MIN_SPEED_MS)
             lastEaten = food.track
             spawnFood()?.let { foods = foods + it }
-            if (foods.isEmpty()) phase = SnakePhase.WIN
+            if (foods.isEmpty() && !endless) phase = SnakePhase.WIN
         }
     }
 
     private fun spawnFood(): SnakeFood? {
-        if (poolIndex >= pool.size) return null
+        // No songs at all (the classic game): an endless supply of treats.
+        val treat = pool.isEmpty() && endless
+        if (!treat && poolIndex >= pool.size) return null
         val occupied = snake.toHashSet() + foods.map { it.cell }
         val free = mutableListOf<SnakeCell>()
         for (x in 0 until cols) for (y in 0 until rows) {
@@ -300,7 +335,7 @@ internal class SnakeEngine(
             if (cell !in occupied) free.add(cell)
         }
         if (free.isEmpty()) return null
-        val track = pool[poolIndex++]
+        val track = if (treat) null else pool[poolIndex++]
         return SnakeFood(track, free.random())
     }
 
@@ -313,10 +348,10 @@ internal class SnakeEngine(
 
     private companion object {
         const val FOODS_ON_BOARD = 1
-        /** Very slow at first, ramps up with every swallowed track. */
-        const val START_SPEED_MS = 460f
-        const val SPEED_STEP_MS = 8f
-        const val MIN_SPEED_MS = 110f
+        /** A brisk start that ramps up with every swallowed track. */
+        const val START_SPEED_MS = 160f
+        const val SPEED_STEP_MS = 4f
+        const val MIN_SPEED_MS = 75f
     }
 }
 
@@ -374,6 +409,7 @@ internal fun SnakeGameScreen(
 ) {
     val scheme = MaterialTheme.colorScheme
     val isWave = request.mode == SnakeGameMode.WAVE
+    val isClassic = request.mode == SnakeGameMode.CLASSIC
 
     // The wave gathers its own menu: fresh finds, one batch per run.
     var waveReloadKey by remember { mutableStateOf(0) }
@@ -393,6 +429,7 @@ internal fun SnakeGameScreen(
     val menu = when (request.mode) {
         SnakeGameMode.PLAYLIST -> request.tracks
         SnakeGameMode.WAVE -> waveTracks
+        SnakeGameMode.CLASSIC -> emptyList()
     }
     val sourceTracks = remember(menu) {
         menu?.let { BlockManager.filterBlocked(it).distinctBy(Track::playbackKey) }
@@ -411,12 +448,12 @@ internal fun SnakeGameScreen(
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        str(if (isWave) "game_wave_title" else "game_eat_playlist"),
+                        str(if (isClassic) "arcade_snake" else if (isWave) "game_wave_title" else "game_eat_playlist"),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        request.title,
+                        if (isClassic) str("snake_classic_sub") else request.title,
                         style = MaterialTheme.typography.bodyMedium,
                         color = scheme.onSurfaceVariant,
                         maxLines = 1,
@@ -424,6 +461,40 @@ internal fun SnakeGameScreen(
                     )
                 }
                 Spacer(Modifier.width(12.dp))
+                // Songs or no songs: off by default, so a game never starts a mix on its own.
+                val musicOn = SnakeGameLauncher.playMusic
+                Tip(str(if (musicOn) "snake_music_on" else "snake_music_off")) {
+                    FilledTonalIconToggleButton(
+                        checked = musicOn,
+                        onCheckedChange = { on ->
+                            SnakeGameLauncher.changePlayMusic(on)
+                            // The classic board has no songs to play: switching music on serves the wave instead.
+                            if (on && isClassic) {
+                                val title = str("wave_title")
+                                SnakeGameLauncher.launch(
+                                    SnakeGameRequest(title, SnakeGameMode.WAVE, playbackContext = PlaybackContext(title, PlayerViewModel.MY_WAVE_NAV_ID))
+                                )
+                            }
+                        },
+                        shapes = IconButtonDefaults.toggleableShapes(),
+                    ) {
+                        Icon(if (musicOn) Icons.Rounded.MusicNote else Icons.Rounded.MusicOff, contentDescription = str("snake_play_music"))
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                // The other games of the arcade, one click away.
+                Tip(str("arcade_title")) {
+                    FilledTonalIconButton(
+                        onClick = {
+                            SnakeGameLauncher.dismiss()
+                            ArcadeLauncher.open()
+                        },
+                        shapes = IconButtonDefaults.shapes(),
+                    ) {
+                        Icon(Icons.Rounded.Apps, contentDescription = str("arcade_title"))
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
                 Tip(str("btn_close")) {
                     FilledTonalIconButton(onClick = onClose, shapes = IconButtonDefaults.shapes()) {
                         Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
@@ -434,9 +505,10 @@ internal fun SnakeGameScreen(
 
             when {
                 isWave && waveTracks == null -> GameMessage(str("game_loading"), loading = true)
-                sourceTracks.isNullOrEmpty() -> GameMessage(str("game_empty"))
+                !isClassic && sourceTracks.isNullOrEmpty() -> GameMessage(str("game_empty"))
                 else -> SnakeGameBoardArea(
-                    sourceTracks = sourceTracks,
+                    sourceTracks = sourceTracks.orEmpty(),
+                    isClassic = isClassic,
                     onPlayTrack = onPlayTrack,
                     onOpenPlayer = onOpenPlayer,
                     isWave = isWave,
@@ -478,6 +550,7 @@ internal fun steeringFor(event: KeyEvent): SnakeDirection? {
 @Composable
 private fun SnakeGameBoardArea(
     sourceTracks: List<Track>,
+    isClassic: Boolean,
     onPlayTrack: (List<Track>, Int, Long, Boolean) -> Unit,
     onOpenPlayer: () -> Unit,
     isWave: Boolean,
@@ -490,17 +563,42 @@ private fun SnakeGameBoardArea(
     val pet = remember { PetConfig.load() }
 
     val engine = remember(sourceTracks) {
-        SnakeEngine(COLS, ROWS, sourceTracks.drop(1).ifEmpty { sourceTracks })
+        SnakeEngine(COLS, ROWS, sourceTracks.drop(1).ifEmpty { sourceTracks }, endless = isWave || isClassic)
     }
+    // Every song the board can serve: the first batch, then what the wave adds while the snake eats.
+    var menu by remember(engine) { mutableStateOf(sourceTracks) }
+    if (isWave) {
+        LaunchedEffect(engine, engine.remaining < 2) {
+            if (engine.remaining >= 2) return@LaunchedEffect
+            val more = try {
+                MyWave.nextBatch(WaveMode.DISCOVER, exclude = menu.map { it.id }.toSet())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val fresh = BlockManager.filterBlocked(more).distinctBy(Track::playbackKey).filter { t -> menu.none { it.playbackKey() == t.playbackKey() } }
+            if (fresh.isNotEmpty()) {
+                menu = menu + fresh
+                engine.append(fresh)
+            }
+        }
+    }
+    TrackGamePlaytime(GameId.SNAKE, active = engine.phase == SnakePhase.RUNNING, needsInput = false)
 
-    // Start and steering share the same entry point. Pausing the game keeps the selected song.
-    val requestedTrack = if (engine.phase == SnakePhase.IDLE) null else engine.lastEaten ?: sourceTracks.first()
+    // Start and steering share the same entry point. Pausing the game keeps the selected song. With music off (the
+    // default) nothing is ever played: the covers are just food.
+    val musicOn = SnakeGameLauncher.playMusic && !isClassic
+    val requestedTrack = if (!musicOn || engine.phase == SnakePhase.IDLE) null else engine.lastEaten ?: sourceTracks.firstOrNull()
     var playingTrack by remember(engine) { mutableStateOf<Track?>(null) }
     LaunchedEffect(engine, requestedTrack) {
         val track = requestedTrack ?: return@LaunchedEffect
         val startMs = TrackHighlights.startMs(track)
         ensureActive()
-        onPlayTrack(sourceTracks, sourceTracks.indexOf(track), startMs, playingTrack != null)
+        val queue = menu
+        val index = queue.indexOf(track)
+        if (index < 0) return@LaunchedEffect
+        onPlayTrack(queue, index, startMs, playingTrack != null)
         playingTrack = track
     }
     val bannerTrack = playingTrack.takeIf { requestedTrack != null }
@@ -560,11 +658,21 @@ private fun SnakeGameBoardArea(
         }
     }
 
-    // The ticker: slower at first, frantic once the menu is half eaten.
-    LaunchedEffect(engine, engine.phase, engine.speedMs) {
-        while (engine.phase == SnakePhase.RUNNING) {
-            delay(engine.speedMs.toLong())
-            engine.step()
+    // The ticker runs on frames, not on a restarted delay: steps land on time whatever else the app is doing, and
+    // the snake glides between cells. Brisk at first, frantic once the menu is half eaten.
+    val stepProgress = remember(engine) { mutableFloatStateOf(1f) }
+    LaunchedEffect(engine, engine.phase) {
+        if (engine.phase != SnakePhase.RUNNING) return@LaunchedEffect
+        var elapsed = 0f
+        runGameFrames { dt ->
+            elapsed += dt * 1000f
+            val period = engine.speedMs
+            if (elapsed >= period) {
+                elapsed = (elapsed - period).coerceAtMost(period * 0.5f)
+                engine.step()
+            }
+            stepProgress.floatValue = (elapsed / engine.speedMs).coerceIn(0f, 1f)
+            engine.phase == SnakePhase.RUNNING
         }
     }
 
@@ -590,8 +698,10 @@ private fun SnakeGameBoardArea(
         val board: @Composable (Modifier) -> Unit = { modifier ->
             SnakeBoard(
                 engine = engine,
+                progress = { stepProgress.floatValue },
                 pet = pet,
                 isWave = isWave,
+                isClassic = isClassic,
                 best = best,
                 onRequestFocus = { runCatching { focusRequester.requestFocus() } },
                 onStart = {
@@ -643,8 +753,10 @@ private fun SnakeGameBoardArea(
 @Composable
 private fun SnakeBoard(
     engine: SnakeEngine,
+    progress: () -> Float,
     pet: com.alananasss.kittytune.ui.pet.PetSettings,
     isWave: Boolean,
+    isClassic: Boolean,
     best: Int,
     onRequestFocus: () -> Unit = {},
     onStart: () -> Unit,
@@ -657,6 +769,8 @@ private fun SnakeBoard(
     var dragAccum by remember { mutableStateOf(Offset.Zero) }
     val gridColor = scheme.outlineVariant.copy(alpha = 0.45f)
     val glowColor = scheme.tertiary
+    val treatColor = scheme.tertiary
+    val treatShade = scheme.onTertiary
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val cell = min(constraints.maxWidth.toFloat() / COLS, constraints.maxHeight.toFloat() / ROWS)
@@ -696,8 +810,9 @@ private fun SnakeBoard(
             Canvas(Modifier.fillMaxSize()) {
                 drawGrid(cell, gridColor)
                 drawFoodsGlow(engine.foods, cell, glowColor)
+                drawTreats(engine.foods, cell, treatColor, treatShade)
                 drawSnake(
-                    engine.snake, cell,
+                    engine.snake, engine.previous, if (engine.phase == SnakePhase.RUNNING) progress() else 1f, cell,
                     fur = Color(pet.palette.fur),
                     shade = Color(pet.palette.shade),
                     mark = Color(pet.palette.mark),
@@ -706,13 +821,14 @@ private fun SnakeBoard(
             }
 
             engine.foods.forEach { food ->
-                val appeared = remember(food.track.id, food.cell) { Animatable(0.4f) }
-                LaunchedEffect(food.track.id, food.cell) {
+                val track = food.track ?: return@forEach // treats are drawn on the canvas
+                val appeared = remember(track.id, food.cell) { Animatable(0.4f) }
+                LaunchedEffect(track.id, food.cell) {
                     appeared.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 500f))
                 }
                 AsyncImage(
-                    model = trackImageModel(food.track),
-                    contentDescription = food.track.title,
+                    model = trackImageModel(track),
+                    contentDescription = track.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .offset { IntOffset((food.cell.x * cell).roundToInt(), (food.cell.y * cell).roundToInt()) }
@@ -743,7 +859,7 @@ private fun SnakeBoard(
                     when (engine.phase) {
                         SnakePhase.IDLE -> GameOverlayCard(
                             title = str(if (isWave) "game_wave_idle" else "game_idle"),
-                            body = str("game_eat_hint"),
+                            body = str(if (isClassic || !SnakeGameLauncher.playMusic) "snake_treat_hint" else "game_eat_hint"),
                             primary = { BigPlayButton(onStart) },
                         )
                         SnakePhase.PAUSED -> GameOverlayCard(
@@ -1056,6 +1172,18 @@ private fun DrawScope.drawGrid(cell: Float, color: Color) {
     }
 }
 
+/** A plain treat: a little fish, nose toward the right. */
+private fun DrawScope.drawTreats(foods: List<SnakeFood>, cell: Float, color: Color, eye: Color) {
+    foods.forEach { food ->
+        if (food.track != null) return@forEach
+        val cx = food.cell.x * cell + cell / 2f
+        val cy = food.cell.y * cell + cell / 2f
+        drawOval(color, Offset(cx - cell * 0.3f, cy - cell * 0.2f), Size(cell * 0.5f, cell * 0.4f))
+        drawTriangle(Offset(cx - cell * 0.2f, cy), Offset(cx - cell * 0.42f, cy - cell * 0.18f), Offset(cx - cell * 0.42f, cy + cell * 0.18f), color)
+        drawCircle(eye, cell * 0.045f, Offset(cx + cell * 0.08f, cy - cell * 0.04f))
+    }
+}
+
 private fun DrawScope.drawFoodsGlow(foods: List<SnakeFood>, cell: Float, color: Color) {
     foods.forEach { food ->
         drawCircle(
@@ -1071,6 +1199,8 @@ private fun DrawScope.drawFoodsGlow(foods: List<SnakeFood>, cell: Float, color: 
 
 private fun DrawScope.drawSnake(
     snake: List<SnakeCell>,
+    previous: List<SnakeCell>,
+    progress: Float,
     cell: Float,
     fur: Color,
     shade: Color,
@@ -1078,27 +1208,33 @@ private fun DrawScope.drawSnake(
     eyeColor: Color,
 ) {
     val ink = Color(0xFF101015)
-    val inset = cell * 0.06f
-    val size = cell - inset * 2
-    val radius = CornerRadius(cell * 0.22f, cell * 0.22f)
-    snake.forEachIndexed { index, segment ->
-        val color = if (index == 0) {
-            fur
-        } else {
-            fur.copy(alpha = (0.92f - index * 0.02f).coerceAtLeast(0.45f))
-        }
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(segment.x * cell + inset, segment.y * cell + inset),
-            size = Size(size, size),
-            cornerRadius = radius,
-        )
+    // Each segment glides from where it was a step ago; one that wrapped round the edge just appears.
+    val points = snake.mapIndexed { i, seg ->
+        val from = previous.getOrNull(i) ?: previous.lastOrNull() ?: seg
+        val far = abs(from.x - seg.x) + abs(from.y - seg.y) > 1
+        val t = if (far) 1f else progress
+        Offset((from.x + (seg.x - from.x) * t + 0.5f) * cell, (from.y + (seg.y - from.y) * t + 0.5f) * cell)
     }
+    val bodyWidth = cell * 0.78f
+    for (i in points.indices.reversed()) {
+        val color = if (i == 0) fur else fur.copy(alpha = (0.95f - i * 0.015f).coerceAtLeast(0.55f))
+        val width = bodyWidth * (1f - (i.toFloat() / (points.size + 6)) * 0.35f)
+        if (i + 1 < points.size) {
+            val a = points[i]
+            val b = points[i + 1]
+            if ((a - b).getDistance() < cell * 1.5f) {
+                drawLine(color, a, b, strokeWidth = width, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            }
+        }
+        drawCircle(color, width / 2f, points[i])
+    }
+    // A darker stripe now and then: the coat's markings along the back.
+    points.forEachIndexed { i, p -> if (i > 0 && i % 3 == 0) drawCircle(shade.copy(alpha = 0.55f), bodyWidth * 0.16f, p) }
 
     // The head is the pet cat's face: its fur, its eye colour, its markings for the nose.
-    val head = snake.firstOrNull() ?: return
-    val cx = head.x * cell + cell / 2f
-    val cy = head.y * cell + cell / 2f
+    val headPoint = points.firstOrNull() ?: return
+    val cx = headPoint.x
+    val cy = headPoint.y
     val earSize = cell * 0.2f
     val leftEar = listOf(
         Offset(cx - cell * 0.26f, cy - cell * 0.12f),

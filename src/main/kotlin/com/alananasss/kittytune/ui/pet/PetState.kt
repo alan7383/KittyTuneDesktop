@@ -73,6 +73,9 @@ object PetState {
     private var beatTrackId: Long? = null
     @Volatile private var offlineBeat: BeatInfoEntity? = null
 
+    /** Whether the automix analysis heard the current song in a minor key (null when unknown). */
+    val keyIsMinor: Boolean? get() = offlineBeat?.keyIsMinor
+
     /** Starts watching playback (idempotent). Called once the app is up. */
     fun start() {
         if (watcher?.isActive == true) return

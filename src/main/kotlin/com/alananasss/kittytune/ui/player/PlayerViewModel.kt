@@ -4541,6 +4541,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         if (manual) {
             currentTrack?.let { track ->
+                // The pet notices; a favourite skipped this early may get a "go back?" from it.
+                com.alananasss.kittytune.ui.pet.PetEvents.emit(
+                    com.alananasss.kittytune.ui.pet.PetEvent.Skip(track.id, currentPosition, isLiked)
+                )
                 flushListenSession("SKIP_NEXT")
             }
             noteWaveSkip()
@@ -4906,6 +4910,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), autoPlay: Boolean = true) {
         if (routeRemote("previous")) return
+        com.alananasss.kittytune.ui.pet.PetEvents.emit(com.alananasss.kittytune.ui.pet.PetEvent.Previous)
         if (!applyingTogether && com.alananasss.kittytune.data.together.Together.active.value != null) {
             com.alananasss.kittytune.data.together.Together.control(com.alananasss.kittytune.data.together.TogetherMessage.CONTROL_PREVIOUS, currentPosition)
         }
@@ -5007,6 +5012,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         MusicManager.player.repeatMode = exoMode
     }
 
+    /**
+     * Back to the previous song even well into this one (the pet's "go back?" bubble): unlike [smartPrevious], which
+     * rewinds the current song after its first three seconds.
+     */
+    fun previousTrack() {
+        val prev = currentQueueIndex - 1
+        if (isRemotePlayback || prev < 0 || currentPosition <= 3000L) {
+            smartPrevious()
+            return
+        }
+        com.alananasss.kittytune.ui.pet.PetEvents.emit(com.alananasss.kittytune.ui.pet.PetEvent.Previous)
+        if (!applyingTogether && com.alananasss.kittytune.data.together.Together.active.value != null) {
+            com.alananasss.kittytune.data.together.Together.control(com.alananasss.kittytune.data.together.TogetherMessage.CONTROL_PREVIOUS, 0L)
+        }
+        if (currentTrack != null) flushListenSession("SKIP_PREVIOUS")
+        playTrackAtIndex(prev, addToHistory = false, isCrossfade = playerPrefs.getCrossfadeEnabled(), autoPlay = true)
+        updateMprisMedia()
+    }
+
+    /** Repeat this one song (the pet's "once more?" bubble), whatever the repeat mode was. */
+    fun repeatCurrentTrack() {
+        repeat(3) { if (uiRepeatMode != RepeatMode.ONE) toggleRepeatMode() }
+    }
+
     fun toggleRepeatMode() {
         if (routeRemote("repeat", when (uiRepeatMode) { RepeatMode.NONE -> 1; RepeatMode.ALL -> 2; RepeatMode.ONE -> 0 })) return
         repeatMode = when (repeatMode) {
@@ -5016,6 +5045,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         applyRepeatMode()
         saveStateAsync(saveQueue = false)
+        com.alananasss.kittytune.ui.pet.PetEvents.emit(com.alananasss.kittytune.ui.pet.PetEvent.Repeat(repeatMode == RepeatMode.ONE))
 
         mprisService?.updateLoopStatus(repeatMode.toMprisLoopStatus())
     }
@@ -5277,6 +5307,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         val t = currentTrack ?: return
         isLiked = !isLiked
+        com.alananasss.kittytune.ui.pet.PetEvents.emit(
+            if (isLiked) com.alananasss.kittytune.ui.pet.PetEvent.Like else com.alananasss.kittytune.ui.pet.PetEvent.Unlike
+        )
 
         if (isLiked) {
             LikeRepository.addLike(t)
@@ -5592,6 +5625,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun dislikeCurrentTrackInMix() {
         if (routeRemote("dislike")) return
         val track = currentTrack ?: return
+        com.alananasss.kittytune.ui.pet.PetEvents.emit(com.alananasss.kittytune.ui.pet.PetEvent.Dislike)
         if (isMyWaveActive) com.alananasss.kittytune.data.wave.WaveFeedback.onDisliked(track)
         playerPrefs.addMixDislikedTrack(track.id)
         if (isLiked) {

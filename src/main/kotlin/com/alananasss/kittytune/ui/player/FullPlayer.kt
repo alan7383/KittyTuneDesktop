@@ -109,9 +109,13 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import com.alananasss.kittytune.ui.player.cover.CanvasVideo
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.FullPlayerInfoAlign
 import com.alananasss.kittytune.data.local.FullPlayerLayout
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.together.Together
 import com.alananasss.kittytune.ui.main.PanelLyrics
+import com.alananasss.kittytune.ui.together.REACTION_OVERLAY_WIDTH
+import com.alananasss.kittytune.ui.together.TogetherReactionOverlay
 import com.alananasss.kittytune.ui.utils.fadingEdge
 import com.alananasss.kittytune.utils.makeTimeString
 
@@ -267,12 +271,31 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
 
         val isPortrait = maxHeight > maxWidth
         val hasLyrics = viewModel.hasLyrics
-        val showPortraitLyrics = isPortrait && hasLyrics && showText
+        val showPortraitLyrics = isPortrait && layout != FullPlayerLayout.COVER_AND_LINE && hasLyrics && showText
+        val lyricsBesideCover = !isPortrait && lyricsShare > 0.001f &&
+            (layout == FullPlayerLayout.LYRICS_LEFT || layout == FullPlayerLayout.LYRICS_RIGHT)
+        val reactionRoom by Together.active.collectAsState()
+        val creditAlignment = viewModel.fullPlayerInfoAlign.takeUnless {
+            showPortraitLyrics || (layout == FullPlayerLayout.LYRICS_CENTRED && hasLyrics && showText)
+        }
+        val reactionsAtEnd = fullPlayerReactionsAtEnd(layout, lyricsBesideCover, creditAlignment)
+        // Reserve room on the cover's outer side, including when the cover is zoomed in.
+        val reactionWidth = if (reactionRoom != null) {
+            (maxWidth * 0.14f).coerceIn(64.dp, REACTION_OVERLAY_WIDTH).coerceAtMost(maxWidth * 0.2f)
+        } else 0.dp
+        val lyricsProgress = if (lyricsBesideCover) (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f) else 0f
+        val oppositeGutter = reactionWidth * (1f - lyricsProgress)
+        val startGutter = if (reactionsAtEnd) oppositeGutter else reactionWidth
+        val endGutter = if (reactionsAtEnd) reactionWidth else oppositeGutter
+        val bodyModifier = Modifier.fillMaxSize().padding(
+            start = startGutter,
+            end = endGutter,
+        )
 
         // The single line suits a tall window as well as a wide one, so it is the one layout a portrait window
         // honours; the others become the stacked portrait layout below (issue #33, round 5).
         if (layout == FullPlayerLayout.COVER_AND_LINE) {
-            CoverAndLineLayout(viewModel, palette, showText, toggleLyricsAction)
+            CoverAndLineLayout(viewModel, palette, showText, toggleLyricsAction, bodyModifier)
         } else if (isPortrait) {
             AnimatedContent(
                 targetState = showPortraitLyrics,
@@ -304,7 +327,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                     }
                 },
                 label = "portraitCoverLyricsCrossfade",
-                modifier = Modifier.fillMaxSize()
+                modifier = bodyModifier,
             ) { isShowingLyrics ->
                 if (isShowingLyrics) {
                     // Portrait mode with lyrics: Cover is HIDDEN, lyrics take full width/height
@@ -361,7 +384,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 }
             }
         } else if (layout == FullPlayerLayout.LYRICS_CENTRED) {
-            CentredLyricsLayout(viewModel, palette, showText, toggleLyricsAction)
+            CentredLyricsLayout(viewModel, palette, showText, toggleLyricsAction, bodyModifier)
         } else {
             CoverBesideLyrics(
                 viewModel = viewModel,
@@ -370,7 +393,8 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 showText = showText,
                 onToggleText = toggleLyricsAction,
                 lyricsFirst = layout == FullPlayerLayout.LYRICS_LEFT,
-                totalWidth = maxWidth,
+                totalWidth = maxWidth - startGutter - endGutter,
+                modifier = bodyModifier,
             )
         }
 
@@ -423,11 +447,34 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             )
         }
 
+        val room = reactionRoom
+        if (room != null && reactionWidth > 0.dp && viewModel.isLyricsFullScreen) {
+            val overlayAtEnd = screensaverActive || reactionsAtEnd
+            TogetherReactionOverlay(
+                code = room,
+                modifier = Modifier
+                    .align(if (overlayAtEnd) Alignment.BottomEnd else Alignment.BottomStart)
+                    .width(reactionWidth)
+                    .padding(bottom = 20.dp),
+                atEnd = overlayAtEnd,
+            )
+        }
+
         // Inside this window, not in a window of its own: that one opened behind the full-screen player.
         if (viewModel.isSearchingLyrics) {
             SearchLyricsDialog(viewModel = viewModel, onDismiss = { viewModel.isSearchingLyrics = false })
         }
     }
+}
+
+internal fun fullPlayerReactionsAtEnd(
+    layout: FullPlayerLayout,
+    lyricsBesideCover: Boolean,
+    creditAlignment: FullPlayerInfoAlign?,
+): Boolean = when {
+    lyricsBesideCover && layout == FullPlayerLayout.LYRICS_RIGHT -> false
+    lyricsBesideCover && layout == FullPlayerLayout.LYRICS_LEFT -> true
+    else -> creditAlignment != FullPlayerInfoAlign.END
 }
 
 /**
@@ -445,6 +492,7 @@ private fun CoverBesideLyrics(
     onToggleText: () -> Unit,
     lyricsFirst: Boolean,
     totalWidth: androidx.compose.ui.unit.Dp,
+    modifier: Modifier,
 ) {
     val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
     val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
@@ -453,7 +501,7 @@ private fun CoverBesideLyrics(
 
     // No padding on this Row, and the two halves inset themselves: the words have to reach the window's own edge
     // so that their scrollbar sits against it — "met la barre de slide tout à droite" (issue #33).
-    Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         val cover: @Composable RowScope.() -> Unit = {
             Box(
                 Modifier
@@ -537,6 +585,7 @@ private fun CentredLyricsLayout(
     palette: FullPlayerPalette,
     showText: Boolean,
     onToggleText: () -> Unit,
+    modifier: Modifier,
 ) {
     val track = viewModel.uiCurrentTrack ?: return
     AnimatedContent(
@@ -569,7 +618,7 @@ private fun CentredLyricsLayout(
             }
         },
         label = "centredLyrics",
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
     ) { showsWords ->
         if (!showsWords) {
             Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
@@ -619,8 +668,9 @@ private fun CoverAndLineLayout(
     palette: FullPlayerPalette,
     showText: Boolean,
     onToggleText: () -> Unit,
+    modifier: Modifier,
 ) {
-    Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
+    Box(modifier.padding(horizontal = 24.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
         CoverColumn(
             viewModel = viewModel,
             palette = palette,

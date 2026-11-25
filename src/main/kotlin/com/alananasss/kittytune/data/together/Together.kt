@@ -582,8 +582,9 @@ object Together {
     internal fun sendReaction(code: String, reaction: TogetherReaction) {
         if (_active.value != code || !isConnected.value) return
         if (!reactionLimiter.tryAcquire(System.nanoTime())) return
-        _reactions.tryEmit(TogetherReactionEvent(code, reaction))
-        send(code, TogetherMessage.Reaction(memberId, System.currentTimeMillis(), reaction.wireId))
+        val senderName = reactionNickname(myName)
+        _reactions.tryEmit(TogetherReactionEvent(code, reaction, senderName))
+        send(code, TogetherMessage.Reaction(memberId, System.currentTimeMillis(), reaction.wireId, senderName))
     }
 
     /** Whether this listener may switch automix: only the host, while listening along. */
@@ -824,7 +825,9 @@ object Together {
             is TogetherMessage.Reaction -> {
                 if (isSnapshot || _active.value != code) return
                 val reaction = TogetherReaction.entries.firstOrNull { it.wireId == message.reactionId } ?: return
-                _reactions.tryEmit(TogetherReactionEvent(code, reaction))
+                val senderName = reactionNickname(message.byName)
+                    ?: reactionNickname(_rooms.value[code]?.members?.get(message.from)?.name)
+                _reactions.tryEmit(TogetherReactionEvent(code, reaction, senderName))
             }
             is TogetherMessage.Control -> if (isHostOf(code) && !_isHostLocked.value) kotlinx.coroutines.withContext(Dispatchers.Main) {
                 player?.hostControl(message.action, message.positionMs)
@@ -910,7 +913,7 @@ object Together {
     }.getOrNull().orEmpty()
 
     @androidx.annotation.VisibleForTesting
-    internal fun resetForTesting() {
+    internal fun resetForTesting(activeCode: String? = null) {
         _rooms.value = emptyMap()
         _saved.value = emptyList()
         _active.value = null
@@ -927,6 +930,7 @@ object Together {
         Prefs.remove(KEY_SAVED)
         Prefs.remove(KEY_LIVE_CODE)
         Prefs.remove(KEY_HOST_LOCKED)
+        _active.value = activeCode
     }
 
     /**

@@ -84,6 +84,17 @@ enum class PetActivity(
     /** Ivy mode only: floating among the stars, like in his photo. */
     IVY_SPACE(listOf("ivy_float_1", "ivy_float_2", "ivy_float_3", "ivy_float_2", "ivy_float_1", "ivy_float_2", "ivy_float_3", "ivy_float_2"), 550, "(=✪ω✪=)", "pet_ivy_space", PetRarity.EXCLUSIVE),
     SLEEP(listOf("sleep_1", "sleep_1", "sleep_2", "sleep_2", "sleep_3", "sleep_3", "sleep_2", "sleep_2"), 600, "(-_-)", "pet_status_sleeping"),
+
+    // ---- life on the player bar (desktop): on its feet, by the play button, hinting, reacting
+    /** On the move: a little trot of its own sitting drawing, a pixel up and down, tail swinging. */
+    WALK(listOf("trot_1", "trot_2", "trot_3", "trot_4"), 170, "(=^･ω･^=)", "pet_status_walking"),
+    STAND(listOf("idle_open", "idle_open", "idle_look_l", "idle_look_l", "idle_open", "idle_blink", "idle_look_r", "idle_look_r"), 520, "(=^･ω･^=)?", "pet_status_watching"),
+    STAND_CURIOUS(listOf("wait_up", "wait_up", "idle_open", "idle_blink"), 600, "(・ω・)?", "pet_status_watching"),
+    WAIT_BUTTON(listOf("wait_1", "wait_1", "wait_2", "wait_1", "wait_tap", "wait_1", "wait_up", "wait_up"), 650, "(・ω・`)", "pet_status_waiting"),
+    POINT(x4("point_1", "point_2"), 420, "(｡･ω･)ﾉ", "pet_status_hinting"),
+    GRUMPY(x4("grumpy_1", "grumpy_2"), 600, "(¬_¬)", "pet_status_grumpy"),
+    SURPRISED(listOf("surprised", "surprised", "idle_look_r", "idle_look_r", "idle_open", "idle_blink", "idle_open", "idle_open"), 260, "(ﾟoﾟ)", "pet_status_surprised"),
+    LOOK_BACK(listOf("idle_look_l", "idle_look_l", "idle_look_l", "idle_blink", "idle_look_l", "idle_look_l", "idle_open", "idle_open"), 320, "(・ω・)", "pet_status_watching"),
     BOOP(x4("boop_1", "boop_2"), 300, "(>ω<)♡", "pet_status_booped");
 
     val isDance get() = this in DANCES
@@ -106,6 +117,8 @@ enum class TimeSlot(val room: String) { MORNING("morning"), DAY("day"), EVENING(
 data class PetPalette(val fur: Int, val shade: Int, val mark: Int, val white: Int)
 
 enum class PetColor(val id: String, val label: String, val palette: PetPalette) {
+    /** The app's own colours: a near-white coat lightly tinted with the theme (see [PetThemeTint]). */
+    AUTO("auto", "pet_color_auto", pal(0xFFFFFFFF, 0xFFE3E7F2, 0xFFC4CCE3, 0xFFF4F7FF)),
     CREAM("cream", "pet_color_cream", pal(0xFFFFF7EE, 0xFFF0D9C8, 0xFFF7B27A)),
     GINGER("ginger", "pet_color_ginger", pal(0xFFFFC58A, 0xFFF0A060, 0xFFD77A35)),
     GREY("grey", "pet_color_grey", pal(0xFF9AA3B8, 0xFF7D869E, 0xFF5E6780)),
@@ -181,8 +194,8 @@ enum class PetTap(val label: String) {
 /** Everything the user can customise. */
 data class PetSettings(
     val name: String = PetConfig.DEFAULT_NAME,
-    // A ginger tabby out of the box: the cat on KittyTune's cover.
-    val colorId: String = PetColor.GINGER.id,
+    // Out of the box, the app's colours: white like KittyTune's cover, tinted by the theme and following it.
+    val colorId: String = PetColor.AUTO.id,
     val customPalette: PetPalette? = null,
     val pattern: PetPattern = PetPattern.TABBY,
     val coat: PetCoat? = null,
@@ -210,10 +223,15 @@ data class PetSettings(
     val ivyMode: Boolean = false,
     val speed: PetSpeed = PetSpeed.NORMAL,
     val tap: PetTap = PetTap.BOOP,
+    /** The theme colour an [PetColor.AUTO] coat is tinted with; part of equality so cached frames follow the theme. */
+    val themeSeed: Int = PetThemeTint.seed,
 ) {
     val palette: PetPalette
-        get() = if (colorId == PetColor.CUSTOM && customPalette != null) customPalette
-        else (PetColor.fromId(colorId) ?: PetColor.CREAM).palette
+        get() = when {
+            colorId == PetColor.CUSTOM && customPalette != null -> customPalette
+            colorId == PetColor.AUTO.id -> PetThemeTint.palette(themeSeed)
+            else -> (PetColor.fromId(colorId) ?: PetColor.CREAM).palette
+        }
 }
 
 /**
@@ -234,6 +252,9 @@ object PetConfig {
     private val _version = kotlinx.coroutines.flow.MutableStateFlow(0L)
     val version: kotlinx.coroutines.flow.StateFlow<Long> = _version
     private fun changed() { _version.value = _version.value + 1 }
+
+    /** The theme changed: an app-coloured coat must be drawn again. */
+    internal fun themeChanged() = changed()
 
     private fun NamedPrefs.getFloat(key: String, def: Float): Float = getString(key, null)?.toFloatOrNull() ?: def
     private fun NamedPrefs.putFloat(key: String, value: Float) = putString(key, value.toString())

@@ -549,6 +549,15 @@ class DownloadDao(private val db: AppDatabase) {
         mapper = ::statsMonth,
     )
 
+    suspend fun getTrackHabit(trackId: Long, since: Long): Pair<Int, Int> =
+        db.query(
+            """SELECT SUM(CASE WHEN eventType IN ('PLAY_COMPLETE', 'REPEAT_ONE_LOOP', 'MANUAL_REPLAY') THEN 1 ELSE 0 END) AS plays,
+                      SUM(CASE WHEN eventType = 'SKIP_NEXT' AND listenDurationMs < 30000 THEN 1 ELSE 0 END) AS skips
+               FROM listening_stats WHERE trackId = ? AND timestamp >= ?""",
+            trackId, since,
+            mapper = { it.getInt("plays") to it.getInt("skips") },
+        ).firstOrNull() ?: (0 to 0)
+
     suspend fun getEventsAfter(since: Long): List<ListeningStatsEvent> =
         db.query("SELECT * FROM listening_stats WHERE timestamp >= ? ORDER BY timestamp DESC", since, mapper = ::statsEvent)
 

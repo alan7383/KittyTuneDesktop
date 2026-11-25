@@ -948,7 +948,9 @@ private fun eyeLabel(color: Int): String =
 private fun ColorSwatches(settings: PetSettings, onSelect: (String) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         PetColor.entries.forEach { c ->
-            Swatch(fill = Color(c.palette.fur), ring = Color(c.palette.mark), selected = settings.colorId == c.id) { onSelect(c.id) }
+            // The app's colours are shown as they are now, tinted by the current theme.
+            val p = if (c == PetColor.AUTO) PetThemeTint.palette(PetThemeTint.seed) else c.palette
+            Swatch(fill = Color(p.fur), ring = Color(p.mark), selected = settings.colorId == c.id) { onSelect(c.id) }
         }
         settings.customPalette?.let { p ->
             Swatch(fill = Color(p.fur), ring = Color(p.mark), selected = settings.colorId == PetColor.CUSTOM, badge = Icons.Rounded.PhotoCamera) {

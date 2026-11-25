@@ -85,6 +85,7 @@ internal fun CompactStats(
                 }
             }
             item { HabitsLine(report) }
+            item(key = "games") { GamesPlaytimeCard(report.window) }
         }
     }
 }

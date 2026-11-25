@@ -24,6 +24,8 @@ class SnakeRenderTest {
     fun `keyboard starts the playlist and pause resumes the same song`() {
         val previousLanguage = Strings.appLanguage
         Strings.appLanguage = "fr"
+        val previousMusic = SnakeGameLauncher.playMusic
+        SnakeGameLauncher.playMusic = true // songs on: this test is about the song a bite plays
         val tracks = listOf(
             Track(-11, "Premier morceau", null, 120_000L, null, source = "local"),
             Track(-12, "Morceau suivant", null, 60_000L, null, source = "local"),
@@ -78,6 +80,7 @@ class SnakeRenderTest {
             assertEquals(1, playerOpened)
         } finally {
             scene.close()
+            SnakeGameLauncher.playMusic = previousMusic
             Strings.appLanguage = previousLanguage
         }
     }

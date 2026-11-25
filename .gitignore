@@ -17,6 +17,7 @@ kotlin-js-store/
 # they are swallowed by the *.png rule above and the icon picker crashes on a build
 # made from a fresh clone (issue #33).
 !src/main/resources/icons/variants/*.png
+!src/main/resources/together/reactions/*.png
 *.wav
 *.py
 !nix/tests/test_audio_env.py

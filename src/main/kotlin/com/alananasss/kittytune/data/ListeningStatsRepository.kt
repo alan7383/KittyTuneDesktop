@@ -183,6 +183,10 @@ object ListeningStatsRepository {
     suspend fun getUniqueTracks(since: Long): Int = getSnapshot(since).uniqueTracks
     suspend fun getUniqueArtists(since: Long): Int = getSnapshot(since).uniqueArtists
     suspend fun getEventCount(type: String, since: Long): Int = dao.getEventCountByType(type, since)
+
+    /** (times played through, times skipped early) for one track over the last 90 days, for the pet's hints. */
+    suspend fun trackHabit(trackId: Long): Pair<Int, Int> =
+        dao.getTrackHabit(trackId, System.currentTimeMillis() - 90L * 24 * 3_600_000)
     suspend fun getEvents(since: Long): List<ListeningStatsEvent> = dao.getEventsAfter(since)
 
     /** Artists heard before [before], lower-cased and split, for the recaps' "new this period" counts. */

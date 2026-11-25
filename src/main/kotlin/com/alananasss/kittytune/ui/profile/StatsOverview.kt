@@ -104,6 +104,7 @@ internal fun OverviewStats(
                 }
             }
             item { HabitsGrid(report, isWide) }
+            item(key = "games") { GamesPlaytimeCard(report.window) }
         }
     }
 }

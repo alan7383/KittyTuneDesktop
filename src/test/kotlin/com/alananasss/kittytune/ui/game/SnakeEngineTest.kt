@@ -39,7 +39,7 @@ class SnakeEngineTest {
 
         assertEquals(SnakePhase.IDLE, engine.phase)
         assertEquals(songs[1], engine.foods.single().track)
-        assertEquals(460f, engine.speedMs, 0f)
+        assertEquals(160f, engine.speedMs, 0f)
         assertEquals(0, engine.score)
     }
 

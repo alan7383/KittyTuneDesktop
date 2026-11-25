@@ -101,7 +101,7 @@ internal fun MyWaveCard(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                 }
                 Spacer(Modifier.width(16.dp))
                 // The wave as a game: as big as the play button beside it, and in the same family.
-                Tip(str("game_wave_title")) {
+                Tip(str("arcade_title")) {
                 FilledTonalIconButton(
                     shapes = IconButtonDefaults.shapes(),
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
@@ -109,18 +109,10 @@ internal fun MyWaveCard(vm: PlayerViewModel, modifier: Modifier = Modifier) {
                         contentColor = scheme.onSecondaryContainer,
                     ),
                     modifier = Modifier.size(PLAY_SIZE),
-                    onClick = {
-                        val title = str("wave_title")
-                        SnakeGameLauncher.launch(
-                            SnakeGameRequest(
-                                title = title,
-                                mode = SnakeGameMode.WAVE,
-                                playbackContext = PlaybackContext(title, PlayerViewModel.MY_WAVE_NAV_ID),
-                            )
-                        )
-                    },
+                    // The arcade: the wave snake and the other games.
+                    onClick = { com.alananasss.kittytune.ui.game.ArcadeLauncher.open() },
                 ) {
-                    Icon(Icons.Rounded.SportsEsports, contentDescription = str("game_wave_title"), modifier = Modifier.size(32.dp))
+                    Icon(Icons.Rounded.SportsEsports, contentDescription = str("arcade_title"), modifier = Modifier.size(32.dp))
                 }
                 }
                 Spacer(Modifier.width(12.dp))

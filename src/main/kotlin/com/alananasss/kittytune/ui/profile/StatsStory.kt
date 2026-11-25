@@ -143,6 +143,7 @@ internal fun StoryStats(
                 }
             }
         }
+        item(key = "games") { GamesPlaytimeCard(report.window, Modifier.widthIn(max = 880.dp)) }
     }
 }
 

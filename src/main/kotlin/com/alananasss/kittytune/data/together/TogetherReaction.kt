@@ -15,7 +15,17 @@ internal enum class TogetherReaction(val wireId: String, val emoji: String) {
     SPARKLES("sparkles", "✨"),
 }
 
-internal data class TogetherReactionEvent(val code: String, val reaction: TogetherReaction)
+internal data class TogetherReactionEvent(
+    val code: String,
+    val reaction: TogetherReaction,
+    val senderName: String?,
+)
+
+private val reactionNameBreaks = Regex("[\\p{Cc}\\p{Zl}\\p{Zp}]+")
+
+internal fun reactionNickname(name: String?): String? = name?.trim()?.take(96)
+    ?.trimEnd { it.isHighSurrogate() }
+    ?.replace(reactionNameBreaks, " ")?.trim()?.takeIf { it.isNotEmpty() }
 
 private const val REACTION_REFILL_NANOS = 20_000_000L
 private const val REACTION_BURST_CAPACITY = 120

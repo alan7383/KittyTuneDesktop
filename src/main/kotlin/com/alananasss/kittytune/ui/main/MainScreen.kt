@@ -496,27 +496,32 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
             // Full-screen library replaces the sidebar + content panels but always
             // stops before the Now Playing panel (rendered after this block).
             if (libraryViewModel.isLibraryFullScreen) {
-                LibraryPanel(
-                    libraryViewModel = libraryViewModel,
-                    playerViewModel = playerViewModel,
-                    fullScreen = true,
-                    onImport = {
-                        libraryViewModel.isLibraryFullScreen = false
-                        playerViewModel.showLyricsSheet = false
-                        navController.navigate("music_import")
-                    },
-                    onHistory = {
-                        libraryViewModel.isLibraryFullScreen = false
-                        playerViewModel.showLyricsSheet = false
-                        navController.navigate("history")
-                    },
-                    onUpload = {
-                        libraryViewModel.isLibraryFullScreen = false
-                        playerViewModel.showLyricsSheet = false
-                        navController.navigate("upload")
-                    },
-                    modifier = Modifier.weight(1f).fillMaxSize()
-                )
+                Box(Modifier.weight(1f).fillMaxSize()) {
+                    LibraryPanel(
+                        libraryViewModel = libraryViewModel,
+                        playerViewModel = playerViewModel,
+                        fullScreen = true,
+                        onImport = {
+                            libraryViewModel.isLibraryFullScreen = false
+                            playerViewModel.showLyricsSheet = false
+                            navController.navigate("music_import")
+                        },
+                        onHistory = {
+                            libraryViewModel.isLibraryFullScreen = false
+                            playerViewModel.showLyricsSheet = false
+                            navController.navigate("history")
+                        },
+                        onUpload = {
+                            libraryViewModel.isLibraryFullScreen = false
+                            playerViewModel.showLyricsSheet = false
+                            navController.navigate("upload")
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    if (!playerViewModel.isLyricsFullScreen) {
+                        com.alananasss.kittytune.ui.together.WindowedTogetherReactionOverlay(Modifier.matchParentSize())
+                    }
+                }
             } else {
 
             var draggingSidebar by remember { mutableStateOf(false) }
@@ -1308,6 +1313,10 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                 }
                 }
             }
+                // Draw within the content surface so the right panel remains clear during its resize.
+                if (!playerViewModel.isLyricsFullScreen) {
+                    com.alananasss.kittytune.ui.together.WindowedTogetherReactionOverlay(Modifier.fillMaxSize())
+                }
             }
             } // end if (!isLibraryFullScreen)
 
@@ -1433,14 +1442,30 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
         onPlayPause = { playerViewModel.togglePlayPause() },
     )
     // Or on the player bar: a small cat on the bar's top edge, dancing, wandering or asleep.
+    com.alananasss.kittytune.ui.pet.PetThemeSync()
+    val petPlayer = remember(playerViewModel) {
+        com.alananasss.kittytune.ui.pet.PetPlayerLink(
+            track = { playerViewModel.uiCurrentTrack },
+            positionMs = { playerViewModel.uiCurrentPosition },
+            durationMs = { playerViewModel.uiDuration },
+            liked = { playerViewModel.uiIsLiked },
+            repeatOn = { playerViewModel.uiRepeatMode != com.alananasss.kittytune.ui.player.RepeatMode.NONE },
+            play = { playerViewModel.play() },
+            next = { playerViewModel.playNext() },
+            previous = { playerViewModel.previousTrack() },
+            repeatOne = { playerViewModel.repeatCurrentTrack() },
+        )
+    }
     com.alananasss.kittytune.ui.pet.PetBarOverlay(
         onOpenSettings = { playerViewModel.navigateToPlaylistId = "pet_settings" },
         onPlayPause = { playerViewModel.togglePlayPause() },
+        player = petPlayer,
     )
 
     TrackOptionsOverlays(playerViewModel)
     com.alananasss.kittytune.ui.library.LikeAllPromptHost()
     com.alananasss.kittytune.ui.game.SnakeGameHost(playerViewModel)
+    com.alananasss.kittytune.ui.game.ArcadeHost(playerViewModel)
 
     CoverViewerOverlay()
     com.alananasss.kittytune.ui.profile.passport.PassportViewerOverlay()
@@ -1510,8 +1535,6 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
         )
         }
     }
-
-    com.alananasss.kittytune.ui.together.TogetherReactionOverlay()
 
     AiDetectionOverlays(playerViewModel, navController)
 
