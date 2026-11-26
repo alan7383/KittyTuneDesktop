@@ -3728,7 +3728,7 @@
     <string name="performance_in_use">Şu anda kullanılan: %s</string>
     <string name="performance_cpu">İşlemci (ekran kartı olmadan)</string>
     <string name="performance_unknown">Sürücü bildirmedi</string>
-    <string name="performance_gpu_mismatch">%s seçildi ancak başka bir kart kullanılıyor. Aşağıdaki Windows grafik ayarlarını deneyin.</string>
+    <string name="performance_gpu_mismatch">KittyTune şu anda istenen ekran kartını (%s) kullanmıyor. Aşağıdaki Windows grafik ayarlarını deneyin.</string>
     <string name="performance_named_gpu_note">Bir kart seçip yeniden başlatın. Uyumluluk modunda aşağıdaki Windows ayarlarından seçin.</string>
     <string name="performance_detection_failed">Ekran kartları listelenemedi. Aşağıdaki Windows grafik ayarlarını kullanın.</string>
     <string name="performance_gpu_missing">%s kullanılamıyor. Başka bir kart veya Otomatik seçin.</string>

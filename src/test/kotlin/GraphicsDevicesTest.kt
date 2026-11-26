@@ -20,13 +20,38 @@ class GraphicsDevicesTest {
         assertNull(inventory.copy(devices = listOf(nvidia, nvidia)).preference(nvidia.id))
     }
 
+    @Test fun namedGpuUsesTheCurrentPreferenceOrder() {
+        val options = PerformanceOptions(gpu = PerformanceGpu.DISCRETE, gpuId = nvidia.id)
+        val reordered = inventory.copy(automatic = nvidia.id, highPerformance = intel.id)
+        val before = PerformanceSettings.startupProperties(options, "Windows 11", resolveWindowsGpu = inventory::preference)
+        val after = PerformanceSettings.startupProperties(options, "Windows 11", resolveWindowsGpu = reordered::preference)
+        assertEquals("discrete", before["skiko.gpu.priority"])
+        assertEquals("auto", after["skiko.gpu.priority"])
+    }
+
+    @Test fun unavailableNamedGpuFallsBackToAutomaticOnlyForSupportedRendering() {
+        val options = PerformanceOptions(gpu = PerformanceGpu.DISCRETE, gpuId = nvidia.id)
+        val removed = inventory.copy(devices = listOf(intel))
+        val properties = PerformanceSettings.startupProperties(options, "Windows 11", resolveWindowsGpu = removed::preference)
+        assertEquals("auto", properties["skiko.gpu.priority"])
+
+        val software = PerformanceSettings.startupProperties(options.copy(renderer = PerformanceRenderer.SOFTWARE_COMPAT), "Windows 11") {
+            error("Software rendering should not enumerate GPUs")
+        }
+        assertFalse(software.containsKey("skiko.gpu.priority"))
+    }
+
     @Test fun hardwareAndSoftwareStatusAreReadFromTheRenderer() {
         val actual = GraphicsInUse.parse("GraphicsApi: OPENGL\nModel: NVIDIA GeForce GTX 960M/PCIe/SSE2\n")
         assertTrue(actual.matches(nvidia.name))
         assertTrue(GraphicsInUse.parse("Model: GeForce GTX 960M/PCIe/SSE2\n").matches(nvidia.name))
         assertFalse(actual.matches(intel.name))
         assertTrue(GraphicsInUse.parse("GraphicsApi: SOFTWARE_COMPAT\n").software)
+        assertTrue(GraphicsInUse.parse("GraphicsApi: SOFTWARE_FAST\r\n").software)
+        assertFalse(GraphicsInUse.parse("GraphicsApi: OPENGL\nVendor: Software Inc.\nModel: Graphics Card\n").software)
         assertNull(GraphicsInUse.parse("GraphicsApi: OPENGL\n").name)
+        assertNull(GraphicsInUse.parse("GraphicsApi: OPENGL\nModel: \nTotal VRAM: 0 MB\n").name)
+        assertNull(GraphicsInUse.parse("GraphicsApi: OPENGL\nModel: null\n").name)
         assertTrue(GraphicsInUse.parse("Video card: Intel(R) HD Graphics 530\n").matches("intel hd graphics 530"))
     }
 
@@ -40,6 +65,11 @@ class GraphicsDevicesTest {
             assertEquals(PerformanceGpu.DISCRETE, saved.gpu)
             PerformanceSettings.selectGpu(null, inventory)
             assertNull(PerformanceSettings.read().gpuId)
+            PerformanceSettings.selectGpu(intel, inventory)
+            PerformanceSettings.selectGpuPreference(PerformanceGpu.DISCRETE)
+            assertNull(PerformanceSettings.read().gpuId)
+            assertNull(PerformanceSettings.read().gpuName)
+            assertEquals(PerformanceGpu.DISCRETE, PerformanceSettings.read().gpu)
             PerformanceSettings.selectGpu(intel, inventory)
             PerformanceSettings.reset()
             assertNull(PerformanceSettings.read().gpuName)

@@ -3727,7 +3727,7 @@
     <string name="performance_in_use">Сейчас используется: %s</string>
     <string name="performance_cpu">Процессор (без видеокарты)</string>
     <string name="performance_unknown">Драйвер не сообщил</string>
-    <string name="performance_gpu_mismatch">Выбрана %s, но используется другая карта. Попробуйте настройки графики Windows ниже.</string>
+    <string name="performance_gpu_mismatch">Запрошенная видеокарта (%s) неактивна в KittyTune. Попробуйте изменить настройки графики Windows ниже.</string>
     <string name="performance_named_gpu_note">Выберите карту и перезапустите приложение. В режиме совместимости выберите её в настройках Windows ниже.</string>
     <string name="performance_detection_failed">Не удалось получить список карт. Используйте настройки графики Windows ниже.</string>
     <string name="performance_gpu_missing">%s недоступна. Выберите другую карту или автоматический режим.</string>

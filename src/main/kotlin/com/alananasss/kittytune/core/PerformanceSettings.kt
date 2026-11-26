@@ -90,24 +90,30 @@ object PerformanceSettings {
         options: PerformanceOptions,
         os: String,
         arch: String = System.getProperty("os.arch"),
+        resolveWindowsGpu: (String) -> PerformanceGpu? = { id ->
+            runCatching { WindowsGraphicsDevices.read().preference(id) }.getOrNull()
+        },
     ): Map<String, String> = buildMap {
         if (options.renderer != PerformanceRenderer.AUTO && options.renderer in renderers(os, arch)) {
             put("skiko.renderApi", options.renderer.name)
         }
-        if (gpuPreferenceSupported(options.renderer, os) && options.gpu != PerformanceGpu.AUTO) {
-            put("skiko.gpu.priority", options.gpu.name.lowercase())
+        if (gpuPreferenceSupported(options.renderer, os)) {
+            val id = options.gpuId?.takeIf { os.startsWith("Windows", true) }
+            val priority = if (id == null) options.gpu else resolveWindowsGpu(id) ?: PerformanceGpu.AUTO
+            // A named card can take the default DXGI order. Request it explicitly to override a JVM priority.
+            if (id != null || priority != PerformanceGpu.AUTO) {
+                put("skiko.gpu.priority", priority.name.lowercase())
+            }
         }
         put("skiko.vsync.enabled", options.vsync.toString())
         put("skiko.gpu.resourceCacheLimit", (options.gpuCacheMiB.toLong() * 1024 * 1024).toString())
     }
 
     fun applyAtStartup() {
-        val options = read()
-        val resolvedGpu = if (options.gpuId != null && System.getProperty("os.name").startsWith("Windows", true)) {
-            runCatching { WindowsGraphicsDevices.read().preference(options.gpuId) }.getOrNull() ?: PerformanceGpu.AUTO
-        } else options.gpu
+        val os = System.getProperty("os.name")
+        val options = read(os)
         val configured = keys.filter(Prefs::contains).toSet()
-        val properties = startupProperties(options.copy(gpu = resolvedGpu), System.getProperty("os.name"))
+        val properties = startupProperties(options, os)
         properties.forEach { (property, value) ->
             val configuredKey = when (property) {
                 "skiko.renderApi" -> RENDERER
@@ -123,6 +129,12 @@ object PerformanceSettings {
     internal fun selectGpu(device: GraphicsDevice?, inventory: GraphicsDevices?) {
         val preference = if (device == null) PerformanceGpu.AUTO else
             requireNotNull(inventory?.preference(device.id)) { "This adapter requires OS graphics settings" }
+        saveGpu(preference, device)
+    }
+
+    internal fun selectGpuPreference(preference: PerformanceGpu) = saveGpu(preference, null)
+
+    private fun saveGpu(preference: PerformanceGpu, device: GraphicsDevice?) {
         Prefs.replaceEntries(listOf(GPU, GPU_ID, GPU_NAME), buildMap {
             put(GPU, JsonPrimitive(preference.name))
             if (device != null) {

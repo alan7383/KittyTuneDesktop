@@ -3726,7 +3726,7 @@
     <string name="performance_in_use">Jelenleg használt: %s</string>
     <string name="performance_cpu">Processzor (grafikus kártya nélkül)</string>
     <string name="performance_unknown">Az illesztőprogram nem jelzi</string>
-    <string name="performance_gpu_mismatch">%s lett kiválasztva, de másik kártya működik. Próbáld az alábbi Windows grafikai beállításokat.</string>
+    <string name="performance_gpu_mismatch">A kért videokártya (%s) inaktív a KittyTune-ban. Próbáld ki az alábbi Windows grafikai beállításokat.</string>
     <string name="performance_named_gpu_note">Válassz kártyát és indítsd újra. Kompatibilitási módban az alábbi Windows-beállításokban válaszd ki.</string>
     <string name="performance_detection_failed">A kártyák nem listázhatók. Használd az alábbi Windows grafikai beállításokat.</string>
     <string name="performance_gpu_missing">%s nem érhető el. Válassz másik kártyát vagy automatikus módot.</string>

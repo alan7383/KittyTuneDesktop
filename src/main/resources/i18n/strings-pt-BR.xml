@@ -3725,7 +3725,7 @@
     <string name="performance_in_use">Em uso: %s</string>
     <string name="performance_cpu">Processador (sem placa de vídeo)</string>
     <string name="performance_unknown">Não informado pelo driver</string>
-    <string name="performance_gpu_mismatch">Você pediu %s, mas outra placa está em uso. Tente as configurações gráficas do Windows abaixo.</string>
+    <string name="performance_gpu_mismatch">A placa solicitada (%s) está inativa no KittyTune. Tente as configurações gráficas do Windows abaixo.</string>
     <string name="performance_named_gpu_note">Escolha uma placa e reinicie. No modo de compatibilidade, escolha nas configurações do Windows abaixo.</string>
     <string name="performance_detection_failed">Não foi possível listar as placas. Use as configurações gráficas do Windows abaixo.</string>
     <string name="performance_gpu_missing">%s não está disponível. Escolha outra placa ou Automático.</string>

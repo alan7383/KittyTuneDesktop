@@ -92,10 +92,13 @@ internal data class GraphicsInUse(val name: String?, val software: Boolean) {
     }
 
     companion object {
+        private val modelLine = Regex("(?m)^(?:Model|Video card|Device name|Device|GPU):[ \\t]*([^\\r\\n]*)")
+        private val softwareApi = Regex("(?m)^GraphicsApi:[ \\t]*(?:SOFTWARE_FAST|SOFTWARE_COMPAT)[ \\t]*\\r?$")
+
         fun parse(info: String): GraphicsInUse {
-            val name = Regex("(?m)^(?:Model|Video card|Device name|Device|GPU):\\s*([^\\r\\n]+)")
-                .find(info)?.groupValues?.get(1)?.trim()
-            return GraphicsInUse(name, info.contains("SOFTWARE", true))
+            val name = modelLine.find(info)?.groupValues?.get(1)?.trim()
+                ?.takeUnless { it.isEmpty() || it.equals("null", ignoreCase = true) }
+            return GraphicsInUse(name, softwareApi.containsMatchIn(info))
         }
 
         fun current(): GraphicsInUse {

@@ -3947,7 +3947,7 @@
     <string name="performance_in_use">Aktuell verwendet: %s</string>
     <string name="performance_cpu">Prozessor (ohne Grafikkarte)</string>
     <string name="performance_unknown">Vom Treiber nicht gemeldet</string>
-    <string name="performance_gpu_mismatch">%s wurde angefordert, aber eine andere Karte wird verwendet. Versuche die Windows-Grafikeinstellungen unten.</string>
+    <string name="performance_gpu_mismatch">Die angeforderte Grafikkarte (%s) ist in KittyTune inaktiv. Versuche es mit den Windows-Grafikeinstellungen unten.</string>
     <string name="performance_named_gpu_note">Karte auswählen und neu starten. Im Kompatibilitätsmodus die Karte in den Windows-Einstellungen unten wählen.</string>
     <string name="performance_detection_failed">Grafikkarten konnten nicht aufgelistet werden. Nutze die Windows-Grafikeinstellungen unten.</string>
     <string name="performance_gpu_missing">%s ist nicht verfügbar. Andere Karte oder Automatisch wählen.</string>
