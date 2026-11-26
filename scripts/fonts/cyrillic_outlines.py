@@ -1084,6 +1084,7 @@ class Letter(Pen):
         iky=None,
         flat_frac=None,
         draw_spine=True,
+        min_counter_width=None,
     ):
         """Build a 2-handle Google Sans Flex bowl (B/P/R or b/p style) with monotonic contrast."""
         m = self.metrics
@@ -1206,6 +1207,8 @@ class Letter(Pen):
         in_x = left + min(sw * 0.72, sw - 4.0) if draw_spine else stem_r
         in_l = stem_r
         in_r = max(in_l + min_cw, right - eff_wall)
+        if min_counter_width is not None:
+            in_r = max(in_r, in_l + min_counter_width)
         in_b = out_b + raw_bot_bar
         in_t = out_t - raw_top_bar
         in_mid = (in_b + in_t) * 0.5

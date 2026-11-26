@@ -11,7 +11,21 @@ from __future__ import annotations
 
 from math import hypot
 
+from fontTools.varLib.models import piecewiseLinearMap
+
 from cyrillic_outlines import ARC_K, Outline, Pen, _pill_cap, shear_slnt
+
+
+_YERU_COUNTER_FRACTIONS = {
+    True: {
+        1: 0.960, 100: 0.930, 250: 0.880, 400: 0.820,
+        550: 0.730, 700: 0.620, 900: 0.415, 1000: 0.375,
+    },
+    False: {
+        1: 0.959, 100: 0.926, 250: 0.870, 400: 0.795,
+        550: 0.665, 700: 0.500, 900: 0.400, 1000: 0.420,
+    },
+}
 
 
 def _make_letter(d, cap, adv, lsb, rsb, ref="H"):
@@ -58,7 +72,7 @@ def _pill_end_quads(p0, p1, scale):
 
 
 def _draw_be_cap(d):
-    """Draw uppercase Б: B-style spine & lower bowl + E-style top arm."""
+    """Draw uppercase Б with a B-style bowl and a straight top arm."""
     m = d.metrics
     adv = m.B_adv * 1.02
     lsb = m.B_lsb
@@ -72,6 +86,7 @@ def _draw_be_cap(d):
     spine_r = sw * 0.55 * m.roundness
     bar_r = top_h * 0.50 * m.roundness
     bowl_top = m.cap_h * 0.605
+    arm_r = max(p.left + sw * 1.4, p.left + p.width * 0.84)
 
     p.stem(
         p.left,
@@ -81,7 +96,6 @@ def _draw_be_cap(d):
         corner_radii=(spine_r, spine_r, 0.0, 0.0),
         sharp_corners=(2, 3),
     )
-    arm_r = max(p.left + sw * 1.4, p.left + p.width * 0.84)
     p.bar(
         p.left + sw * 0.48,
         m.cap_h - top_h * 0.5,
@@ -109,71 +123,57 @@ def _draw_be_cap(d):
 
 
 def _draw_be_lower(d):
-    """Draw lowercase б: o-matched 2-handle squircle flowing into f/e-style arm."""
+    """Continue the bowl of б into a single curved shoulder and a gently rising arm."""
     m = d.metrics
-    adv = m.o_adv * 0.99
-    lsb = m.o_lsb
-    rsb = m.o_lsb
-    p = _make_letter(d, False, adv, lsb, rsb, ref="o")
-
-    l, r, w = p.left, p.right, p.width
-    xh = m.x_h
-    ch = m.cap_h
-    b_low = -m.low_ov
-    b_high = xh + m.low_ov
-
+    p = _make_letter(d, False, m.o_adv * 0.99, m.o_lsb, m.o_lsb, ref="o")
+    left, right, width = p.left, p.right, p.width
+    bowl_top = m.x_h + m.low_ov
     p.squircle(
-        l,
-        b_low,
-        r,
-        b_high,
+        left,
+        -m.low_ov,
+        right,
+        bowl_top,
         wall_side=m.o_side,
         wall_top=m.o_top,
         wall_bot=m.o_top,
         cap=False,
     )
+    exterior = p.outline.contours[0]
+    # Replace the upper-left quarter of the bowl. Both ends of the new sweep
+    # follow the tangents of the oval, leaving its counter as one closed path.
+    _, side_y, _ = exterior[4]
+    headroom = max(24.0, m.cap_h - bowl_top)
+    slope = min(0.16, headroom * 0.43 / width)
+    half_arm = min(m.f_bar * 0.90, headroom * 0.66) * 0.5
+    normal_y = 1.0 / hypot(1.0, slope)
+    tip_center_x = right - width * 0.083 - half_arm * normal_y * m.roundness
+    tip_dx = half_arm * normal_y * slope
+    upper_tip = (tip_center_x - tip_dx, m.cap_h)
+    lower_tip = (tip_center_x + tip_dx, m.cap_h - 2.0 * half_arm * normal_y)
 
-    neck_w = min(m.n_stem * 0.92, m.o_side * 0.94, w * 0.36)
-    avail_top = max(24.0, ch - b_high)
-    arm_h = max(10.0, min(m.f_bar * 0.92, avail_top * 0.72))
-
-    y_start = xh * 0.46
-    y_bend_out = xh * 0.94
-    y_bend_in = min(ch - arm_h - 6.0, xh * 0.99)
-    x_flat_out = min(r - arm_h * 0.6 - 10.0, l + max(neck_w * 1.15, w * 0.43))
-    x_flat_in = min(r - arm_h * 0.6 - 8.0, max(l + neck_w + 8.0, x_flat_out + neck_w * 0.16))
-
-    arm_end = max(x_flat_in + 12.0, l + w * 0.89)
-    pill_r = arm_h * 0.50 * m.roundness
-    tip_x = arm_end - pill_r + m.h_overhang_low
-
-    dx_out = max(8.0, x_flat_out - l)
-    dy_out = max(8.0, ch - y_bend_out)
-    dx_in = max(8.0, x_flat_in - (l + neck_w))
-    dy_in = max(8.0, (ch - arm_h) - y_bend_in)
-
-    kx_n, ky_n = 0.56, 0.56
-    in_start_x = l + neck_w * 0.72
-    neck_pts = [
-        (l, y_start, True),
-        (l, y_bend_out, True),
-        (l, y_bend_out + dy_out * ky_n, False),
-        (x_flat_out - dx_out * kx_n, ch, False),
-        (x_flat_out, ch, True),
-        (tip_x, ch, True),
+    shoulder_x = left + width * 0.39
+    shoulder_y = upper_tip[1] - slope * (upper_tip[0] - shoulder_x)
+    outer_handle = (shoulder_x - width * 0.19, shoulder_y - slope * width * 0.19)
+    inner_x = p.mid
+    inner_y = lower_tip[1] - slope * (lower_tip[0] - inner_x)
+    neck = min(width * 0.41, m.n_stem * 0.90 + width * 0.06)
+    turn_x = left + neck
+    handle_x = inner_x - (inner_x - turn_x) * 0.71
+    inner_handle = (handle_x, inner_y - slope * (inner_x - handle_x))
+    p.outline.contours[0] = [
+        *exterior[:5],
+        (left, side_y + (shoulder_y - side_y) * 0.56, False),
+        (*outer_handle, False),
+        (shoulder_x, shoulder_y, True),
+        (*upper_tip, True),
+        *_pill_end_quads(upper_tip, lower_tip, m.roundness),
+        (*lower_tip, True),
+        (inner_x, inner_y, True),
+        (*inner_handle, False),
+        (turn_x, bowl_top, False),
+        *exterior[7:],
     ]
-    neck_pts.extend(_pill_end_quads((tip_x, ch), (tip_x, ch - arm_h), m.roundness))
-    neck_pts.extend([
-        (tip_x, ch - arm_h, True),
-        (x_flat_in, ch - arm_h, True),
-        (x_flat_in - dx_in * kx_n, ch - arm_h, False),
-        (l + neck_w, y_bend_in + dy_in * ky_n, False),
-        (l + neck_w, y_bend_in, True),
-        (l + neck_w * 0.90, y_start + (y_bend_in - y_start) * 0.35, True),
-        (in_start_x, y_start, True),
-    ])
-    _append_cw(p, neck_pts)
-    d.set_anchor_x("б", l + (arm_end - l) * 0.52)
+    d.set_anchor_x("б", p.mid)
     d.put("б", p)
 
 
@@ -351,12 +351,13 @@ def _draw_ze(p, m, cap, mirror=False):
 
 
 def _draw_ze_pair(d):
-    """Draw uppercase З (from native 3 with balanced bearings) & lowercase з."""
+    """Fit the native figure's smooth bowls to the two Cyrillic letter sizes."""
     m = d.metrics
     nat3 = d.native("3", upright=True)
+    left, bottom, right, top = nat3.bounds()
     dl = d.sb(18.0, True)
     dr = d.sb(15.0, True)
-    z_cap = nat3.transform(sx=1.03, dx=dl)
+    z_cap = nat3.transform(sx=1.055, dx=dl - left * 0.025)
     z_cap.advance += dl + dr
     d.put("З", z_cap)
 
@@ -364,7 +365,11 @@ def _draw_ze_pair(d):
     lsb = d.sb(58.0, False)
     rsb = d.sb(64.0, False)
     p = _make_letter(d, False, adv, lsb, rsb, ref="o")
-    _draw_ze(p, m, cap=False, mirror=False)
+    sx = p.width / (right - left)
+    sy = (m.x_h + 2.0 * m.low_ov) / (top - bottom)
+    p.outline.contours = nat3.transform(
+        sx=sx, sy=sy, dx=p.left - left * sx, dy=-m.low_ov - bottom * sy,
+    ).contours
     d.put("з", p)
 
 
@@ -456,7 +461,8 @@ def _draw_ef(d, cap):
 
 
 def _draw_yer_bowl(
-    p, m, stem_x, right, top, *, cap, stem_w=None, draw_spine=False, stroke_scale=1.0
+    p, m, stem_x, right, top, *, cap, stem_w=None, draw_spine=False, stroke_scale=1.0,
+    min_counter_width=None,
 ):
     """Attach a flat-base B/b-style curved bowl with B_mid heavy-weight modulation."""
     sw = m.stem(cap) if stem_w is None else stem_w
@@ -481,6 +487,7 @@ def _draw_yer_bowl(
         spine_top_r=0.0,
         spine_bot_r=0.0,
         draw_spine=draw_spine,
+        min_counter_width=min_counter_width,
     )
 
 
@@ -557,8 +564,11 @@ def _draw_yers(d, cap):
     rnd_y = sw_y * 0.50 * m.roundness
     sp_y = sw_y * 0.55 * m.roundness
     w_scale = m.wdth_ratios["H" if cap else "n"]
-    gap = max(sw_y * 0.34, min(sw_y * 0.92, sw_y * 0.84 * w_scale))
-    bowl_r = max(p.left + sw_y * 2.2, p.right - sw_y - gap)
+    reference_gap = max(sw_y * 0.34, min(sw_y * 0.92, sw_y * 0.84 * w_scale))
+    bowl_r = max(p.left + sw_y * 2.2, p.right - sw_y - reference_gap)
+    open_gap = p.right - sw_y - bowl_r
+    gap = max(open_gap * 0.58, min(open_gap * 0.84, 44.0))
+    stem_left = bowl_r + gap
     p.stem(
         p.left,
         bottom=0.0,
@@ -567,8 +577,18 @@ def _draw_yers(d, cap):
         corner_radii=(sp_y, rnd_y, rnd_y, 0.0),
         sharp_corners=(3,),
     )
-    _draw_yer_bowl(p, m, p.left, bowl_r, bowl_top, cap=cap, stem_w=sw_y)
-    p.stem(p.right - sw_y, bottom=-rond_ov, top=ch + rond_ov, weight=sw_y / p.v)
+    # Fit the window to the bowl's available width, including condensed display styles.
+    counter_fraction = piecewiseLinearMap(m.wght, _YERU_COUNTER_FRACTIONS[cap])
+    display = max(0.0, (m.opsz - 36.0) / 108.0)
+    condensed = max(0.0, (100.0 - m.wdth) / 75.0)
+    counter_fraction += (1.0 - counter_fraction) * 0.28 * display * condensed
+    counter_width = (bowl_r - p.left - sw_y) * counter_fraction
+    _draw_yer_bowl(
+        p, m, p.left, bowl_r, bowl_top, cap=cap, stem_w=sw_y,
+        stroke_scale=0.90, min_counter_width=counter_width,
+    )
+    p.stem(stem_left, bottom=-rond_ov, top=ch + rond_ov, weight=sw_y / p.v)
+    p.outline.advance -= open_gap - gap
     d.put("Ы" if cap else "ы", p)
 
 

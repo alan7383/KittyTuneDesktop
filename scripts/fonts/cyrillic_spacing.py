@@ -117,7 +117,7 @@ def fit_cyrillic_text(designs, glyphs, drawn, inherited):
             nearest += original
             optical += original
             adjustment = 0.0
-            if nearest < clearance and (left in "жд" or right in "жд"):
+            if nearest < clearance and (left in "ждЗз" or right in "ждз"):
                 adjustment = min(clearance - nearest, m.n_adv * 0.06)
             elif optical > high and nearest < inf:
                 # Keep the existing clearance when a pair is already tighter than the floor.

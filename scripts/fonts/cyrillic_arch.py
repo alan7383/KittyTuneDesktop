@@ -275,28 +275,23 @@ def _draw_el_contour(
     *,
     l_body,
     r_body,
-    foot_y=0.0,
     stem_bot=None,
-    round_foot=True,
     round_right_bot=True,
-    max_sweep=None,
-    leg_scale=1.0,
 ):
-    """Build unified 2-handle G1 S-inflection Л/л body inside [l_body, r_body]."""
+    """Draw the curved Л body used by the extended Cyrillic letters."""
     top = p.top
+    foot_y = 0.0
     sw = p.v
     bar_h = _bar_thickness(m, cap, "u_bar") if cap else _bar_thickness(m, cap, "arch")
     rnd = m.roundness
     width = max(sw * 2.2, r_body - l_body)
 
     min_cnt = max(36.0, (width - sw) * 0.16)
-    leg_w = min(sw * (0.88 if cap else 0.87) * leg_scale, max(16.0, (width - sw - min_cnt) * 0.56))
+    leg_w = min(sw * (0.88 if cap else 0.87), max(16.0, (width - sw - min_cnt) * 0.56))
     foot_w = leg_w * 1.06
     avail = max(24.0, width - sw - leg_w)
     target_cnt = min(162.0 if cap else 154.0, avail * 0.48)
     sweep = min(width * 0.31, max(avail * 0.36, avail - target_cnt))
-    if max_sweep is not None:
-        sweep = min(sweep, max_sweep, max(24.0, avail - min_cnt))
     sh_x = l_body + sweep
     sh_in = sh_x + leg_w
 
@@ -317,8 +312,8 @@ def _draw_el_contour(
     m_in = ((c1_in[0] + c2_in[0]) * 0.5, (c1_in[1] + c2_in[1]) * 0.5)
 
     foot_roundness = 0.16 + 0.84 * rnd if cap else rnd
-    toe_r = min(leg_w * (0.48 if cap else 0.40), span_h * 0.15) * foot_roundness if round_foot else 0.0
-    heel_r = min(leg_w * (0.36 if cap else 0.22), span_h * 0.12) * foot_roundness if round_foot else 0.0
+    toe_r = min(leg_w * (0.48 if cap else 0.40), span_h * 0.15) * foot_roundness
+    heel_r = min(leg_w * (0.36 if cap else 0.22), span_h * 0.12) * foot_roundness
 
     toe_pt = (l_body, foot_y)
     heel_pt = (l_body + foot_w, foot_y)
@@ -344,26 +339,87 @@ def _draw_el_contour(
     p.outline.contours.append(contour)
 
 
-def _draw_de_shelf(p, m, cap, *, l_shelf, r_shelf, shelf_h, desc_depth):
-    """Draw unified baseline shelf + left & right descenders for Д / д."""
-    sw = p.v
-    rnd = m.roundness
-    ext = (r_shelf - l_shelf) * 0.05
-    desc_w = min(sw * (0.82 if cap else 0.78), (r_shelf - l_shelf) * 0.22)
-    desc_r = desc_w * 0.50 * rnd
-    shelf_r = min(max(ext, sw * 0.16) * 0.85, shelf_h * 0.48) * rnd
-    verts = [
-        (l_shelf, -desc_depth),
-        (l_shelf, shelf_h),
-        (r_shelf, shelf_h),
-        (r_shelf, -desc_depth),
-        (r_shelf - desc_w, -desc_depth),
-        (r_shelf - desc_w, 0.0),
-        (l_shelf + desc_w, 0.0),
-        (l_shelf + desc_w, -desc_depth),
+def _draw_lintel(p, m):
+    """Draw a straight, gently rounded Л/л with an open counter."""
+    left, right = p.left, p.right
+    stem = min(p.v, p.width * 0.34)
+    left_stem = stem * 0.89
+    sweep = min(p.width * 0.26, p.width * 0.85 - stem - left_stem)
+    bottom = -m.rond_ov(p.cap)
+    bar_h = min(_bar_thickness(m, p.cap, "u_bar" if p.cap else "arch"), p.top * 0.27)
+    inner_top = p.top - bar_h
+    inner_sweep = (inner_top - bottom) / (p.top - bottom)
+    top_left = left + sweep
+    points = [
+        (left, bottom),
+        (top_left, p.top),
+        (right, p.top),
+        (right, bottom),
+        (right - stem, bottom),
+        (right - stem, inner_top),
+        (left + left_stem + sweep * inner_sweep, inner_top),
+        (left + left_stem, bottom),
     ]
-    radii = [desc_r, shelf_r, shelf_r, desc_r, desc_r, None, None, desc_r]
-    p.polygon(verts, corner_radii=radii)
+    shoulder = min(stem * 0.48, bar_h * 0.66) * m.roundness
+    inner = min(stem, bar_h) * 0.12 * m.roundness
+    left_foot = left_stem * 0.43 * m.roundness
+    right_foot = stem * 0.48 * m.roundness
+    p.polygon(points, corner_radii=(
+        left_foot, shoulder, shoulder, right_foot, right_foot, inner, inner, left_foot,
+    ))
+    return (top_left + right) * 0.5
+
+
+def _draw_de(p, m, *, shelf_h, desc_depth):
+    """Draw a mirrored roof and a wider, rounded base for Д/д."""
+    rnd = m.roundness
+    spread = min(p.width * 0.038, p.v * 0.25)
+    left, right = p.left + spread, p.right + spread
+    shelf_left, shelf_right = p.left, p.right + 2.0 * spread
+    inset = min(p.v * 0.52, p.width * 0.098)
+    body_width = p.width - 2.0 * inset
+    stem = min(p.v, body_width * 0.31)
+    sweep = min(body_width * 0.108, body_width * 0.425 - stem)
+    wall_bottom = shelf_h * 0.45
+    side_at_shelf = inset + sweep * (shelf_h - wall_bottom) / (p.top - wall_bottom)
+    bar_h = min(_bar_thickness(m, p.cap, "u_bar" if p.cap else "arch"), p.top * 0.27)
+    inner_top = p.top - bar_h
+    inner_inset = inset + stem + sweep * (inner_top - wall_bottom) / (p.top - wall_bottom)
+
+    soft = 0.12 + 0.88 * rnd
+    desc_w = min(p.v * (0.91 if p.cap else 0.88), (shelf_right - shelf_left) * 0.22)
+    desc_r = desc_w * 0.50 * soft
+    shelf_r = min((side_at_shelf + spread) * 0.58, shelf_h * 0.52) * soft
+    join = min(side_at_shelf + spread, shelf_h) * 0.24 * soft
+    underside = min(shelf_h * 0.28, desc_w * 0.20) * soft
+    shoulder = min(stem * 0.48, bar_h * 0.66) * rnd
+    inner = min(stem, bar_h) * 0.12 * rnd
+    counter_bottom = min(shelf_h * 0.20, stem * 0.15) * soft
+    outline = [
+        (shelf_left, -desc_depth),
+        (shelf_left, shelf_h),
+        (left + side_at_shelf, shelf_h),
+        (left + inset + sweep, p.top),
+        (right - inset - sweep, p.top),
+        (right - side_at_shelf, shelf_h),
+        (shelf_right, shelf_h),
+        (shelf_right, -desc_depth),
+        (shelf_right - desc_w, -desc_depth),
+        (shelf_right - desc_w, 0.0),
+        (shelf_left + desc_w, 0.0),
+        (shelf_left + desc_w, -desc_depth),
+    ]
+    p.polygon(outline, corner_radii=(
+        desc_r, shelf_r, join, shoulder, shoulder, join,
+        shelf_r, desc_r, desc_r, underside, underside, desc_r,
+    ))
+    p.polygon([
+        (left + side_at_shelf + stem, shelf_h),
+        (left + inner_inset, inner_top),
+        (right - inner_inset, inner_top),
+        (right - side_at_shelf - stem, shelf_h),
+    ], hole=True, corner_radii=(counter_bottom, inner, inner, counter_bottom))
+    p.outline.advance += 2.0 * spread
 
 
 def _draw_u_comb(
@@ -843,10 +899,9 @@ def draw_arch_letters(d):
             left=52 if cap else 46,
             right=160 if cap else 126,
         )
-        _draw_el_contour(p, m, cap, l_body=p.left, r_body=p.right)
+        roof_center = _draw_lintel(p, m)
         put("Лл", p)
-        el_l, _, el_r, _ = p.outline.bounds()
-        d.set_anchor_x("Л" if cap else "л", el_l + (el_r - el_l) * 0.56)
+        d.set_anchor_x("Л" if cap else "л", roof_center)
 
         # --- Д / д ---
         p = d.adv_letter(
@@ -856,45 +911,15 @@ def draw_arch_letters(d):
             left=48 if cap else 44,
             right=48 if cap else 44,
         )
-        shelf_h = min(_bar_thickness(m, cap, "shelf"), p.top * 0.18)
-        if cap:
-            ext_l = ext_r = min(p.v * 0.60, p.width * 0.10)
-            max_sweep = min((p.width - ext_l - ext_r) * 0.085, 45.0 + p.v * 0.17)
-        else:
-            ext_l = ext_r = min(p.v * 0.49, p.width * 0.095)
-            max_sweep = min((p.width - ext_l - ext_r) * 0.085, 36.0 + p.v * 0.16)
-        _draw_el_contour(
+        shelf_h = min(_bar_thickness(m, cap, "shelf") * 1.06, p.top * 0.197)
+        _draw_de(
             p,
             m,
-            cap,
-            l_body=p.left + ext_l,
-            r_body=p.right - ext_r,
-            foot_y=shelf_h * 0.45,
-            stem_bot=shelf_h * 0.45,
-            round_foot=False,
-            round_right_bot=False,
-            max_sweep=max_sweep,
-            leg_scale=0.96,
-        )
-        top_edge = [x for x, y, on in p.outline.contours[0] if on and y == p.top]
-        top_center = (min(top_edge) + max(top_edge)) * 0.5
-        body_left, _, body_right, _ = p.outline.bounds()
-        # Align the top bar over the shelf while keeping both feet inside it.
-        half_body = max(top_center - body_left, body_right - top_center)
-        scale = min(1.0, (p.width * 0.5) / half_body)
-        p.outline.contours = p.outline.transform(sx=scale, dx=p.mid - top_center * scale).contours
-        _draw_de_shelf(
-            p,
-            m,
-            cap,
-            l_shelf=p.left,
-            r_shelf=p.right,
             shelf_h=shelf_h,
-            desc_depth=330.0 if cap else 232.0,
+            desc_depth=355.0 if cap else 259.0,
         )
         put("Дд", p)
-        de_l, _, de_r, _ = p.outline.bounds()
-        d.set_anchor_x("Д" if cap else "д", de_l + (de_r - de_l) * 0.50)
+        d.set_anchor_x("Д" if cap else "д", p.outline.advance * 0.50)
 
         # --- Ш / ш ---
         p = d.adv_letter(cap, adv_ratio=1.03 if cap else 0.89, ref="M" if cap else "m")
