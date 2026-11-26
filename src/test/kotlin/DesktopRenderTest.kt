@@ -25,6 +25,7 @@ import org.jetbrains.skia.FontMgr
 import org.jetbrains.skia.FontVariation
 import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Surface
+import org.jetbrains.skia.shaper.Shaper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -62,9 +63,35 @@ class DesktopRenderTest {
                     )
                     checkNotNull(typeface.makeClone(variations)).use { heavy ->
                         SkiaFont(heavy, 44f).use { font ->
-                            for ((letter, vertical) in listOf("ф" to false, "ө" to true, "ꚛ" to false)) {
+                            for ((letter, vertical) in listOf("Ф" to false, "ф" to false, "ө" to true, "ꚛ" to false)) {
                                 assertTrue("$letter at weight $weight, roundness $roundness",
                                     hasTwoOpenings(font, letter, vertical))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun russianTextPairsKernInSkia() {
+        Data.makeFromBytes(flexFontBytes()).use { data ->
+            checkNotNull(FontMgr.default.makeFromData(data)).use { typeface ->
+                for (roundness in listOf(0f, 100f)) {
+                    val variations = arrayOf(
+                        FontVariation("wght", 600f), FontVariation("ROND", roundness),
+                        FontVariation("opsz", 14f),
+                    )
+                    checkNotNull(typeface.makeClone(variations)).use { variant ->
+                        SkiaFont(variant, 80f).use { font ->
+                            Shaper.make().use { shaper ->
+                                fun width(text: String) = shaper.shapeLine(text, font).use { it.width }
+                                for (pair in listOf("тр", "тв", "ет", "ст", "св", "гк")) {
+                                    val separated = width(pair.take(1)) + width(pair.takeLast(1))
+                                    val adjustment = separated - width(pair)
+                                    assertTrue("$pair at roundness $roundness kerned by $adjustment pixels", adjustment > 1f)
+                                }
                             }
                         }
                     }
