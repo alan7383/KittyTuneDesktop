@@ -74,8 +74,8 @@ internal class IndexedSetting(val entry: SettingsSearchEntry) {
     fun rank(phrase: String, tokens: List<String>): Int? {
         if (phrase == titlePhrase) return 0
         if (phrase == englishTitle) return 1
-        if (tokens.all(titleWords::hasPrefix)) return 2
-        if (phrase in phrases) return 3
+        if (phrase in phrases) return 2
+        if (tokens.all(titleWords::hasPrefix)) return 3
         if (tokens.all { titleWords.hasPrefix(it) || aliasWords.hasPrefix(it) }) return 4
         if (tokens.any { it in titleWords } && tokens.all {
                 titleWords.hasPrefix(it) || aliasWords.hasPrefix(it) || breadcrumbWords.hasPrefix(it)

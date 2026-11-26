@@ -23,6 +23,8 @@ import com.alananasss.kittytune.ui.common.SettingsHighlight
 import com.alananasss.kittytune.ui.common.SettingsHighlightScope
 import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.profile.SettingsCategory
+import com.alananasss.kittytune.ui.profile.IndexedSetting
+import com.alananasss.kittytune.ui.profile.SettingsSearchEntry
 import com.alananasss.kittytune.ui.profile.SettingsPlace
 import com.alananasss.kittytune.ui.profile.SettingsSubPage
 import com.alananasss.kittytune.ui.profile.buildSettingsSearchCatalog
@@ -139,6 +141,42 @@ class SettingsSearchTest {
             assertEquals("settings_cat_interface", interfaceMatches.first().entry.titleKey)
             assertTrue(interfaceMatches.none { it.entry.titleKey == "pref_font" })
             assertTrue(searchSettings(index, "  !!! ").isEmpty())
+        }
+    }
+
+    @Test
+    fun testExactAliasesRankBeforePartialTitlesButAfterExactTitles() {
+        withLanguage("en") {
+            val place = SettingsPlace(SettingsCategory.PERFORMANCE)
+            val exactAlias = IndexedSetting(SettingsSearchEntry("test_alias", place,
+                displayTitle = "Graphics card", aliases = listOf("adapter")))
+            val partialTitle = IndexedSetting(SettingsSearchEntry("test_partial", place,
+                displayTitle = "Adapter acceleration"))
+            val exactTitle = IndexedSetting(SettingsSearchEntry("test_exact", place,
+                displayTitle = "Adapter"))
+            assertEquals(listOf(exactAlias, partialTitle), searchSettings(listOf(partialTitle, exactAlias), "adapter"))
+            assertEquals(listOf(exactTitle, exactAlias, partialTitle),
+                searchSettings(listOf(partialTitle, exactAlias, exactTitle), "adapter"))
+        }
+    }
+
+    @Test
+    fun testPerformanceControlsKeepTheirOldSearchTermsAndNewLabels() {
+        withLanguage("en") {
+            val index = buildSettingsSearchIndex("Windows", emptyList())
+            val queries = mapOf(
+                "performance_image_cache" to listOf("artwork memory cache", "covers kept in memory"),
+                "performance_gpu_cache" to listOf("graphics resource cache", "memory for drawing"),
+                "performance_disk_cache" to listOf("artwork disk cache", "covers saved on disk"),
+                "performance_vsync" to listOf("vsync", "vertical synchronization", "keep motion in step with the screen"),
+                "performance_gpu" to listOf("gpu", "preferred gpu", "graphics card"),
+                "performance_renderer" to listOf("renderer", "drawing mode"),
+            )
+            for ((key, terms) in queries) for (term in terms) {
+                assertEquals(key, searchSettings(index, term).first().entry.highlightKey, term)
+            }
+            assertTrue(searchSettings(index, "gpu").any { it.entry.highlightKey == "karaoke_gpu_acceleration" })
+            assertEquals("karaoke_gpu_acceleration", searchSettings(index, "hardware gpu acceleration").first().entry.highlightKey)
         }
     }
 

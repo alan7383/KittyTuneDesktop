@@ -512,18 +512,23 @@ internal fun buildSettingsSearchCatalog(os: String): List<SettingsSearchEntry> =
         control("performance_reset")
     }
     controls(PERFORMANCE_GRAPHICS.place) {
-        control("performance_vsync", "performance_vsync_note")
+        control("performance_vsync", "performance_vsync_note",
+            aliases = listOf("vsync", "vertical sync", "vertical synchronization"))
         control("performance_renderer", "performance_renderer_note",
-            aliases = PerformanceSettings.renderers(os).map { it.name },
+            aliases = PerformanceSettings.renderers(os).map { it.name } + listOf("renderer", "rendering mode"),
             aliasKeys = listOf("performance_software"))
         control("performance_gpu", "performance_gpu_note",
+            aliases = listOf("gpu", "preferred gpu", "graphics card", "video card"),
             aliasKeys = listOf("performance_integrated", "performance_discrete"))
         if (windows) control("performance_windows_gpu", "performance_windows_gpu_note")
     }
     controls(PERFORMANCE_CACHES.place) {
-        control("performance_image_cache", "performance_cache_note")
-        control("performance_gpu_cache", "performance_cache_note")
-        control("performance_disk_cache", "performance_cache_note")
+        control("performance_image_cache", "performance_cache_note",
+            aliases = listOf("artwork memory cache", "artwork ram cache"))
+        control("performance_gpu_cache", "performance_cache_note",
+            aliases = listOf("graphics resource cache", "gpu cache", "vram cache"))
+        control("performance_disk_cache", "performance_cache_note",
+            aliases = listOf("artwork disk cache"))
     }
     controls(SOURCES_SERVICES.place) {
         control("SoundCloud", highlightKey = "sources_soundcloud", aliases = listOf("soundcloud sign in", "account"))

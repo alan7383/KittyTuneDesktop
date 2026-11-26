@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,15 +29,20 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.alananasss.kittytune.core.GraphicsDevices
+import com.alananasss.kittytune.core.GraphicsInUse
 import com.alananasss.kittytune.core.PerformanceGpu
 import com.alananasss.kittytune.core.PerformanceOptions
 import com.alananasss.kittytune.core.PerformancePreset
 import com.alananasss.kittytune.core.PerformanceRenderer
 import com.alananasss.kittytune.core.PerformanceSettings
 import com.alananasss.kittytune.core.Prefs
+import com.alananasss.kittytune.core.WindowsGraphicsDevices
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
@@ -132,10 +138,36 @@ private val StackedAlbumCovers = ImageVector.Builder(
 }.build()
 
 @Composable
-internal fun PerformanceGraphicsPage() {
+internal fun PerformanceGraphicsPage(
+    loadDevices: () -> GraphicsDevices? = { runCatching { WindowsGraphicsDevices.read() }.getOrNull() },
+    loadGraphics: () -> GraphicsInUse = { runCatching { GraphicsInUse.current() }.getOrDefault(GraphicsInUse(null, false)) },
+) {
     val options = savedPerformanceOptions()
     val os = remember { System.getProperty("os.name") }
     var openError by remember { mutableStateOf(false) }
+    var devices by remember { mutableStateOf<GraphicsDevices?>(null) }
+    var detected by remember { mutableStateOf(false) }
+    var inUse by remember { mutableStateOf(GraphicsInUse(null, false)) }
+    val windows = os.startsWith("Windows", true)
+    LaunchedEffect(Unit) {
+        inUse = loadGraphics()
+        if (windows) devices = withContext(Dispatchers.IO) { loadDevices() }
+        detected = true
+    }
+    val available = devices
+    val allDevices = available?.devices.orEmpty()
+    val selectableDevices = allDevices.filter { available?.preference(it.id) != null }
+    val actual = inUse
+    val currentDevice = if (actual.software) str("performance_cpu") else actual.name ?: str("performance_unknown")
+    PerformanceNote(str("performance_in_use", currentDevice))
+    val active = PerformanceSettings.active
+    val requestedName = active.gpuName
+    if (windows && active.gpuId != null && requestedName != null &&
+        PerformanceSettings.gpuPreferenceSupported(active.renderer, os) &&
+        (actual.software || (actual.name != null && !actual.matches(requestedName)))
+    ) {
+        PerformanceNote(str("performance_gpu_mismatch", requestedName), color = MaterialTheme.colorScheme.error)
+    }
 
     SettingsGroup(items = buildList {
         add { shape ->
@@ -146,28 +178,54 @@ internal fun PerformanceGraphicsPage() {
                 choices = PerformanceSettings.renderers(os).map { renderer ->
                     renderer to when (renderer) {
                         PerformanceRenderer.AUTO -> str("performance_auto")
-                        PerformanceRenderer.DIRECT3D -> "Direct3D"
-                        PerformanceRenderer.OPENGL -> "OpenGL"
+                        PerformanceRenderer.DIRECT3D -> str("performance_windows_rendering")
+                        PerformanceRenderer.OPENGL -> str("performance_compatible_rendering")
                         PerformanceRenderer.SOFTWARE_COMPAT -> str("performance_software")
-                        PerformanceRenderer.METAL -> "Metal"
+                        PerformanceRenderer.METAL -> str("performance_macos_rendering")
                     }
                 },
                 subtitleKey = "performance_renderer_note",
             ) { Prefs.putString(PerformanceSettings.RENDERER, it.name) }
         }
         add { shape ->
-            PerformanceChoice(
-                shape = shape,
-                titleKey = "performance_gpu",
-                value = options.gpu,
-                choices = listOf(
-                    PerformanceGpu.AUTO to str("performance_auto"),
-                    PerformanceGpu.INTEGRATED to str("performance_integrated"),
-                    PerformanceGpu.DISCRETE to str("performance_discrete"),
-                ),
-                subtitleKey = "performance_gpu_note",
-                enabled = PerformanceSettings.gpuPreferenceSupported(options.renderer, os),
-            ) { Prefs.putString(PerformanceSettings.GPU, it.name) }
+            if (windows && !detected) {
+                SettingsItem(
+                    shape = shape,
+                    title = str("performance_gpu"),
+                    subtitle = str("performance_detecting"),
+                    highlightKey = "performance_gpu",
+                    enabled = false,
+                )
+            } else if (windows && (available != null || options.gpuId != null)) {
+                val selectedId = options.gpuId ?: when (options.gpu) {
+                    PerformanceGpu.AUTO -> null
+                    PerformanceGpu.INTEGRATED -> available?.powerSaving
+                    PerformanceGpu.DISCRETE -> available?.highPerformance
+                }
+                PerformanceChoice(
+                    shape = shape,
+                    titleKey = "performance_gpu",
+                    value = selectedId,
+                    choices = listOf(null to str("performance_auto")) + selectableDevices.map { it.id to it.name },
+                    subtitleKey = "performance_named_gpu_note",
+                    enabled = PerformanceSettings.gpuPreferenceSupported(options.renderer, os),
+                    fallbackLabel = options.gpuName.takeIf { options.gpuId != null },
+                ) { id -> PerformanceSettings.selectGpu(selectableDevices.firstOrNull { it.id == id }, available) }
+            } else {
+                PerformanceChoice(
+                    shape = shape,
+                    titleKey = "performance_gpu",
+                    value = options.gpu,
+                    choices = listOf(
+                        PerformanceGpu.AUTO to str("performance_auto"),
+                        PerformanceGpu.INTEGRATED to str("performance_integrated"),
+                        PerformanceGpu.DISCRETE to str("performance_discrete"),
+                    ),
+                    subtitleKey = "performance_gpu_note",
+                    enabled = PerformanceSettings.gpuPreferenceSupported(options.renderer, os),
+                    onSelect = PerformanceSettings::selectGpuPreference,
+                )
+            }
         }
         add { shape ->
             SettingsItem(
@@ -180,7 +238,7 @@ internal fun PerformanceGraphicsPage() {
                 onSwitchChange = { Prefs.putBoolean(PerformanceSettings.VSYNC, it) },
             )
         }
-        if (os.startsWith("Windows", ignoreCase = true)) {
+        if (windows) {
             add { shape ->
                 SettingsItem(
                     shape = shape,
@@ -196,6 +254,16 @@ internal fun PerformanceGraphicsPage() {
             }
         }
     })
+    if (windows && detected && allDevices.isEmpty()) {
+        PerformanceNote(str("performance_detection_failed"))
+    }
+    if (options.gpuId != null && available != null && available.preference(options.gpuId) == null) {
+        PerformanceNote(str("performance_gpu_missing", options.gpuName ?: str("performance_unknown")))
+    }
+    val otherDevices = (allDevices - selectableDevices.toSet()).map { it.name }.distinct()
+    if (otherDevices.isNotEmpty()) {
+        PerformanceNote(str("performance_gpu_other", otherDevices.joinToString()))
+    }
     if (openError) {
         PerformanceNote(str("performance_windows_gpu_error"), color = MaterialTheme.colorScheme.error)
     }
@@ -253,6 +321,7 @@ private fun <T> PerformanceChoice(
     choices: List<Pair<T, String>>,
     subtitleKey: String? = null,
     enabled: Boolean = true,
+    fallbackLabel: String? = null,
     onSelect: (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -262,7 +331,7 @@ private fun <T> PerformanceChoice(
         title = title,
         subtitle = subtitleKey?.let { str(it) },
         highlightKey = titleKey,
-        trailingText = choices.firstOrNull { it.first == value }?.second,
+        trailingText = choices.firstOrNull { it.first == value }?.second ?: fallbackLabel,
         enabled = enabled,
         onClick = { expanded = true },
     )

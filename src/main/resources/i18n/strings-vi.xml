@@ -3805,4 +3805,16 @@
     <string name="pet_status_hinting">Có ý này</string>
     <string name="pet_status_grumpy">Không thích</string>
     <string name="pet_status_surprised">Giật mình</string>
+    <string name="performance_in_use">Đang sử dụng: %s</string>
+    <string name="performance_cpu">CPU (không dùng card đồ họa)</string>
+    <string name="performance_unknown">Trình điều khiển không báo cáo</string>
+    <string name="performance_gpu_mismatch">KittyTune hiện không dùng card đồ họa đã chọn (%s). Hãy thử cài đặt đồ họa Windows bên dưới.</string>
+    <string name="performance_named_gpu_note">Chọn card rồi khởi động lại. Trong chế độ tương thích, hãy chọn trong cài đặt Windows bên dưới.</string>
+    <string name="performance_detection_failed">Không thể liệt kê card đồ họa. Dùng cài đặt đồ họa Windows bên dưới.</string>
+    <string name="performance_gpu_missing">%s không khả dụng. Chọn card khác hoặc Tự động.</string>
+    <string name="performance_gpu_other">Chọn các card này trong cài đặt Windows: %s</string>
+    <string name="performance_detecting">Đang tìm card đồ họa…</string>
+    <string name="performance_windows_rendering">Đồ họa Windows</string>
+    <string name="performance_compatible_rendering">Chế độ tương thích</string>
+    <string name="performance_macos_rendering">Đồ họa macOS</string>
 </resources>

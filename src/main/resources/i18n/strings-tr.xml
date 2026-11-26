@@ -3725,4 +3725,16 @@
     <string name="pet_status_hinting">Bir fikri var</string>
     <string name="pet_status_grumpy">Pek sevmedi</string>
     <string name="pet_status_surprised">Irkildi</string>
+    <string name="performance_in_use">Şu anda kullanılan: %s</string>
+    <string name="performance_cpu">İşlemci (ekran kartı olmadan)</string>
+    <string name="performance_unknown">Sürücü bildirmedi</string>
+    <string name="performance_gpu_mismatch">KittyTune şu anda istenen ekran kartını (%s) kullanmıyor. Aşağıdaki Windows grafik ayarlarını deneyin.</string>
+    <string name="performance_named_gpu_note">Bir kart seçip yeniden başlatın. Uyumluluk modunda aşağıdaki Windows ayarlarından seçin.</string>
+    <string name="performance_detection_failed">Ekran kartları listelenemedi. Aşağıdaki Windows grafik ayarlarını kullanın.</string>
+    <string name="performance_gpu_missing">%s kullanılamıyor. Başka bir kart veya Otomatik seçin.</string>
+    <string name="performance_gpu_other">Bu kartları Windows ayarlarında seçin: %s</string>
+    <string name="performance_detecting">Ekran kartları aranıyor…</string>
+    <string name="performance_windows_rendering">Windows grafikleri</string>
+    <string name="performance_compatible_rendering">Uyumluluk modu</string>
+    <string name="performance_macos_rendering">macOS grafikleri</string>
 </resources>
