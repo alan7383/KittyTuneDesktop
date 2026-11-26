@@ -23,6 +23,8 @@ import com.alananasss.kittytune.ui.common.SettingsHighlight
 import com.alananasss.kittytune.ui.common.SettingsHighlightScope
 import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.ui.profile.SettingsCategory
+import com.alananasss.kittytune.ui.profile.IndexedSetting
+import com.alananasss.kittytune.ui.profile.SettingsSearchEntry
 import com.alananasss.kittytune.ui.profile.SettingsPlace
 import com.alananasss.kittytune.ui.profile.SettingsSubPage
 import com.alananasss.kittytune.ui.profile.buildSettingsSearchCatalog
@@ -143,6 +145,22 @@ class SettingsSearchTest {
     }
 
     @Test
+    fun testExactAliasesRankBeforePartialTitlesButAfterExactTitles() {
+        withLanguage("en") {
+            val place = SettingsPlace(SettingsCategory.PERFORMANCE)
+            val exactAlias = IndexedSetting(SettingsSearchEntry("test_alias", place,
+                displayTitle = "Graphics card", aliases = listOf("adapter")))
+            val partialTitle = IndexedSetting(SettingsSearchEntry("test_partial", place,
+                displayTitle = "Adapter acceleration"))
+            val exactTitle = IndexedSetting(SettingsSearchEntry("test_exact", place,
+                displayTitle = "Adapter"))
+            assertEquals(listOf(exactAlias, partialTitle), searchSettings(listOf(partialTitle, exactAlias), "adapter"))
+            assertEquals(listOf(exactTitle, exactAlias, partialTitle),
+                searchSettings(listOf(partialTitle, exactAlias, exactTitle), "adapter"))
+        }
+    }
+
+    @Test
     fun testPerformanceControlsKeepTheirOldSearchTermsAndNewLabels() {
         withLanguage("en") {
             val index = buildSettingsSearchIndex("Windows", emptyList())
@@ -157,6 +175,8 @@ class SettingsSearchTest {
             for ((key, terms) in queries) for (term in terms) {
                 assertEquals(key, searchSettings(index, term).first().entry.highlightKey, term)
             }
+            assertTrue(searchSettings(index, "gpu").any { it.entry.highlightKey == "karaoke_gpu_acceleration" })
+            assertEquals("karaoke_gpu_acceleration", searchSettings(index, "hardware gpu acceleration").first().entry.highlightKey)
         }
     }
 
