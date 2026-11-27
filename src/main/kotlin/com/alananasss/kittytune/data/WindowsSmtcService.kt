@@ -86,9 +86,9 @@ class WindowsSmtcService(
     ) {
         if (!enabled) return
         val update = Update(
-            title = track?.title.orEmpty(),
+            title = track?.displayTitle.orEmpty(),
             artist = track?.displayArtist.orEmpty(),
-            album = (track?.publisherMetadata?.albumTitle ?: track?.publisherMetadata?.releaseTitle).orEmpty(),
+            album = track?.displayAlbumTitle.orEmpty(),
             artwork = track?.fullResArtwork.orEmpty(),
             playing = isPlaying,
             positionMs = positionMs.coerceAtLeast(0L),

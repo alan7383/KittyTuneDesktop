@@ -219,7 +219,7 @@ fun ExpandedQueueScreen(
                                     .alpha(itemAlpha)
                             ) {
                                 Text(
-                                    text = track.title
+                                    text = track.displayTitle
                                         ?: str("generic_title"),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,

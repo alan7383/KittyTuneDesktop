@@ -617,12 +617,12 @@ class MprisService(
                 return meta
             }
             meta["mpris:trackid"] = Variant(DBusPath(trackObjectPath(track.id)), "o")
-            meta["xesam:title"] = Variant(track.title ?: "", "s")
+            meta["xesam:title"] = Variant(track.displayTitle.orEmpty(), "s")
             val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
             if (artist.isNotBlank()) meta["xesam:artist"] = Variant(arrayOf(artist), "as")
             val albumArtist = track.publisherMetadata?.artist?.takeIf { it.isNotBlank() }
             if (!albumArtist.isNullOrBlank()) meta["xesam:albumArtist"] = Variant(arrayOf(albumArtist), "as")
-            val album = track.publisherMetadata?.albumTitle ?: track.publisherMetadata?.releaseTitle
+            val album = track.displayAlbumTitle
             if (!album.isNullOrBlank()) meta["xesam:album"] = Variant(album, "s")
             track.permalinkUrl?.takeIf { it.isNotBlank() }?.let { meta["xesam:url"] = Variant(it, "s") }
             // Local covers must remain literal paths: the SoundCloud size substitution in

@@ -126,7 +126,7 @@ private fun TitleAndArtist(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = track.title ?: "",
+                text = track.displayTitle.orEmpty(),
                 style = if (isLarge) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,

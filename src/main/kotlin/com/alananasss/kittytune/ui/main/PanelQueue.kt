@@ -391,7 +391,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = track.title ?: "",
+                text = track.displayTitle.orEmpty(),
                 style = if (isCompact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                 color = if (isCurrent) scheme.onSecondaryContainer else scheme.onSurface,

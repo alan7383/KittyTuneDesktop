@@ -2407,7 +2407,7 @@ fun TrackListItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = track.title ?: str("untitled_track"),
+                        text = track.displayTitle ?: str("untitled_track"),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = titleWeight,
@@ -2662,7 +2662,7 @@ fun TrackTableItem(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = track.title ?: str("untitled_track"),
+                            text = track.displayTitle ?: str("untitled_track"),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontWeight = titleWeight,
@@ -2713,12 +2713,12 @@ fun TrackTableItem(
                     val albumId = resolved.info.playlistId
                     if (albumId != null) {
                         AlbumHoverLink(
-                            text = resolved.info.title,
+                            text = track.albumTitleForDisplay(resolved.info.title) ?: resolved.info.title,
                             onClick = { onAlbumClick(albumId.toString()) }
                         )
                     } else {
                         Text(
-                            text = resolved.info.title,
+                            text = track.albumTitleForDisplay(resolved.info.title) ?: resolved.info.title,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -2995,7 +2995,7 @@ fun TrackCompactItem(
             Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Row(modifier = Modifier.weight(TrackCompactColumns.title), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = track.title ?: str("untitled_track"),
+                        text = track.displayTitle ?: str("untitled_track"),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = titleWeight,
@@ -3036,12 +3036,12 @@ fun TrackCompactItem(
                             val albumId = resolved.info.playlistId
                             if (albumId != null) {
                                 AlbumHoverLink(
-                                    text = resolved.info.title,
+                                    text = track.albumTitleForDisplay(resolved.info.title) ?: resolved.info.title,
                                     onClick = { onAlbumClick(albumId.toString()) }
                                 )
                             } else {
                                 Text(
-                                    text = resolved.info.title,
+                                    text = track.albumTitleForDisplay(resolved.info.title) ?: resolved.info.title,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,

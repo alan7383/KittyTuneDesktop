@@ -117,10 +117,9 @@ class MacNowPlayingService(
 
         val fields = listOf(
             "UPDATE",
-            track.title.orEmpty(),
+            track.displayTitle.orEmpty(),
             track.displayArtist,
-            (track.publisherMetadata?.albumTitle
-                ?: track.publisherMetadata?.releaseTitle).orEmpty(),
+            track.displayAlbumTitle.orEmpty(),
             track.fullResArtwork.orEmpty(),
             if (playing) "1" else "0",
             position.coerceAtLeast(0).toString(),

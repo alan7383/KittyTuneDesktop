@@ -250,7 +250,7 @@ fun PlayerBar(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = track.title.orEmpty(),
+                                        text = track.displayTitle.orEmpty(),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,

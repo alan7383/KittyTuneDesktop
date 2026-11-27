@@ -1304,7 +1304,7 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 androidx.compose.material3.Text(
-                    text = track.title ?: "",
+                    text = track.displayTitle.orEmpty(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     color = palette.bright,
@@ -1338,7 +1338,7 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                 // is one line instead of two for something nobody needs two lines of.
                 text = listOfNotNull(
                     track.displayArtist.takeIf { it.isNotBlank() } ?: track.user?.username?.takeIf { it.isNotBlank() },
-                    track.publisherMetadata?.albumTitle?.takeIf { it.isNotBlank() },
+                    track.displayAlbumTitle,
                 ).joinToString(" — "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = palette.dim,

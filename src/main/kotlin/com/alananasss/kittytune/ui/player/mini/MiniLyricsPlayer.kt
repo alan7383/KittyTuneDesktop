@@ -849,7 +849,8 @@ private fun MiniLyricsContent(
     }
     val trackInfo = track?.let {
         val artist = it.displayArtist.ifBlank { it.user?.username.orEmpty() }
-        if (artist.isNotBlank()) "${it.title.orEmpty()} • $artist" else it.title.orEmpty()
+        val title = it.displayTitle.orEmpty()
+        if (artist.isNotBlank()) "$title • $artist" else title
     }.orEmpty()
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -965,7 +966,7 @@ private fun MiniLyricsContent(
                     else -> {
                         Column(verticalArrangement = Arrangement.Center) {
                             Text(
-                                text = track.title ?: "",
+                                text = track.displayTitle.orEmpty(),
                                 style = MaterialTheme.typography.titleMedium.copy(shadow = textShadow),
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -1126,11 +1127,11 @@ private fun MiniLyricsElongatedContent(
     val textPlan = remember(contentMode, lyricLine != null) {
         resolveMiniPlayerTextPlan(contentMode, lyricLine != null)
     }
-    val trackInfo = remember(track?.title, track?.displayArtist, track?.user?.username) {
+    val trackInfo = remember(track?.displayTitle, track?.displayArtist, track?.user?.username) {
         val current = track
         if (current == null) "" else {
             val artist = current.displayArtist.ifBlank { current.user?.username.orEmpty() }
-            val title = current.title.orEmpty()
+            val title = current.displayTitle.orEmpty()
             if (artist.isNotBlank()) "$title • $artist" else title
         }
     }

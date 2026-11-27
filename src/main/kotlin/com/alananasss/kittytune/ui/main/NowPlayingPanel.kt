@@ -177,7 +177,7 @@ fun NowPlayingPanel(
                 } else {
                     Text(
                         text = if (tab == NowPlayingTab.DEVICES) panelTabLabel(tab)
-                            else context?.displayText ?: track?.title.orEmpty(),
+                            else context?.displayText ?: track?.displayTitle.orEmpty(),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
