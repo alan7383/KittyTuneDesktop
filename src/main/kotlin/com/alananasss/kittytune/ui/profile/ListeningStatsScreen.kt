@@ -20,10 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -35,6 +41,7 @@ import com.alananasss.kittytune.data.stats.ActivityBucket
 import com.alananasss.kittytune.data.stats.ListeningReport
 import com.alananasss.kittytune.data.stats.ReportArtist
 import com.alananasss.kittytune.data.stats.ReportPeriod
+import com.alananasss.kittytune.ui.common.hapticAction
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
@@ -502,6 +509,64 @@ internal fun StatsCard(
             )
             Spacer(Modifier.height(12.dp))
             content()
+        }
+    }
+}
+
+/** Heading and quick action for the artist and arcade panels. */
+@Composable
+internal fun StatsPanelHeader(
+    title: String,
+    icon: ImageVector,
+    iconShape: Shape,
+    iconContainer: Color,
+    iconContent: Color,
+    actionLabel: String,
+    actionIcon: ImageVector,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+) {
+    val click = hapticAction(action = onAction)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(44.dp).background(iconContainer, iconShape), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = iconContent, modifier = Modifier.size(22.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (LocalDensity.current.fontScale >= 1.5f) {
+            FilledTonalIconButton(onClick = click, shapes = IconButtonDefaults.shapes()) {
+                Icon(actionIcon, contentDescription = actionLabel, modifier = Modifier.size(20.dp))
+            }
+        } else {
+            FilledTonalButton(
+                onClick = click,
+                shapes = ButtonDefaults.shapes(),
+                contentPadding = ButtonDefaults.SmallContentPadding,
+                modifier = Modifier.widthIn(max = 144.dp),
+            ) {
+                Text(
+                    text = actionLabel,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(actionIcon, contentDescription = null, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }

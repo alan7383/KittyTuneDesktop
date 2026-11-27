@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -190,12 +189,12 @@ private fun RecapCardContent(summary: RecapSummary, palette: RecapPalette, compa
     val period = summary.period
     Box(Modifier.fillMaxSize()) {
         SpinningShape(
-            polygon = period.polygon(),
-            color = palette.accent.copy(alpha = 0.22f),
+            polygon = period.artworkPolygon(),
+            color = palette.onContainer.copy(alpha = 0.18f),
             modifier = Modifier
-                .size(if (compact) 120.dp else 170.dp)
                 .align(Alignment.TopEnd)
-                .offset(x = 40.dp, y = (-36).dp),
+                .padding(top = 12.dp, end = 12.dp)
+                .size(if (compact) 88.dp else 124.dp),
         )
         Column(Modifier.fillMaxSize().padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

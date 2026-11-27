@@ -112,7 +112,7 @@ internal fun RecapSlide.palette(scheme: ColorScheme, recap: ListeningRecap): Rec
 }
 
 internal fun RecapSlide.polygon(recap: ListeningRecap): RoundedPolygon = when (this) {
-    RecapSlide.INTRO -> recap.period.polygon()
+    RecapSlide.INTRO -> recap.period.artworkPolygon()
     RecapSlide.TIME -> MaterialShapes.Cookie9Sided
     RecapSlide.FIRST -> MaterialShapes.Arch
     RecapSlide.TOP_ARTIST -> MaterialShapes.Cookie12Sided

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -50,27 +51,22 @@ internal fun GamesPlaytimeCard(window: ReportWindow, modifier: Modifier = Modifi
     val total = inPeriod.values.sum()
 
     Surface(shape = RoundedCornerShape(28.dp), color = scheme.surfaceContainer, modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(48.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(scheme.tertiaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.SportsEsports, null, tint = scheme.onTertiaryContainer, modifier = Modifier.size(26.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    com.alananasss.kittytune.ui.common.InlineSectionHeader(
-                        title = str("stats_games_title"),
-                        subtitle = if (allTime > 0) str("stats_games_all_time", formatDurationShort(allTime)) else str("stats_games_empty"),
-                        titleStyle = MaterialTheme.typography.titleMedium,
-                        titleFontWeight = FontWeight.SemiBold,
-                        actionTooltip = str("stats_games_play"),
-                        arrowSize = 22.dp,
-                        onAction = { ArcadeLauncher.open() },
-                    )
-                }
-            }
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            StatsPanelHeader(
+                title = str("stats_games_title"),
+                subtitle = if (allTime > 0) {
+                    str("stats_games_all_time", formatDurationShort(allTime))
+                } else {
+                    str("stats_games_empty")
+                },
+                icon = Icons.Rounded.SportsEsports,
+                iconShape = MaterialShapes.Cookie9Sided.toShape(),
+                iconContainer = scheme.tertiaryContainer,
+                iconContent = scheme.onTertiaryContainer,
+                actionLabel = str("stats_games_play"),
+                actionIcon = Icons.Rounded.PlayArrow,
+                onAction = { ArcadeLauncher.open() },
+            )
             if (total > 0) {
                 Spacer(Modifier.height(16.dp))
                 Text(

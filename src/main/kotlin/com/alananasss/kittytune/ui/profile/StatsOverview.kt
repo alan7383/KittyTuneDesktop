@@ -4,9 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -103,23 +100,12 @@ internal fun OverviewStats(
                 item { HabitsGrid(report, columns = if (isWide) 4 else 2) }
             }
             if (report.topArtists.isNotEmpty()) {
-                item {
-                    StatsCard(
-                        title = str("listening_stats_top_artists"),
-                        action = if (report.topArtists.size > 6) ({ onOpen(StatsList.ARTISTS) }) else null,
-                    ) {
-                        // One row of portrait cards, the artist's photo filling each, ranked: the way a streaming service
-                        // shows who you listen to, instead of a crowd of small circles.
-                        com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                            contentPadding = PaddingValues(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            fadeColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ) {
-                            itemsIndexed(report.topArtists.take(TOP_ARTISTS_SHOWN)) { index, artist ->
-                                TopArtistCard(index + 1, artist) { onArtistClick(artist) }
-                            }
-                        }
-                    }
+                item(key = "top_artists") {
+                    TopArtistsSection(
+                        artists = report.topArtists,
+                        onOpenAll = { onOpen(StatsList.ARTISTS) },
+                        onArtistClick = onArtistClick,
+                    )
                 }
             }
             item(key = "games") { GamesPlaytimeCard(report.window, columns = if (isWide) 2 else 1) }
@@ -478,40 +464,6 @@ internal fun PlaysAndTime(plays: Int, listenMs: Long) {
         Text(formatDuration(listenMs), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false)
     }
 }
-
-@Composable
-private fun TopArtistCard(rank: Int, artist: ReportArtist, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Box(
-        Modifier.size(width = 150.dp, height = 190.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick)
-            .pressScale(interaction),
-    ) {
-        StatsCover(artist.imageUrl, Modifier.fillMaxSize(), placeholder = Icons.Rounded.Person)
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.78f)),
-            ),
-        )
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-            modifier = Modifier.align(Alignment.TopStart).padding(10.dp).size(28.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(rank.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-            }
-        }
-        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 12.dp)) {
-            Text(artist.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
-        }
-    }
-}
-
-private const val TOP_ARTISTS_SHOWN = 12
 
 // ─── Habits ──────────────────────────────────────────────────────
 

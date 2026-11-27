@@ -30,7 +30,6 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -72,7 +71,7 @@ internal fun RecapPeriod.palette(scheme: ColorScheme): RecapPalette = when {
     else -> RecapPalette(scheme.inverseSurface, scheme.inverseOnSurface, scheme.inversePrimary, scheme.inverseSurface)
 }
 
-/** The expressive shape that stands for each kind: a flower for spring, a sun for summer… */
+/** The backing shape for the period icon. */
 internal fun RecapPeriod.polygon(): RoundedPolygon = when {
     kind == RecapKind.YEAR -> MaterialShapes.Cookie12Sided
     kind == RecapKind.MONTH -> MaterialShapes.Cookie9Sided
@@ -186,7 +185,6 @@ internal fun SpinningShape(
     Box(
         modifier
             .graphicsLayer { rotationZ = angle.value }
-            .clip(polygon.toShape())
-            .background(color)
+            .background(color, polygon.toShape())
     )
 }
