@@ -43,7 +43,7 @@ internal fun summarizeDiscordEffects(
     if (effects.isNightDriveEnabled) tags += "Night Drive"
     if (effects.isVocalRemoverEnabled) tags += "Instrumental"
     if (effects.isVocalBoostEnabled) tags += "Vocal Boost"
-    if (effects.isEarrapeEnabled) tags += "Overdrive"
+    if (effects.isEarrapeEnabled) tags += "Earrape"
     if (effects.isMonoEnabled) tags += "Mono"
     if (effects.isStadiumEnabled) tags += "Stadium"
     if (effects.isEmptyMallEnabled) tags += "Empty Mall"
