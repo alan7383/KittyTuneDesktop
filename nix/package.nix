@@ -30,16 +30,16 @@
 
 let
   pname = "kitty-tune";
-  version = "1.7.3";
+  version = "1.8.0";
 
   sources = {
     x86_64-linux = {
       arch = "amd64";
-      hash = "sha256-fl6UTsP/obQAbs3yJ447t+QHsmDnre3VO9dr0kmZIes=";
+      hash = "sha256-FxNMJKWutoo0WgQlIrKFiM6FqT05cGcd/9GrUzq7aT4=";
     };
     aarch64-linux = {
       arch = "arm64";
-      hash = "sha256-YkbBfn7BydUEbn3pNAJelHe7Bv4Zck9Op5NKA1Yotd0=";
+      hash = "sha256-vskjRadheJFO0wHXlDgsZ2xhykafKe8FjorYAPMJ4R8=";
     };
   };
 
