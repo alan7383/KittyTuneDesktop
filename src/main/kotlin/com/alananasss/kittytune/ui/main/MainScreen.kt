@@ -166,6 +166,100 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
         }
     }
 
+    androidx.compose.runtime.LaunchedEffect(
+        backStackEntry,
+        homeViewModel.isSearching,
+        homeViewModel.searchQuery,
+        playerViewModel.showLyricsSheet,
+        playerViewModel.currentTrack,
+    ) {
+        val kind: com.alananasss.kittytune.data.discord.DiscordBrowsingKind
+        val detail: String?
+        if (playerViewModel.showLyricsSheet) {
+            kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.LYRICS
+            detail = playerViewModel.currentTrack?.title
+        } else if (homeViewModel.isSearching) {
+            kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.SEARCHING
+            detail = homeViewModel.searchQuery.trim().takeIf { it.isNotEmpty() }
+        } else {
+            val route = backStackEntry?.destination?.route.orEmpty()
+            when {
+                route.startsWith("charts") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.CHARTS
+                    detail = null
+                }
+                route.startsWith("feed") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.FEED
+                    detail = null
+                }
+                route.startsWith("genres") || route.startsWith("genre_detail") || route.startsWith("genre_playlists") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.GENRES
+                    detail = null
+                }
+                route.startsWith("new_releases") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.NEW_RELEASES
+                    detail = null
+                }
+                route.startsWith("upload") || route.startsWith("edit_track") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.UPLOAD
+                    detail = null
+                }
+                route.startsWith("recognition") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.RECOGNITION
+                    detail = null
+                }
+                route.startsWith("listening_stats") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.STATS
+                    detail = null
+                }
+                route.startsWith("music_passport") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.PASSPORT
+                    detail = null
+                }
+                route.startsWith("recaps") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.RECAPS
+                    detail = null
+                }
+                route.startsWith("equalizer") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.EQUALIZER
+                    detail = null
+                }
+                route.startsWith("together") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.TOGETHER
+                    detail = null
+                }
+                route.startsWith("profile") || route.startsWith("followers") || route.startsWith("followings") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.PROFILE
+                    detail = null
+                }
+                route.startsWith("playlist_detail") || route.startsWith("playlist_fans") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.PLAYLIST
+                    detail = null
+                }
+                route.startsWith("history") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.HISTORY
+                    detail = null
+                }
+                route.startsWith("settings") || route.startsWith("sync_settings") || route.startsWith("proxy_settings") ||
+                    route.startsWith("provider_order") || route.startsWith("qobuz_settings") ||
+                    route.startsWith("tidal_settings") || route.startsWith("deezer_settings") ||
+                    route.startsWith("color_palette") || route.startsWith("player_design") || route.startsWith("credits") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.SETTINGS
+                    detail = null
+                }
+                route.startsWith("music_import") -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.IMPORT
+                    detail = null
+                }
+                else -> {
+                    kind = com.alananasss.kittytune.data.discord.DiscordBrowsingKind.HOME
+                    detail = null
+                }
+            }
+        }
+        playerViewModel.updateDiscordBrowsingContext(kind, detail)
+    }
+
     // Same navigation protocol as the Android MainScreen: PlayerViewModel exposes
     // destination ids ("likes", "profile:<id>", numeric playlist ids, ...) that we
     // translate into NavHost routes.

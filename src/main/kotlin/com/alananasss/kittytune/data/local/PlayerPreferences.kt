@@ -375,6 +375,15 @@ class PlayerPreferences {
         private const val KEY_PLAYER_BAR_TOGETHER_REACTIONS_MIGRATED = "player_bar_together_reactions_migrated"
         private const val KEY_DISCORD_LISTEN_ALONG = "discord_listen_along_enabled"
         private const val KEY_DISCORD_AUTO_LIVE = "discord_auto_live_enabled"
+        private const val KEY_DISCORD_SHOW_SONG = "discord_show_song"
+        private const val KEY_DISCORD_SHOW_BROWSING = "discord_show_browsing"
+        private const val KEY_DISCORD_HIDE_PAUSED = "discord_hide_paused"
+        private const val KEY_DISCORD_SHOW_TIMESTAMPS = "discord_show_timestamps"
+        private const val KEY_DISCORD_SHOW_COVER = "discord_show_cover"
+        private const val KEY_DISCORD_SHOW_LINKS = "discord_show_links"
+        private const val KEY_DISCORD_TITLE_PARSING = "discord_title_parsing"
+        private const val KEY_DISCORD_SHOW_EFFECTS = "discord_show_effects"
+        private const val KEY_DISCORD_SHOW_SEARCH_QUERY = "discord_show_search_query"
 
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(
@@ -830,8 +839,21 @@ class PlayerPreferences {
     internal fun discordRpcEnabledFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_DISCORD_ENABLED, true)
 
     internal fun discordSettingsFlow() = Prefs.flow.map { settings ->
-        listOf(KEY_DISCORD_ENABLED, KEY_DISCORD_STATUS_DISPLAY, KEY_DISCORD_LISTEN_ALONG, KEY_DISCORD_AUTO_LIVE)
-            .map(settings::get)
+        listOf(
+            KEY_DISCORD_ENABLED,
+            KEY_DISCORD_STATUS_DISPLAY,
+            KEY_DISCORD_LISTEN_ALONG,
+            KEY_DISCORD_AUTO_LIVE,
+            KEY_DISCORD_SHOW_SONG,
+            KEY_DISCORD_SHOW_BROWSING,
+            KEY_DISCORD_HIDE_PAUSED,
+            KEY_DISCORD_SHOW_TIMESTAMPS,
+            KEY_DISCORD_SHOW_COVER,
+            KEY_DISCORD_SHOW_LINKS,
+            KEY_DISCORD_TITLE_PARSING,
+            KEY_DISCORD_SHOW_EFFECTS,
+            KEY_DISCORD_SHOW_SEARCH_QUERY,
+        ).map(settings::get)
     }.distinctUntilChanged()
 
     fun getDiscordListenAlongEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_LISTEN_ALONG, true)
@@ -839,6 +861,33 @@ class PlayerPreferences {
 
     fun getDiscordAutoLiveEnabled(): Boolean = Prefs.getBoolean(KEY_DISCORD_AUTO_LIVE, false)
     fun setDiscordAutoLiveEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_AUTO_LIVE, enabled)
+
+    fun getDiscordShowSong(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_SONG, true)
+    fun setDiscordShowSong(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_SONG, enabled)
+
+    fun getDiscordShowBrowsing(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_BROWSING, true)
+    fun setDiscordShowBrowsing(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_BROWSING, enabled)
+
+    fun getDiscordHidePaused(): Boolean = Prefs.getBoolean(KEY_DISCORD_HIDE_PAUSED, false)
+    fun setDiscordHidePaused(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_HIDE_PAUSED, enabled)
+
+    fun getDiscordShowTimestamps(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_TIMESTAMPS, true)
+    fun setDiscordShowTimestamps(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_TIMESTAMPS, enabled)
+
+    fun getDiscordShowCover(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_COVER, true)
+    fun setDiscordShowCover(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_COVER, enabled)
+
+    fun getDiscordShowLinks(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_LINKS, true)
+    fun setDiscordShowLinks(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_LINKS, enabled)
+
+    fun getDiscordTitleParsing(): Boolean = Prefs.getBoolean(KEY_DISCORD_TITLE_PARSING, true)
+    fun setDiscordTitleParsing(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_TITLE_PARSING, enabled)
+
+    fun getDiscordShowEffects(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_EFFECTS, true)
+    fun setDiscordShowEffects(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_EFFECTS, enabled)
+
+    fun getDiscordShowSearchQuery(): Boolean = Prefs.getBoolean(KEY_DISCORD_SHOW_SEARCH_QUERY, true)
+    fun setDiscordShowSearchQuery(enabled: Boolean) = Prefs.putBoolean(KEY_DISCORD_SHOW_SEARCH_QUERY, enabled)
 
     /** The line being sung, on one row above the player bar's transport (issue #66). */
     fun getWaveMode(): String = Prefs.getString(KEY_WAVE_MODE, "BALANCED") ?: "BALANCED"

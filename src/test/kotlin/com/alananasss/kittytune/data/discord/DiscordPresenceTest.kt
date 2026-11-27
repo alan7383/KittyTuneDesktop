@@ -6,6 +6,8 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.together.DiscordActivityParty
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
+import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.ui.player.EqualizerState
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -111,6 +113,45 @@ class DiscordPresenceTest {
         assertEquals(2, song.getInt("status_display_type"))
         val soundCloud = discordActivity(track, null, false, 0, 180_000, DiscordStatusDisplay.SOUNDCLOUD)
         assertEquals("SoundCloud", soundCloud.getString("name"))
+        assertEquals("pause", soundCloud.getJSONObject("assets").getString("small_image"))
+    }
+
+    @Test
+    fun parsesTitlesSummarizesEffectsAndBuildsBrowsingActivities() {
+        val parsed = parseDiscordTrackTitle("Bladee + Ecco2k - Girls Just Want to Have Fun (feat. Thaiboy) (Slowed) [prod. Whitearmor]", "Uploader")
+        assertEquals("Girls Just Want to Have Fun (Slowed)", parsed.title)
+        assertEquals("Bladee feat. Ecco2k, Thaiboy", parsed.artist)
+
+        val fx = summarizeDiscordEffects(
+            AudioEffectsState(speed = 0.85f, isPitchEnabled = true, isReverbEnabled = true, isBassBoostEnabled = true, is8DEnabled = true),
+            EqualizerState(isEnabled = true, selectedPreset = "Bass Boost"),
+        )
+        assertEquals("Slowed + Reverb (0.85x) • Bass Boost +2", fx)
+
+        val pitchLock = summarizeDiscordEffects(
+            AudioEffectsState(speed = 1.25f, isPitchEnabled = false),
+            EqualizerState(),
+        )
+        assertEquals("1.25x (Pitch Lock)", pitchLock)
+
+        val searchVisible = discordBrowsingActivity(
+            DiscordBrowsingContext(DiscordBrowsingKind.SEARCHING, "drain gang"),
+            DiscordStatusDisplay.ACTIVITY,
+            showSearchQuery = true,
+            sessionStartSec = 1000L,
+        )
+        assertEquals("drain gang", searchVisible.getString("state"))
+        assertEquals("search", searchVisible.getJSONObject("assets").getString("small_image"))
+        assertEquals(1000L, searchVisible.getJSONObject("timestamps").getLong("start"))
+
+        val searchHidden = discordBrowsingActivity(
+            DiscordBrowsingContext(DiscordBrowsingKind.SEARCHING, "secret query"),
+            DiscordStatusDisplay.ACTIVITY,
+            showSearchQuery = false,
+            showTimestamps = false,
+        )
+        assertFalse(searchHidden.getString("state").contains("secret query"))
+        assertFalse(searchHidden.has("timestamps"))
     }
 
     private suspend fun waitUntil(condition: () -> Boolean) {

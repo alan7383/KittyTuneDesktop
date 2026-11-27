@@ -1994,6 +1994,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var discordJob: Job? = null
     private val discordRpc = DiscordRPC()
     private var discordPresenceJob: Job? = null
+    private var discordBrowsingContext = com.alananasss.kittytune.data.discord.DiscordBrowsingContext(
+        com.alananasss.kittytune.data.discord.DiscordBrowsingKind.HOME
+    )
+    private var discordBrowsingStartSec: Long = System.currentTimeMillis() / 1_000L
     internal val discordPresenceStatus get() = discordRpc.status
     internal fun discordConnectionLog() = discordRpc.copyLog()
     var showLiveListenDialog by mutableStateOf(false)
@@ -2705,36 +2709,87 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         return code
     }
 
+    internal fun updateDiscordBrowsingContext(
+        kind: com.alananasss.kittytune.data.discord.DiscordBrowsingKind,
+        detail: String? = null,
+    ) {
+        val next = com.alananasss.kittytune.data.discord.DiscordBrowsingContext(kind, detail)
+        if (next == discordBrowsingContext) return
+        if (next.kind != discordBrowsingContext.kind) {
+            discordBrowsingStartSec = System.currentTimeMillis() / 1_000L
+        }
+        discordBrowsingContext = next
+        updateDiscordPresence()
+    }
+
     fun updateDiscordPresence() {
         if (discordPresenceJob == null) return
         val track = currentTrack
         discordJob?.cancel()
-        if (!playerPrefs.getDiscordRpcEnabled() || track == null) {
+        if (!playerPrefs.getDiscordRpcEnabled()) {
             discordRpc.setActivity(null)
             return
         }
-        if (isPlaying && playerPrefs.getDiscordAutoLiveEnabled() &&
+        val showSong = playerPrefs.getDiscordShowSong()
+        val showBrowsing = playerPrefs.getDiscordShowBrowsing()
+        val hidePaused = playerPrefs.getDiscordHidePaused()
+        val showTimestamps = playerPrefs.getDiscordShowTimestamps()
+        val mode = playerPrefs.getDiscordStatusDisplay()
+
+        if (track != null && isPlaying && playerPrefs.getDiscordAutoLiveEnabled() &&
             discordRpc.status.value == DiscordPresenceStatus.READY && Together.active.value == null
         ) {
             startLiveListenAlong()
             return
         }
 
-        // Debounce playback/seek bursts and sample the final position once the player settles.
-        discordJob = viewModelScope.launch {
-            delay(500.milliseconds)
-            val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: 0L
-            val liveCode = Together.active.value?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
-            discordRpc.setActivity(discordActivity(
-                track = track,
-                contextName = currentContext?.displayText,
-                isPlaying = isPlaying,
-                positionMs = currentPosition,
-                durationMs = effectiveDuration,
-                mode = playerPrefs.getDiscordStatusDisplay(),
-                liveInviteUrl = liveCode?.let(TogetherLinks::inviteUrl),
-                party = liveCode?.let { togetherDiscordParty(it, Together.rooms.value[it], Together.memberId) },
-            ))
+        val showingTrack = track != null && (isPlaying || !showBrowsing) && showSong
+        if (showingTrack && track != null) {
+            if (!isPlaying && hidePaused) {
+                discordRpc.setActivity(null)
+                return
+            }
+            // Debounce playback/seek bursts and sample the final position once the player settles.
+            discordJob = viewModelScope.launch {
+                delay(500.milliseconds)
+                val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: 0L
+                val liveCode = Together.active.value?.takeIf { playerPrefs.getDiscordListenAlongEnabled() }
+                val fxSummary = if (playerPrefs.getDiscordShowEffects()) {
+                    com.alananasss.kittytune.data.discord.summarizeDiscordEffects(effectsState, equalizerState)
+                } else {
+                    null
+                }
+                discordRpc.setActivity(discordActivity(
+                    track = track,
+                    contextName = currentContext?.displayText,
+                    isPlaying = isPlaying,
+                    positionMs = currentPosition,
+                    durationMs = effectiveDuration,
+                    mode = mode,
+                    liveInviteUrl = liveCode?.let(TogetherLinks::inviteUrl),
+                    party = liveCode?.let { togetherDiscordParty(it, Together.rooms.value[it], Together.memberId) },
+                    showCover = playerPrefs.getDiscordShowCover(),
+                    showTimestamps = showTimestamps,
+                    showLinks = playerPrefs.getDiscordShowLinks(),
+                    titleParsing = playerPrefs.getDiscordTitleParsing(),
+                    effectsSummary = fxSummary,
+                ))
+            }
+        } else if (showBrowsing) {
+            discordJob = viewModelScope.launch {
+                delay(300.milliseconds)
+                discordRpc.setActivity(
+                    com.alananasss.kittytune.data.discord.discordBrowsingActivity(
+                        context = discordBrowsingContext,
+                        mode = mode,
+                        showSearchQuery = playerPrefs.getDiscordShowSearchQuery(),
+                        showTimestamps = showTimestamps,
+                        sessionStartSec = discordBrowsingStartSec,
+                    )
+                )
+            }
+        } else {
+            discordRpc.setActivity(null)
         }
     }
 
@@ -6604,6 +6659,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         clearModifiedAudioFxPreset()
         MusicManager.applyEffects(effectsState)
         mprisService?.updateRate(effectsState.speed.toDouble())
+        updateDiscordPresence()
         viewModelScope.launch(Dispatchers.IO) {
             playerPrefs.saveEffects(
                 effectsState
@@ -6616,6 +6672,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun applyEqualizerAndSave() {
         clearModifiedAudioFxPreset()
         MusicManager.applyEqualizer(equalizerState)
+        updateDiscordPresence()
         val snapshot = equalizerState
         equalizerSaveJob?.cancel()
         equalizerSaveJob = viewModelScope.launch(Dispatchers.IO) {

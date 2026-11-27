@@ -40,6 +40,15 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
     Prefs.flow.collectAsState().value
     val enabled = prefs.getDiscordRpcEnabled()
     val statusDisplay = prefs.getDiscordStatusDisplay()
+    val showSong = prefs.getDiscordShowSong()
+    val showBrowsing = prefs.getDiscordShowBrowsing()
+    val hidePaused = prefs.getDiscordHidePaused()
+    val showTimestamps = prefs.getDiscordShowTimestamps()
+    val showCover = prefs.getDiscordShowCover()
+    val showLinks = prefs.getDiscordShowLinks()
+    val titleParsing = prefs.getDiscordTitleParsing()
+    val showEffects = prefs.getDiscordShowEffects()
+    val showSearchQuery = prefs.getDiscordShowSearchQuery()
     val listenAlongEnabled = prefs.getDiscordListenAlongEnabled()
     val status by playerViewModel.discordPresenceStatus.collectAsState()
     val clipboard = LocalClipboardManager.current
@@ -99,6 +108,107 @@ fun DiscordSettingsScreen(playerViewModel: PlayerViewModel) {
                     highlightKey = "pref_discord_status_display",
                     subtitle = str(statusDisplay.labelKey()),
                     onClick = { showStatusDialog = true },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_show_song_title"),
+                    highlightKey = "discord_show_song_title",
+                    subtitle = str("discord_show_song_desc"),
+                    hasSwitch = true,
+                    switchState = showSong,
+                    onSwitchChange = prefs::setDiscordShowSong,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_show_browsing_title"),
+                    highlightKey = "discord_show_browsing_title",
+                    subtitle = str("discord_show_browsing_desc"),
+                    hasSwitch = true,
+                    switchState = showBrowsing,
+                    onSwitchChange = prefs::setDiscordShowBrowsing,
+                )
+            }
+            if (showBrowsing) {
+                add { shape ->
+                    SettingsItem(
+                        shape = shape,
+                        title = str("discord_show_search_query_title"),
+                        highlightKey = "discord_show_search_query_title",
+                        subtitle = str("discord_show_search_query_desc"),
+                        hasSwitch = true,
+                        switchState = showSearchQuery,
+                        onSwitchChange = prefs::setDiscordShowSearchQuery,
+                    )
+                }
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_hide_paused_title"),
+                    highlightKey = "discord_hide_paused_title",
+                    subtitle = str("discord_hide_paused_desc"),
+                    hasSwitch = true,
+                    switchState = hidePaused,
+                    onSwitchChange = prefs::setDiscordHidePaused,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_show_timestamps_title"),
+                    highlightKey = "discord_show_timestamps_title",
+                    subtitle = str("discord_show_timestamps_desc"),
+                    hasSwitch = true,
+                    switchState = showTimestamps,
+                    onSwitchChange = prefs::setDiscordShowTimestamps,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_show_cover_title"),
+                    highlightKey = "discord_show_cover_title",
+                    subtitle = str("discord_show_cover_desc"),
+                    hasSwitch = true,
+                    switchState = showCover,
+                    onSwitchChange = prefs::setDiscordShowCover,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_show_links_title"),
+                    highlightKey = "discord_show_links_title",
+                    subtitle = str("discord_show_links_desc"),
+                    hasSwitch = true,
+                    switchState = showLinks,
+                    onSwitchChange = prefs::setDiscordShowLinks,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_title_parsing_title"),
+                    highlightKey = "discord_title_parsing_title",
+                    subtitle = str("discord_title_parsing_desc"),
+                    hasSwitch = true,
+                    switchState = titleParsing,
+                    onSwitchChange = prefs::setDiscordTitleParsing,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("discord_show_effects_title"),
+                    highlightKey = "discord_show_effects_title",
+                    subtitle = str("discord_show_effects_desc"),
+                    hasSwitch = true,
+                    switchState = showEffects,
+                    onSwitchChange = prefs::setDiscordShowEffects,
                 )
             }
             add { shape ->

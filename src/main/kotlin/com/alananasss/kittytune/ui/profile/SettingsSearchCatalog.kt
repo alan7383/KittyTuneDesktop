@@ -682,6 +682,15 @@ internal fun buildSettingsSearchCatalog(os: String): List<SettingsSearchEntry> =
     controls(MISC_DISCORD.place) {
         control("discord_enable_rpc", highlightKey = "pref_discord")
         control("pref_discord_status_display")
+        control("discord_show_song_title", "discord_show_song_desc", aliases = listOf("discord", "track", "song"))
+        control("discord_show_browsing_title", "discord_show_browsing_desc", aliases = listOf("discord", "browsing", "search", "navigation", "recherche"))
+        control("discord_show_search_query_title", "discord_show_search_query_desc", aliases = listOf("discord", "search", "query", "recherche"))
+        control("discord_hide_paused_title", "discord_hide_paused_desc", aliases = listOf("discord", "pause", "paused"))
+        control("discord_show_timestamps_title", "discord_show_timestamps_desc", aliases = listOf("discord", "timestamp", "time", "duration"))
+        control("discord_show_cover_title", "discord_show_cover_desc", aliases = listOf("discord", "cover", "artwork", "pochette"))
+        control("discord_show_links_title", "discord_show_links_desc", aliases = listOf("discord", "link", "button", "soundcloud"))
+        control("discord_title_parsing_title", "discord_title_parsing_desc", aliases = listOf("discord", "title", "parsing", "feat", "artist"))
+        control("discord_show_effects_title", "discord_show_effects_desc", aliases = listOf("discord", "effects", "fx", "bass boost", "pitch", "slowed", "nightcore", "reverb", "eq"))
         control(
             "discord_listen_along_title",
             "discord_listen_along_desc",
@@ -803,8 +812,16 @@ internal fun SettingsSearchEntry.targetKey(prefs: PlayerPreferences, player: Pla
         else -> highlightKey
     }
     "sync_now", "sync_devices" -> if (SyncPeers.all().isEmpty()) "sync_pair_device" else highlightKey
-    "pref_discord_status_display", "discord_listen_along_title", "discord_auto_live_title" ->
+    "pref_discord_status_display", "discord_show_song_title", "discord_show_browsing_title",
+    "discord_hide_paused_title", "discord_show_timestamps_title", "discord_show_cover_title",
+    "discord_show_links_title", "discord_title_parsing_title", "discord_show_effects_title",
+    "discord_listen_along_title", "discord_auto_live_title" ->
         if (prefs.getDiscordRpcEnabled()) highlightKey else "pref_discord"
+    "discord_show_search_query_title" -> when {
+        !prefs.getDiscordRpcEnabled() -> "pref_discord"
+        !prefs.getDiscordShowBrowsing() -> "discord_show_browsing_title"
+        else -> highlightKey
+    }
     "together_copy_link", "together_reset_link" -> when {
         !prefs.getDiscordRpcEnabled() -> "pref_discord"
         !prefs.getDiscordListenAlongEnabled() -> "discord_listen_along_title"
