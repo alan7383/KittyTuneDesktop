@@ -129,9 +129,6 @@ import kotlin.math.roundToInt
         var showQuickSettingsDialog by remember { mutableStateOf(false) }
         var showUploadYamlDialog by remember { mutableStateOf(false) }
 
-        val hasSynced = viewModel.lyricsLines.any { it.startTime > 0 }
-        val hasPlain = !viewModel.rawPlainLyrics.isNullOrBlank()
-
         if (showQuickSettingsDialog) {
             QuickLyricsSettingsDialog(
                 viewModel = viewModel,
@@ -152,6 +149,9 @@ import kotlin.math.roundToInt
             } else {
                 onClose()
             }
+        }
+        BackHandler(enabled = viewModel.showLyricsOffsetControls && !viewModel.isSearchingLyrics) {
+            viewModel.showLyricsOffsetControls = false
         }
 
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
@@ -178,7 +178,7 @@ import kotlin.math.roundToInt
                                         Spacer(Modifier.width(10.dp))
                                         Column(horizontalAlignment = Alignment.Start) {
                                             Text(
-                                                text = currentTrack.title ?: "",
+                                                text = currentTrack.displayTitle.orEmpty(),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onSurface,
@@ -209,11 +209,6 @@ import kotlin.math.roundToInt
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                }
-                            },
-                            navigationIcon = {
-                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
-                                    Icon(Icons.Rounded.Close, str("btn_close"), tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             },
                             actions = {
@@ -259,135 +254,22 @@ import kotlin.math.roundToInt
                                 EmptyLyricsState(onManualSearch = { viewModel.isSearchingLyrics = true })
                             }
                         } else {
-                            AnimatedContent(
-                                targetState = viewModel.lyricsMode,
-                                transitionSpec = {
-                                    fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 0.95f) togetherWith
-                                            fadeOut(animationSpec = tween(300))
-                                },
-                                label = "LyricsModeTransition",
-                                modifier = Modifier.fillMaxSize()
-                            ) { mode ->
-                                when (mode) {
-                                    LyricsMode.SYNCED -> {
-                                        when (viewModel.lyricsUiStyle) {
-                                            com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED -> {
-                                                LyricsEnhanced(
-                                                    viewModel = viewModel,
-                                                    textColorOverride = null
-                                                )
-                                            }
-                                            com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC -> {
-                                                SyncedLyricsView(viewModel)
-                                            }
-                                        }
-                                    }
-                                    LyricsMode.PLAIN -> {
-                                        PlainLyricsView(viewModel)
-                                    }
-                                }
-                            }
-
-                            if (hasSynced && hasPlain) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 16.dp)
-                                        .zIndex(10f)
-                                ) {
-                                    LyricsModeSelector(
-                                        currentMode = viewModel.lyricsMode,
-                                        onModeSelected = { viewModel.lyricsMode = it },
-                                        hasSynced = hasSynced,
-                                        hasPlain = hasPlain
-                                    )
-                                }
+                            if (viewModel.lyricsLines.isNotEmpty()) {
+                                LyricsEnhanced(
+                                    viewModel = viewModel,
+                                    textColorOverride = null,
+                                    contentPosition = viewModel.lyricsCentralPosition,
+                                )
+                            } else {
+                                PlainLyricsView(
+                                    viewModel,
+                                    contentPosition = viewModel.lyricsCentralPosition,
+                                )
                             }
                         }
                     }
                 }
             }
-        }
-    }
-    
-    @Composable
-    fun LyricsModeSelector(
-        currentMode: LyricsMode,
-        onModeSelected: (LyricsMode) -> Unit,
-        hasSynced: Boolean,
-        hasPlain: Boolean,
-        modifier: Modifier = Modifier
-    ) {
-        // Themed rather than hard-coded black and white: the hover effect came from Material and so
-        // already followed the palette, which is exactly why the buttons under it looked wrong
-        // (issue #33).
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = CircleShape,
-            modifier = modifier.height(38.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Row(
-                modifier = Modifier.padding(3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (hasSynced) {
-                    LyricsModeChip(
-                        text = str("lyrics_mode_synced"),
-                        isSelected = currentMode == LyricsMode.SYNCED,
-                        onClick = { onModeSelected(LyricsMode.SYNCED) }
-                    )
-                }
-    
-                if (hasPlain) {
-                    LyricsModeChip(
-                        text = str("lyrics_mode_plain"),
-                        isSelected = currentMode == LyricsMode.PLAIN,
-                        onClick = { onModeSelected(LyricsMode.PLAIN) },
-                        enabled = hasPlain
-                    )
-                }
-            }
-        }
-    }
-    
-    @Composable
-    fun LyricsModeChip(
-        text: String,
-        isSelected: Boolean,
-        onClick: () -> Unit,
-        enabled: Boolean = true
-    ) {
-        val scheme = MaterialTheme.colorScheme
-        val backgroundColor by animateColorAsState(
-            targetValue = if (isSelected) scheme.primary else Color.Transparent,
-            animationSpec = tween(300),
-            label = "bgColor"
-        )
-        val textColor by animateColorAsState(
-            targetValue = when {
-                isSelected -> scheme.onPrimary
-                enabled -> scheme.onSurfaceVariant
-                else -> scheme.onSurfaceVariant.copy(alpha = 0.38f)
-            },
-            animationSpec = tween(300),
-            label = "textColor"
-        )
-    
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(backgroundColor)
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = textColor
-            )
         }
     }
     
@@ -495,17 +377,8 @@ import kotlin.math.roundToInt
 
                     // For duet lines, override alignment per singer (normal style, no bubbles)
                     val isDuetActive = viewModel.isDuetActiveForTrack(viewModel.uiCurrentTrack)
-                    val effectiveSinger = if (isDuetActive) {
-                        line.singer?.takeIf { it != LyricSinger.DEFAULT }
-                            ?: when (line.agent?.trim()?.lowercase()) {
-                                "v2", "singer2", "2" -> LyricSinger.SINGER_2
-                                "v1", "singer1", "1" -> LyricSinger.SINGER_1
-                                "both", "group", "all", "v1000", "v2000", "3", "v3" -> LyricSinger.BOTH
-                                else -> LyricSinger.DEFAULT
-                            }
-                    } else {
-                        LyricSinger.DEFAULT
-                    }
+                    val hasDuetLayout = remember(lyrics, isDuetActive) { isDuetActive && hasDuetSecondSinger(lyrics) }
+                    val effectiveSinger = line.effectiveDuetSinger(hasDuetLayout)
 
                     val lineTextAlign = when (effectiveSinger) {
                         LyricSinger.SINGER_1 -> TextAlign.Start
@@ -690,16 +563,24 @@ import kotlin.math.roundToInt
     }
     
     @Composable
-    fun PlainLyricsView(viewModel: PlayerViewModel) {
+    fun PlainLyricsView(
+        viewModel: PlayerViewModel,
+        isFullScreen: Boolean = false,
+        isSidebar: Boolean = false,
+        contentPosition: LyricsAlignment = LyricsAlignment.LEFT,
+    ) {
         val text = viewModel.rawPlainLyrics ?: str("lyrics_no_data")
         val clipboardManager = LocalClipboardManager.current
         val density = androidx.compose.ui.platform.LocalDensity.current
-    
-        val fontSize = viewModel.lyricsFontSize
-        val alignment = when(viewModel.lyricsAlignment) {
-            LyricsAlignment.LEFT -> TextAlign.Left
+
+        val fontSize = viewModel.fontSizeFor(isFullScreen, isSidebar)
+        val lyricsFontFamily = com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(
+            viewModel.lyricsFontFor(isFullScreen, isSidebar)
+        )
+        val alignment = when (viewModel.alignmentFor(isFullScreen, isSidebar)) {
+            LyricsAlignment.LEFT -> TextAlign.Start
             LyricsAlignment.CENTER -> TextAlign.Center
-            LyricsAlignment.RIGHT -> TextAlign.Right
+            LyricsAlignment.RIGHT -> TextAlign.End
         }
     
         val lines = remember(text) { text.split("\n") }
@@ -751,19 +632,30 @@ import kotlin.math.roundToInt
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 items(lines) { line ->
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = fontSize.sp,
-                            lineHeight = (fontSize * 1.4).sp
-                        ),
-                        // The synced view draws its lines in onSurface, which picks up the cover's
-                        // tint; this was pure white, so the two modes did not match (issue #33).
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = alignment,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    val lineBoxAlign = when (contentPosition) {
+                        LyricsAlignment.CENTER -> Alignment.Center
+                        LyricsAlignment.RIGHT -> Alignment.CenterEnd
+                        LyricsAlignment.LEFT -> Alignment.CenterStart
+                    }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = lyricsFontFamily,
+                                fontSize = fontSize.sp,
+                                lineHeight = (fontSize * 1.4).sp
+                            ),
+                            // The synced view draws its lines in onSurface, which picks up the cover's
+                            // tint; this was pure white, so the two modes did not match (issue #33).
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = alignment,
+                            modifier = Modifier
+                                .align(lineBoxAlign)
+                                .then(if (contentPosition != LyricsAlignment.LEFT) Modifier.widthIn(max = 760.dp) else Modifier)
+                                .fillMaxWidth()
+                        )
+                    }
                 }
             }
     
@@ -891,8 +783,11 @@ import kotlin.math.roundToInt
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RepeatingIconButton(onClick = { onAdjust(-OFFSET_STEP_MS) }, icon = Icons.Rounded.Remove, tint = scheme.onSurface)
-                    val shiftColor by androidx.compose.animation.animateColorAsState(
-                        if (offset == 0L) scheme.onSurfaceVariant else scheme.primary, label = "lyricsOffsetColor"
+                    val shiftColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                        selected = offset == 0L,
+                        selectedColor = scheme.onSurfaceVariant,
+                        unselectedColor = scheme.primary,
+                        label = "lyricsOffsetColor",
                     )
                     Text(
                         text = String.format(java.util.Locale.US, "%s%.1f s", if (offset > 0) "+" else "", offset / 1000.0),

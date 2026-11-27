@@ -222,6 +222,13 @@ private val isWindowsHost: Boolean = System.getProperty("os.name", "").startsWit
 /** Line-by-line lyrics: how the current line fills in as it is sung (same values as Android). */
 enum class LyricsLineAnimation { FADE, SWEEP }
 
+/** Which lyrics presentation surface is being configured. */
+enum class LyricsSurfaceMode(val keyPrefix: String) {
+    CENTRAL("lyrics_"),
+    FULLSCREEN("lyrics_fullscreen_"),
+    SIDEBAR("lyrics_sidebar_"),
+}
+
 /** What long instrumental gaps in the lyrics show (same values as Android). */
 enum class InstrumentalIndicatorStyle {
     DOTS,
@@ -475,6 +482,7 @@ class PlayerPreferences {
 
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
+        private const val KEY_LYRICS_CENTRAL_POSITION = "lyrics_central_position"
         private const val KEY_LYRICS_FULLSCREEN_ALIGNMENT = "lyrics_fullscreen_alignment"
         private const val KEY_LYRICS_SIDEBAR_ALIGNMENT = "lyrics_sidebar_alignment"
         private const val KEY_LYRICS_DISPLAY_STYLE = "lyrics_display_style"
@@ -1027,6 +1035,12 @@ class PlayerPreferences {
     }
     fun setLyricsAlignment(align: LyricsAlignment) = Prefs.putString(KEY_LYRICS_ALIGNMENT, align.name)
 
+    fun getLyricsCentralPosition(): LyricsAlignment {
+        val name = Prefs.getString(KEY_LYRICS_CENTRAL_POSITION, LyricsAlignment.LEFT.name)
+        return try { LyricsAlignment.valueOf(name ?: LyricsAlignment.LEFT.name) } catch (_: Exception) { LyricsAlignment.LEFT }
+    }
+    fun setLyricsCentralPosition(position: LyricsAlignment) = Prefs.putString(KEY_LYRICS_CENTRAL_POSITION, position.name)
+
     fun getLyricsFullScreenAlignment(): LyricsAlignment {
         val name = Prefs.getString(KEY_LYRICS_FULLSCREEN_ALIGNMENT, LyricsAlignment.LEFT.name)
         return try { LyricsAlignment.valueOf(name!!) } catch (_: Exception) { LyricsAlignment.LEFT }
@@ -1062,9 +1076,6 @@ class PlayerPreferences {
 
     fun setLyricsSidebarDisplayStyle(style: LyricsDisplayStyle) =
         Prefs.putString(KEY_LYRICS_SIDEBAR_DISPLAY_STYLE, style.name)
-
-    fun getLyricsDuetViewEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_DUET_VIEW, true)
-    fun setLyricsDuetViewEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_DUET_VIEW, enabled)
 
     fun getLyricsDuetBlacklist(): Set<String> = Prefs.getStringSet(KEY_LYRICS_DUET_BLACKLIST, emptySet())
     fun setLyricsDuetBlacklist(blacklist: Set<String>) = Prefs.putStringSet(KEY_LYRICS_DUET_BLACKLIST, blacklist)
@@ -1465,48 +1476,32 @@ class PlayerPreferences {
     fun setStopOnTaskClear(enabled: Boolean) = Prefs.putBoolean(KEY_STOP_ON_TASK_CLEAR, enabled)
     fun stopOnTaskClearFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_STOP_ON_TASK_CLEAR, true)
 
-    fun getLyricsAppleEffectEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_APPLE_EFFECT, true)
-    fun setLyricsAppleEffectEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_APPLE_EFFECT, enabled)
+    fun getLyricsAppleEffectEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}apple_effect", true)
 
-    fun getLyricsUiStyle(): LyricsUiStyle {
-        val name = Prefs.getString(KEY_LYRICS_UI_STYLE, LyricsUiStyle.ENHANCED.name)
-        return try {
-            LyricsUiStyle.valueOf(name ?: LyricsUiStyle.ENHANCED.name)
-        } catch (_: Exception) {
-            LyricsUiStyle.ENHANCED
-        }
-    }
-    fun setLyricsUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_UI_STYLE, style.name)
+    fun setLyricsAppleEffectEnabled(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}apple_effect", enabled)
 
-    fun getLyricsFullScreenUiStyle(): LyricsUiStyle {
-        val name = Prefs.getString(KEY_LYRICS_FULLSCREEN_UI_STYLE, LyricsUiStyle.ENHANCED.name)
-        return try {
-            LyricsUiStyle.valueOf(name ?: LyricsUiStyle.ENHANCED.name)
-        } catch (_: Exception) {
-            LyricsUiStyle.ENHANCED
-        }
-    }
-    fun setLyricsFullScreenUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_FULLSCREEN_UI_STYLE, style.name)
+    fun setLyricsAppleEffectEnabled(enabled: Boolean) =
+        setLyricsAppleEffectEnabled(LyricsSurfaceMode.CENTRAL, enabled)
 
-    fun getLyricsSidebarUiStyle(): LyricsUiStyle {
-        val name = Prefs.getString(KEY_LYRICS_SIDEBAR_UI_STYLE, LyricsUiStyle.CLASSIC.name)
-        return try {
-            LyricsUiStyle.valueOf(name ?: LyricsUiStyle.CLASSIC.name)
-        } catch (_: Exception) {
-            LyricsUiStyle.CLASSIC
-        }
+    fun getLyricsUiStyle(): LyricsUiStyle = LyricsUiStyle.ENHANCED
+    fun setLyricsUiStyle(style: LyricsUiStyle) {
+        Prefs.putString(KEY_LYRICS_UI_STYLE, LyricsUiStyle.ENHANCED.name)
     }
-    fun setLyricsSidebarUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_SIDEBAR_UI_STYLE, style.name)
 
-    fun getLyricsFont(): LyricsFont {
-        val name = Prefs.getString(KEY_LYRICS_FONT, LyricsFont.APPLE.name)
-        return try {
-            LyricsFont.valueOf(name ?: LyricsFont.APPLE.name)
-        } catch (_: Exception) {
-            LyricsFont.APPLE
-        }
+    fun getLyricsFullScreenUiStyle(): LyricsUiStyle = LyricsUiStyle.ENHANCED
+    fun setLyricsFullScreenUiStyle(style: LyricsUiStyle) {
+        Prefs.putString(KEY_LYRICS_FULLSCREEN_UI_STYLE, LyricsUiStyle.ENHANCED.name)
     }
-    fun setLyricsFont(font: LyricsFont) = Prefs.putString(KEY_LYRICS_FONT, font.name)
+
+    fun getLyricsSidebarUiStyle(): LyricsUiStyle = LyricsUiStyle.ENHANCED
+    fun setLyricsSidebarUiStyle(style: LyricsUiStyle) {
+        Prefs.putString(KEY_LYRICS_SIDEBAR_UI_STYLE, LyricsUiStyle.ENHANCED.name)
+    }
+
+    fun getLyricsFont(): LyricsFont = getLyricsFont(LyricsSurfaceMode.CENTRAL)
+    fun setLyricsFont(font: LyricsFont) = setLyricsFont(LyricsSurfaceMode.CENTRAL, font)
 
     fun getPlayerSliderStyle(): PlayerSliderStyle {
         val name = Prefs.getString(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name)
@@ -1557,25 +1552,59 @@ class PlayerPreferences {
         Prefs.getBoolean(KEY_LYRICS_SIDEBAR_LINE_BLUR, true)
     fun setLyricsSidebarLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SIDEBAR_LINE_BLUR, enabled)
 
-    fun getLyricsLrcBounceEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, true)
+    fun getLyricsLrcBounceEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}lrc_bounce_enabled", true)
 
-    /** Backing vocals in round brackets drawn as their own smaller line under the sung one. */
-    fun getLyricsSplitBackingVocals(): Boolean = Prefs.getBoolean(KEY_LYRICS_SPLIT_BACKING_VOCALS, true)
-    fun setLyricsSplitBackingVocals(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SPLIT_BACKING_VOCALS, enabled)
+    fun setLyricsLrcBounceEnabled(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}lrc_bounce_enabled", enabled)
 
-    /** Lines timed by the line only light up word by word as they start, instead of all at once. */
-    fun getLyricsRevealWords(): Boolean = Prefs.getBoolean(KEY_LYRICS_REVEAL_WORDS, false)
-    fun setLyricsRevealWords(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_REVEAL_WORDS, enabled)
-    fun setLyricsLrcBounceEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, enabled)
+    fun setLyricsLrcBounceEnabled(enabled: Boolean) =
+        setLyricsLrcBounceEnabled(LyricsSurfaceMode.CENTRAL, enabled)
 
-    fun getLyricsBounceFactor(): Float = Prefs.getFloat(KEY_LYRICS_BOUNCE_FACTOR, 1.0f)
-    fun setLyricsBounceFactor(factor: Float) = Prefs.putFloat(KEY_LYRICS_BOUNCE_FACTOR, factor)
+    fun getLyricsSplitBackingVocals(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}split_backing_vocals", true)
 
-    fun getLyricsGlowFactor(): Float = Prefs.getFloat(KEY_LYRICS_GLOW_FACTOR, 1.0f)
-    fun setLyricsGlowFactor(factor: Float) = Prefs.putFloat(KEY_LYRICS_GLOW_FACTOR, factor)
+    fun setLyricsSplitBackingVocals(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}split_backing_vocals", enabled)
 
-    fun getLyricsFillTransitionWidth(): Float = Prefs.getFloat(KEY_LYRICS_FILL_TRANSITION_WIDTH, 8.0f)
-    fun setLyricsFillTransitionWidth(width: Float) = Prefs.putFloat(KEY_LYRICS_FILL_TRANSITION_WIDTH, width)
+    fun setLyricsSplitBackingVocals(enabled: Boolean) =
+        setLyricsSplitBackingVocals(LyricsSurfaceMode.CENTRAL, enabled)
+
+    fun getLyricsRevealWords(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}reveal_words", false)
+
+    fun setLyricsRevealWords(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}reveal_words", enabled)
+
+    fun setLyricsRevealWords(enabled: Boolean) =
+        setLyricsRevealWords(LyricsSurfaceMode.CENTRAL, enabled)
+
+    fun getLyricsBounceFactor(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Float =
+        Prefs.getFloat("${mode.keyPrefix}bounce_factor", 1.0f)
+
+    fun setLyricsBounceFactor(mode: LyricsSurfaceMode, factor: Float) =
+        Prefs.putFloat("${mode.keyPrefix}bounce_factor", factor)
+
+    fun setLyricsBounceFactor(factor: Float) =
+        setLyricsBounceFactor(LyricsSurfaceMode.CENTRAL, factor)
+
+    fun getLyricsGlowFactor(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Float =
+        Prefs.getFloat("${mode.keyPrefix}glow_factor", 1.0f)
+
+    fun setLyricsGlowFactor(mode: LyricsSurfaceMode, factor: Float) =
+        Prefs.putFloat("${mode.keyPrefix}glow_factor", factor)
+
+    fun setLyricsGlowFactor(factor: Float) =
+        setLyricsGlowFactor(LyricsSurfaceMode.CENTRAL, factor)
+
+    fun getLyricsFillTransitionWidth(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Float =
+        Prefs.getFloat("${mode.keyPrefix}fill_transition_width", 8.0f)
+
+    fun setLyricsFillTransitionWidth(mode: LyricsSurfaceMode, width: Float) =
+        Prefs.putFloat("${mode.keyPrefix}fill_transition_width", width)
+
+    fun setLyricsFillTransitionWidth(width: Float) =
+        setLyricsFillTransitionWidth(LyricsSurfaceMode.CENTRAL, width)
 
     fun getLyricsLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_LINE_SPACING, 0.0f).coerceIn(0f, 48f)
     fun setLyricsLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_LINE_SPACING, spacing.coerceIn(0f, 48f))
@@ -1583,8 +1612,8 @@ class PlayerPreferences {
     fun getLyricsFullScreenLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_LINE_SPACING, 0.0f).coerceIn(0f, 64f)
     fun setLyricsFullScreenLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_LINE_SPACING, spacing.coerceIn(0f, 64f))
 
-    fun getLyricsSidebarLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_LINE_SPACING, 0.0f).coerceIn(0f, 32f)
-    fun setLyricsSidebarLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_LINE_SPACING, spacing.coerceIn(0f, 32f))
+    fun getLyricsSidebarLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_LINE_SPACING, 0.0f).coerceIn(0f, 48f)
+    fun setLyricsSidebarLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_LINE_SPACING, spacing.coerceIn(0f, 48f))
 
     fun getLyricsActiveScale(): Float = Prefs.getFloat(KEY_LYRICS_ACTIVE_SCALE, 1.00f).coerceIn(1.00f, 1.30f)
     fun setLyricsActiveScale(scale: Float) = Prefs.putFloat(KEY_LYRICS_ACTIVE_SCALE, scale.coerceIn(1.00f, 1.30f))
@@ -1601,8 +1630,8 @@ class PlayerPreferences {
     fun getLyricsFullScreenHorizontalMargin(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_HORIZONTAL_MARGIN, 0.0f).coerceIn(0f, 160f)
     fun setLyricsFullScreenHorizontalMargin(margin: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_HORIZONTAL_MARGIN, margin.coerceIn(0f, 160f))
 
-    fun getLyricsSidebarHorizontalMargin(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN, 0.0f).coerceIn(0f, 48f)
-    fun setLyricsSidebarHorizontalMargin(margin: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN, margin.coerceIn(0f, 48f))
+    fun getLyricsSidebarHorizontalMargin(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN, 0.0f).coerceIn(0f, 64f)
+    fun setLyricsSidebarHorizontalMargin(margin: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN, margin.coerceIn(0f, 64f))
 
     fun getLyricsVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_VERTICAL_OFFSET, 0.38f).coerceIn(0.20f, 0.60f)
     fun setLyricsVerticalOffset(offset: Float) = Prefs.putFloat(KEY_LYRICS_VERTICAL_OFFSET, offset.coerceIn(0.20f, 0.60f))
@@ -1610,15 +1639,77 @@ class PlayerPreferences {
     fun getLyricsFullScreenVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_VERTICAL_OFFSET, 0.38f).coerceIn(0.20f, 0.60f)
     fun setLyricsFullScreenVerticalOffset(offset: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_VERTICAL_OFFSET, offset.coerceIn(0.20f, 0.60f))
 
-    fun getLyricsSidebarVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_VERTICAL_OFFSET, 0.38f).coerceIn(0.20f, 0.60f)
+    fun getLyricsSidebarVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_VERTICAL_OFFSET, 0.36f).coerceIn(0.20f, 0.60f)
     fun setLyricsSidebarVerticalOffset(offset: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_VERTICAL_OFFSET, offset.coerceIn(0.20f, 0.60f))
 
+    fun getLyricsWordSyncEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}word_sync", true)
 
-    fun getLyricsWordSyncEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_WORD_SYNC, true)
-    fun setLyricsWordSyncEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_WORD_SYNC, enabled)
+    fun setLyricsWordSyncEnabled(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}word_sync", enabled)
 
-    fun getLyricsTranslationEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_TRANSLATION_ENABLED, false)
-    fun setLyricsTranslationEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_TRANSLATION_ENABLED, enabled)
+    fun setLyricsWordSyncEnabled(enabled: Boolean) =
+        setLyricsWordSyncEnabled(LyricsSurfaceMode.CENTRAL, enabled)
+
+    fun getLyricsDuetViewEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}duet_view", true)
+
+    fun setLyricsDuetViewEnabled(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}duet_view", enabled)
+
+    fun getLyricsFont(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): LyricsFont {
+        val name = Prefs.getString("${mode.keyPrefix}font", LyricsFont.APPLE.name)
+        return runCatching { LyricsFont.valueOf(name ?: LyricsFont.APPLE.name) }.getOrDefault(LyricsFont.APPLE)
+    }
+
+    fun setLyricsFont(mode: LyricsSurfaceMode, font: LyricsFont) =
+        Prefs.putString("${mode.keyPrefix}font", font.name)
+
+    fun getLyricsSweepEnabled(mode: LyricsSurfaceMode): Boolean =
+        when (mode) {
+            LyricsSurfaceMode.CENTRAL -> getLyricsSweepEnabled()
+            else -> Prefs.getString("${mode.keyPrefix}line_animation_v2", LyricsLineAnimation.FADE.name) == LyricsLineAnimation.SWEEP.name
+        }
+
+    fun setLyricsSweepEnabled(mode: LyricsSurfaceMode, enabled: Boolean) {
+        when (mode) {
+            LyricsSurfaceMode.CENTRAL -> setLyricsSweepEnabled(enabled)
+            else -> Prefs.putString(
+                "${mode.keyPrefix}line_animation_v2",
+                if (enabled) LyricsLineAnimation.SWEEP.name else LyricsLineAnimation.FADE.name,
+            )
+        }
+    }
+
+    fun getInstrumentalIndicatorStyle(mode: LyricsSurfaceMode): InstrumentalIndicatorStyle =
+        when (mode) {
+            LyricsSurfaceMode.CENTRAL -> getInstrumentalIndicatorStyle()
+            else -> InstrumentalIndicatorStyle.fromString(
+                Prefs.getString("${mode.keyPrefix}instrumental_indicator_style", InstrumentalIndicatorStyle.DOTS.name)
+            )
+        }
+
+    fun setInstrumentalIndicatorStyle(mode: LyricsSurfaceMode, style: InstrumentalIndicatorStyle) {
+        when (mode) {
+            LyricsSurfaceMode.CENTRAL -> setInstrumentalIndicatorStyle(style)
+            else -> Prefs.putString("${mode.keyPrefix}instrumental_indicator_style", style.name)
+        }
+    }
+
+    fun getLyricsRomanizationEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}romanization_enabled", false)
+
+    fun setLyricsRomanizationEnabled(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}romanization_enabled", enabled)
+
+    fun getLyricsTranslationEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =
+        Prefs.getBoolean("${mode.keyPrefix}translation_enabled", false)
+
+    fun setLyricsTranslationEnabled(mode: LyricsSurfaceMode, enabled: Boolean) =
+        Prefs.putBoolean("${mode.keyPrefix}translation_enabled", enabled)
+
+    fun getLyricsTranslationEnabled(): Boolean = getLyricsTranslationEnabled(LyricsSurfaceMode.CENTRAL)
+    fun setLyricsTranslationEnabled(enabled: Boolean) = setLyricsTranslationEnabled(LyricsSurfaceMode.CENTRAL, enabled)
 
     fun getLyricsTranslationLang(): String {
         val code = Prefs.getString(KEY_LYRICS_TRANSLATION_LANG, null)

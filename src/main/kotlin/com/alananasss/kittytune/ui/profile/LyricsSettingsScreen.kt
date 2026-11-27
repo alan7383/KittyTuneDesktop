@@ -40,8 +40,10 @@ import com.alananasss.kittytune.ui.common.Slider
     import androidx.compose.ui.text.font.FontWeight
     import androidx.compose.ui.unit.dp
     import androidx.compose.ui.window.Dialog
+        import com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle
         import com.alananasss.kittytune.data.local.LyricsAlignment
-    import com.alananasss.kittytune.data.local.LyricsDisplayStyle
+    import com.alananasss.kittytune.data.local.LyricsFont
+    import com.alananasss.kittytune.data.local.LyricsSurfaceMode
     import com.alananasss.kittytune.data.local.PlayerPreferences
     import com.alananasss.kittytune.ui.common.SettingsGroup
     import com.alananasss.kittytune.ui.common.SettingsItem
@@ -63,50 +65,42 @@ import com.alananasss.kittytune.ui.common.Slider
     ) {
             val prefs = remember { PlayerPreferences() }
     
-        val fontSize = playerViewModel.lyricsFontSize
-        val fullScreenFontSize = playerViewModel.lyricsFullScreenFontSize
-        val sidebarFontSize = playerViewModel.lyricsSidebarFontSize
-        val alignment = playerViewModel.lyricsAlignment
-        val fullScreenAlignment = playerViewModel.lyricsFullScreenAlignment
-        val sidebarAlignment = playerViewModel.lyricsSidebarAlignment
-        var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
-        var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
-        var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
-    
+        var dialogMode by remember(page) {
+            mutableStateOf(
+                when (page) {
+                    LyricsSettingsPage.FULLSCREEN -> LyricsSurfaceMode.FULLSCREEN
+                    LyricsSettingsPage.SIDEBAR -> LyricsSurfaceMode.SIDEBAR
+                    else -> LyricsSurfaceMode.CENTRAL
+                }
+            )
+        }
         var showAlignmentDialog by remember { mutableStateOf(false) }
-        var showSidebarAlignmentDialog by remember { mutableStateOf(false) }
-        var showFullScreenAlignmentDialog by remember { mutableStateOf(false) }
-        var showDisplayStyleDialog by remember { mutableStateOf(false) }
-        var showFullScreenDisplayStyleDialog by remember { mutableStateOf(false) }
+        var showCentralPositionDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
-        var showFullScreenFontSizeDialog by remember { mutableStateOf(false) }
-        var showSidebarFontSizeDialog by remember { mutableStateOf(false) }
         var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
         var showWheelStepDialog by remember { mutableStateOf(false) }
         var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
         var showProviderDialog by remember { mutableStateOf(false) }
 
-        var enableTranslation by remember { mutableStateOf(prefs.getLyricsTranslationEnabled()) }
         var targetLang by remember { mutableStateOf(prefs.getLyricsTranslationLang()) }
         var showLangDialog by remember { mutableStateOf(false) }
         var showPaxsenixKeyDialog by remember { mutableStateOf(false) }
         var paxsenixKeyInput by remember { mutableStateOf(prefs.getPaxsenixApiKey()) }
         var showProviderOrderDialog by remember { mutableStateOf(false) }
 
-        var showUiStyleDialog by remember { mutableStateOf(false) }
-        var showSidebarUiStyleDialog by remember { mutableStateOf(false) }
-        var showFullScreenUiStyleDialog by remember { mutableStateOf(false) }
         var showLyricsFontDialog by remember { mutableStateOf(false) }
         var showBounceFactorDialog by remember { mutableStateOf(false) }
         var showGlowFactorDialog by remember { mutableStateOf(false) }
         var showFillTransitionDialog by remember { mutableStateOf(false) }
         var showLineSpacingDialog by remember { mutableStateOf(false) }
-        var showFullScreenLineSpacingDialog by remember { mutableStateOf(false) }
         var showActiveScaleDialog by remember { mutableStateOf(false) }
         var showHorizontalMarginDialog by remember { mutableStateOf(false) }
-        var showFullScreenHorizontalMarginDialog by remember { mutableStateOf(false) }
         var showVerticalOffsetDialog by remember { mutableStateOf(false) }
-        var showFullScreenVerticalOffsetDialog by remember { mutableStateOf(false) }
+        var showInstrumentalDialog by remember { mutableStateOf(false) }
+        var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
+        var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
+        val isFsMode = dialogMode == LyricsSurfaceMode.FULLSCREEN
+        val isSbMode = dialogMode == LyricsSurfaceMode.SIDEBAR
 
         if (showProviderDialog) {
             EscapableAlertDialog(
@@ -226,124 +220,30 @@ import com.alananasss.kittytune.ui.common.Slider
     
         // --- DIALOGS ---
 
-        if (showSidebarUiStyleDialog) {
-            EscapableAlertDialog(
-                onDismissRequest = { showSidebarUiStyleDialog = false },
-                title = { Text(str("pref_lyrics_ui_style_sidebar", "Style des paroles (Panneau latéral)")) },
-                text = {
-                    Column {
-                        com.alananasss.kittytune.data.local.LyricsUiStyle.entries.forEach { style ->
-                            val label = when (style) {
-                                com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED -> str("pref_lyrics_ui_style_enhanced", "Apple Music")
-                                com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC -> str("pref_lyrics_ui_style_classic", "Classique")
-                            }
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    playerViewModel.updateLyricsSidebarUiStyle(style)
-                                    showSidebarUiStyleDialog = false
-                                }.padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = (playerViewModel.lyricsSidebarUiStyle == style), onClick = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(label)
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSidebarUiStyleDialog = false }) {
-                        Text(str("btn_cancel"))
-                    }
-                }
-            )
-        }
-
-        if (showUiStyleDialog) {
-            EscapableAlertDialog(
-                onDismissRequest = { showUiStyleDialog = false },
-                title = { Text(str("pref_lyrics_ui_style_central", str("pref_lyrics_ui_style_title"))) },
-                text = {
-                    Column {
-                        com.alananasss.kittytune.data.local.LyricsUiStyle.entries.forEach { style ->
-                            val label = when (style) {
-                                com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED -> str("pref_lyrics_ui_style_enhanced", "Apple Music")
-                                com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC -> str("pref_lyrics_ui_style_classic", "Classique")
-                            }
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    playerViewModel.updateLyricsUiStyle(style)
-                                    showUiStyleDialog = false
-                                }.padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = (playerViewModel.lyricsUiStyle == style), onClick = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(label)
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showUiStyleDialog = false }) {
-                        Text(str("btn_cancel"))
-                    }
-                }
-            )
-        }
-
-        if (showFullScreenUiStyleDialog) {
-            EscapableAlertDialog(
-                onDismissRequest = { showFullScreenUiStyleDialog = false },
-                title = { Text(str("pref_lyrics_ui_style_fullscreen", "Style des paroles (Plein écran)")) },
-                text = {
-                    Column {
-                        com.alananasss.kittytune.data.local.LyricsUiStyle.entries.forEach { style ->
-                            val label = when (style) {
-                                com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED -> str("pref_lyrics_ui_style_enhanced", "Apple Music")
-                                com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC -> str("pref_lyrics_ui_style_classic", "Classique")
-                            }
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    playerViewModel.updateLyricsFullScreenUiStyle(style)
-                                    showFullScreenUiStyleDialog = false
-                                }.padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(selected = (playerViewModel.lyricsFullScreenUiStyle == style), onClick = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(label)
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenUiStyleDialog = false }) {
-                        Text(str("btn_cancel"))
-                    }
-                }
-            )
-        }
-
         if (showLyricsFontDialog) {
+            val currentFont = playerViewModel.lyricsFontFor(isFsMode, isSbMode)
             EscapableAlertDialog(
                 onDismissRequest = { showLyricsFontDialog = false },
                 title = { Text(str("pref_lyrics_font_title")) },
                 text = {
                     Column {
-                        com.alananasss.kittytune.data.local.LyricsFont.entries.forEach { font ->
+                        LyricsFont.entries.forEach { font ->
                             val label = when (font) {
-                                com.alananasss.kittytune.data.local.LyricsFont.APPLE -> str("pref_lyrics_font_apple")
-                                com.alananasss.kittytune.data.local.LyricsFont.APP_DEFAULT -> str("pref_lyrics_font_app_default")
+                                LyricsFont.APPLE -> str("pref_lyrics_font_apple")
+                                LyricsFont.APP_DEFAULT -> str("pref_lyrics_font_app_default")
                             }
                             Row(
                                 Modifier.fillMaxWidth().clickable {
-                                    playerViewModel.updateLyricsFont(font)
+                                    when (dialogMode) {
+                                        LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenFont(font)
+                                        LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarFont(font)
+                                        LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsFont(font)
+                                    }
                                     showLyricsFontDialog = false
                                 }.padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RadioButton(selected = (playerViewModel.lyricsFont == font), onClick = null)
+                                RadioButton(selected = (currentFont == font), onClick = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text(label)
                             }
@@ -358,488 +258,222 @@ import com.alananasss.kittytune.ui.common.Slider
             )
         }
 
-
-        if (showBounceFactorDialog) {
-            BackHandler(onBack = { showBounceFactorDialog = false })
-            Dialog(onDismissRequest = { showBounceFactorDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_bounce_factor_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${(playerViewModel.lyricsBounceFactor * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsBounceFactor((playerViewModel.lyricsBounceFactor - 0.1f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsBounceFactor,
-                                onValueChange = { playerViewModel.updateLyricsBounceFactor(it) },
-                                valueRange = 0f..2f,
-                                steps = 19,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsBounceFactor((playerViewModel.lyricsBounceFactor + 0.1f).coerceAtMost(2f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsBounceFactor(1f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showBounceFactorDialog = false }) { Text(str("btn_close")) }
+        if (showInstrumentalDialog) {
+            val currentStyle = playerViewModel.instrumentalIndicatorStyleFor(isFsMode, isSbMode)
+            EscapableAlertDialog(
+                onDismissRequest = { showInstrumentalDialog = false },
+                title = { Text(str("pref_instrumental_indicator")) },
+                text = {
+                    Column {
+                        InstrumentalIndicatorStyle.entries.forEach { style ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable {
+                                    when (dialogMode) {
+                                        LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenInstrumentalIndicatorStyle(style)
+                                        LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarInstrumentalIndicatorStyle(style)
+                                        LyricsSurfaceMode.CENTRAL -> playerViewModel.updateInstrumentalIndicatorStyle(style)
+                                    }
+                                    showInstrumentalDialog = false
+                                }.padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = (currentStyle == style), onClick = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(instrumentalStyleLabel(style))
+                            }
                         }
                     }
+                },
+                confirmButton = {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showInstrumentalDialog = false }) {
+                        Text(str("btn_cancel"))
+                    }
+                }
+            )
+        }
+
+        if (showBounceFactorDialog) {
+            val currentValue = playerViewModel.bounceFactorFor(isFsMode, isSbMode)
+            val updateBounce: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenBounceFactor(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarBounceFactor(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsBounceFactor(v)
                 }
             }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_bounce_factor_title"),
+                valueText = "${(currentValue * 100).toInt()}%",
+                value = currentValue,
+                valueRange = 0f..2f,
+                steps = 19,
+                stepDelta = 0.1f,
+                defaultValue = 1f,
+                onValueChange = updateBounce,
+                onDismiss = { showBounceFactorDialog = false },
+            )
         }
 
         if (showGlowFactorDialog) {
-            BackHandler(onBack = { showGlowFactorDialog = false })
-            Dialog(onDismissRequest = { showGlowFactorDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_glow_factor_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${(playerViewModel.lyricsGlowFactor * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsGlowFactor((playerViewModel.lyricsGlowFactor - 0.1f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsGlowFactor,
-                                onValueChange = { playerViewModel.updateLyricsGlowFactor(it) },
-                                valueRange = 0f..2f,
-                                steps = 19,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsGlowFactor((playerViewModel.lyricsGlowFactor + 0.1f).coerceAtMost(2f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsGlowFactor(1f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showGlowFactorDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.glowFactorFor(isFsMode, isSbMode)
+            val updateGlow: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenGlowFactor(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarGlowFactor(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsGlowFactor(v)
                 }
             }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_glow_factor_title"),
+                valueText = "${(currentValue * 100).toInt()}%",
+                value = currentValue,
+                valueRange = 0f..2f,
+                steps = 19,
+                stepDelta = 0.1f,
+                defaultValue = 1f,
+                onValueChange = updateGlow,
+                onDismiss = { showGlowFactorDialog = false },
+            )
         }
 
         if (showFillTransitionDialog) {
-            BackHandler(onBack = { showFillTransitionDialog = false })
-            Dialog(onDismissRequest = { showFillTransitionDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_fill_transition_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${playerViewModel.lyricsFillTransitionWidth.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFillTransitionWidth((playerViewModel.lyricsFillTransitionWidth - 2f).coerceAtLeast(2f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsFillTransitionWidth,
-                                onValueChange = { playerViewModel.updateLyricsFillTransitionWidth(it) },
-                                valueRange = 2f..24f,
-                                steps = 10,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFillTransitionWidth((playerViewModel.lyricsFillTransitionWidth + 2f).coerceAtMost(24f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFillTransitionWidth(8f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFillTransitionDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.fillTransitionWidthFor(isFsMode, isSbMode)
+            val updateFill: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenFillTransitionWidth(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarFillTransitionWidth(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsFillTransitionWidth(v)
                 }
             }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_fill_transition_title"),
+                valueText = "${currentValue.toInt()} dp",
+                value = currentValue,
+                valueRange = 2f..24f,
+                steps = 10,
+                stepDelta = 2f,
+                defaultValue = 8f,
+                onValueChange = updateFill,
+                onDismiss = { showFillTransitionDialog = false },
+            )
         }
 
         if (showLineSpacingDialog) {
-            BackHandler(onBack = { showLineSpacingDialog = false })
-            Dialog(onDismissRequest = { showLineSpacingDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_line_spacing_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${playerViewModel.lyricsLineSpacing.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsLineSpacing((playerViewModel.lyricsLineSpacing - 2f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsLineSpacing,
-                                onValueChange = { playerViewModel.updateLyricsLineSpacing(it) },
-                                valueRange = 0f..48f,
-                                steps = 23,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsLineSpacing((playerViewModel.lyricsLineSpacing + 2f).coerceAtMost(48f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsLineSpacing(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showLineSpacingDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.lineSpacingFor(isFsMode, isSbMode)
+            val maxSpacing = if (isFsMode) 64f else 48f
+            val spacingSteps = if (isFsMode) 31 else 23
+            val updateSpacing: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenLineSpacing(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarLineSpacing(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsLineSpacing(v)
                 }
             }
-        }
-
-        if (showFullScreenLineSpacingDialog) {
-            BackHandler(onBack = { showFullScreenLineSpacingDialog = false })
-            Dialog(onDismissRequest = { showFullScreenLineSpacingDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_fullscreen_line_spacing_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${playerViewModel.lyricsFullScreenLineSpacing.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenLineSpacing((playerViewModel.lyricsFullScreenLineSpacing - 2f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsFullScreenLineSpacing,
-                                onValueChange = { playerViewModel.updateLyricsFullScreenLineSpacing(it) },
-                                valueRange = 0f..64f,
-                                steps = 31,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenLineSpacing((playerViewModel.lyricsFullScreenLineSpacing + 2f).coerceAtMost(64f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenLineSpacing(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenLineSpacingDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
-                }
-            }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_line_spacing_title"),
+                valueText = "${currentValue.toInt()} dp",
+                value = currentValue,
+                valueRange = 0f..maxSpacing,
+                steps = spacingSteps,
+                stepDelta = 2f,
+                defaultValue = 0f,
+                onValueChange = updateSpacing,
+                onDismiss = { showLineSpacingDialog = false },
+            )
         }
 
         if (showActiveScaleDialog) {
-            BackHandler(onBack = { showActiveScaleDialog = false })
-            Dialog(onDismissRequest = { showActiveScaleDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_active_scale_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(8.dp))
-                        Text(str("pref_lyrics_active_scale_desc"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(16.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${(playerViewModel.lyricsActiveScale * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsActiveScale((playerViewModel.lyricsActiveScale - 0.05f).coerceAtLeast(1.00f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsActiveScale,
-                                onValueChange = { playerViewModel.updateLyricsActiveScale(it) },
-                                valueRange = 1.00f..1.30f,
-                                steps = 5,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsActiveScale((playerViewModel.lyricsActiveScale + 0.05f).coerceAtMost(1.30f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsActiveScale(1.00f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showActiveScaleDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.activeScaleFor(isFsMode, isSbMode)
+            val updateScale: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenActiveScale(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarActiveScale(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsActiveScale(v)
                 }
             }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_active_scale_title"),
+                subtitle = str("pref_lyrics_active_scale_desc"),
+                valueText = "${(currentValue * 100).toInt()}%",
+                value = currentValue,
+                valueRange = 1.00f..1.30f,
+                steps = 5,
+                stepDelta = 0.05f,
+                defaultValue = 1.00f,
+                onValueChange = updateScale,
+                onDismiss = { showActiveScaleDialog = false },
+            )
         }
 
         if (showHorizontalMarginDialog) {
-            BackHandler(onBack = { showHorizontalMarginDialog = false })
-            Dialog(onDismissRequest = { showHorizontalMarginDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_horizontal_margin_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${playerViewModel.lyricsHorizontalMargin.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsHorizontalMargin((playerViewModel.lyricsHorizontalMargin - 4f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsHorizontalMargin,
-                                onValueChange = { playerViewModel.updateLyricsHorizontalMargin(it) },
-                                valueRange = 0f..64f,
-                                steps = 7,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsHorizontalMargin((playerViewModel.lyricsHorizontalMargin + 4f).coerceAtMost(64f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsHorizontalMargin(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showHorizontalMarginDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.horizontalMarginFor(isFsMode, isSbMode)
+            val maxMargin = if (isFsMode) 160f else 64f
+            val stepDelta = if (isFsMode) 8f else 4f
+            val steps = if (isFsMode) 19 else 7
+            val updateMargin: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenHorizontalMargin(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarHorizontalMargin(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsHorizontalMargin(v)
                 }
             }
-        }
-
-        if (showFullScreenHorizontalMarginDialog) {
-            BackHandler(onBack = { showFullScreenHorizontalMarginDialog = false })
-            Dialog(onDismissRequest = { showFullScreenHorizontalMarginDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_fullscreen_horizontal_margin_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${playerViewModel.lyricsFullScreenHorizontalMargin.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin((playerViewModel.lyricsFullScreenHorizontalMargin - 8f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsFullScreenHorizontalMargin,
-                                onValueChange = { playerViewModel.updateLyricsFullScreenHorizontalMargin(it) },
-                                valueRange = 0f..160f,
-                                steps = 19,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin((playerViewModel.lyricsFullScreenHorizontalMargin + 8f).coerceAtMost(160f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenHorizontalMarginDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
-                }
-            }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_horizontal_margin_title"),
+                valueText = "${currentValue.toInt()} dp",
+                value = currentValue,
+                valueRange = 0f..maxMargin,
+                steps = steps,
+                stepDelta = stepDelta,
+                defaultValue = 0f,
+                onValueChange = updateMargin,
+                onDismiss = { showHorizontalMarginDialog = false },
+            )
         }
 
         if (showVerticalOffsetDialog) {
-            BackHandler(onBack = { showVerticalOffsetDialog = false })
-            Dialog(onDismissRequest = { showVerticalOffsetDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_vertical_offset_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${(playerViewModel.lyricsVerticalOffset * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsVerticalOffset((playerViewModel.lyricsVerticalOffset - 0.02f).coerceAtLeast(0.20f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsVerticalOffset,
-                                onValueChange = { playerViewModel.updateLyricsVerticalOffset(it) },
-                                valueRange = 0.20f..0.60f,
-                                steps = 19,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsVerticalOffset((playerViewModel.lyricsVerticalOffset + 0.02f).coerceAtMost(0.60f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsVerticalOffset(0.38f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showVerticalOffsetDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.verticalOffsetFor(isFsMode, isSbMode)
+            val defaultOffset = if (isSbMode) 0.36f else 0.38f
+            val updateOffset: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenVerticalOffset(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarVerticalOffset(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsVerticalOffset(v)
                 }
             }
-        }
-
-        if (showFullScreenVerticalOffsetDialog) {
-            BackHandler(onBack = { showFullScreenVerticalOffsetDialog = false })
-            Dialog(onDismissRequest = { showFullScreenVerticalOffsetDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_fullscreen_vertical_offset_title"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${(playerViewModel.lyricsFullScreenVerticalOffset * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset((playerViewModel.lyricsFullScreenVerticalOffset - 0.02f).coerceAtLeast(0.20f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = playerViewModel.lyricsFullScreenVerticalOffset,
-                                onValueChange = { playerViewModel.updateLyricsFullScreenVerticalOffset(it) },
-                                valueRange = 0.20f..0.60f,
-                                steps = 19,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset((playerViewModel.lyricsFullScreenVerticalOffset + 0.02f).coerceAtMost(0.60f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset(0.38f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenVerticalOffsetDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
-                }
-            }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_vertical_offset_title"),
+                valueText = "${(currentValue * 100).toInt()}%",
+                value = currentValue,
+                valueRange = 0.20f..0.60f,
+                steps = 19,
+                stepDelta = 0.02f,
+                defaultValue = defaultOffset,
+                onValueChange = updateOffset,
+                onDismiss = { showVerticalOffsetDialog = false },
+            )
         }
 
         if (showFontSizeDialog) {
-            BackHandler(onBack = { showFontSizeDialog = false })
-            Dialog(onDismissRequest = { showFontSizeDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_size"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${fontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFontSize((fontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = fontSize,
-                                onValueChange = { playerViewModel.updateLyricsFontSize(it) },
-                                valueRange = 12f..100f,
-                                steps = 43,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFontSizeDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
+            val currentValue = playerViewModel.fontSizeFor(isFsMode, isSbMode)
+            val defaultSize = if (isSbMode) 22f else 42f
+            val updateFontSize: (Float) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenFontSize(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarFontSize(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsFontSize(v)
                 }
             }
-        }
-
-        if (showFullScreenFontSizeDialog) {
-            BackHandler(onBack = { showFullScreenFontSizeDialog = false })
-            Dialog(onDismissRequest = { showFullScreenFontSizeDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_fullscreen_size"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${fullScreenFontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = fullScreenFontSize,
-                                onValueChange = { playerViewModel.updateLyricsFullScreenFontSize(it) },
-                                valueRange = 12f..100f,
-                                steps = 43,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenFontSizeDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (showSidebarFontSizeDialog) {
-            BackHandler(onBack = { showSidebarFontSizeDialog = false })
-            Dialog(onDismissRequest = { showSidebarFontSizeDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_size_sidebar"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${sidebarFontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsSidebarFontSize((sidebarFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
-                            Slider(
-                                value = sidebarFontSize,
-                                onValueChange = { playerViewModel.updateLyricsSidebarFontSize(it) },
-                                valueRange = 12f..100f,
-                                steps = 43,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsSidebarFontSize((sidebarFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsSidebarFontSize(22f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSidebarFontSizeDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
-                }
-            }
+            LyricsModeSliderDialog(
+                title = str("pref_lyrics_size"),
+                valueText = "${currentValue.roundToInt()} sp",
+                value = currentValue,
+                valueRange = 12f..100f,
+                steps = 43,
+                stepDelta = 2f,
+                defaultValue = defaultSize,
+                onValueChange = updateFontSize,
+                onDismiss = { showFontSizeDialog = false },
+            )
         }
     
         if (showAutoScrollSpeedDialog) {
@@ -950,93 +584,52 @@ import com.alananasss.kittytune.ui.common.Slider
             }
         }
 
-        if (showSidebarAlignmentDialog) {
+        if (showCentralPositionDialog) {
+            val current = playerViewModel.lyricsCentralPosition
+            val setVal: (LyricsAlignment) -> Unit = { v ->
+                playerViewModel.updateLyricsCentralPosition(v)
+                showCentralPositionDialog = false
+            }
             EscapableAlertDialog(
-                onDismissRequest = { showSidebarAlignmentDialog = false },
-                title = { Text(str("pref_lyrics_sidebar_align", "Alignement (panneau latéral)")) },
+                onDismissRequest = { showCentralPositionDialog = false },
+                title = { Text(str("pref_lyrics_position_title")) },
                 text = {
                     Column {
-                        AlignRadioButton(str("align_left"), LyricsAlignment.LEFT, sidebarAlignment) { playerViewModel.updateLyricsSidebarAlignment(it); showSidebarAlignmentDialog = false }
-                        AlignRadioButton(str("align_center"), LyricsAlignment.CENTER, sidebarAlignment) { playerViewModel.updateLyricsSidebarAlignment(it); showSidebarAlignmentDialog = false }
-                        AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, sidebarAlignment) { playerViewModel.updateLyricsSidebarAlignment(it); showSidebarAlignmentDialog = false }
+                        AlignRadioButton(str("align_left"), LyricsAlignment.LEFT, current, setVal)
+                        AlignRadioButton(str("align_center_simple"), LyricsAlignment.CENTER, current, setVal)
+                        AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, current, setVal)
                     }
                 },
-                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSidebarAlignmentDialog = false }) { Text(str("btn_cancel")) } }
+                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showCentralPositionDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
         if (showAlignmentDialog) {
+            val current = playerViewModel.alignmentFor(isFsMode, isSbMode)
+            val setVal: (LyricsAlignment) -> Unit = { v ->
+                when (dialogMode) {
+                    LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenAlignment(v)
+                    LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarAlignment(v)
+                    LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsAlignment(v)
+                }
+                showAlignmentDialog = false
+            }
             EscapableAlertDialog(
                 onDismissRequest = { showAlignmentDialog = false },
                 title = { Text(str("pref_lyrics_align")) },
                 text = {
                     Column {
-                        AlignRadioButton(str("align_left"), LyricsAlignment.LEFT, alignment) { playerViewModel.updateLyricsAlignment(it); showAlignmentDialog = false }
-                        AlignRadioButton(str("align_center"), LyricsAlignment.CENTER, alignment) { playerViewModel.updateLyricsAlignment(it); showAlignmentDialog = false }
-                        AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, alignment) { playerViewModel.updateLyricsAlignment(it); showAlignmentDialog = false }
+                        AlignRadioButton(str("align_left"), LyricsAlignment.LEFT, current, setVal)
+                        AlignRadioButton(str("align_center"), LyricsAlignment.CENTER, current, setVal)
+                        AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, current, setVal)
                     }
                 },
                 confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAlignmentDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
-        if (showFullScreenAlignmentDialog) {
-            EscapableAlertDialog(
-                onDismissRequest = { showFullScreenAlignmentDialog = false },
-                title = { Text(str("pref_lyrics_fullscreen_align")) },
-                text = {
-                    Column {
-                        AlignRadioButton(str("align_left"), LyricsAlignment.LEFT, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
-                        AlignRadioButton(str("align_center"), LyricsAlignment.CENTER, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
-                        AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
-                    }
-                },
-                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenAlignmentDialog = false }) { Text(str("btn_cancel")) } }
-            )
-        }
-    
-        if (showDisplayStyleDialog) {
-            val currentStyle = playerViewModel.lyricsDisplayStyle
-
-            EscapableAlertDialog(
-                onDismissRequest = { showDisplayStyleDialog = false },
-                title = { Text(str("pref_lyrics_display_style")) },
-                text = {
-                    com.alananasss.kittytune.ui.player.lyrics.LyricsDisplayStylePicker(
-                        selected = currentStyle,
-                        onSelect = { playerViewModel.updateLyricsDisplayStyle(it) },
-                    )
-                },
-                confirmButton = {
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDisplayStyleDialog = false }) { Text(str("btn_close")) }
-                }
-            )
-        }
-
-        if (showFullScreenDisplayStyleDialog) {
-            val currentStyle = playerViewModel.lyricsFullScreenDisplayStyle
-
-            EscapableAlertDialog(
-                onDismissRequest = { showFullScreenDisplayStyleDialog = false },
-                title = { Text(str("pref_lyrics_fullscreen_display_style")) },
-                text = {
-                    com.alananasss.kittytune.ui.player.lyrics.LyricsDisplayStylePicker(
-                        selected = currentStyle,
-                        onSelect = { playerViewModel.updateLyricsFullScreenDisplayStyle(it) },
-                    )
-                },
-                confirmButton = {
-                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenDisplayStyleDialog = false }) { Text(str("btn_close")) }
-                }
-            )
-        }
-
         // --- MAIN SCREEN ---
         fun shows(part: LyricsSettingsPage) = page == part
-        val lyricsStyle = com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC
-        val isEnhanced = playerViewModel.lyricsUiStyle != lyricsStyle ||
-            playerViewModel.lyricsFullScreenUiStyle != lyricsStyle ||
-            playerViewModel.lyricsSidebarUiStyle != lyricsStyle
         val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -1077,23 +670,8 @@ import com.alananasss.kittytune.ui.common.Slider
                 }
 
                 SettingsGroup(
-                    title = str("settings_cat_appearance"),
+                    title = str("settings_cat_behavior", "Behavior"),
                     items = buildList {
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_font_title"),
-                                highlightKey = "pref_lyrics_font_title",
-                                icon = Icons.Rounded.TextFields,
-                                subtitle = when (playerViewModel.lyricsFont) {
-                                    com.alananasss.kittytune.data.local.LyricsFont.APPLE -> str("pref_lyrics_font_apple")
-                                    com.alananasss.kittytune.data.local.LyricsFont.APP_DEFAULT -> str("pref_lyrics_font_app_default")
-                                },
-                                onClick = { showLyricsFontDialog = true }
-                            )
-                        }
-                        // Only unsynced lyrics scroll on their own — synced ones already
-                        // follow the track (issue #33).
                         add { shape ->
                             SettingsItem(
                                 shape = shape,
@@ -1116,7 +694,6 @@ import com.alananasss.kittytune.ui.common.Slider
                                 onClick = { showAutoScrollSpeedDialog = true }
                             )
                         }
-                        // Applies to every lyrics view, synced or not (issue #33).
                         add { shape ->
                             SettingsItem(
                                 shape = shape,
@@ -1125,48 +702,6 @@ import com.alananasss.kittytune.ui.common.Slider
                                 icon = Icons.Rounded.Mouse,
                                 subtitle = str("pref_lyrics_wheel_step_value", wheelLinesLabel(playerViewModel.lyricsWheelLines)),
                                 onClick = { showWheelStepDialog = true }
-                            )
-                        }
-                    },
-                )
-
-                SettingsGroup(
-                    title = str("lyrics_content_title"),
-                    items = buildList {
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_word_sync"),
-                                highlightKey = "pref_lyrics_word_sync",
-                                icon = Icons.Rounded.Mic,
-                                subtitle = str("pref_lyrics_word_sync_sub"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.isWordSyncEnabled,
-                                onSwitchChange = { playerViewModel.toggleWordSync(it) }
-                            )
-                        }
-                        if (playerViewModel.isWordSyncEnabled) add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_apple_effect"),
-                                highlightKey = "pref_lyrics_apple_effect",
-                                icon = Icons.Rounded.AutoAwesome,
-                                subtitle = str("pref_lyrics_apple_effect_sub"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.isAppleMusicEffectEnabled,
-                                onSwitchChange = { playerViewModel.toggleAppleMusicEffect(it) }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_duet_title"),
-                                highlightKey = "pref_lyrics_duet_title",
-                                icon = Icons.Rounded.Groups,
-                                subtitle = str("pref_lyrics_duet_desc"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.isDuetViewEnabled,
-                                onSwitchChange = { playerViewModel.toggleDuetView(it) }
                             )
                         }
                         add { shape ->
@@ -1187,59 +722,6 @@ import com.alananasss.kittytune.ui.common.Slider
                         add { shape ->
                             SettingsItem(
                                 shape = shape,
-                                title = str("pref_lyrics_backing_title"),
-                                icon = Icons.Rounded.RecordVoiceOver,
-                                subtitle = str("pref_lyrics_backing_sub"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.lyricsSplitBackingVocals,
-                                onSwitchChange = { playerViewModel.updateLyricsSplitBackingVocals(it) },
-                                highlightKey = "pref_lyrics_backing",
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_reveal_words_title"),
-                                icon = Icons.Rounded.Animation,
-                                subtitle = str("pref_lyrics_reveal_words_sub"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.lyricsRevealWords,
-                                onSwitchChange = { playerViewModel.updateLyricsRevealWords(it) },
-                                highlightKey = "pref_lyrics_reveal_words",
-                            )
-                        }
-                        add { shape -> LyricsSweepSettingItem(shape) }
-                        add { shape -> InstrumentalIndicatorSettingItem(shape) }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_romanization"),
-                                highlightKey = "pref_lyrics_romanization",
-                                icon = Icons.Rounded.Abc,
-                                subtitle = str("pref_lyrics_romanization_sub"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.isRomanizationEnabled,
-                                onSwitchChange = { playerViewModel.toggleRomanization(it) }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_translation_title"),
-                                highlightKey = "pref_lyrics_translation_title",
-                                icon = Icons.Rounded.Translate,
-                                subtitle = str("pref_lyrics_translation_sub"),
-                                hasSwitch = true,
-                                switchState = enableTranslation,
-                                onSwitchChange = {
-                                    enableTranslation = it
-                                    playerViewModel.toggleLyricsTranslation(it)
-                                }
-                            )
-                        }
-                        if (enableTranslation) add { shape ->
-                            SettingsItem(
-                                shape = shape,
                                 title = str("pref_lyrics_translation_lang"),
                                 highlightKey = "pref_lyrics_translation_lang",
                                 icon = Icons.Rounded.Language,
@@ -1247,147 +729,81 @@ import com.alananasss.kittytune.ui.common.Slider
                                 onClick = { showLangDialog = true }
                             )
                         }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_lyrics_reset_typography"),
+                                highlightKey = "pref_lyrics_reset_typography",
+                                icon = Icons.Rounded.RestartAlt,
+                                subtitle = str("pref_lyrics_reset_typography_desc"),
+                                onClick = { playerViewModel.resetAllLyricsTypography() }
+                            )
+                        }
                     },
                 )
-
-                // The animation knobs only do anything in the Apple-style view.
-                if (isEnhanced) {
-                    SettingsGroup(
-                        title = str("pref_lyrics_effects_category"),
-                        items = listOf(
-                            { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_lrc_bounce_title"),
-                                    highlightKey = "pref_lyrics_lrc_bounce_title",
-                                    icon = Icons.Rounded.Animation,
-                                    subtitle = str("pref_lyrics_lrc_bounce_desc"),
-                                    hasSwitch = true,
-                                    switchState = playerViewModel.lyricsLrcBounceEnabled,
-                                    onSwitchChange = { playerViewModel.updateLyricsLrcBounceEnabled(it) }
-                                )
-                            },
-                            { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_bounce_factor_title"),
-                                    highlightKey = "pref_lyrics_bounce_factor_title",
-                                    icon = Icons.Rounded.Height,
-                                    subtitle = "${(playerViewModel.lyricsBounceFactor * 100).toInt()}%",
-                                    onClick = { showBounceFactorDialog = true }
-                                )
-                            },
-                            { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_glow_factor_title"),
-                                    highlightKey = "pref_lyrics_glow_factor_title",
-                                    icon = Icons.Rounded.LightMode,
-                                    subtitle = "${(playerViewModel.lyricsGlowFactor * 100).toInt()}%",
-                                    onClick = { showGlowFactorDialog = true }
-                                )
-                            },
-                            { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_fill_transition_title"),
-                                    highlightKey = "pref_lyrics_fill_transition_title",
-                                    icon = Icons.Rounded.Gradient,
-                                    subtitle = "${playerViewModel.lyricsFillTransitionWidth.toInt()} dp",
-                                    onClick = { showFillTransitionDialog = true }
-                                )
-                            },
-                            { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_active_scale_title"),
-                                    highlightKey = "pref_lyrics_active_scale_title",
-                                    icon = Icons.Rounded.ZoomOutMap,
-                                    subtitle = "${(playerViewModel.lyricsActiveScale * 100).toInt()}%",
-                                    onClick = { showActiveScaleDialog = true }
-                                )
-                            },
-                            { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_reset_typography"),
-                                    highlightKey = "pref_lyrics_reset_typography",
-                                    icon = Icons.Rounded.RestartAlt,
-                                    subtitle = str("pref_lyrics_reset_typography_desc"),
-                                    onClick = { playerViewModel.resetAllLyricsTypography() }
-                                )
-                            },
-                        ),
-                    )
-                }
             }
 
             if (shows(LyricsSettingsPage.FULLSCREEN)) {
                 LyricsModeGroup(
+                    mode = LyricsSurfaceMode.FULLSCREEN,
+                    playerViewModel = playerViewModel,
                     screensaverEnabled = playerViewModel.fullPlayerScreensaverEnabled,
                     onScreensaverChange = { playerViewModel.updateFullPlayerScreensaverEnabled(it) },
-                    style = playerViewModel.lyricsFullScreenUiStyle,
-                    onStyleClick = { showFullScreenUiStyleDialog = true },
-                    lineBlur = playerViewModel.lyricsFullScreenLineBlurEnabled,
-                    onLineBlurChange = { playerViewModel.updateLyricsFullScreenLineBlurEnabled(it) },
-                    alignment = fullScreenAlignment,
-                    onAlignmentClick = { showFullScreenAlignmentDialog = true },
-                    displayStyle = playerViewModel.lyricsFullScreenDisplayStyle,
-                    onDisplayStyleClick = { showFullScreenDisplayStyleDialog = true },
-                    fontSize = fullScreenFontSize,
-                    onFontSizeClick = { showFullScreenFontSizeDialog = true },
-                    spacing = LyricsSpacing(
-                        lineSpacing = playerViewModel.lyricsFullScreenLineSpacing,
-                        onLineSpacingClick = { showFullScreenLineSpacingDialog = true },
-                        horizontalMargin = playerViewModel.lyricsFullScreenHorizontalMargin,
-                        onHorizontalMarginClick = { showFullScreenHorizontalMarginDialog = true },
-                        verticalOffset = playerViewModel.lyricsFullScreenVerticalOffset,
-                        onVerticalOffsetClick = { showFullScreenVerticalOffsetDialog = true },
-                    ),
+                    onOpenFontDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showLyricsFontDialog = true },
+                    onOpenAlignmentDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showAlignmentDialog = true },
+                    onOpenFontSizeDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showFontSizeDialog = true },
+                    onOpenLineSpacingDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showLineSpacingDialog = true },
+                    onOpenHorizontalMarginDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showHorizontalMarginDialog = true },
+                    onOpenVerticalOffsetDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showVerticalOffsetDialog = true },
+                    onOpenActiveScaleDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showActiveScaleDialog = true },
+                    onOpenBounceFactorDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showBounceFactorDialog = true },
+                    onOpenGlowFactorDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showGlowFactorDialog = true },
+                    onOpenFillTransitionDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showFillTransitionDialog = true },
+                    onOpenInstrumentalDialog = { dialogMode = LyricsSurfaceMode.FULLSCREEN; showInstrumentalDialog = true },
+                    onOpenTranslationLangDialog = { showLangDialog = true },
                 )
             }
 
             if (shows(LyricsSettingsPage.CENTRAL)) {
                 LyricsModeGroup(
+                    mode = LyricsSurfaceMode.CENTRAL,
+                    playerViewModel = playerViewModel,
                     screensaverEnabled = null,
                     onScreensaverChange = {},
-                    style = playerViewModel.lyricsUiStyle,
-                    onStyleClick = { showUiStyleDialog = true },
-                    lineBlur = playerViewModel.lyricsLineBlurEnabled,
-                    onLineBlurChange = { playerViewModel.updateLyricsLineBlurEnabled(it) },
-                    alignment = alignment,
-                    onAlignmentClick = { showAlignmentDialog = true },
-                    displayStyle = playerViewModel.lyricsDisplayStyle,
-                    onDisplayStyleClick = { showDisplayStyleDialog = true },
-                    fontSize = fontSize,
-                    onFontSizeClick = { showFontSizeDialog = true },
-                    spacing = LyricsSpacing(
-                        lineSpacing = playerViewModel.lyricsLineSpacing,
-                        onLineSpacingClick = { showLineSpacingDialog = true },
-                        horizontalMargin = playerViewModel.lyricsHorizontalMargin,
-                        onHorizontalMarginClick = { showHorizontalMarginDialog = true },
-                        verticalOffset = playerViewModel.lyricsVerticalOffset,
-                        onVerticalOffsetClick = { showVerticalOffsetDialog = true },
-                    ),
+                    onOpenFontDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showLyricsFontDialog = true },
+                    onOpenCentralPositionDialog = { showCentralPositionDialog = true },
+                    onOpenAlignmentDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showAlignmentDialog = true },
+                    onOpenFontSizeDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showFontSizeDialog = true },
+                    onOpenLineSpacingDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showLineSpacingDialog = true },
+                    onOpenHorizontalMarginDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showHorizontalMarginDialog = true },
+                    onOpenVerticalOffsetDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showVerticalOffsetDialog = true },
+                    onOpenActiveScaleDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showActiveScaleDialog = true },
+                    onOpenBounceFactorDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showBounceFactorDialog = true },
+                    onOpenGlowFactorDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showGlowFactorDialog = true },
+                    onOpenFillTransitionDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showFillTransitionDialog = true },
+                    onOpenInstrumentalDialog = { dialogMode = LyricsSurfaceMode.CENTRAL; showInstrumentalDialog = true },
+                    onOpenTranslationLangDialog = { showLangDialog = true },
                 )
             }
 
             if (shows(LyricsSettingsPage.SIDEBAR)) {
-                // The side panel has no display-style or spacing knobs of its own.
                 LyricsModeGroup(
+                    mode = LyricsSurfaceMode.SIDEBAR,
+                    playerViewModel = playerViewModel,
                     screensaverEnabled = null,
                     onScreensaverChange = {},
-                    style = playerViewModel.lyricsSidebarUiStyle,
-                    onStyleClick = { showSidebarUiStyleDialog = true },
-                    lineBlur = playerViewModel.lyricsSidebarLineBlurEnabled,
-                    onLineBlurChange = { playerViewModel.updateLyricsSidebarLineBlurEnabled(it) },
-                    alignment = sidebarAlignment,
-                    onAlignmentClick = { showSidebarAlignmentDialog = true },
-                    displayStyle = null,
-                    onDisplayStyleClick = {},
-                    fontSize = sidebarFontSize,
-                    onFontSizeClick = { showSidebarFontSizeDialog = true },
-                    spacing = null,
+                    onOpenFontDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showLyricsFontDialog = true },
+                    onOpenAlignmentDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showAlignmentDialog = true },
+                    onOpenFontSizeDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showFontSizeDialog = true },
+                    onOpenLineSpacingDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showLineSpacingDialog = true },
+                    onOpenHorizontalMarginDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showHorizontalMarginDialog = true },
+                    onOpenVerticalOffsetDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showVerticalOffsetDialog = true },
+                    onOpenActiveScaleDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showActiveScaleDialog = true },
+                    onOpenBounceFactorDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showBounceFactorDialog = true },
+                    onOpenGlowFactorDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showGlowFactorDialog = true },
+                    onOpenFillTransitionDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showFillTransitionDialog = true },
+                    onOpenInstrumentalDialog = { dialogMode = LyricsSurfaceMode.SIDEBAR; showInstrumentalDialog = true },
+                    onOpenTranslationLangDialog = { showLangDialog = true },
                 )
             }
 
@@ -1471,34 +887,8 @@ private fun autoScrollSpeedLabel(speed: Float): String {
     return "$text×"
 }
 
-/** Settings label for lyrics display style. */
-private fun displayStyleLabel(style: LyricsDisplayStyle): String = when (style) {
-    LyricsDisplayStyle.STANDARD -> str("lyrics_style_standard")
-    LyricsDisplayStyle.SCALE -> str("lyrics_style_scale")
-    LyricsDisplayStyle.FOCUS -> str("lyrics_style_focus")
-    LyricsDisplayStyle.SCALE_FOCUS -> "${str("lyrics_style_scale")} + ${str("lyrics_style_focus")}"
-}
-
-/** One line on what each style actually does to the lines. */
-private fun displayStyleDescription(style: LyricsDisplayStyle): String = when (style) {
-    LyricsDisplayStyle.STANDARD -> "lyrics_style_standard_sub"
-    LyricsDisplayStyle.SCALE -> "lyrics_style_scale_sub"
-    LyricsDisplayStyle.FOCUS -> "lyrics_style_focus_sub"
-    LyricsDisplayStyle.SCALE_FOCUS -> "lyrics_style_scale_focus_sub"
-}
-
 /** Which part of the lyrics settings a page shows. */
 enum class LyricsSettingsPage { OVERVIEW, FULLSCREEN, CENTRAL, SIDEBAR, SOURCES }
-
-/** The spacing knobs the full-screen and central views have and the side panel does not. */
-private class LyricsSpacing(
-    val lineSpacing: Float,
-    val onLineSpacingClick: () -> Unit,
-    val horizontalMargin: Float,
-    val onHorizontalMarginClick: () -> Unit,
-    val verticalOffset: Float,
-    val onVerticalOffsetClick: () -> Unit,
-)
 
 /**
  * The settings of one lyrics view — full screen, central or side panel. The three used to be interleaved in
@@ -1507,22 +897,50 @@ private class LyricsSpacing(
  */
 @Composable
 private fun LyricsModeGroup(
+    mode: LyricsSurfaceMode,
+    playerViewModel: PlayerViewModel,
     screensaverEnabled: Boolean?,
     onScreensaverChange: (Boolean) -> Unit,
-    style: com.alananasss.kittytune.data.local.LyricsUiStyle,
-    onStyleClick: () -> Unit,
-    lineBlur: Boolean,
-    onLineBlurChange: (Boolean) -> Unit,
-    alignment: LyricsAlignment,
-    onAlignmentClick: () -> Unit,
-    displayStyle: LyricsDisplayStyle?,
-    onDisplayStyleClick: () -> Unit,
-    fontSize: Float,
-    onFontSizeClick: () -> Unit,
-    spacing: LyricsSpacing?,
+    onOpenFontDialog: () -> Unit,
+    onOpenCentralPositionDialog: (() -> Unit)? = null,
+    onOpenAlignmentDialog: () -> Unit,
+    onOpenFontSizeDialog: () -> Unit,
+    onOpenLineSpacingDialog: () -> Unit,
+    onOpenHorizontalMarginDialog: () -> Unit,
+    onOpenVerticalOffsetDialog: () -> Unit,
+    onOpenActiveScaleDialog: () -> Unit,
+    onOpenBounceFactorDialog: () -> Unit,
+    onOpenGlowFactorDialog: () -> Unit,
+    onOpenFillTransitionDialog: () -> Unit,
+    onOpenInstrumentalDialog: () -> Unit,
+    onOpenTranslationLangDialog: () -> Unit,
 ) {
-    val isClassic = style == com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC
+    val isFS = mode == LyricsSurfaceMode.FULLSCREEN
+    val isSB = mode == LyricsSurfaceMode.SIDEBAR
+    val font = playerViewModel.lyricsFontFor(isFS, isSB)
+    val lineBlur = playerViewModel.lineBlurFor(isFS, isSB)
+    val alignment = playerViewModel.alignmentFor(isFS, isSB)
+    val fontSize = playerViewModel.fontSizeFor(isFS, isSB)
+    val lineSpacing = playerViewModel.lineSpacingFor(isFS, isSB)
+    val horizontalMargin = playerViewModel.horizontalMarginFor(isFS, isSB)
+    val verticalOffset = playerViewModel.verticalOffsetFor(isFS, isSB)
+    val activeScale = playerViewModel.activeScaleFor(isFS, isSB)
+    val wordSync = playerViewModel.wordSyncEnabledFor(isFS, isSB)
+    val appleEffect = playerViewModel.appleMusicEffectEnabledFor(isFS, isSB)
+    val duetView = playerViewModel.duetViewEnabledFor(isFS, isSB)
+    val splitBacking = playerViewModel.splitBackingVocalsFor(isFS, isSB)
+    val revealWords = playerViewModel.revealWordsFor(isFS, isSB)
+    val sweepEnabled = playerViewModel.sweepEnabledFor(isFS, isSB)
+    val instrumentalStyle = playerViewModel.instrumentalIndicatorStyleFor(isFS, isSB)
+    val romanization = playerViewModel.romanizationEnabledFor(isFS, isSB)
+    val translation = playerViewModel.translationEnabledFor(isFS, isSB)
+    val lrcBounce = playerViewModel.lrcBounceEnabledFor(isFS, isSB)
+    val bounceFactor = playerViewModel.bounceFactorFor(isFS, isSB)
+    val glowFactor = playerViewModel.glowFactorFor(isFS, isSB)
+    val fillTransition = playerViewModel.fillTransitionWidthFor(isFS, isSB)
+
     SettingsGroup(
+        title = str("settings_cat_appearance"),
         items = buildList {
             if (screensaverEnabled != null) add { shape ->
                 SettingsItem(
@@ -1539,14 +957,17 @@ private fun LyricsModeGroup(
             add { shape ->
                 SettingsItem(
                     shape = shape,
-                    title = str("pref_lyrics_ui_style_title"),
-                    highlightKey = "pref_lyrics_ui_style_title",
-                    icon = Icons.Rounded.AutoAwesome,
-                    subtitle = if (isClassic) str("pref_lyrics_ui_style_classic") else str("pref_lyrics_ui_style_enhanced"),
-                    onClick = onStyleClick,
+                    title = str("pref_lyrics_font_title"),
+                    highlightKey = "pref_lyrics_font_title",
+                    icon = Icons.Rounded.TextFields,
+                    subtitle = when (font) {
+                        LyricsFont.APPLE -> str("pref_lyrics_font_apple")
+                        LyricsFont.APP_DEFAULT -> str("pref_lyrics_font_app_default")
+                    },
+                    onClick = onOpenFontDialog,
                 )
             }
-            if (!isClassic) add { shape ->
+            add { shape ->
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_line_blur_title"),
@@ -1555,17 +976,27 @@ private fun LyricsModeGroup(
                     subtitle = str("pref_lyrics_line_blur_desc"),
                     hasSwitch = true,
                     switchState = lineBlur,
-                    onSwitchChange = onLineBlurChange,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenLineBlurEnabled(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarLineBlurEnabled(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsLineBlurEnabled(enabled)
+                        }
+                    },
                 )
             }
-            if (isClassic && displayStyle != null) add { shape ->
+            if (onOpenCentralPositionDialog != null) add { shape ->
                 SettingsItem(
                     shape = shape,
-                    title = str("pref_lyrics_display_style"),
-                    highlightKey = "pref_lyrics_display_style",
-                    icon = Icons.Rounded.Subtitles,
-                    subtitle = displayStyleLabel(displayStyle),
-                    onClick = onDisplayStyleClick,
+                    title = str("pref_lyrics_position_title"),
+                    highlightKey = "pref_lyrics_position_title",
+                    icon = Icons.Rounded.ViewWeek,
+                    subtitle = when (playerViewModel.lyricsCentralPosition) {
+                        LyricsAlignment.LEFT -> str("align_left")
+                        LyricsAlignment.CENTER -> str("align_center_simple")
+                        LyricsAlignment.RIGHT -> str("align_right")
+                    },
+                    onClick = onOpenCentralPositionDialog,
                 )
             }
             add { shape ->
@@ -1579,7 +1010,7 @@ private fun LyricsModeGroup(
                         LyricsAlignment.CENTER -> str("align_center_simple")
                         LyricsAlignment.RIGHT -> str("align_right")
                     },
-                    onClick = onAlignmentClick,
+                    onClick = onOpenAlignmentDialog,
                 )
             }
             add { shape ->
@@ -1589,41 +1020,356 @@ private fun LyricsModeGroup(
                     highlightKey = "pref_lyrics_size",
                     icon = Icons.Rounded.FormatSize,
                     subtitle = "${fontSize.roundToInt()} sp",
-                    onClick = onFontSizeClick,
+                    onClick = onOpenFontSizeDialog,
                 )
             }
-            if (spacing != null) {
-                add { shape ->
-                    SettingsItem(
-                        shape = shape,
-                        title = str("pref_lyrics_line_spacing_title"),
-                        highlightKey = "pref_lyrics_line_spacing_title",
-                        icon = Icons.Rounded.FormatLineSpacing,
-                        subtitle = "${spacing.lineSpacing.toInt()} dp",
-                        onClick = spacing.onLineSpacingClick,
-                    )
-                }
-                add { shape ->
-                    SettingsItem(
-                        shape = shape,
-                        title = str("pref_lyrics_horizontal_margin_title"),
-                        highlightKey = "pref_lyrics_horizontal_margin_title",
-                        icon = Icons.Rounded.SwapHoriz,
-                        subtitle = "${spacing.horizontalMargin.toInt()} dp",
-                        onClick = spacing.onHorizontalMarginClick,
-                    )
-                }
-                add { shape ->
-                    SettingsItem(
-                        shape = shape,
-                        title = str("pref_lyrics_vertical_offset_title"),
-                        highlightKey = "pref_lyrics_vertical_offset_title",
-                        icon = Icons.Rounded.VerticalAlignCenter,
-                        subtitle = "${(spacing.verticalOffset * 100).toInt()}%",
-                        onClick = spacing.onVerticalOffsetClick,
-                    )
-                }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_line_spacing_title"),
+                    highlightKey = "pref_lyrics_line_spacing_title",
+                    icon = Icons.Rounded.FormatLineSpacing,
+                    subtitle = "${lineSpacing.toInt()} dp",
+                    onClick = onOpenLineSpacingDialog,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_horizontal_margin_title"),
+                    highlightKey = "pref_lyrics_horizontal_margin_title",
+                    icon = Icons.Rounded.SwapHoriz,
+                    subtitle = "${horizontalMargin.toInt()} dp",
+                    onClick = onOpenHorizontalMarginDialog,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_vertical_offset_title"),
+                    highlightKey = "pref_lyrics_vertical_offset_title",
+                    icon = Icons.Rounded.VerticalAlignCenter,
+                    subtitle = "${(verticalOffset * 100).toInt()}%",
+                    onClick = onOpenVerticalOffsetDialog,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_active_scale_title"),
+                    highlightKey = "pref_lyrics_active_scale_title",
+                    icon = Icons.Rounded.ZoomOutMap,
+                    subtitle = "${(activeScale * 100).toInt()}%",
+                    onClick = onOpenActiveScaleDialog,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_reset_typography"),
+                    highlightKey = "pref_lyrics_reset_typography",
+                    icon = Icons.Rounded.RestartAlt,
+                    subtitle = str("pref_lyrics_reset_typography_desc"),
+                    onClick = { playerViewModel.resetLyricsTypography(isFullScreen = isFS, isSidebar = isSB) },
+                )
             }
         },
     )
+
+    SettingsGroup(
+        title = str("lyrics_content_title"),
+        items = buildList {
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_word_sync"),
+                    highlightKey = "pref_lyrics_word_sync",
+                    icon = Icons.Rounded.Mic,
+                    subtitle = str("pref_lyrics_word_sync_sub"),
+                    hasSwitch = true,
+                    switchState = wordSync,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.toggleFullScreenWordSync(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.toggleSidebarWordSync(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.toggleWordSync(enabled)
+                        }
+                    },
+                )
+            }
+            if (wordSync) add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_apple_effect"),
+                    highlightKey = "pref_lyrics_apple_effect",
+                    icon = Icons.Rounded.AutoAwesome,
+                    subtitle = str("pref_lyrics_apple_effect_sub"),
+                    hasSwitch = true,
+                    switchState = appleEffect,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.toggleFullScreenAppleMusicEffect(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.toggleSidebarAppleMusicEffect(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.toggleAppleMusicEffect(enabled)
+                        }
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_duet_title"),
+                    highlightKey = "pref_lyrics_duet_title",
+                    icon = Icons.Rounded.Groups,
+                    subtitle = str("pref_lyrics_duet_desc"),
+                    hasSwitch = true,
+                    switchState = duetView,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.toggleFullScreenDuetView(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.toggleSidebarDuetView(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.toggleDuetView(enabled)
+                        }
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_backing_title"),
+                    highlightKey = "pref_lyrics_backing",
+                    icon = Icons.Rounded.RecordVoiceOver,
+                    subtitle = str("pref_lyrics_backing_sub"),
+                    hasSwitch = true,
+                    switchState = splitBacking,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenSplitBackingVocals(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarSplitBackingVocals(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsSplitBackingVocals(enabled)
+                        }
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_reveal_words_title"),
+                    highlightKey = "pref_lyrics_reveal_words",
+                    icon = Icons.Rounded.Animation,
+                    subtitle = str("pref_lyrics_reveal_words_sub"),
+                    hasSwitch = true,
+                    switchState = revealWords,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenRevealWords(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarRevealWords(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsRevealWords(enabled)
+                        }
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_line_animation"),
+                    highlightKey = "pref_lyrics_line_animation",
+                    icon = Icons.Rounded.Lyrics,
+                    subtitle = str("pref_lyrics_line_animation_sub"),
+                    hasSwitch = true,
+                    switchState = sweepEnabled,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenSweepEnabled(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarSweepEnabled(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsSweepEnabled(enabled)
+                        }
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_instrumental_indicator"),
+                    highlightKey = "pref_instrumental_indicator",
+                    icon = Icons.Rounded.GraphicEq,
+                    subtitle = instrumentalStyleLabel(instrumentalStyle),
+                    onClick = onOpenInstrumentalDialog,
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_romanization"),
+                    highlightKey = "pref_lyrics_romanization",
+                    icon = Icons.Rounded.Abc,
+                    subtitle = str("pref_lyrics_romanization_sub"),
+                    hasSwitch = true,
+                    switchState = romanization,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.toggleFullScreenRomanization(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.toggleSidebarRomanization(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.toggleRomanization(enabled)
+                        }
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_translation_title"),
+                    highlightKey = "pref_lyrics_translation_title",
+                    icon = Icons.Rounded.Translate,
+                    subtitle = str("pref_lyrics_translation_sub"),
+                    hasSwitch = true,
+                    switchState = translation,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.toggleFullScreenLyricsTranslation(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.toggleSidebarLyricsTranslation(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.toggleLyricsTranslation(enabled)
+                        }
+                    },
+                )
+            }
+            if (translation) add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_translation_lang"),
+                    highlightKey = "pref_lyrics_translation_lang",
+                    icon = Icons.Rounded.Language,
+                    subtitle = playerViewModel.lyricsTranslationLang.uppercase(),
+                    onClick = onOpenTranslationLangDialog,
+                )
+            }
+        },
+    )
+
+    SettingsGroup(
+        title = str("pref_lyrics_effects_category"),
+        items = listOf(
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_lrc_bounce_title"),
+                    highlightKey = "pref_lyrics_lrc_bounce_title",
+                    icon = Icons.Rounded.Animation,
+                    subtitle = str("pref_lyrics_lrc_bounce_desc"),
+                    hasSwitch = true,
+                    switchState = lrcBounce,
+                    onSwitchChange = { enabled ->
+                        when (mode) {
+                            LyricsSurfaceMode.FULLSCREEN -> playerViewModel.updateLyricsFullScreenLrcBounceEnabled(enabled)
+                            LyricsSurfaceMode.SIDEBAR -> playerViewModel.updateLyricsSidebarLrcBounceEnabled(enabled)
+                            LyricsSurfaceMode.CENTRAL -> playerViewModel.updateLyricsLrcBounceEnabled(enabled)
+                        }
+                    },
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_bounce_factor_title"),
+                    highlightKey = "pref_lyrics_bounce_factor_title",
+                    icon = Icons.Rounded.Height,
+                    subtitle = "${(bounceFactor * 100).toInt()}%",
+                    onClick = onOpenBounceFactorDialog,
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_glow_factor_title"),
+                    highlightKey = "pref_lyrics_glow_factor_title",
+                    icon = Icons.Rounded.LightMode,
+                    subtitle = "${(glowFactor * 100).toInt()}%",
+                    onClick = onOpenGlowFactorDialog,
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_lyrics_fill_transition_title"),
+                    highlightKey = "pref_lyrics_fill_transition_title",
+                    icon = Icons.Rounded.Gradient,
+                    subtitle = "${fillTransition.toInt()} dp",
+                    onClick = onOpenFillTransitionDialog,
+                )
+            },
+        ),
+    )
+}
+
+@Composable
+private fun instrumentalStyleLabel(style: InstrumentalIndicatorStyle): String = when (style) {
+    InstrumentalIndicatorStyle.DOTS -> str("pref_instrumental_dots")
+    InstrumentalIndicatorStyle.CIRCLE -> str("pref_instrumental_circle")
+    InstrumentalIndicatorStyle.NOTE_WAVE -> str("pref_instrumental_note_wave")
+    InstrumentalIndicatorStyle.OFF -> str("pref_instrumental_off")
+}
+
+@Composable
+private fun LyricsModeSliderDialog(
+    title: String,
+    valueText: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    stepDelta: Float,
+    defaultValue: Float,
+    subtitle: String? = null,
+    onValueChange: (Float) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall)
+                if (subtitle != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(16.dp))
+                } else {
+                    Spacer(Modifier.height(24.dp))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(valueText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = { onValueChange((value - stepDelta).coerceAtLeast(valueRange.start)) },
+                    ) { Icon(Icons.Rounded.Remove, null) }
+                    Slider(
+                        value = value,
+                        onValueChange = onValueChange,
+                        valueRange = valueRange,
+                        steps = steps,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    )
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = { onValueChange((value + stepDelta).coerceAtMost(valueRange.endInclusive)) },
+                    ) { Icon(Icons.Rounded.Add, null) }
+                }
+                Spacer(Modifier.height(24.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { onValueChange(defaultValue) }) {
+                        Text(str("pref_lyrics_reset"))
+                    }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) {
+                        Text(str("btn_close"))
+                    }
+                }
+            }
+        }
+    }
 }

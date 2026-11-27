@@ -1,8 +1,13 @@
 import com.alananasss.kittytune.core.Prefs
+import com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle
 import com.alananasss.kittytune.data.local.LyricsAlignment
+import com.alananasss.kittytune.data.local.LyricsFont
+import com.alananasss.kittytune.data.local.LyricsSurfaceMode
+import com.alananasss.kittytune.data.local.LyricsUiStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class EnhancedLyricsCustomizationTest {
@@ -218,43 +223,173 @@ class EnhancedLyricsCustomizationTest {
     @Test
     fun testIndependentLayoutModeUiStyles() {
         val prefs = PlayerPreferences()
-        val origCentral = prefs.getLyricsUiStyle()
-        val origFullscreen = prefs.getLyricsFullScreenUiStyle()
-        val origSidebar = prefs.getLyricsSidebarUiStyle()
-
         try {
-            // Default verification
-            // Sidebar must default to CLASSIC
-            // Central & Fullscreen must default to ENHANCED
-            Prefs.remove("lyrics_sidebar_ui_style")
+            // Even with legacy CLASSIC values persisted, all 3 surfaces always use ENHANCED
+            Prefs.putString("lyrics_ui_style", LyricsUiStyle.CLASSIC.name)
+            Prefs.putString("lyrics_fullscreen_ui_style", LyricsUiStyle.CLASSIC.name)
+            Prefs.putString("lyrics_sidebar_ui_style", LyricsUiStyle.CLASSIC.name)
+
+            assertEquals(LyricsUiStyle.ENHANCED, prefs.getLyricsUiStyle())
+            assertEquals(LyricsUiStyle.ENHANCED, prefs.getLyricsFullScreenUiStyle())
+            assertEquals(LyricsUiStyle.ENHANCED, prefs.getLyricsSidebarUiStyle())
+
+            prefs.setLyricsUiStyle(LyricsUiStyle.CLASSIC)
+            prefs.setLyricsFullScreenUiStyle(LyricsUiStyle.CLASSIC)
+            prefs.setLyricsSidebarUiStyle(LyricsUiStyle.CLASSIC)
+
+            assertEquals(LyricsUiStyle.ENHANCED, prefs.getLyricsUiStyle())
+            assertEquals(LyricsUiStyle.ENHANCED, prefs.getLyricsFullScreenUiStyle())
+            assertEquals(LyricsUiStyle.ENHANCED, prefs.getLyricsSidebarUiStyle())
+        } finally {
             Prefs.remove("lyrics_ui_style")
             Prefs.remove("lyrics_fullscreen_ui_style")
+            Prefs.remove("lyrics_sidebar_ui_style")
+        }
+    }
 
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC, prefs.getLyricsSidebarUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsFullScreenUiStyle())
+    @Test
+    fun testPerModeLyricsSettingsIsolation() {
+        val prefs = PlayerPreferences()
+        val modes = listOf(LyricsSurfaceMode.CENTRAL, LyricsSurfaceMode.FULLSCREEN, LyricsSurfaceMode.SIDEBAR)
+        val origFonts = modes.associateWith { prefs.getLyricsFont(it) }
+        val origWordSync = modes.associateWith { prefs.getLyricsWordSyncEnabled(it) }
+        val origAppleEffect = modes.associateWith { prefs.getLyricsAppleEffectEnabled(it) }
+        val origDuet = modes.associateWith { prefs.getLyricsDuetViewEnabled(it) }
+        val origBacking = modes.associateWith { prefs.getLyricsSplitBackingVocals(it) }
+        val origReveal = modes.associateWith { prefs.getLyricsRevealWords(it) }
+        val origSweep = modes.associateWith { prefs.getLyricsSweepEnabled(it) }
+        val origInstrumental = modes.associateWith { prefs.getInstrumentalIndicatorStyle(it) }
+        val origLrcBounce = modes.associateWith { prefs.getLyricsLrcBounceEnabled(it) }
+        val origBounce = modes.associateWith { prefs.getLyricsBounceFactor(it) }
+        val origGlow = modes.associateWith { prefs.getLyricsGlowFactor(it) }
+        val origFill = modes.associateWith { prefs.getLyricsFillTransitionWidth(it) }
+        val origTrans = modes.associateWith { prefs.getLyricsTranslationEnabled(it) }
+        val origRoman = modes.associateWith { prefs.getLyricsRomanizationEnabled(it) }
 
-            // Changing sidebar to ENHANCED must not change central or fullscreen
-            prefs.setLyricsSidebarUiStyle(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED)
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsSidebarUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsFullScreenUiStyle())
+        try {
+            // Mutate only FULLSCREEN and verify CENTRAL and SIDEBAR remain untouched
+            prefs.setLyricsFont(LyricsSurfaceMode.CENTRAL, LyricsFont.APPLE)
+            prefs.setLyricsFont(LyricsSurfaceMode.SIDEBAR, LyricsFont.APPLE)
+            prefs.setLyricsFont(LyricsSurfaceMode.FULLSCREEN, LyricsFont.APP_DEFAULT)
+            assertEquals(LyricsFont.APPLE, prefs.getLyricsFont(LyricsSurfaceMode.CENTRAL))
+            assertEquals(LyricsFont.APP_DEFAULT, prefs.getLyricsFont(LyricsSurfaceMode.FULLSCREEN))
+            assertEquals(LyricsFont.APPLE, prefs.getLyricsFont(LyricsSurfaceMode.SIDEBAR))
 
-            // Changing fullscreen to CLASSIC must not change sidebar or central
-            prefs.setLyricsFullScreenUiStyle(com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC)
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsSidebarUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC, prefs.getLyricsFullScreenUiStyle())
+            // Mutate only SIDEBAR and verify CENTRAL and FULLSCREEN remain untouched
+            prefs.setLyricsFont(LyricsSurfaceMode.SIDEBAR, LyricsFont.APP_DEFAULT)
+            prefs.setLyricsFont(LyricsSurfaceMode.FULLSCREEN, LyricsFont.APPLE)
+            assertEquals(LyricsFont.APPLE, prefs.getLyricsFont(LyricsSurfaceMode.CENTRAL))
+            assertEquals(LyricsFont.APPLE, prefs.getLyricsFont(LyricsSurfaceMode.FULLSCREEN))
+            assertEquals(LyricsFont.APP_DEFAULT, prefs.getLyricsFont(LyricsSurfaceMode.SIDEBAR))
 
-            // Changing central to CLASSIC must not change sidebar or fullscreen
-            prefs.setLyricsUiStyle(com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC)
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED, prefs.getLyricsSidebarUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC, prefs.getLyricsUiStyle())
-            assertEquals(com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC, prefs.getLyricsFullScreenUiStyle())
+            // Booleans & enums per mode
+            prefs.setLyricsWordSyncEnabled(LyricsSurfaceMode.CENTRAL, true)
+            prefs.setLyricsWordSyncEnabled(LyricsSurfaceMode.FULLSCREEN, false)
+            prefs.setLyricsWordSyncEnabled(LyricsSurfaceMode.SIDEBAR, true)
+            assertTrue(prefs.getLyricsWordSyncEnabled(LyricsSurfaceMode.CENTRAL))
+            assertFalse(prefs.getLyricsWordSyncEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertTrue(prefs.getLyricsWordSyncEnabled(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsAppleEffectEnabled(LyricsSurfaceMode.CENTRAL, false)
+            prefs.setLyricsAppleEffectEnabled(LyricsSurfaceMode.FULLSCREEN, true)
+            prefs.setLyricsAppleEffectEnabled(LyricsSurfaceMode.SIDEBAR, false)
+            assertFalse(prefs.getLyricsAppleEffectEnabled(LyricsSurfaceMode.CENTRAL))
+            assertTrue(prefs.getLyricsAppleEffectEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertFalse(prefs.getLyricsAppleEffectEnabled(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsDuetViewEnabled(LyricsSurfaceMode.CENTRAL, true)
+            prefs.setLyricsDuetViewEnabled(LyricsSurfaceMode.FULLSCREEN, true)
+            prefs.setLyricsDuetViewEnabled(LyricsSurfaceMode.SIDEBAR, false)
+            assertTrue(prefs.getLyricsDuetViewEnabled(LyricsSurfaceMode.CENTRAL))
+            assertTrue(prefs.getLyricsDuetViewEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertFalse(prefs.getLyricsDuetViewEnabled(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsSplitBackingVocals(LyricsSurfaceMode.CENTRAL, false)
+            prefs.setLyricsSplitBackingVocals(LyricsSurfaceMode.FULLSCREEN, true)
+            prefs.setLyricsSplitBackingVocals(LyricsSurfaceMode.SIDEBAR, false)
+            assertFalse(prefs.getLyricsSplitBackingVocals(LyricsSurfaceMode.CENTRAL))
+            assertTrue(prefs.getLyricsSplitBackingVocals(LyricsSurfaceMode.FULLSCREEN))
+            assertFalse(prefs.getLyricsSplitBackingVocals(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsRevealWords(LyricsSurfaceMode.CENTRAL, true)
+            prefs.setLyricsRevealWords(LyricsSurfaceMode.FULLSCREEN, false)
+            prefs.setLyricsRevealWords(LyricsSurfaceMode.SIDEBAR, true)
+            assertTrue(prefs.getLyricsRevealWords(LyricsSurfaceMode.CENTRAL))
+            assertFalse(prefs.getLyricsRevealWords(LyricsSurfaceMode.FULLSCREEN))
+            assertTrue(prefs.getLyricsRevealWords(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsSweepEnabled(LyricsSurfaceMode.CENTRAL, false)
+            prefs.setLyricsSweepEnabled(LyricsSurfaceMode.FULLSCREEN, true)
+            prefs.setLyricsSweepEnabled(LyricsSurfaceMode.SIDEBAR, false)
+            assertFalse(prefs.getLyricsSweepEnabled(LyricsSurfaceMode.CENTRAL))
+            assertTrue(prefs.getLyricsSweepEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertFalse(prefs.getLyricsSweepEnabled(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setInstrumentalIndicatorStyle(LyricsSurfaceMode.CENTRAL, InstrumentalIndicatorStyle.DOTS)
+            prefs.setInstrumentalIndicatorStyle(LyricsSurfaceMode.FULLSCREEN, InstrumentalIndicatorStyle.NOTE_WAVE)
+            prefs.setInstrumentalIndicatorStyle(LyricsSurfaceMode.SIDEBAR, InstrumentalIndicatorStyle.OFF)
+            assertEquals(InstrumentalIndicatorStyle.DOTS, prefs.getInstrumentalIndicatorStyle(LyricsSurfaceMode.CENTRAL))
+            assertEquals(InstrumentalIndicatorStyle.NOTE_WAVE, prefs.getInstrumentalIndicatorStyle(LyricsSurfaceMode.FULLSCREEN))
+            assertEquals(InstrumentalIndicatorStyle.OFF, prefs.getInstrumentalIndicatorStyle(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsLrcBounceEnabled(LyricsSurfaceMode.CENTRAL, false)
+            prefs.setLyricsLrcBounceEnabled(LyricsSurfaceMode.FULLSCREEN, true)
+            prefs.setLyricsLrcBounceEnabled(LyricsSurfaceMode.SIDEBAR, true)
+            assertFalse(prefs.getLyricsLrcBounceEnabled(LyricsSurfaceMode.CENTRAL))
+            assertTrue(prefs.getLyricsLrcBounceEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertTrue(prefs.getLyricsLrcBounceEnabled(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsBounceFactor(LyricsSurfaceMode.CENTRAL, 0.5f)
+            prefs.setLyricsBounceFactor(LyricsSurfaceMode.FULLSCREEN, 1.5f)
+            prefs.setLyricsBounceFactor(LyricsSurfaceMode.SIDEBAR, 1.8f)
+            assertEquals(0.5f, prefs.getLyricsBounceFactor(LyricsSurfaceMode.CENTRAL))
+            assertEquals(1.5f, prefs.getLyricsBounceFactor(LyricsSurfaceMode.FULLSCREEN))
+            assertEquals(1.8f, prefs.getLyricsBounceFactor(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsGlowFactor(LyricsSurfaceMode.CENTRAL, 0.2f)
+            prefs.setLyricsGlowFactor(LyricsSurfaceMode.FULLSCREEN, 1.4f)
+            prefs.setLyricsGlowFactor(LyricsSurfaceMode.SIDEBAR, 0.9f)
+            assertEquals(0.2f, prefs.getLyricsGlowFactor(LyricsSurfaceMode.CENTRAL))
+            assertEquals(1.4f, prefs.getLyricsGlowFactor(LyricsSurfaceMode.FULLSCREEN))
+            assertEquals(0.9f, prefs.getLyricsGlowFactor(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsFillTransitionWidth(LyricsSurfaceMode.CENTRAL, 4f)
+            prefs.setLyricsFillTransitionWidth(LyricsSurfaceMode.FULLSCREEN, 16f)
+            prefs.setLyricsFillTransitionWidth(LyricsSurfaceMode.SIDEBAR, 10f)
+            assertEquals(4f, prefs.getLyricsFillTransitionWidth(LyricsSurfaceMode.CENTRAL))
+            assertEquals(16f, prefs.getLyricsFillTransitionWidth(LyricsSurfaceMode.FULLSCREEN))
+            assertEquals(10f, prefs.getLyricsFillTransitionWidth(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsTranslationEnabled(LyricsSurfaceMode.CENTRAL, false)
+            prefs.setLyricsTranslationEnabled(LyricsSurfaceMode.FULLSCREEN, true)
+            prefs.setLyricsTranslationEnabled(LyricsSurfaceMode.SIDEBAR, false)
+            assertFalse(prefs.getLyricsTranslationEnabled(LyricsSurfaceMode.CENTRAL))
+            assertTrue(prefs.getLyricsTranslationEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertFalse(prefs.getLyricsTranslationEnabled(LyricsSurfaceMode.SIDEBAR))
+
+            prefs.setLyricsRomanizationEnabled(LyricsSurfaceMode.CENTRAL, true)
+            prefs.setLyricsRomanizationEnabled(LyricsSurfaceMode.FULLSCREEN, false)
+            prefs.setLyricsRomanizationEnabled(LyricsSurfaceMode.SIDEBAR, false)
+            assertTrue(prefs.getLyricsRomanizationEnabled(LyricsSurfaceMode.CENTRAL))
+            assertFalse(prefs.getLyricsRomanizationEnabled(LyricsSurfaceMode.FULLSCREEN))
+            assertFalse(prefs.getLyricsRomanizationEnabled(LyricsSurfaceMode.SIDEBAR))
         } finally {
-            prefs.setLyricsUiStyle(origCentral)
-            prefs.setLyricsFullScreenUiStyle(origFullscreen)
-            prefs.setLyricsSidebarUiStyle(origSidebar)
+            modes.forEach { m ->
+                prefs.setLyricsFont(m, origFonts.getValue(m))
+                prefs.setLyricsWordSyncEnabled(m, origWordSync.getValue(m))
+                prefs.setLyricsAppleEffectEnabled(m, origAppleEffect.getValue(m))
+                prefs.setLyricsDuetViewEnabled(m, origDuet.getValue(m))
+                prefs.setLyricsSplitBackingVocals(m, origBacking.getValue(m))
+                prefs.setLyricsRevealWords(m, origReveal.getValue(m))
+                prefs.setLyricsSweepEnabled(m, origSweep.getValue(m))
+                prefs.setInstrumentalIndicatorStyle(m, origInstrumental.getValue(m))
+                prefs.setLyricsLrcBounceEnabled(m, origLrcBounce.getValue(m))
+                prefs.setLyricsBounceFactor(m, origBounce.getValue(m))
+                prefs.setLyricsGlowFactor(m, origGlow.getValue(m))
+                prefs.setLyricsFillTransitionWidth(m, origFill.getValue(m))
+                prefs.setLyricsTranslationEnabled(m, origTrans.getValue(m))
+                prefs.setLyricsRomanizationEnabled(m, origRoman.getValue(m))
+            }
         }
     }
 
@@ -343,6 +478,29 @@ class EnhancedLyricsCustomizationTest {
             prefs.setLyricsAlignment(origCentral)
             prefs.setLyricsFullScreenAlignment(origFullscreen)
             prefs.setLyricsSidebarAlignment(origSidebar)
+        }
+    }
+
+    @Test
+    fun testCentralLyricsPositionDefaultsLeftAndPersistsIndependently() {
+        val prefs = PlayerPreferences()
+        val origPos = prefs.getLyricsCentralPosition()
+        val origAlign = prefs.getLyricsAlignment()
+        try {
+            Prefs.remove("lyrics_central_position")
+            assertEquals(LyricsAlignment.LEFT, prefs.getLyricsCentralPosition())
+
+            prefs.setLyricsAlignment(LyricsAlignment.LEFT)
+            prefs.setLyricsCentralPosition(LyricsAlignment.CENTER)
+            assertEquals(LyricsAlignment.CENTER, prefs.getLyricsCentralPosition())
+            assertEquals(LyricsAlignment.LEFT, prefs.getLyricsAlignment())
+
+            prefs.setLyricsCentralPosition(LyricsAlignment.RIGHT)
+            assertEquals(LyricsAlignment.RIGHT, prefs.getLyricsCentralPosition())
+            assertEquals(LyricsAlignment.LEFT, prefs.getLyricsAlignment())
+        } finally {
+            prefs.setLyricsCentralPosition(origPos)
+            prefs.setLyricsAlignment(origAlign)
         }
     }
 }

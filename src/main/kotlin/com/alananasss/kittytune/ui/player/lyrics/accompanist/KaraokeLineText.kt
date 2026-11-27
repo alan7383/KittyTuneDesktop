@@ -1,16 +1,6 @@
 package com.alananasss.kittytune.ui.player.lyrics.accompanist
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,7 +24,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -50,6 +39,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.alananasss.kittytune.ui.player.lyrics.BackingVocalRun
+import com.alananasss.kittytune.ui.player.lyrics.backingVocalRuns
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.ui.utils.LayerPaint
@@ -281,6 +272,22 @@ fun DrawScope.drawLyricsLine(
     }
 }
 
+private fun DrawScope.drawBackingVocalRun(
+    rows: List<RowRenderData>,
+    run: BackingVocalRun,
+    timeMs: Int,
+    color: Color,
+) {
+    for (row in rows) {
+        for (layout in row.rowLayouts) {
+            val opacity = run.syllableOpacityAt(layout.syllable, timeMs)
+            if (opacity > 0f) {
+                drawText(layout.textLayoutResult, color = color.copy(alpha = color.alpha * opacity), topLeft = layout.position)
+            }
+        }
+    }
+}
+
 /**
  * Draws text for a single row, handling word and character animations.
  *
@@ -476,7 +483,7 @@ private fun DrawScope.drawRowText(
  * @param textMeasurer Text measurer for layout (default provided).
  */
 @Composable
-fun KaraokeLineText(
+internal fun KaraokeLineText(
     line: KaraokeLine,
     currentTimeProvider: () -> Int,
     modifier: Modifier = Modifier,
@@ -495,7 +502,8 @@ fun KaraokeLineText(
     // Mini-style top-to-bottom sweep fill, for a line-timed line drawn as syllables (all of them light
     // at once - the kind of line a line WITH backing vocals becomes when they are split off).
     // Non-null only while the line is current; null draws the usual per-word gradient fill.
-    sweep: KaraokeSweepSpec? = null
+    sweep: KaraokeSweepSpec? = null,
+    backingVocalRun: BackingVocalRun? = null,
 ) {
     val isLineRtl = remember(line.syllables) { line.syllables.any { it.content.isRtl() } }
 
@@ -527,83 +535,28 @@ fun KaraokeLineText(
         }
     }
 
-    val mainLine = line as? KaraokeLine.MainKaraokeLine
-    val accompanimentLinesBeforeMain =
-        mainLine?.accompanimentLines?.filter { it.start < line.start }.orEmpty()
-    val accompanimentLinesAfterMain =
-        mainLine?.accompanimentLines?.filter { it.start >= line.start }.orEmpty()
-
-    @Composable
-    fun AccompanimentLines(isBefore: Boolean, accompanimentLines: List<KaraokeLine>) {
-        accompanimentLines.forEach { bgLine ->
-            val isAccompanimentVisible by remember(bgLine) {
-                derivedStateOf {
-                    val currentTime = currentTimeProvider()
-                    // Use a simplified visibility range for nested lines, or pass ranges down
-                    currentTime >= (bgLine.start - 600) && currentTime <= (bgLine.end + 600)
-                }
-            }
-
-            AnimatedVisibility(
-                visible = isAccompanimentVisible,
-                enter = scaleIn(
-                    tween(600), transformOrigin = TransformOrigin(
-                        if (isCenterAligned) 0.5f else if (isRightAligned) 1f else 0f, if (isBefore) 1f else 0f
-                    )
-                ) + fadeIn(tween(600)) + slideInVertically(
-                    tween(
-                        600
-                    )
-                ) + expandVertically(tween(600), if (isBefore) Alignment.Top else Alignment.Bottom),
-                exit = scaleOut(
-                    tween(600), transformOrigin = TransformOrigin(
-                        if (isCenterAligned) 0.5f else if (isRightAligned) 1f else 0f, if (isBefore) 1f else 0f
-                    )
-                ) + fadeOut(tween(600)) + slideOutVertically(
-                    tween(
-                        600
-                    )
-                ) + shrinkVertically(tween(600), if (isBefore) Alignment.Top else Alignment.Bottom),
-            ) {
-                LyricsLineItem(
-                    isFocused = true,
-                    isRightAligned = isRightAligned,
-                    isCenterAligned = isCenterAligned,
-                    onLineClicked = { },
-                    onLinePressed = { },
-                    blurRadius = { 0f },
-                    blendMode = blendMode,
-                    activeAlpha = 0.6f,
-                    inactiveAlpha = 0.2f
-                ) {
-                    KaraokeLineText(
-                        line = bgLine,
-                        currentTimeProvider = currentTimeProvider,
-                        normalLineTextStyle = normalLineTextStyle,
-                        accompanimentLineTextStyle = accompanimentLineTextStyle,
-                        phoneticTextStyle = phoneticTextStyle,
-                        activeColor = activeColor,
-                        blendMode = blendMode,
-                        showDebugRectangles = showDebugRectangles,
-                        showTranslation = showTranslation,
-                        showPhonetic = showPhonetic,
-                        textMeasurer = textMeasurer,
-                        activeScale = activeScale
-                    )
-                }
-            }
-        }
+    val (backingBefore, backingAfter) = remember(line) {
+        val phrases = (line as? KaraokeLine.MainKaraokeLine)?.accompanimentLines.orEmpty()
+        backingVocalRuns(phrases, line.end).partition { it.line.start < line.start }
     }
 
     Column(
         modifier = modifier.fillMaxWidth().padding(
-            vertical = 8.dp, horizontal = if (line is KaraokeLine.AccompanimentKaraokeLine) 0.dp
+            vertical = if (line is KaraokeLine.AccompanimentKaraokeLine) 2.dp else 8.dp,
+            horizontal = if (line is KaraokeLine.AccompanimentKaraokeLine) 0.dp
             else 16.dp
         ),
         verticalArrangement = Arrangement.spacedBy(2.dp),
         horizontalAlignment = columnHorizontalAlignment
     ) {
-        AccompanimentLines(true, accompanimentLinesBeforeMain)
+        BackingVocalRows(
+            runs = backingBefore,
+            currentTimeProvider = currentTimeProvider,
+            textStyle = accompanimentLineTextStyle,
+            activeColor = activeColor,
+            blendMode = blendMode,
+            expandFrom = Alignment.Bottom,
+        )
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val density = LocalDensity.current
@@ -698,7 +651,9 @@ fun KaraokeLineText(
 
             Canvas(modifier = Modifier.size(maxWidth, (totalHeight.roundToInt() + 8).toDp())) {
                 val time = currentTimeProvider()
-                if (sweep != null) {
+                if (backingVocalRun != null) {
+                    drawBackingVocalRun(rowRenderData, backingVocalRun, time, activeColor)
+                } else if (sweep != null) {
                     // The line-timed line with its backing vocals split off: the same
                     // top-to-bottom sweep a plain SyncedLine gets, drawn over syllables.
                     drawLyricsLineSweep(
@@ -750,7 +705,13 @@ fun KaraokeLineText(
                 )
             }
         }
-        AccompanimentLines(false, accompanimentLinesAfterMain)
+        BackingVocalRows(
+            runs = backingAfter,
+            currentTimeProvider = currentTimeProvider,
+            textStyle = accompanimentLineTextStyle,
+            activeColor = activeColor,
+            blendMode = blendMode,
+        )
     }
 }
 

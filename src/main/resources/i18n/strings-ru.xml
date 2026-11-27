@@ -3736,4 +3736,5 @@
     <string name="performance_windows_rendering">Графика Windows</string>
     <string name="performance_compatible_rendering">Режим совместимости</string>
     <string name="performance_macos_rendering">Графика macOS</string>
+    <string name="pref_lyrics_position_title">Расположение</string>
 </resources>

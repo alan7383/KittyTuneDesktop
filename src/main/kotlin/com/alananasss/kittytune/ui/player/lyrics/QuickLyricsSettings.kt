@@ -29,6 +29,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.AlignHorizontalLeft
+import androidx.compose.material.icons.automirrored.rounded.AlignHorizontalRight
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
 import androidx.compose.material.icons.rounded.*
@@ -72,10 +74,8 @@ import com.alananasss.kittytune.data.local.FullPlayerInfoAlign
 import com.alananasss.kittytune.data.local.FullPlayerLayout
 import com.alananasss.kittytune.data.local.LyricsAlignment
 import com.alananasss.kittytune.data.local.LyricsFont
-import com.alananasss.kittytune.data.local.LyricsUiStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
-import com.alananasss.kittytune.ui.common.FunFactDot
 import com.alananasss.kittytune.ui.common.SettingsSwitch
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
@@ -185,6 +185,7 @@ fun QuickLyricsSettingsDialog(
                                 QuickTab.LAYOUT -> LayoutTab(viewModel, knobs)
                                 QuickTab.FEATURES -> FeaturesTab(
                                     viewModel,
+                                    knobs,
                                     isFullScreen,
                                     onPickLanguage = { showLanguagePicker = true },
                                     onOpenSources = { showSourceOrder = true },
@@ -385,9 +386,6 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
         ChoiceRow(
             icon = Icons.Rounded.Wallpaper,
             title = str("full_player_bg_style"),
-            aside = if (viewModel.fullPlayerBgStyle == FullPlayerBgStyle.APPLE_MUSIC) {
-                { FunFactDot(str("full_player_bg_apple_music_fact")) }
-            } else null,
         ) {
             // Each style drawn as a small sketch, so the choice is seen before it is made.
             SketchChoices(
@@ -460,43 +458,25 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
             onReset = { viewModel.updateFullPlayerCoverScale(1f) },
         )
     }
-    ChoiceRow(icon = Icons.Rounded.AutoAwesome, title = str("pref_lyrics_ui_style_title")) {
-        ExpressiveConnectedButtonGroup(
-            options = LyricsUiStyle.entries,
-            selectedOption = knobs.uiStyle,
-            onOptionSelected = { knobs.uiStyle = it },
-            fillMaxWidth = true,
-            labelProvider = {
-                ChoiceLabel(if (it == LyricsUiStyle.ENHANCED) str("pref_lyrics_ui_style_enhanced") else str("pref_lyrics_ui_style_classic"))
-            },
-        )
-    }
-    AnimatedVisibility(knobs.uiStyle == LyricsUiStyle.CLASSIC) {
-        ChoiceRow(icon = Icons.Rounded.Subtitles, title = str("pref_lyrics_display_style")) {
-            LyricsDisplayStylePicker(selected = knobs.displayStyle, onSelect = { knobs.displayStyle = it })
-        }
-    }
     ChoiceRow(icon = Icons.Rounded.TextFields, title = str("pref_lyrics_font_title")) {
         val fonts = listOf(LyricsFont.APPLE, LyricsFont.APP_DEFAULT)
         ExpressiveConnectedButtonGroup(
             options = fonts,
-            selectedOption = viewModel.lyricsFont,
-            onOptionSelected = { viewModel.updateLyricsFont(it) },
+            selectedOption = knobs.font,
+            onOptionSelected = { knobs.font = it },
             fillMaxWidth = true,
             labelProvider = {
                 ChoiceLabel(if (it == LyricsFont.APPLE) str("pref_lyrics_font_apple_short") else str("pref_lyrics_font_app_default_short"))
             },
         )
     }
-    AnimatedVisibility(knobs.uiStyle != LyricsUiStyle.CLASSIC) {
-        SwitchRow(
-            icon = Icons.Rounded.BlurOn,
-            title = str("pref_lyrics_line_blur_title"),
-            subtitle = str("pref_lyrics_line_blur_desc"),
-            checked = knobs.lineBlur,
-            onChange = { knobs.lineBlur = it },
-        )
-    }
+    SwitchRow(
+        icon = Icons.Rounded.BlurOn,
+        title = str("pref_lyrics_line_blur_title"),
+        subtitle = str("pref_lyrics_line_blur_desc"),
+        checked = knobs.lineBlur,
+        onChange = { knobs.lineBlur = it },
+    )
 }
 
 @Composable
@@ -511,6 +491,33 @@ private fun ColumnScope.LayoutTab(viewModel: PlayerViewModel, knobs: ModeKnobs) 
         onChange = { knobs.fontSize = it },
         onReset = { knobs.fontSize = knobs.defaultFontSize },
     )
+    if (knobs.isCentral) {
+        ChoiceRow(icon = Icons.Rounded.ViewWeek, title = str("pref_lyrics_position_title")) {
+            ExpressiveConnectedButtonGroup(
+                options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
+                selectedOption = knobs.centralPosition,
+                onOptionSelected = { knobs.centralPosition = it },
+                fillMaxWidth = true,
+                iconProvider = {
+                    val icon = when (it) {
+                        LyricsAlignment.LEFT -> Icons.AutoMirrored.Rounded.AlignHorizontalLeft
+                        LyricsAlignment.CENTER -> Icons.Rounded.AlignHorizontalCenter
+                        LyricsAlignment.RIGHT -> Icons.AutoMirrored.Rounded.AlignHorizontalRight
+                    }
+                    Icon(icon, null, modifier = Modifier.size(16.dp))
+                },
+                labelProvider = {
+                    ChoiceLabel(
+                        when (it) {
+                            LyricsAlignment.LEFT -> str("align_left")
+                            LyricsAlignment.CENTER -> str("align_center_simple")
+                            LyricsAlignment.RIGHT -> str("align_right")
+                        }
+                    )
+                },
+            )
+        }
+    }
     ChoiceRow(icon = Icons.Rounded.FormatAlignCenter, title = str("pref_lyrics_align")) {
         ExpressiveConnectedButtonGroup(
             options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
@@ -536,51 +543,48 @@ private fun ColumnScope.LayoutTab(viewModel: PlayerViewModel, knobs: ModeKnobs) 
             },
         )
     }
-    // The fine spacing only exists in the Apple-style view; the classic one lays its lines out itself.
-    AnimatedVisibility(knobs.uiStyle == LyricsUiStyle.ENHANCED) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SliderRow(
-                icon = Icons.Rounded.FormatLineSpacing,
-                title = str("pref_lyrics_line_spacing_title"),
-                value = knobs.lineSpacing,
-                valueText = "${knobs.lineSpacing.roundToInt()} dp",
-                range = 0f..knobs.maxLineSpacing,
-                steps = (knobs.maxLineSpacing / 2f).toInt() - 1,
-                onChange = { knobs.lineSpacing = it },
-                onReset = { knobs.lineSpacing = 0f },
-            )
-            SliderRow(
-                icon = Icons.Rounded.ZoomOutMap,
-                title = str("pref_lyrics_active_scale_title"),
-                subtitle = str("pref_lyrics_active_scale_desc"),
-                value = knobs.activeScale,
-                valueText = "${(knobs.activeScale * 100).roundToInt()}%",
-                range = 1f..1.3f,
-                steps = 5,
-                onChange = { knobs.activeScale = it },
-                onReset = { knobs.activeScale = 1f },
-            )
-            SliderRow(
-                icon = Icons.Rounded.SwapHoriz,
-                title = str("pref_lyrics_horizontal_margin_title"),
-                value = knobs.horizontalMargin,
-                valueText = "${knobs.horizontalMargin.roundToInt()} dp",
-                range = 0f..knobs.maxHorizontalMargin,
-                steps = (knobs.maxHorizontalMargin / 8f).toInt() - 1,
-                onChange = { knobs.horizontalMargin = it },
-                onReset = { knobs.horizontalMargin = 0f },
-            )
-            SliderRow(
-                icon = Icons.Rounded.VerticalAlignCenter,
-                title = str("pref_lyrics_vertical_offset_title"),
-                value = knobs.verticalOffset,
-                valueText = "${(knobs.verticalOffset * 100).roundToInt()}%",
-                range = 0.2f..0.6f,
-                steps = 19,
-                onChange = { knobs.verticalOffset = it },
-                onReset = { knobs.verticalOffset = 0.38f },
-            )
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SliderRow(
+            icon = Icons.Rounded.FormatLineSpacing,
+            title = str("pref_lyrics_line_spacing_title"),
+            value = knobs.lineSpacing,
+            valueText = "${knobs.lineSpacing.roundToInt()} dp",
+            range = 0f..knobs.maxLineSpacing,
+            steps = (knobs.maxLineSpacing / 2f).toInt() - 1,
+            onChange = { knobs.lineSpacing = it },
+            onReset = { knobs.lineSpacing = 0f },
+        )
+        SliderRow(
+            icon = Icons.Rounded.ZoomOutMap,
+            title = str("pref_lyrics_active_scale_title"),
+            subtitle = str("pref_lyrics_active_scale_desc"),
+            value = knobs.activeScale,
+            valueText = "${(knobs.activeScale * 100).roundToInt()}%",
+            range = 1f..1.3f,
+            steps = 5,
+            onChange = { knobs.activeScale = it },
+            onReset = { knobs.activeScale = 1f },
+        )
+        SliderRow(
+            icon = Icons.Rounded.SwapHoriz,
+            title = str("pref_lyrics_horizontal_margin_title"),
+            value = knobs.horizontalMargin,
+            valueText = "${knobs.horizontalMargin.roundToInt()} dp",
+            range = 0f..knobs.maxHorizontalMargin,
+            steps = (knobs.maxHorizontalMargin / 8f).toInt() - 1,
+            onChange = { knobs.horizontalMargin = it },
+            onReset = { knobs.horizontalMargin = 0f },
+        )
+        SliderRow(
+            icon = Icons.Rounded.VerticalAlignCenter,
+            title = str("pref_lyrics_vertical_offset_title"),
+            value = knobs.verticalOffset,
+            valueText = "${(knobs.verticalOffset * 100).roundToInt()}%",
+            range = 0.2f..0.6f,
+            steps = 19,
+            onChange = { knobs.verticalOffset = it },
+            onReset = { knobs.verticalOffset = knobs.defaultVerticalOffset },
+        )
     }
     TextButton(shapes = ButtonDefaults.shapes(),
         onClick = { knobs.resetTypography() },
@@ -595,37 +599,37 @@ private fun ColumnScope.LayoutTab(viewModel: PlayerViewModel, knobs: ModeKnobs) 
 @Composable
 private fun ColumnScope.FeaturesTab(
     viewModel: PlayerViewModel,
+    knobs: ModeKnobs,
     isFullScreen: Boolean,
     onPickLanguage: () -> Unit,
     onOpenSources: () -> Unit,
 ) {
     val prefs = remember { PlayerPreferences() }
     var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
-    var translationOn by remember { mutableStateOf(prefs.getLyricsTranslationEnabled()) }
 
     SectionTitle(str("lyrics_content_title"))
     SwitchRow(
         icon = Icons.Rounded.Mic,
         title = str("pref_lyrics_word_sync"),
         subtitle = str("pref_lyrics_word_sync_sub"),
-        checked = viewModel.isWordSyncEnabled,
-        onChange = { viewModel.toggleWordSync(it) },
+        checked = knobs.wordSync,
+        onChange = { knobs.wordSync = it },
     )
-    AnimatedVisibility(viewModel.isWordSyncEnabled) {
+    AnimatedVisibility(knobs.wordSync) {
         SwitchRow(
             icon = Icons.Rounded.AutoAwesome,
             title = str("pref_lyrics_apple_effect"),
             subtitle = str("pref_lyrics_apple_effect_sub"),
-            checked = viewModel.isAppleMusicEffectEnabled,
-            onChange = { viewModel.toggleAppleMusicEffect(it) },
+            checked = knobs.appleEffect,
+            onChange = { knobs.appleEffect = it },
         )
     }
     SwitchRow(
         icon = Icons.Rounded.Groups,
         title = str("pref_lyrics_duet_title"),
         subtitle = str("pref_lyrics_duet_desc"),
-        checked = viewModel.isDuetViewEnabled,
-        onChange = { viewModel.toggleDuetView(it) },
+        checked = knobs.duetView,
+        onChange = { knobs.duetView = it },
     )
     var oneLine by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
     SwitchRow(
@@ -642,34 +646,56 @@ private fun ColumnScope.FeaturesTab(
         icon = Icons.Rounded.RecordVoiceOver,
         title = str("pref_lyrics_backing_title"),
         subtitle = str("pref_lyrics_backing_sub"),
-        checked = viewModel.lyricsSplitBackingVocals,
-        onChange = { viewModel.updateLyricsSplitBackingVocals(it) },
+        checked = knobs.splitBackingVocals,
+        onChange = { knobs.splitBackingVocals = it },
     )
     SwitchRow(
         icon = Icons.Rounded.Animation,
         title = str("pref_lyrics_reveal_words_title"),
         subtitle = str("pref_lyrics_reveal_words_sub"),
-        checked = viewModel.lyricsRevealWords,
-        onChange = { viewModel.updateLyricsRevealWords(it) },
+        checked = knobs.revealWords,
+        onChange = { knobs.revealWords = it },
     )
+    SwitchRow(
+        icon = Icons.Rounded.Lyrics,
+        title = str("pref_lyrics_line_animation"),
+        subtitle = str("pref_lyrics_line_animation_sub"),
+        checked = knobs.sweepEnabled,
+        onChange = { knobs.sweepEnabled = it },
+    )
+    ChoiceRow(icon = Icons.Rounded.GraphicEq, title = str("pref_instrumental_indicator")) {
+        ExpressiveConnectedButtonGroup(
+            options = com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.entries,
+            selectedOption = knobs.instrumentalIndicator,
+            onOptionSelected = { knobs.instrumentalIndicator = it },
+            fillMaxWidth = true,
+            labelProvider = {
+                ChoiceLabel(
+                    when (it) {
+                        com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.DOTS -> str("pref_instrumental_dots")
+                        com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.CIRCLE -> str("pref_instrumental_circle")
+                        com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.NOTE_WAVE -> str("pref_instrumental_note_wave")
+                        com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.OFF -> str("pref_instrumental_off")
+                    }
+                )
+            },
+        )
+    }
     SwitchRow(
         icon = Icons.Rounded.Abc,
         title = str("pref_lyrics_romanization"),
         subtitle = str("pref_lyrics_romanization_sub"),
-        checked = viewModel.isRomanizationEnabled,
-        onChange = { viewModel.toggleRomanization(it) },
+        checked = knobs.romanization,
+        onChange = { knobs.romanization = it },
     )
     SwitchRow(
         icon = Icons.Rounded.Translate,
         title = str("pref_lyrics_translation_title"),
         subtitle = str("pref_lyrics_translation_sub"),
-        checked = translationOn,
-        onChange = {
-            translationOn = it
-            viewModel.toggleLyricsTranslation(it)
-        },
+        checked = knobs.translation,
+        onChange = { knobs.translation = it },
     )
-    AnimatedVisibility(translationOn) {
+    AnimatedVisibility(knobs.translation) {
         ClickRow(
             icon = Icons.Rounded.Language,
             title = str("pref_lyrics_translation_lang"),
@@ -677,6 +703,45 @@ private fun ColumnScope.FeaturesTab(
             onClick = onPickLanguage,
         )
     }
+
+    SectionTitle(str("pref_lyrics_effects_category"))
+    SwitchRow(
+        icon = Icons.Rounded.Animation,
+        title = str("pref_lyrics_lrc_bounce_title"),
+        subtitle = str("pref_lyrics_lrc_bounce_desc"),
+        checked = knobs.lrcBounce,
+        onChange = { knobs.lrcBounce = it },
+    )
+    SliderRow(
+        icon = Icons.Rounded.Height,
+        title = str("pref_lyrics_bounce_factor_title"),
+        value = knobs.bounceFactor,
+        valueText = "${(knobs.bounceFactor * 100).roundToInt()}%",
+        range = 0f..2f,
+        steps = 19,
+        onChange = { knobs.bounceFactor = it },
+        onReset = { knobs.bounceFactor = 1f },
+    )
+    SliderRow(
+        icon = Icons.Rounded.LightMode,
+        title = str("pref_lyrics_glow_factor_title"),
+        value = knobs.glowFactor,
+        valueText = "${(knobs.glowFactor * 100).roundToInt()}%",
+        range = 0f..2f,
+        steps = 19,
+        onChange = { knobs.glowFactor = it },
+        onReset = { knobs.glowFactor = 1f },
+    )
+    SliderRow(
+        icon = Icons.Rounded.Gradient,
+        title = str("pref_lyrics_fill_transition_title"),
+        value = knobs.fillTransitionWidth,
+        valueText = "${knobs.fillTransitionWidth.roundToInt()} dp",
+        range = 2f..24f,
+        steps = 10,
+        onChange = { knobs.fillTransitionWidth = it },
+        onReset = { knobs.fillTransitionWidth = 8f },
+    )
 
     SectionTitle(str("pref_lyrics_providers_category"))
     // The same list as in the lyrics settings: every source, in the order they are tried, each switchable.
@@ -956,25 +1021,27 @@ private class ModeKnobs(private val vm: PlayerViewModel, private val isFullScree
         else -> central
     }
 
+    val isCentral: Boolean get() = !isFullScreen && !isSidebar
     val defaultFontSize: Float get() = pick(42f, 22f, 42f)
+    val defaultVerticalOffset: Float get() = pick(0.38f, 0.36f, 0.38f)
     val maxLineSpacing: Float get() = pick(64f, 48f, 48f)
     val maxHorizontalMargin: Float get() = pick(160f, 64f, 64f)
+
+    var font: LyricsFont
+        get() = pick(vm.lyricsFullScreenFont, vm.lyricsSidebarFont, vm.lyricsFont)
+        set(v) = pick({ vm.updateLyricsFullScreenFont(v) }, { vm.updateLyricsSidebarFont(v) }, { vm.updateLyricsFont(v) })()
 
     var fontSize: Float
         get() = pick(vm.lyricsFullScreenFontSize, vm.lyricsSidebarFontSize, vm.lyricsFontSize)
         set(v) = pick({ vm.updateLyricsFullScreenFontSize(v) }, { vm.updateLyricsSidebarFontSize(v) }, { vm.updateLyricsFontSize(v) })()
 
-    var uiStyle: LyricsUiStyle
-        get() = pick(vm.lyricsFullScreenUiStyle, vm.lyricsSidebarUiStyle, vm.lyricsUiStyle)
-        set(v) = pick({ vm.updateLyricsFullScreenUiStyle(v) }, { vm.updateLyricsSidebarUiStyle(v) }, { vm.updateLyricsUiStyle(v) })()
+    var centralPosition: LyricsAlignment
+        get() = vm.lyricsCentralPosition
+        set(v) = vm.updateLyricsCentralPosition(v)
 
     var alignment: LyricsAlignment
         get() = pick(vm.lyricsFullScreenAlignment, vm.lyricsSidebarAlignment, vm.lyricsAlignment)
         set(v) = pick({ vm.updateLyricsFullScreenAlignment(v) }, { vm.updateLyricsSidebarAlignment(v) }, { vm.updateLyricsAlignment(v) })()
-
-    var displayStyle: com.alananasss.kittytune.data.local.LyricsDisplayStyle
-        get() = pick(vm.lyricsFullScreenDisplayStyle, vm.lyricsSidebarDisplayStyle, vm.lyricsDisplayStyle)
-        set(v) = pick({ vm.updateLyricsFullScreenDisplayStyle(v) }, { vm.updateLyricsSidebarDisplayStyle(v) }, { vm.updateLyricsDisplayStyle(v) })()
 
     var lineSpacing: Float
         get() = pick(vm.lyricsFullScreenLineSpacing, vm.lyricsSidebarLineSpacing, vm.lyricsLineSpacing)
@@ -995,6 +1062,58 @@ private class ModeKnobs(private val vm: PlayerViewModel, private val isFullScree
     var lineBlur: Boolean
         get() = pick(vm.lyricsFullScreenLineBlurEnabled, vm.lyricsSidebarLineBlurEnabled, vm.lyricsLineBlurEnabled)
         set(v) = pick({ vm.updateLyricsFullScreenLineBlurEnabled(v) }, { vm.updateLyricsSidebarLineBlurEnabled(v) }, { vm.updateLyricsLineBlurEnabled(v) })()
+
+    var wordSync: Boolean
+        get() = pick(vm.lyricsFullScreenWordSyncEnabled, vm.lyricsSidebarWordSyncEnabled, vm.isWordSyncEnabled)
+        set(v) = pick({ vm.toggleFullScreenWordSync(v) }, { vm.toggleSidebarWordSync(v) }, { vm.toggleWordSync(v) })()
+
+    var appleEffect: Boolean
+        get() = pick(vm.lyricsFullScreenAppleMusicEffectEnabled, vm.lyricsSidebarAppleMusicEffectEnabled, vm.isAppleMusicEffectEnabled)
+        set(v) = pick({ vm.toggleFullScreenAppleMusicEffect(v) }, { vm.toggleSidebarAppleMusicEffect(v) }, { vm.toggleAppleMusicEffect(v) })()
+
+    var duetView: Boolean
+        get() = pick(vm.lyricsFullScreenDuetViewEnabled, vm.lyricsSidebarDuetViewEnabled, vm.isDuetViewEnabled)
+        set(v) = pick({ vm.toggleFullScreenDuetView(v) }, { vm.toggleSidebarDuetView(v) }, { vm.toggleDuetView(v) })()
+
+    var splitBackingVocals: Boolean
+        get() = pick(vm.lyricsFullScreenSplitBackingVocals, vm.lyricsSidebarSplitBackingVocals, vm.lyricsSplitBackingVocals)
+        set(v) = pick({ vm.updateLyricsFullScreenSplitBackingVocals(v) }, { vm.updateLyricsSidebarSplitBackingVocals(v) }, { vm.updateLyricsSplitBackingVocals(v) })()
+
+    var revealWords: Boolean
+        get() = pick(vm.lyricsFullScreenRevealWords, vm.lyricsSidebarRevealWords, vm.lyricsRevealWords)
+        set(v) = pick({ vm.updateLyricsFullScreenRevealWords(v) }, { vm.updateLyricsSidebarRevealWords(v) }, { vm.updateLyricsRevealWords(v) })()
+
+    var sweepEnabled: Boolean
+        get() = pick(vm.lyricsFullScreenSweepEnabled, vm.lyricsSidebarSweepEnabled, vm.lyricsSweepEnabled)
+        set(v) = pick({ vm.updateLyricsFullScreenSweepEnabled(v) }, { vm.updateLyricsSidebarSweepEnabled(v) }, { vm.updateLyricsSweepEnabled(v) })()
+
+    var instrumentalIndicator: com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle
+        get() = pick(vm.lyricsFullScreenInstrumentalIndicatorStyle, vm.lyricsSidebarInstrumentalIndicatorStyle, vm.instrumentalIndicatorStyle)
+        set(v) = pick({ vm.updateLyricsFullScreenInstrumentalIndicatorStyle(v) }, { vm.updateLyricsSidebarInstrumentalIndicatorStyle(v) }, { vm.updateInstrumentalIndicatorStyle(v) })()
+
+    var lrcBounce: Boolean
+        get() = pick(vm.lyricsFullScreenLrcBounceEnabled, vm.lyricsSidebarLrcBounceEnabled, vm.lyricsLrcBounceEnabled)
+        set(v) = pick({ vm.updateLyricsFullScreenLrcBounceEnabled(v) }, { vm.updateLyricsSidebarLrcBounceEnabled(v) }, { vm.updateLyricsLrcBounceEnabled(v) })()
+
+    var bounceFactor: Float
+        get() = pick(vm.lyricsFullScreenBounceFactor, vm.lyricsSidebarBounceFactor, vm.lyricsBounceFactor)
+        set(v) = pick({ vm.updateLyricsFullScreenBounceFactor(v) }, { vm.updateLyricsSidebarBounceFactor(v) }, { vm.updateLyricsBounceFactor(v) })()
+
+    var glowFactor: Float
+        get() = pick(vm.lyricsFullScreenGlowFactor, vm.lyricsSidebarGlowFactor, vm.lyricsGlowFactor)
+        set(v) = pick({ vm.updateLyricsFullScreenGlowFactor(v) }, { vm.updateLyricsSidebarGlowFactor(v) }, { vm.updateLyricsGlowFactor(v) })()
+
+    var fillTransitionWidth: Float
+        get() = pick(vm.lyricsFullScreenFillTransitionWidth, vm.lyricsSidebarFillTransitionWidth, vm.lyricsFillTransitionWidth)
+        set(v) = pick({ vm.updateLyricsFullScreenFillTransitionWidth(v) }, { vm.updateLyricsSidebarFillTransitionWidth(v) }, { vm.updateLyricsFillTransitionWidth(v) })()
+
+    var romanization: Boolean
+        get() = pick(vm.lyricsFullScreenRomanizationEnabled, vm.lyricsSidebarRomanizationEnabled, vm.isRomanizationEnabled)
+        set(v) = pick({ vm.toggleFullScreenRomanization(v) }, { vm.toggleSidebarRomanization(v) }, { vm.toggleRomanization(v) })()
+
+    var translation: Boolean
+        get() = pick(vm.lyricsFullScreenTranslationEnabled, vm.lyricsSidebarTranslationEnabled, vm.isLyricsTranslationEnabled)
+        set(v) = pick({ vm.toggleFullScreenLyricsTranslation(v) }, { vm.toggleSidebarLyricsTranslation(v) }, { vm.toggleLyricsTranslation(v) })()
 
     fun resetTypography() = vm.resetLyricsTypography(isFullScreen = isFullScreen, isSidebar = isSidebar)
 }

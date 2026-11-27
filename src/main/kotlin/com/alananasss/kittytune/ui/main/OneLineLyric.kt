@@ -54,7 +54,7 @@ import com.alananasss.kittytune.ui.player.lyrics.withEvenWords
  * Placed at the top of the bar and drawn above it: it takes no room in the bar's layout.
  */
 @Composable
-internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifier, visible: Boolean = true) {
     val syncedLines = vm.lyricsLines
     val plainText = vm.rawPlainLyrics.orEmpty()
     val plainSpeed = vm.effectivePlainAutoScrollSpeed
@@ -71,9 +71,9 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
     val maxChipPx = with(androidx.compose.ui.platform.LocalDensity.current) { (MAX_LINE_WIDTH + 40.dp).roundToPx() }
 
     AnimatedVisibility(
-        visible = isTimed,
+        visible = visible && isTimed,
         enter = fadeIn(tween(220)) + scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = 0.9f),
-        exit = fadeOut(tween(160)) + scaleOut(tween(200), targetScale = 0.9f),
+        exit = fadeOut(tween(180, easing = FastOutSlowInEasing)) + scaleOut(tween(200, easing = FastOutSlowInEasing), targetScale = 0.9f),
         modifier = modifier.layout { measurable, constraints ->
             // Bounded, so a long line breaks onto a second row instead of running on past the card.
             val chip = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = constraints.maxWidth.coerceAtMost(maxChipPx)))

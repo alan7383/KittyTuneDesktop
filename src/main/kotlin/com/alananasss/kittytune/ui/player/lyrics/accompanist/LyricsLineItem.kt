@@ -7,8 +7,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlendMode
@@ -18,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -34,6 +37,8 @@ fun LyricsLineItem(
     blendMode: BlendMode = BlendMode.SrcOver,
     isInteractive: Boolean = true,
     activeScale: Float = 1.00f,
+    contentAlignment: Alignment = Alignment.CenterStart,
+    contentMaxWidth: Dp = Dp.Unspecified,
     content: @Composable () -> Unit
 ) {
     val inactiveScale = if (activeScale <= 1.02f) 0.98f else (activeScale * 0.92f).coerceAtMost(1.0f)
@@ -75,6 +80,8 @@ fun LyricsLineItem(
     ) {
         Box(
             modifier = Modifier
+                .align(contentAlignment)
+                .then(if (contentMaxWidth != Dp.Unspecified) Modifier.widthIn(max = contentMaxWidth) else Modifier)
                 .fillMaxWidth()
                 .graphicsLayer {
                     scaleX = scaleState

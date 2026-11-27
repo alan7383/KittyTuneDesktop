@@ -3817,4 +3817,5 @@
     <string name="performance_windows_rendering">Đồ họa Windows</string>
     <string name="performance_compatible_rendering">Chế độ tương thích</string>
     <string name="performance_macos_rendering">Đồ họa macOS</string>
+    <string name="pref_lyrics_position_title">Vị trí</string>
 </resources>

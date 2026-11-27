@@ -149,7 +149,7 @@ class AccompanistLyricsTest {
     @Test
     fun testAwesomeAndNonAwesomeBaselineAlignment() {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
-        val stream = object {}.javaClass.getResourceAsStream("/fonts/google_sans_flex.ttf")
+        val stream = object {}.javaClass.getResourceAsStream("/fonts/kittytune_flex.ttf")
         val bytes = stream!!.readBytes()
         val customFont = androidx.compose.ui.text.platform.Font(identity = "googlesans", data = bytes, weight = androidx.compose.ui.text.font.FontWeight.Bold)
         val fontFamily = androidx.compose.ui.text.font.FontFamily(customFont)
@@ -326,6 +326,46 @@ class AccompanistLyricsTest {
             kotlin.test.assertNull(layout.charLayouts)
             kotlin.test.assertNull(layout.charOriginalBounds)
         }
+    }
+
+    @Test
+    fun testSoloAgentV1HonorsUserAlignment() {
+        val soloLines = listOf(
+            com.alananasss.kittytune.ui.player.lyrics.LyricLine(
+                text = "Solo TTML line",
+                startTime = 1000L,
+                endTime = 3000L,
+                words = listOf(
+                    com.alananasss.kittytune.ui.player.lyrics.LyricWord("Solo", 1000L, 1800L),
+                    com.alananasss.kittytune.ui.player.lyrics.LyricWord(" TTML", 1800L, 2400L),
+                    com.alananasss.kittytune.ui.player.lyrics.LyricWord(" line", 2400L, 3000L)
+                ),
+                singer = com.alananasss.kittytune.ui.player.lyrics.LyricSinger.SINGER_1,
+                agent = "v1"
+            )
+        )
+
+        val centered = com.alananasss.kittytune.ui.player.lyrics.buildSyncedLyrics(
+            soloLines,
+            isWordSynced = true,
+            isDuetEnabled = true,
+            userAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.CENTER
+        )
+        assertEquals(
+            KaraokeAlignment.Unspecified,
+            (centered.lines[0] as KaraokeLine.MainKaraokeLine).alignment
+        )
+
+        val rightAligned = com.alananasss.kittytune.ui.player.lyrics.buildSyncedLyrics(
+            soloLines,
+            isWordSynced = true,
+            isDuetEnabled = true,
+            userAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT
+        )
+        assertEquals(
+            KaraokeAlignment.End,
+            (rightAligned.lines[0] as KaraokeLine.MainKaraokeLine).alignment
+        )
     }
 }
 

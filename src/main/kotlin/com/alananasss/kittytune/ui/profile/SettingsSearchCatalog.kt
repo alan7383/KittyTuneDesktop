@@ -10,7 +10,6 @@ import com.alananasss.kittytune.audio.providers.AudioProviderOrderItem
 import com.alananasss.kittytune.audio.ai.AiDetectionManager
 import com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager
 import com.alananasss.kittytune.data.TokenManager
-import com.alananasss.kittytune.data.local.LyricsUiStyle
 import com.alananasss.kittytune.data.local.PlayerBarStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.sync.SyncPeers
@@ -251,13 +250,9 @@ internal fun buildSettingsSearchCatalog(os: String): List<SettingsSearchEntry> =
         }
     }
     controls(LYRICS.place) {
-        control("pref_lyrics_font_title", icon = Icons.Rounded.TextFields, aliasKeys = listOf("pref_lyrics_font_apple", "pref_lyrics_font_app_default"))
         control("pref_lyrics_autoscroll", "pref_lyrics_autoscroll_sub")
         control("pref_lyrics_autoscroll_speed")
         control("pref_lyrics_wheel_step")
-        control("pref_lyrics_word_sync", "pref_lyrics_word_sync_sub")
-        control("pref_lyrics_apple_effect", "pref_lyrics_apple_effect_sub")
-        control("pref_lyrics_duet_title", "pref_lyrics_duet_desc")
         control(
             "pref_lyrics_one_line_title",
             "pref_lyrics_one_line_sub",
@@ -265,69 +260,67 @@ internal fun buildSettingsSearchCatalog(os: String): List<SettingsSearchEntry> =
             icon = Icons.Rounded.Subtitles,
             aliases = listOf("one line", "floating lyrics", "lyrics bar", "une ligne", "paroles flottantes", "одна строка", "плавающий текст"),
         )
-        control(
-            "pref_lyrics_backing_title",
-            "pref_lyrics_backing_sub",
-            highlightKey = "pref_lyrics_backing",
-            icon = Icons.Rounded.RecordVoiceOver,
-            aliases = listOf("backing vocals", "backing", "choeurs", "voix secondaires", "бэк вокал"),
-        )
-        control(
-            "pref_lyrics_reveal_words_title",
-            "pref_lyrics_reveal_words_sub",
-            highlightKey = "pref_lyrics_reveal_words",
-            icon = Icons.Rounded.Animation,
-            aliases = listOf("reveal words", "word by word", "animation", "mot à mot", "пословное появление"),
-        )
-        control("pref_lyrics_romanization", "pref_lyrics_romanization_sub")
-        control("pref_lyrics_translation_title", "pref_lyrics_translation_sub")
         control("pref_lyrics_translation_lang")
-        control("pref_lyrics_lrc_bounce_title", "pref_lyrics_lrc_bounce_desc")
-        control("pref_lyrics_bounce_factor_title")
-        control("pref_lyrics_glow_factor_title")
-        control("pref_lyrics_fill_transition_title")
-        control("pref_lyrics_active_scale_title")
-        control("pref_lyrics_reset_typography", "pref_lyrics_reset_typography_desc")
-        control(
-            "pref_lyrics_line_animation",
-            "pref_lyrics_line_animation_sub",
-            icon = Icons.Rounded.Lyrics,
-            aliases = listOf("sweep", "dégradé", "karaoké"),
-        )
-        control("pref_instrumental_indicator", icon = Icons.Rounded.Lyrics, aliases = listOf("interlude", "breathing dots", "points", "vague"))
     }
-    controls(LYRICS_FULLSCREEN.place) {
-        control(
-            "pref_screensaver_title",
-            "pref_screensaver_desc",
-            highlightKey = "pref_screensaver",
-            icon = Icons.Rounded.DarkMode,
-            aliases = listOf("screensaver", "écran de veille", "veille", "sleep", "dim", "fullscreen", "plein écran", "заставка", "экранная заставка"),
-        )
-        control("pref_lyrics_ui_style_title")
-        control("pref_lyrics_line_blur_title", "pref_lyrics_line_blur_desc")
-        control("pref_lyrics_display_style")
-        control("pref_lyrics_align")
-        control("pref_lyrics_size")
-        control("pref_lyrics_line_spacing_title")
-        control("pref_lyrics_horizontal_margin_title")
-        control("pref_lyrics_vertical_offset_title")
-    }
-    controls(LYRICS_CENTRAL.place) {
-        control("pref_lyrics_ui_style_title")
-        control("pref_lyrics_line_blur_title", "pref_lyrics_line_blur_desc")
-        control("pref_lyrics_display_style")
-        control("pref_lyrics_align")
-        control("pref_lyrics_size")
-        control("pref_lyrics_line_spacing_title")
-        control("pref_lyrics_horizontal_margin_title")
-        control("pref_lyrics_vertical_offset_title")
-    }
-    controls(LYRICS_SIDEBAR.place) {
-        control("pref_lyrics_ui_style_title")
-        control("pref_lyrics_line_blur_title", "pref_lyrics_line_blur_desc")
-        control("pref_lyrics_align")
-        control("pref_lyrics_size")
+    listOf(LYRICS_FULLSCREEN.place, LYRICS_CENTRAL.place, LYRICS_SIDEBAR.place).forEach { modePlace ->
+        controls(modePlace) {
+            if (modePlace == LYRICS_FULLSCREEN.place) {
+                control(
+                    "pref_screensaver_title",
+                    "pref_screensaver_desc",
+                    highlightKey = "pref_screensaver",
+                    icon = Icons.Rounded.DarkMode,
+                    aliases = listOf("screensaver", "écran de veille", "veille", "sleep", "dim", "fullscreen", "plein écran", "заставка", "экранная заставка"),
+                )
+            }
+            control("pref_lyrics_font_title", icon = Icons.Rounded.TextFields, aliasKeys = listOf("pref_lyrics_font_apple", "pref_lyrics_font_app_default"))
+            control("pref_lyrics_line_blur_title", "pref_lyrics_line_blur_desc")
+            if (modePlace == LYRICS_CENTRAL.place) {
+                control(
+                    "pref_lyrics_position_title",
+                    icon = Icons.Rounded.ViewWeek,
+                    aliasKeys = listOf("align_left", "align_center_simple", "align_right"),
+                    aliases = listOf("location", "position", "emplacement", "расположение"),
+                )
+            }
+            control("pref_lyrics_align")
+            control("pref_lyrics_size")
+            control("pref_lyrics_line_spacing_title")
+            control("pref_lyrics_horizontal_margin_title")
+            control("pref_lyrics_vertical_offset_title")
+            control("pref_lyrics_active_scale_title")
+            control("pref_lyrics_reset_typography", "pref_lyrics_reset_typography_desc")
+            control("pref_lyrics_word_sync", "pref_lyrics_word_sync_sub")
+            control("pref_lyrics_apple_effect", "pref_lyrics_apple_effect_sub")
+            control("pref_lyrics_duet_title", "pref_lyrics_duet_desc")
+            control(
+                "pref_lyrics_backing_title",
+                "pref_lyrics_backing_sub",
+                highlightKey = "pref_lyrics_backing",
+                icon = Icons.Rounded.RecordVoiceOver,
+                aliases = listOf("backing vocals", "backing", "choeurs", "voix secondaires", "бэк вокал"),
+            )
+            control(
+                "pref_lyrics_reveal_words_title",
+                "pref_lyrics_reveal_words_sub",
+                highlightKey = "pref_lyrics_reveal_words",
+                icon = Icons.Rounded.Animation,
+                aliases = listOf("reveal words", "word by word", "animation", "mot à mot", "пословное появление"),
+            )
+            control(
+                "pref_lyrics_line_animation",
+                "pref_lyrics_line_animation_sub",
+                icon = Icons.Rounded.Lyrics,
+                aliases = listOf("sweep", "dégradé", "karaoké"),
+            )
+            control("pref_instrumental_indicator", icon = Icons.Rounded.Lyrics, aliases = listOf("interlude", "breathing dots", "points", "vague"))
+            control("pref_lyrics_romanization", "pref_lyrics_romanization_sub")
+            control("pref_lyrics_translation_title", "pref_lyrics_translation_sub")
+            control("pref_lyrics_lrc_bounce_title", "pref_lyrics_lrc_bounce_desc")
+            control("pref_lyrics_bounce_factor_title")
+            control("pref_lyrics_glow_factor_title")
+            control("pref_lyrics_fill_transition_title")
+        }
     }
     controls(MINI_PLAYER.place) {
         control("mini_player_content_mode")
@@ -799,21 +792,10 @@ internal fun SettingsSearchEntry.targetKey(prefs: PlayerPreferences, player: Pla
     "pref_lyrics_autoscroll_speed" ->
         if (player.isPlainAutoScrollEnabled) highlightKey else "pref_lyrics_autoscroll"
     "pref_lyrics_translation_lang" ->
-        if (prefs.getLyricsTranslationEnabled()) highlightKey else "pref_lyrics_translation_title"
+        if (player.anyTranslationEnabled) highlightKey else "pref_lyrics_translation_title"
     "pref_lyrics_lrc_bounce_title", "pref_lyrics_bounce_factor_title", "pref_lyrics_glow_factor_title",
-    "pref_lyrics_fill_transition_title", "pref_lyrics_active_scale_title", "pref_lyrics_reset_typography" ->
-        if (listOf(player.lyricsUiStyle, player.lyricsFullScreenUiStyle, player.lyricsSidebarUiStyle).any { it != LyricsUiStyle.CLASSIC }) {
-            highlightKey
-        } else "pref_lyrics_font_title"
-    "pref_lyrics_line_blur_title", "pref_lyrics_display_style" -> {
-        val style = when (place.subPage) {
-            LYRICS_FULLSCREEN -> player.lyricsFullScreenUiStyle
-            LYRICS_SIDEBAR -> player.lyricsSidebarUiStyle
-            else -> player.lyricsUiStyle
-        }
-        if ((style == LyricsUiStyle.CLASSIC) == (highlightKey == "pref_lyrics_display_style")) highlightKey
-        else "pref_lyrics_ui_style_title"
-    }
+    "pref_lyrics_fill_transition_title", "pref_lyrics_active_scale_title", "pref_lyrics_reset_typography",
+    "pref_lyrics_line_blur_title" -> highlightKey
     "pref_local_add" -> if (prefs.getLocalMediaEnabled()) highlightKey else "pref_local_enable"
     "pref_local_scan" -> when {
         !prefs.getLocalMediaEnabled() -> "pref_local_enable"

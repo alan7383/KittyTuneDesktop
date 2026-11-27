@@ -94,6 +94,7 @@ fun SyncedLineText(
                     ),
                     color = if (sweepDone) sweep.brightColor else textColor,
                     textAlign = tAlign,
+                    modifier = Modifier.fillMaxWidth(),
                     onTextLayout = { textHeightPx = it.size.height.toFloat().coerceAtLeast(1f) }
                 )
             } else {
@@ -101,7 +102,8 @@ fun SyncedLineText(
                     text = line.content,
                     style = textStyle,
                     color = textColor,
-                    textAlign = tAlign
+                    textAlign = tAlign,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -114,7 +116,8 @@ fun SyncedLineText(
                     Text(
                         text = it,
                         color = textColor.copy(alpha = 0.6f),
-                        textAlign = tAlign
+                        textAlign = tAlign,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

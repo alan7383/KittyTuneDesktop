@@ -3735,4 +3735,5 @@
     <string name="performance_windows_rendering">Graphiques Windows</string>
     <string name="performance_compatible_rendering">Mode de compatibilité</string>
     <string name="performance_macos_rendering">Graphiques macOS</string>
+    <string name="pref_lyrics_position_title">Emplacement</string>
 </resources>

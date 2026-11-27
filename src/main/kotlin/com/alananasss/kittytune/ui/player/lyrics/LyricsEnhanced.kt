@@ -82,42 +82,33 @@ fun LyricsEnhanced(
     fontSizeOverride: Float? = null,
     lineSpacingOverride: Dp? = null,
     isFullScreen: Boolean = false,
-    isSidebar: Boolean = false
+    isSidebar: Boolean = false,
+    contentPosition: com.alananasss.kittytune.data.local.LyricsAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.LEFT,
 ) {
     val lines = viewModel.lyricsLines
     val isSynced = lines.any { it.startTime > 0 }
-    val isWordSyncedFormat = isSynced && viewModel.isWordSyncEnabled && lines.any { it.words.isNotEmpty() }
-    val isDuetActive = viewModel.isDuetActiveForTrack(viewModel.uiCurrentTrack)
+    val isWordSyncedFormat = isSynced && viewModel.wordSyncEnabledFor(isFullScreen, isSidebar) && lines.any { it.words.isNotEmpty() }
+    val isDuetActive = viewModel.isDuetActiveForTrack(viewModel.uiCurrentTrack, isFullScreen, isSidebar)
 
-    val lyricsLineBlur = lyricsLineBlurOverride ?: when {
-        isFullScreen -> viewModel.lyricsFullScreenLineBlurEnabled
-        isSidebar -> viewModel.lyricsSidebarLineBlurEnabled
-        else -> viewModel.lyricsLineBlurEnabled
-    }
-    val lyricsTextSize = fontSizeOverride ?: if (isFullScreen) viewModel.lyricsFullScreenFontSize else viewModel.lyricsFontSize
+    val lyricsLineBlur = lyricsLineBlurOverride ?: viewModel.lineBlurFor(isFullScreen, isSidebar)
+    val lyricsTextSize = fontSizeOverride ?: viewModel.fontSizeFor(isFullScreen, isSidebar)
     val defaultSpacing = if (isFullScreen) (lyricsTextSize * 0.34f) else (lyricsTextSize * 0.22f)
+    val modeLineSpacing = viewModel.lineSpacingFor(isFullScreen, isSidebar)
     val lyricsLineSpacingDp = when {
         lineSpacingOverride != null -> lineSpacingOverride
-        isFullScreen && viewModel.lyricsFullScreenLineSpacing > 0f -> viewModel.lyricsFullScreenLineSpacing.dp
-        !isFullScreen && viewModel.lyricsLineSpacing > 0f -> viewModel.lyricsLineSpacing.dp
+        modeLineSpacing > 0f -> modeLineSpacing.dp
         else -> defaultSpacing.dp
     }
-    val lyricsHorizontalMargin = if (isFullScreen) viewModel.lyricsFullScreenHorizontalMargin else viewModel.lyricsHorizontalMargin
+    val lyricsHorizontalMargin = viewModel.horizontalMarginFor(isFullScreen, isSidebar)
     val lyricsHorizontalMarginDp = if (lyricsHorizontalMargin > 0f) lyricsHorizontalMargin.dp else (if (isFullScreen) 0.dp else 16.dp)
-    // The side panel keeps the sung line near the middle so the one before and the one after are both in view;
-    // the central view's setting is made for a window, and put the line far too low in a panel (issue #66).
-    val lyricsVerticalOffsetFraction = when {
-        isFullScreen -> viewModel.lyricsFullScreenVerticalOffset
-        isSidebar -> SIDEBAR_VERTICAL_OFFSET
-        else -> viewModel.lyricsVerticalOffset
-    }
-    val configuredScale = if (isFullScreen) viewModel.lyricsFullScreenActiveScale else viewModel.lyricsActiveScale
+    val lyricsVerticalOffsetFraction = viewModel.verticalOffsetFor(isFullScreen, isSidebar)
+    val configuredScale = viewModel.activeScaleFor(isFullScreen, isSidebar)
     val lyricsActiveScale = if (isFullScreen && configuredScale <= 1.01f) 1.08f else configuredScale
 
     val textColor = textColorOverride ?: MaterialTheme.colorScheme.onSurface
 
-    val showTranslations = viewModel.isLyricsTranslationEnabled && lines.any { it.translation != null }
-    val showPhonetics = viewModel.isRomanizationEnabled && lines.any { it.romanization != null }
+    val showTranslations = viewModel.translationEnabledFor(isFullScreen, isSidebar) && lines.any { it.translation != null }
+    val showPhonetics = viewModel.romanizationEnabledFor(isFullScreen, isSidebar) && lines.any { it.romanization != null }
 
     val baseLayoutDirection = LocalLayoutDirection.current
     val lyricsLayoutDirection = remember(lines, baseLayoutDirection) {
@@ -133,37 +124,41 @@ fun LyricsEnhanced(
         (viewModel.uiCurrentTrack?.id ?: "") to lines.map { it.startTime }
     }
 
-    val userAlignment = when {
-        isFullScreen -> viewModel.lyricsFullScreenAlignment
-        isSidebar -> viewModel.lyricsSidebarAlignment
-        else -> viewModel.lyricsAlignment
-    }
+    val userAlignment = viewModel.alignmentFor(isFullScreen, isSidebar)
 
-    val splitBacking = viewModel.lyricsSplitBackingVocals
+    val splitBacking = viewModel.splitBackingVocalsFor(isFullScreen, isSidebar)
     // Sweep and word-by-word reveal are two looks for the same line-timed lines, and the reveal turns every
     // line into syllables, which the sweep would never reach. When the Sweep animation is chosen it wins.
-    val sweepSelected = viewModel.lyricsSweepEnabled && !isWordSyncedFormat
-    val revealWords = viewModel.lyricsRevealWords && !sweepSelected
+    val sweepSelected = viewModel.sweepEnabledFor(isFullScreen, isSidebar) && !isWordSyncedFormat
+    val revealWords = viewModel.revealWordsFor(isFullScreen, isSidebar) && !sweepSelected
     val syncedLyrics = remember(lines.toList(), isWordSyncedFormat, isDuetActive, userAlignment, splitBacking, revealWords) {
         buildSyncedLyrics(lines, isWordSyncedFormat, isDuetActive, userAlignment, splitBacking, revealWords)
     }
 
     val leadMs = if (isWordSyncedFormat) WORD_SYNC_LEAD_MS else LRC_LEAD_MS
-    val playbackPositionMs = remember {
-        mutableLongStateOf(MusicManager.player.currentPosition.coerceAtLeast(0L))
+    val isRemote = viewModel.isRemotePlayback
+    val playbackPositionMs = remember(lyricsSessionKey, isRemote) {
+        mutableLongStateOf(if (isRemote) viewModel.remotePositionForLyrics() else MusicManager.player.currentPosition.coerceAtLeast(0L))
     }
     val listState = remember(lyricsSessionKey) { LazyListState() }
-
-    LaunchedEffect(viewModel.uiCurrentTrack?.id, lyricsSessionKey) {
-        playbackPositionMs.longValue = MusicManager.player.currentPosition.coerceAtLeast(0L)
-    }
 
     // High-precision frame loop tracking smooth playback position with PLL drift correction.
     // The playback position for the words moves on the shared ambient pulse, not every frame: it is what kept the full
     // player redrawing at the display's rate — 240 times a second on a 240 Hz monitor — for as long as a song played
     // (see AmbientClock). Line changes and scrolls the reader starts are animations of their own and keep the full rate.
     val ambientClock = com.alananasss.kittytune.ui.common.LocalAmbientClock.current
-    LaunchedEffect(viewModel.uiCurrentTrack?.id, lyricsSessionKey, viewModel.effectsState.speed, ambientClock) {
+    LaunchedEffect(lyricsSessionKey, isRemote, viewModel.effectsState.speed, ambientClock) {
+        if (isRemote) {
+            while (isActive) {
+                playbackPositionMs.longValue = viewModel.remotePositionForLyrics()
+                if (viewModel.uiIsPlaying) {
+                    com.alananasss.kittytune.ui.common.withAmbientFrameNanos(ambientClock) { }
+                } else {
+                    delay(50L)
+                }
+            }
+            return@LaunchedEffect
+        }
         var anchorPlayerPositionMs = MusicManager.player.currentPosition.coerceAtLeast(0L)
         var anchorFrameNanos = 0L
         while (isActive) {
@@ -225,7 +220,12 @@ fun LyricsEnhanced(
             .toInt()
     }
 
-    val lyricsFontFamily = rememberLyricsFontFamily(viewModel.lyricsFont)
+    val lyricsFontFamily = rememberLyricsFontFamily(viewModel.lyricsFontFor(isFullScreen, isSidebar))
+    val lrcBounceEnabled = viewModel.lrcBounceEnabledFor(isFullScreen, isSidebar)
+    val bounceFactor = viewModel.bounceFactorFor(isFullScreen, isSidebar)
+    val glowFactor = viewModel.glowFactorFor(isFullScreen, isSidebar)
+    val fillTransitionWidth = viewModel.fillTransitionWidthFor(isFullScreen, isSidebar)
+    val interludeIndicatorStyle = viewModel.instrumentalIndicatorStyleFor(isFullScreen, isSidebar)
     val normalTextStyle = MaterialTheme.typography.headlineMedium.copy(
         fontSize = lyricsTextSize.sp,
         lineHeight = (lyricsTextSize * 1.30f).sp,
@@ -262,7 +262,12 @@ fun LyricsEnhanced(
 
             !isSynced -> {
                 // Plain lyrics fallback with smooth auto-scroll
-                PlainLyricsView(viewModel)
+                PlainLyricsView(
+                    viewModel,
+                    isFullScreen = isFullScreen,
+                    isSidebar = isSidebar,
+                    contentPosition = contentPosition,
+                )
             }
 
             else -> {
@@ -279,6 +284,7 @@ fun LyricsEnhanced(
                             showPhonetics,
                             isDuetActive,
                             userAlignment,
+                            contentPosition,
                             lyricsFontFamily,
                             lyricsTextSize,
                             lyricsLineBlur,
@@ -291,6 +297,7 @@ fun LyricsEnhanced(
                                 listState = listState,
                                 lyrics = syncedLyrics,
                                 userAlignment = userAlignment,
+                                contentPosition = contentPosition,
                                 currentPosition = playbackSyncPosition,
                                 onLineClicked = { line ->
                                     val target = line.start.toLong() - viewModel.lyricsOffsetAtLyricTime(line.start.toLong())
@@ -312,8 +319,8 @@ fun LyricsEnhanced(
                                 startsAtTop = false,
                                 keepAliveZone = 72.dp,
                                 isScrubbing = viewModel.isScrubbing,
-                                lrcBounceEnabled = viewModel.lyricsLrcBounceEnabled,
-                                bounceFactor = viewModel.lyricsBounceFactor,
+                                lrcBounceEnabled = lrcBounceEnabled,
+                                bounceFactor = bounceFactor,
                                 lineSpacing = lyricsLineSpacingDp,
                                 // The dots between verses at the size of the panel, not of a window.
                                 breathingDotsDefaults = if (isSidebar) {
@@ -324,7 +331,7 @@ fun LyricsEnhanced(
                                 horizontalMargin = lyricsHorizontalMarginDp,
                                 activeScale = lyricsActiveScale,
                                 lineSweepEnabled = sweepSelected,
-                                interludeIndicatorStyle = viewModel.instrumentalIndicatorStyle,
+                                interludeIndicatorStyle = interludeIndicatorStyle,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -347,25 +354,16 @@ fun buildSyncedLyrics(
 ): SyncedLyrics {
     if (entries.isEmpty()) return SyncedLyrics(emptyList())
     val lines = mutableListOf<ISyncedLine>()
+    val hasDuetLayout = isDuetEnabled && hasDuetSecondSinger(entries)
 
     entries.forEachIndexed { index, entry ->
         if (entry.startTime < 0L) return@forEachIndexed
         if (entry.isInstrumental) return@forEachIndexed
-        val cleanText = LyricsUtils.decodeHtmlEntities(entry.text)
+        val cleanText = LyricsUtils.decodeHtmlEntities(entry.text).normalizeLyricCommas()
         if (cleanText.isBlank() && entry.words.isEmpty()) return@forEachIndexed
         val cleanTranslation = entry.translation?.let { LyricsUtils.decodeHtmlEntities(it) }?.takeUnless { LyricsUtils.isDuplicateTranslation(cleanText, it) }
 
-        val effectiveSinger = if (isDuetEnabled) {
-            entry.singer?.takeIf { it != LyricSinger.DEFAULT }
-                ?: when (entry.agent?.trim()?.lowercase()) {
-                    "v2", "singer2", "2" -> LyricSinger.SINGER_2
-                    "v1", "singer1", "1" -> LyricSinger.SINGER_1
-                    "both", "group", "all", "v1000", "v2000", "3", "v3" -> LyricSinger.BOTH
-                    else -> LyricSinger.DEFAULT
-                }
-        } else {
-            LyricSinger.DEFAULT
-        }
+        val effectiveSinger = entry.effectiveDuetSinger(hasDuetLayout)
 
         val alignment = if (isDuetEnabled && effectiveSinger != LyricSinger.DEFAULT) {
             when (effectiveSinger) {
@@ -386,26 +384,19 @@ fun buildSyncedLyrics(
             }
         }
 
-        val hasWords = isWordSynced && entry.words.isNotEmpty()
+        val hasWords = isWordSynced && entry.words.any { it.text.isNotBlank() }
         if (hasWords) {
-            val markedBackground = entry.words.filter { it.isBackground }
-            // Backing vocals the source wrote in brackets rather than marked, when the reader wants them apart.
-            val (ownWords, bracketGroups) = if (splitBacking && markedBackground.isEmpty()) {
-                splitBackingWords(entry.words)
-            } else {
-                entry.words to emptyList()
-            }
-            val mainWords = ownWords.filter { !it.isBackground }
-            val bgWords = markedBackground.ifEmpty { bracketGroups.flatten() }
-            val mainText = if (bracketGroups.isNotEmpty()) splitBackingVocals(cleanText).first else cleanText
+            val parts = splitTimedLyricParts(entry.words, splitBacking)
+            val mainText = if (parts.hasBracketedVocals) splitBackingVocals(cleanText).first else cleanText
 
-            val wordsForMain = if (mainWords.isNotEmpty()) mainWords else entry.words
+            val wordsForMain = parts.mainWords
             val formattedMainContents = formatLyricWordContents(mainText, wordsForMain)
-            val mainSyllables = wordsForMain.mapIndexed { wIdx, w ->
+            val mainSyllables = wordsForMain.mapIndexedNotNull { wIdx, w ->
+                val content = formattedMainContents[wIdx].takeIf { it.isNotEmpty() } ?: return@mapIndexedNotNull null
                 val start = w.startTime.toInt()
                 val end = w.endTime.toInt().coerceAtLeast(start + MIN_KARAOKE_SYLLABLE_DURATION_MS)
                 KaraokeSyllable(
-                    content = formattedMainContents.getOrElse(wIdx) { LyricsUtils.decodeHtmlEntities(w.text) },
+                    content = content,
                     start = start,
                     end = end,
                     phonetic = null
@@ -424,37 +415,7 @@ fun buildSyncedLyrics(
             val lineEnd = maxOf(declaredEnd, mainSyllables.maxOfOrNull { it.end } ?: 0)
             if (lineEnd <= lineStart) return@forEachIndexed
 
-            val accompanimentLines = if (mainWords.isNotEmpty() && bgWords.isNotEmpty()) {
-                val formattedBgContents = if (bracketGroups.isNotEmpty()) {
-                    backingGroupContents(bracketGroups)
-                } else {
-                    formatLyricWordContents("", bgWords)
-                }
-                val bgSyllables = bgWords.mapIndexed { bgIdx, w ->
-                    val start = w.startTime.toInt()
-                    val end = w.endTime.toInt().coerceAtLeast(start + MIN_KARAOKE_SYLLABLE_DURATION_MS)
-                    KaraokeSyllable(
-                        content = formattedBgContents.getOrElse(bgIdx) { LyricsUtils.decodeHtmlEntities(w.text) },
-                        start = start,
-                        end = end,
-                        phonetic = null
-                    )
-                }
-                val bgStart = bgSyllables.minOfOrNull { it.start } ?: lineStart
-                val bgEnd = bgSyllables.maxOfOrNull { it.end } ?: lineEnd
-                if (bgEnd > bgStart) {
-                    listOf(
-                        KaraokeLine.AccompanimentKaraokeLine(
-                            syllables = bgSyllables,
-                            translation = null,
-                            alignment = alignment,
-                            start = bgStart,
-                            end = bgEnd,
-                            phonetic = null
-                        )
-                    )
-                } else null
-            } else null
+            val accompanimentLines = timedBackingVocalLines(parts.backingPhrases, alignment).takeIf { it.isNotEmpty() }
 
             lines.add(
                 KaraokeLine.MainKaraokeLine(
@@ -562,22 +523,6 @@ fun buildSyncedLyrics(
 
     return SyncedLyrics(lines = lines)
 }
-
-/**
- * What each backing word shows: the word and a space, and a comma after the last word of a group when another
- * group follows, so "(oh no)" and "(yeah)" read as "oh no, yeah".
- */
-private fun backingGroupContents(groups: List<List<LyricWord>>): List<String> =
-    groups.flatMapIndexed { groupIndex, group ->
-        group.mapIndexed { wordIndex, word ->
-            val text = LyricsUtils.decodeHtmlEntities(word.text)
-            when {
-                wordIndex < group.lastIndex -> "$text "
-                groupIndex < groups.lastIndex -> text + BACKING_SEPARATOR
-                else -> text
-            }
-        }
-    }
 
 private fun buildWrappingKaraokeSyllables(
     content: String,

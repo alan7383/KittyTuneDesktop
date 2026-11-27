@@ -13,7 +13,8 @@ data class LyricWord(
     val text: String,
     val startTime: Long,
     val endTime: Long,
-    val isBackground: Boolean = false
+    val isBackground: Boolean = false,
+    val backgroundPhrase: Int? = null,
 ) {
     val word: String get() = text
 }
@@ -39,6 +40,21 @@ data class LyricLine(
     val durationMs: Long = 0L,
     val agent: String? = null
 )
+
+internal fun LyricLine.resolvedRawSinger(): LyricSinger =
+    singer?.takeIf { it != LyricSinger.DEFAULT } ?: when (agent?.trim()?.lowercase()) {
+        "v2", "singer2", "2" -> LyricSinger.SINGER_2
+        "v1", "singer1", "1" -> LyricSinger.SINGER_1
+        "both", "group", "all", "v1000", "v2000", "3", "v3" -> LyricSinger.BOTH
+        else -> LyricSinger.DEFAULT
+    }
+
+/** Only treat a track as a left-vs-right duet when a second singer actually appears; solo TTML tracks tag everything `v1`. */
+internal fun hasDuetSecondSinger(lines: List<LyricLine>): Boolean =
+    lines.any { it.resolvedRawSinger() == LyricSinger.SINGER_2 }
+
+internal fun LyricLine.effectiveDuetSinger(hasDuetLayout: Boolean): LyricSinger =
+    if (hasDuetLayout) resolvedRawSinger() else LyricSinger.DEFAULT
 
 fun isRtlText(text: String): Boolean {
     for (ch in text) {
@@ -119,50 +135,72 @@ fun shouldAppendWordSpace(
     return last !in NoSpaceAfterChars
 }
 
-fun formatLyricWordContents(
-    lineText: String,
-    words: List<LyricWord>,
-): List<String> {
-    if (words.isEmpty()) return emptyList()
+/** Fix stray spaces and repeated commas without changing lyric words or other punctuation. */
+fun String.normalizeLyricCommas(): String = LYRIC_COMMAS.replace(this, ",")
 
-    val decodedWords = words.map { LyricsUtils.decodeHtmlEntities(it.word) }
+private val LYRIC_COMMAS = Regex("""(?<=\S)\h*,(?:\h*,)*|,(?:\h*,)+""")
 
-    if (decodedWords.any { it.endsWith(" ") || it.startsWith(" ") }) {
-        return decodedWords
+fun formatLyricWordContents(lineText: String, words: List<LyricWord>): List<String> {
+    val decoded = words.map { LyricsUtils.decodeHtmlEntities(it.word) }
+    val line = LyricsUtils.decodeHtmlEntities(lineText).normalizeLyricCommas().trim()
+    alignLyricWords(line, decoded)?.let { return it }
+
+    val hasExplicitSpaces = decoded.any {
+        it.firstOrNull()?.isWhitespace() == true || it.lastOrNull()?.isWhitespace() == true
     }
-
-    val cleanLine = LyricsUtils.decodeHtmlEntities(lineText).trim()
-
-    if (decodedWords.joinToString("").trim() == cleanLine) {
-        return decodedWords
+    val contents = if (hasExplicitSpaces) decoded else decoded.mapIndexed { index, word ->
+        val next = decoded.getOrNull(index + 1).orEmpty()
+        if (shouldAppendWordSpace(word, next)) "$word " else word
     }
+    return normalizeLyricWordCommas(contents)
+}
 
-    val result = ArrayList<String>(decodedWords.size)
-    var searchIndex = 0
-    for (i in decodedWords.indices) {
-        val word = decodedWords[i]
-        val pos = if (searchIndex < cleanLine.length) cleanLine.indexOf(word, searchIndex) else -1
-        if (pos != -1) {
-            searchIndex = pos + word.length
-            var hasTrailingSpaceInLine = false
-            while (searchIndex < cleanLine.length && cleanLine[searchIndex].isWhitespace()) {
-                hasTrailingSpaceInLine = true
-                searchIndex++
-            }
-            if (hasTrailingSpaceInLine) {
-                result.add("$word ")
-            } else {
-                result.add(word)
-            }
+private fun Char.isLyricSeparator(): Boolean = isWhitespace() || this == ','
+
+/** Keep the line's spelling and spacing when the timed segments describe the same text in order. */
+private fun alignLyricWords(line: String, words: List<String>): List<String>? {
+    val letters = line.indices.filterNot { line[it].isLyricSeparator() }
+    if (letters.isEmpty()) return null
+    val lineText = letters.joinToString("") { line[it].toString() }
+    val timedText = words.joinToString("").filterNot { it.isLyricSeparator() }
+    if (!lineText.equals(timedText, ignoreCase = true)) return null
+
+    var textOffset = 0
+    var letterOffset = 0
+    return words.map { word ->
+        val count = word.count { !it.isLyricSeparator() }
+        if (count == 0) {
+            ""
         } else {
-            if (i < decodedWords.size - 1) {
-                result.add("$word ")
-            } else {
-                result.add(word)
+            letterOffset += count
+            val end = letters.getOrElse(letterOffset) { line.length }
+            line.substring(textOffset, end).also { textOffset = end }
+        }
+    }
+}
+
+/** Retain one string per timing slot, even when a punctuation-only slot disappears. */
+internal fun normalizeLyricWordCommas(contents: List<String>): List<String> {
+    val joined = contents.joinToString("")
+    val runs = LYRIC_COMMAS.findAll(joined).filter { it.value.length > 1 }.toList()
+    if (runs.isEmpty()) return contents
+
+    val removed = BooleanArray(joined.length)
+    for (run in runs) {
+        val firstComma = joined.indexOf(',', run.range.first)
+        for (index in run.range) {
+            removed[index] = index != firstComma
+        }
+    }
+    var offset = 0
+    return contents.map { content ->
+        buildString {
+            for (char in content) {
+                if (!removed[offset]) append(char)
+                offset++
             }
         }
     }
-    return result
 }
 
 object LyricsUtils {
@@ -398,6 +436,8 @@ object LyricsUtils {
                     text = word.text,
                     startTime = (word.startTime * 1000.0).toLong(),
                     endTime = (word.endTime * 1000.0).toLong(),
+                    isBackground = word.isBackground,
+                    backgroundPhrase = word.backgroundPhrase,
                 )
             }
             LyricLine(

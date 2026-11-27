@@ -298,11 +298,15 @@ private const val RETURN_MAX_VIEWPORTS = 2f
  *
  * @param offset the scroll offset to settle the line at, as for [LazyListState.scrollToItem].
  */
-internal suspend fun LazyListState.returnToLine(index: Int, offset: () -> Int) {
+internal suspend fun LazyListState.returnToLine(
+    index: Int,
+    targetIndex: () -> Int = { index },
+    offset: () -> Int,
+) {
     val info = layoutInfo
     val viewport = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
-    var distance = distanceToLine(index, offset) ?: run {
-        scrollToItem(index, offset())
+    var distance = distanceToLine(targetIndex(), offset) ?: run {
+        scrollToItem(targetIndex(), offset())
         return
     }
     val maxRun = viewport * RETURN_MAX_VIEWPORTS
@@ -310,22 +314,32 @@ internal suspend fun LazyListState.returnToLine(index: Int, offset: () -> Int) {
         // Too far to scroll through in one movement: start the movement from closer.
         scrollBy(distance - kotlin.math.sign(distance) * maxRun)
         withFrameNanos { }
-        distance = distanceToLine(index, offset) ?: return
+        distance = distanceToLine(targetIndex(), offset) ?: return
     }
     val durationMs = RETURN_BASE_MS + RETURN_PER_VIEWPORT_MS * kotlin.math.abs(distance) / viewport
     scroll {
-        var travelled = 0f
+        var prevFrac = 0f
         val startNanos = withFrameNanos { it }
         while (true) {
             val now = withFrameNanos { it }
             val t = ((now - startNanos) / 1_000_000f / durationMs).coerceIn(0f, 1f)
-            val left = distanceToLine(index, offset) ?: break
-            val wanted = (travelled + left) * FastOutSlowInEasing.transform(t)
-            val step = wanted - travelled
-            val consumed = scrollBy(step)
-            travelled += consumed
-            // Done, or held at the end of the list.
-            if (t >= 1f || kotlin.math.abs(consumed) + 0.5f < kotlin.math.abs(step)) break
+            val left = distanceToLine(targetIndex(), offset) ?: break
+            val frac = FastOutSlowInEasing.transform(t)
+            val step = if (t >= 1f) {
+                left
+            } else {
+                val remain = (1f - prevFrac).coerceAtLeast(1e-4f)
+                val deltaFrac = ((frac - prevFrac) / remain).coerceIn(0f, 1f)
+                left * deltaFrac
+            }
+            prevFrac = frac
+            if (kotlin.math.abs(step) > 0.1f) {
+                val consumed = scrollBy(step)
+                // Done, or held at the end of the list.
+                if (t >= 1f || kotlin.math.abs(consumed) + 0.5f < kotlin.math.abs(step)) break
+            } else if (t >= 1f) {
+                break
+            }
         }
     }
 }

@@ -31,6 +31,7 @@ object TTMLParser {
         val startTime: Double,
         val endTime: Double,
         val isBackground: Boolean = false,
+        val backgroundPhrase: Int? = null,
     )
 
     private data class TimingContext(
@@ -183,7 +184,7 @@ object TTMLParser {
                         }
                     }
                 val backgroundWords =
-                    line.backgrounds.flatMap { track ->
+                    line.backgrounds.flatMapIndexed { phrase, track ->
                         track.segments.mapNotNull { segment ->
                             segment.timing?.let { timing ->
                                 ParsedWord(
@@ -191,6 +192,7 @@ object TTMLParser {
                                     startTime = timing.startMs / MILLIS_PER_SECOND,
                                     endTime = timing.endMs / MILLIS_PER_SECOND,
                                     isBackground = true,
+                                    backgroundPhrase = phrase,
                                 )
                             }
                         }

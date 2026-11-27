@@ -3,8 +3,10 @@ package com.alananasss.kittytune.ui.player.lyrics.accompanist
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -149,6 +152,7 @@ fun KaraokeLyricsView(
     isScrubbing: Boolean = false,
     showDebugRectangles: Boolean = false,
     userAlignment: com.alananasss.kittytune.data.local.LyricsAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.LEFT,
+    contentPosition: com.alananasss.kittytune.data.local.LyricsAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.LEFT,
     lrcBounceEnabled: Boolean = true,
     bounceFactor: Float = 1f,
     lineSpacing: Dp = 0.dp,
@@ -360,10 +364,16 @@ fun KaraokeLyricsView(
                 scrollInCode.value = true
                 isReturning.value = true
                 try {
-                    // The same spot the follow below settles a line on. The way back used to aim one top inset
-                    // lower, so the follow then pulled the list up again with a jump a moment later (issue #66).
-                    listState.returnToLine(focus) { -followTopPx(listState, stableOffsetPx, keepAliveZonePx) }
-                    lastFocusedIndex = focus
+                    // Track the live active line during return so advancing a line mid-glide
+                    // does not settle on a stale line and trigger a second jump before blurring.
+                    listState.returnToLine(
+                        index = focus,
+                        targetIndex = { lyricsFocusState.firstIndex },
+                    ) { -followTopPx(listState, stableOffsetPx, keepAliveZonePx) }
+                    val settledFocus = lyricsFocusState.firstIndex
+                    if (settledFocus in lyrics.lines.indices) {
+                        lastFocusedIndex = settledFocus
+                    }
                 } finally {
                     isReturning.value = false
                     scrollInCode.value = false
@@ -410,8 +420,11 @@ fun KaraokeLyricsView(
 
                     if (targetItem != null && !isLargeJump) {
                         val scrollOffset = targetItem.offset - desiredOffset
-                        if (kotlin.math.abs(scrollOffset) > 1) {
-                            listState.scrollBy(scrollOffset.toFloat())
+                        if (kotlin.math.abs(scrollOffset) > 4) {
+                            listState.animateScrollBy(
+                                scrollOffset.toFloat(),
+                                animationSpec = tween<Float>(durationMillis = 220, easing = FastOutSlowInEasing)
+                            )
                         }
                     } else if (!isLargeJump && !scrubbing && !isRapidClick) {
                         listState.animateScrollToItem(firstIndex, -desiredOffset)
@@ -544,6 +557,16 @@ fun KaraokeLyricsView(
                             isVisualRightAligned -> Alignment.End
                             else -> Alignment.Start
                         }
+                        val rowContentAlignment = when (contentPosition) {
+                            com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> Alignment.Center
+                            com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> Alignment.CenterEnd
+                            com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> Alignment.CenterStart
+                        }
+                        val rowContentMaxWidth = if (contentPosition == com.alananasss.kittytune.data.local.LyricsAlignment.LEFT) {
+                            androidx.compose.ui.unit.Dp.Unspecified
+                        } else {
+                            760.dp
+                        }
 
                         Column(
                             modifier = Modifier
@@ -564,37 +587,52 @@ fun KaraokeLyricsView(
                             val showDotsIntro = lyricsFocusState.activeIntro && index == 0
 
                             AnimatedVisibility(showDotsInterlude || showDotsIntro) {
-                                when (interludeIndicatorStyle) {
-                                    com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.OFF -> Unit
-                                    com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.DOTS -> KaraokeBreathingDots(
-                                        alignment = when (val line = previousLine ?: firstLine) {
-                                            is KaraokeLine -> line.alignment
-                                            is SyncedLine -> when {
-                                                isVisualCenterAligned -> KaraokeAlignment.Unspecified
-                                                isVisualRightAligned -> KaraokeAlignment.End
-                                                line.content.isRtl() -> KaraokeAlignment.End
-                                                else -> KaraokeAlignment.Start
-                                            }
-                                            else -> KaraokeAlignment.Start
-                                        },
-                                        startTimeMs = previousLine?.end ?: 0,
-                                        endTimeMs = if (showDotsIntro) firstLine!!.start else line.start,
-                                        currentTimeProvider = timeProvider,
-                                        defaults = breathingDotsDefaults,
-                                        modifier = Modifier.padding(vertical = 12.dp)
-                                    )
-                                    // The circle and note+wave indicators take the dots' place over the gap.
-                                    else -> com.alananasss.kittytune.ui.player.lyrics.InstrumentalGapIndicator(
-                                        kind = if (interludeIndicatorStyle == com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.CIRCLE)
-                                            com.alananasss.kittytune.ui.player.lyrics.InstrumentalIndicatorStyleKind.CIRCLE
-                                        else com.alananasss.kittytune.ui.player.lyrics.InstrumentalIndicatorStyleKind.NOTE_WAVE,
-                                        startMs = (previousLine?.end ?: 0).toLong(),
-                                        endMs = (if (showDotsIntro) firstLine!!.start else line.start).toLong(),
-                                        positionProvider = { timeProvider().toLong() },
-                                        accentColor = textColor,
-                                        contentColor = textColor.copy(alpha = 0.6f),
-                                        modifier = Modifier.padding(vertical = 12.dp)
-                                    )
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(rowContentAlignment)
+                                            .then(
+                                                if (rowContentMaxWidth != androidx.compose.ui.unit.Dp.Unspecified) {
+                                                    Modifier.widthIn(max = rowContentMaxWidth)
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
+                                            .fillMaxWidth()
+                                    ) {
+                                        when (interludeIndicatorStyle) {
+                                            com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.OFF -> Unit
+                                            com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.DOTS -> KaraokeBreathingDots(
+                                                alignment = when (val line = previousLine ?: firstLine) {
+                                                    is KaraokeLine -> line.alignment
+                                                    is SyncedLine -> when {
+                                                        isVisualCenterAligned -> KaraokeAlignment.Unspecified
+                                                        isVisualRightAligned -> KaraokeAlignment.End
+                                                        line.content.isRtl() -> KaraokeAlignment.End
+                                                        else -> KaraokeAlignment.Start
+                                                    }
+                                                    else -> KaraokeAlignment.Start
+                                                },
+                                                startTimeMs = previousLine?.end ?: 0,
+                                                endTimeMs = if (showDotsIntro) firstLine!!.start else line.start,
+                                                currentTimeProvider = timeProvider,
+                                                defaults = breathingDotsDefaults,
+                                                modifier = Modifier.padding(vertical = 12.dp)
+                                            )
+                                            // The circle and note+wave indicators take the dots' place over the gap.
+                                            else -> com.alananasss.kittytune.ui.player.lyrics.InstrumentalGapIndicator(
+                                                kind = if (interludeIndicatorStyle == com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle.CIRCLE)
+                                                    com.alananasss.kittytune.ui.player.lyrics.InstrumentalIndicatorStyleKind.CIRCLE
+                                                else com.alananasss.kittytune.ui.player.lyrics.InstrumentalIndicatorStyleKind.NOTE_WAVE,
+                                                startMs = (previousLine?.end ?: 0).toLong(),
+                                                endMs = (if (showDotsIntro) firstLine!!.start else line.start).toLong(),
+                                                positionProvider = { timeProvider().toLong() },
+                                                accentColor = textColor,
+                                                contentColor = textColor.copy(alpha = 0.6f),
+                                                modifier = Modifier.padding(vertical = 12.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -605,7 +643,10 @@ fun KaraokeLyricsView(
                                         else if (distanceWeightState.value > 0) {
                                             distanceWeightState.value * blurDelta
                                         } else 0f),
-                                animationSpec = tween(if (isReadingByHand) 250 else 600),
+                                animationSpec = tween(
+                                    durationMillis = if (isReadingByHand) 250 else 600,
+                                    easing = FastOutSlowInEasing,
+                                ),
                             )
 
                             when (line) {
@@ -637,6 +678,8 @@ fun KaraokeLyricsView(
                                             blurRadius = { blurRadiusState.value },
                                             blendMode = stableBlendMode,
                                             activeScale = activeScale,
+                                            contentAlignment = rowContentAlignment,
+                                            contentMaxWidth = rowContentMaxWidth,
                                         ) {
                                             KaraokeLineText(
                                                 line = line,
@@ -682,6 +725,8 @@ fun KaraokeLyricsView(
                                         blurRadius = { blurRadiusState.value },
                                         blendMode = stableBlendMode,
                                         activeScale = activeScale,
+                                        contentAlignment = rowContentAlignment,
+                                        contentMaxWidth = rowContentMaxWidth,
                                     ) {
                                         SyncedLineText(
                                             line = line,

@@ -680,7 +680,14 @@ fun PlayerBar(
     }
     }
     // Above the play button: the transport is centred in the bar, its two sides having equal weight.
-    if (oneLineLyrics) FloatingLyricChip(vm, Modifier.align(Alignment.TopCenter))
+    // Keep mounted while a track is active so opening/closing the non-fullscreen lyrics sheet fades smoothly.
+    if (track != null) {
+        FloatingLyricChip(
+            vm = vm,
+            visible = oneLineLyrics && !vm.showLyricsSheet,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+    }
 }
 }
 

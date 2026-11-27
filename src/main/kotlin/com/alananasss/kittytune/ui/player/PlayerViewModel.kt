@@ -399,9 +399,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     /** Line-by-line lyrics fill top to bottom as they are sung (the "Sweep" line animation). */
     var lyricsSweepEnabled by mutableStateOf(playerPrefs.getLyricsSweepEnabled())
         private set
+    var lyricsFullScreenSweepEnabled by mutableStateOf(playerPrefs.getLyricsSweepEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarSweepEnabled by mutableStateOf(playerPrefs.getLyricsSweepEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
 
     /** What long instrumental gaps in the lyrics show. */
     var instrumentalIndicatorStyle by mutableStateOf(playerPrefs.getInstrumentalIndicatorStyle())
+        private set
+    var lyricsFullScreenInstrumentalIndicatorStyle by mutableStateOf(playerPrefs.getInstrumentalIndicatorStyle(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarInstrumentalIndicatorStyle by mutableStateOf(playerPrefs.getInstrumentalIndicatorStyle(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
         private set
 
     init {
@@ -815,25 +823,74 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         private set
     var currentQueueIndex by mutableIntStateOf(-1)
 
+    var isPreciseSpeedSearchTemp = false
     var isPreciseLyricsSearchEnabled by mutableStateOf(playerPrefs.getPreciseLyricsSearchEnabled())
     var isAppleMusicEffectEnabled by mutableStateOf(playerPrefs.getLyricsAppleEffectEnabled())
+        private set
+    var lyricsFullScreenAppleMusicEffectEnabled by mutableStateOf(playerPrefs.getLyricsAppleEffectEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarAppleMusicEffectEnabled by mutableStateOf(playerPrefs.getLyricsAppleEffectEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
+
     var isWordSyncEnabled by mutableStateOf(playerPrefs.getLyricsWordSyncEnabled())
+        private set
+    var lyricsFullScreenWordSyncEnabled by mutableStateOf(playerPrefs.getLyricsWordSyncEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarWordSyncEnabled by mutableStateOf(playerPrefs.getLyricsWordSyncEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
 
     fun toggleAppleMusicEffect(enabled: Boolean) {
         isAppleMusicEffectEnabled = enabled
-        playerPrefs.setLyricsAppleEffectEnabled(enabled)
+        playerPrefs.setLyricsAppleEffectEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+    }
+
+    fun toggleFullScreenAppleMusicEffect(enabled: Boolean) {
+        lyricsFullScreenAppleMusicEffectEnabled = enabled
+        playerPrefs.setLyricsAppleEffectEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+    }
+
+    fun toggleSidebarAppleMusicEffect(enabled: Boolean) {
+        lyricsSidebarAppleMusicEffectEnabled = enabled
+        playerPrefs.setLyricsAppleEffectEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
     }
 
     fun toggleWordSync(enabled: Boolean) {
         isWordSyncEnabled = enabled
-        playerPrefs.setLyricsWordSyncEnabled(enabled)
+        playerPrefs.setLyricsWordSyncEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+    }
+
+    fun toggleFullScreenWordSync(enabled: Boolean) {
+        lyricsFullScreenWordSyncEnabled = enabled
+        playerPrefs.setLyricsWordSyncEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+    }
+
+    fun toggleSidebarWordSync(enabled: Boolean) {
+        lyricsSidebarWordSyncEnabled = enabled
+        playerPrefs.setLyricsWordSyncEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
     }
 
     var isDuetViewEnabled by mutableStateOf(playerPrefs.getLyricsDuetViewEnabled())
+        private set
+    var lyricsFullScreenDuetViewEnabled by mutableStateOf(playerPrefs.getLyricsDuetViewEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarDuetViewEnabled by mutableStateOf(playerPrefs.getLyricsDuetViewEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
 
     fun toggleDuetView(enabled: Boolean) {
         isDuetViewEnabled = enabled
-        playerPrefs.setLyricsDuetViewEnabled(enabled)
+        playerPrefs.setLyricsDuetViewEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+        if (enabled) currentTrack?.let { refineLyricVoices(it) }
+    }
+
+    fun toggleFullScreenDuetView(enabled: Boolean) {
+        lyricsFullScreenDuetViewEnabled = enabled
+        playerPrefs.setLyricsDuetViewEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+        if (enabled) currentTrack?.let { refineLyricVoices(it) }
+    }
+
+    fun toggleSidebarDuetView(enabled: Boolean) {
+        lyricsSidebarDuetViewEnabled = enabled
+        playerPrefs.setLyricsDuetViewEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
         if (enabled) currentTrack?.let { refineLyricVoices(it) }
     }
 
@@ -847,8 +904,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         duetBlacklist = playerPrefs.getLyricsDuetBlacklist()
     }
 
-    fun isDuetActiveForTrack(track: Track?): Boolean =
-        isDuetViewEnabled && (track == null || !isTrackDuetBlacklisted(track.id))
+    fun isDuetActiveForTrack(track: Track?, isFullScreen: Boolean = false, isSidebar: Boolean = false): Boolean =
+        duetViewEnabledFor(isFullScreen, isSidebar) && (track == null || !isTrackDuetBlacklisted(track.id))
 
     var lyricsUiStyle by mutableStateOf(playerPrefs.getLyricsUiStyle())
         private set
@@ -857,6 +914,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var lyricsSidebarUiStyle by mutableStateOf(playerPrefs.getLyricsSidebarUiStyle())
         private set
     var lyricsFont by mutableStateOf(playerPrefs.getLyricsFont())
+        private set
+    var lyricsFullScreenFont by mutableStateOf(playerPrefs.getLyricsFont(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarFont by mutableStateOf(playerPrefs.getLyricsFont(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
         private set
     var playerSliderStyle by mutableStateOf(playerPrefs.getPlayerSliderStyle())
         private set
@@ -868,15 +929,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         private set
     var lyricsLrcBounceEnabled by mutableStateOf(playerPrefs.getLyricsLrcBounceEnabled())
         private set
+    var lyricsFullScreenLrcBounceEnabled by mutableStateOf(playerPrefs.getLyricsLrcBounceEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarLrcBounceEnabled by mutableStateOf(playerPrefs.getLyricsLrcBounceEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
     var lyricsSplitBackingVocals by mutableStateOf(playerPrefs.getLyricsSplitBackingVocals())
+        private set
+    var lyricsFullScreenSplitBackingVocals by mutableStateOf(playerPrefs.getLyricsSplitBackingVocals(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarSplitBackingVocals by mutableStateOf(playerPrefs.getLyricsSplitBackingVocals(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
         private set
     var lyricsRevealWords by mutableStateOf(playerPrefs.getLyricsRevealWords())
         private set
+    var lyricsFullScreenRevealWords by mutableStateOf(playerPrefs.getLyricsRevealWords(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarRevealWords by mutableStateOf(playerPrefs.getLyricsRevealWords(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
     var lyricsBounceFactor by mutableFloatStateOf(playerPrefs.getLyricsBounceFactor())
+        private set
+    var lyricsFullScreenBounceFactor by mutableFloatStateOf(playerPrefs.getLyricsBounceFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarBounceFactor by mutableFloatStateOf(playerPrefs.getLyricsBounceFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
         private set
     var lyricsGlowFactor by mutableFloatStateOf(playerPrefs.getLyricsGlowFactor())
         private set
+    var lyricsFullScreenGlowFactor by mutableFloatStateOf(playerPrefs.getLyricsGlowFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarGlowFactor by mutableFloatStateOf(playerPrefs.getLyricsGlowFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
     var lyricsFillTransitionWidth by mutableFloatStateOf(playerPrefs.getLyricsFillTransitionWidth())
+        private set
+    var lyricsFullScreenFillTransitionWidth by mutableFloatStateOf(playerPrefs.getLyricsFillTransitionWidth(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarFillTransitionWidth by mutableFloatStateOf(playerPrefs.getLyricsFillTransitionWidth(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
         private set
     var lyricsLineSpacing by mutableFloatStateOf(playerPrefs.getLyricsLineSpacing())
         private set
@@ -904,23 +989,33 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         private set
 
     fun updateLyricsUiStyle(style: com.alananasss.kittytune.data.local.LyricsUiStyle) {
-        lyricsUiStyle = style
-        playerPrefs.setLyricsUiStyle(style)
+        lyricsUiStyle = com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED
+        playerPrefs.setLyricsUiStyle(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED)
     }
 
     fun updateLyricsFullScreenUiStyle(style: com.alananasss.kittytune.data.local.LyricsUiStyle) {
-        lyricsFullScreenUiStyle = style
-        playerPrefs.setLyricsFullScreenUiStyle(style)
+        lyricsFullScreenUiStyle = com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED
+        playerPrefs.setLyricsFullScreenUiStyle(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED)
     }
 
     fun updateLyricsSidebarUiStyle(style: com.alananasss.kittytune.data.local.LyricsUiStyle) {
-        lyricsSidebarUiStyle = style
-        playerPrefs.setLyricsSidebarUiStyle(style)
+        lyricsSidebarUiStyle = com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED
+        playerPrefs.setLyricsSidebarUiStyle(com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED)
     }
 
     fun updateLyricsFont(font: com.alananasss.kittytune.data.local.LyricsFont) {
         lyricsFont = font
-        playerPrefs.setLyricsFont(font)
+        playerPrefs.setLyricsFont(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, font)
+    }
+
+    fun updateLyricsFullScreenFont(font: com.alananasss.kittytune.data.local.LyricsFont) {
+        lyricsFullScreenFont = font
+        playerPrefs.setLyricsFont(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, font)
+    }
+
+    fun updateLyricsSidebarFont(font: com.alananasss.kittytune.data.local.LyricsFont) {
+        lyricsSidebarFont = font
+        playerPrefs.setLyricsFont(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, font)
     }
 
     fun updatePlayerSliderStyle(style: com.alananasss.kittytune.data.local.PlayerSliderStyle) {
@@ -945,32 +1040,248 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun updateLyricsLrcBounceEnabled(enabled: Boolean) {
         lyricsLrcBounceEnabled = enabled
-        playerPrefs.setLyricsLrcBounceEnabled(enabled)
+        playerPrefs.setLyricsLrcBounceEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+    }
+
+    fun updateLyricsFullScreenLrcBounceEnabled(enabled: Boolean) {
+        lyricsFullScreenLrcBounceEnabled = enabled
+        playerPrefs.setLyricsLrcBounceEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+    }
+
+    fun updateLyricsSidebarLrcBounceEnabled(enabled: Boolean) {
+        lyricsSidebarLrcBounceEnabled = enabled
+        playerPrefs.setLyricsLrcBounceEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
     }
 
     fun updateLyricsSplitBackingVocals(enabled: Boolean) {
         lyricsSplitBackingVocals = enabled
-        playerPrefs.setLyricsSplitBackingVocals(enabled)
+        playerPrefs.setLyricsSplitBackingVocals(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+    }
+
+    fun updateLyricsFullScreenSplitBackingVocals(enabled: Boolean) {
+        lyricsFullScreenSplitBackingVocals = enabled
+        playerPrefs.setLyricsSplitBackingVocals(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+    }
+
+    fun updateLyricsSidebarSplitBackingVocals(enabled: Boolean) {
+        lyricsSidebarSplitBackingVocals = enabled
+        playerPrefs.setLyricsSplitBackingVocals(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
     }
 
     fun updateLyricsRevealWords(enabled: Boolean) {
         lyricsRevealWords = enabled
-        playerPrefs.setLyricsRevealWords(enabled)
+        playerPrefs.setLyricsRevealWords(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+    }
+
+    fun updateLyricsFullScreenRevealWords(enabled: Boolean) {
+        lyricsFullScreenRevealWords = enabled
+        playerPrefs.setLyricsRevealWords(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+    }
+
+    fun updateLyricsSidebarRevealWords(enabled: Boolean) {
+        lyricsSidebarRevealWords = enabled
+        playerPrefs.setLyricsRevealWords(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
     }
 
     fun updateLyricsBounceFactor(factor: Float) {
         lyricsBounceFactor = factor
-        playerPrefs.setLyricsBounceFactor(factor)
+        playerPrefs.setLyricsBounceFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, factor)
+    }
+
+    fun updateLyricsFullScreenBounceFactor(factor: Float) {
+        lyricsFullScreenBounceFactor = factor
+        playerPrefs.setLyricsBounceFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, factor)
+    }
+
+    fun updateLyricsSidebarBounceFactor(factor: Float) {
+        lyricsSidebarBounceFactor = factor
+        playerPrefs.setLyricsBounceFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, factor)
     }
 
     fun updateLyricsGlowFactor(factor: Float) {
         lyricsGlowFactor = factor
-        playerPrefs.setLyricsGlowFactor(factor)
+        playerPrefs.setLyricsGlowFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, factor)
+    }
+
+    fun updateLyricsFullScreenGlowFactor(factor: Float) {
+        lyricsFullScreenGlowFactor = factor
+        playerPrefs.setLyricsGlowFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, factor)
+    }
+
+    fun updateLyricsSidebarGlowFactor(factor: Float) {
+        lyricsSidebarGlowFactor = factor
+        playerPrefs.setLyricsGlowFactor(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, factor)
     }
 
     fun updateLyricsFillTransitionWidth(width: Float) {
         lyricsFillTransitionWidth = width
-        playerPrefs.setLyricsFillTransitionWidth(width)
+        playerPrefs.setLyricsFillTransitionWidth(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, width)
+    }
+
+    fun updateLyricsFullScreenFillTransitionWidth(width: Float) {
+        lyricsFullScreenFillTransitionWidth = width
+        playerPrefs.setLyricsFillTransitionWidth(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, width)
+    }
+
+    fun updateLyricsSidebarFillTransitionWidth(width: Float) {
+        lyricsSidebarFillTransitionWidth = width
+        playerPrefs.setLyricsFillTransitionWidth(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, width)
+    }
+
+    fun updateLyricsSweepEnabled(enabled: Boolean) {
+        lyricsSweepEnabled = enabled
+        playerPrefs.setLyricsSweepEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+    }
+
+    fun updateLyricsFullScreenSweepEnabled(enabled: Boolean) {
+        lyricsFullScreenSweepEnabled = enabled
+        playerPrefs.setLyricsSweepEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+    }
+
+    fun updateLyricsSidebarSweepEnabled(enabled: Boolean) {
+        lyricsSidebarSweepEnabled = enabled
+        playerPrefs.setLyricsSweepEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
+    }
+
+    fun updateInstrumentalIndicatorStyle(style: com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle) {
+        instrumentalIndicatorStyle = style
+        playerPrefs.setInstrumentalIndicatorStyle(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, style)
+    }
+
+    fun updateLyricsFullScreenInstrumentalIndicatorStyle(style: com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle) {
+        lyricsFullScreenInstrumentalIndicatorStyle = style
+        playerPrefs.setInstrumentalIndicatorStyle(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, style)
+    }
+
+    fun updateLyricsSidebarInstrumentalIndicatorStyle(style: com.alananasss.kittytune.data.local.InstrumentalIndicatorStyle) {
+        lyricsSidebarInstrumentalIndicatorStyle = style
+        playerPrefs.setInstrumentalIndicatorStyle(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, style)
+    }
+
+    fun lyricsFontFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenFont
+        isSidebar -> lyricsSidebarFont
+        else -> lyricsFont
+    }
+
+    fun fontSizeFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenFontSize
+        isSidebar -> lyricsSidebarFontSize
+        else -> lyricsFontSize
+    }
+
+    fun alignmentFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenAlignment
+        isSidebar -> lyricsSidebarAlignment
+        else -> lyricsAlignment
+    }
+
+    fun lineBlurFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenLineBlurEnabled
+        isSidebar -> lyricsSidebarLineBlurEnabled
+        else -> lyricsLineBlurEnabled
+    }
+
+    fun lineSpacingFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenLineSpacing
+        isSidebar -> lyricsSidebarLineSpacing
+        else -> lyricsLineSpacing
+    }
+
+    fun activeScaleFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenActiveScale
+        isSidebar -> lyricsSidebarActiveScale
+        else -> lyricsActiveScale
+    }
+
+    fun horizontalMarginFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenHorizontalMargin
+        isSidebar -> lyricsSidebarHorizontalMargin
+        else -> lyricsHorizontalMargin
+    }
+
+    fun verticalOffsetFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenVerticalOffset
+        isSidebar -> lyricsSidebarVerticalOffset
+        else -> lyricsVerticalOffset
+    }
+
+    fun wordSyncEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenWordSyncEnabled
+        isSidebar -> lyricsSidebarWordSyncEnabled
+        else -> isWordSyncEnabled
+    }
+
+    fun appleMusicEffectEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenAppleMusicEffectEnabled
+        isSidebar -> lyricsSidebarAppleMusicEffectEnabled
+        else -> isAppleMusicEffectEnabled
+    }
+
+    fun duetViewEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenDuetViewEnabled
+        isSidebar -> lyricsSidebarDuetViewEnabled
+        else -> isDuetViewEnabled
+    }
+
+    fun splitBackingVocalsFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenSplitBackingVocals
+        isSidebar -> lyricsSidebarSplitBackingVocals
+        else -> lyricsSplitBackingVocals
+    }
+
+    fun revealWordsFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenRevealWords
+        isSidebar -> lyricsSidebarRevealWords
+        else -> lyricsRevealWords
+    }
+
+    fun sweepEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenSweepEnabled
+        isSidebar -> lyricsSidebarSweepEnabled
+        else -> lyricsSweepEnabled
+    }
+
+    fun instrumentalIndicatorStyleFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenInstrumentalIndicatorStyle
+        isSidebar -> lyricsSidebarInstrumentalIndicatorStyle
+        else -> instrumentalIndicatorStyle
+    }
+
+    fun lrcBounceEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenLrcBounceEnabled
+        isSidebar -> lyricsSidebarLrcBounceEnabled
+        else -> lyricsLrcBounceEnabled
+    }
+
+    fun bounceFactorFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenBounceFactor
+        isSidebar -> lyricsSidebarBounceFactor
+        else -> lyricsBounceFactor
+    }
+
+    fun glowFactorFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenGlowFactor
+        isSidebar -> lyricsSidebarGlowFactor
+        else -> lyricsGlowFactor
+    }
+
+    fun fillTransitionWidthFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenFillTransitionWidth
+        isSidebar -> lyricsSidebarFillTransitionWidth
+        else -> lyricsFillTransitionWidth
+    }
+
+    fun translationEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenTranslationEnabled
+        isSidebar -> lyricsSidebarTranslationEnabled
+        else -> isLyricsTranslationEnabled
+    }
+
+    fun romanizationEnabledFor(isFullScreen: Boolean = false, isSidebar: Boolean = false) = when {
+        isFullScreen -> lyricsFullScreenRomanizationEnabled
+        isSidebar -> lyricsSidebarRomanizationEnabled
+        else -> isRomanizationEnabled
     }
 
     fun updateLyricsLineSpacing(spacing: Float) {
@@ -1058,7 +1369,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 updateLyricsSidebarFontSize(22f)
                 updateLyricsSidebarLineSpacing(0f)
                 updateLyricsSidebarHorizontalMargin(0f)
-                updateLyricsSidebarVerticalOffset(0.38f)
+                updateLyricsSidebarVerticalOffset(0.36f)
                 updateLyricsSidebarActiveScale(1.00f)
             }
             else -> {
@@ -1078,6 +1389,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     var isRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled())
+        private set
+    var lyricsFullScreenRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
+
+    val anyRomanizationEnabled: Boolean
+        get() = isRomanizationEnabled || lyricsFullScreenRomanizationEnabled || lyricsSidebarRomanizationEnabled
 
     /** Auto-scroll for lyrics with no timings, and its rate. See [PlainLyricsView]. */
     var isPlainAutoScrollEnabled by mutableStateOf(playerPrefs.getLyricsPlainAutoScroll())
@@ -1143,12 +1462,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private var romanizationJob: Job? = null
 
-    fun toggleRomanization(enabled: Boolean) {
-        isRomanizationEnabled = enabled
-        playerPrefs.setLyricsRomanizationEnabled(enabled)
-        if (enabled && lyricsLines.isNotEmpty()) {
+    private fun refreshRomanizationState() {
+        if (anyRomanizationEnabled && lyricsLines.isNotEmpty()) {
             fetchRomanizationForCurrentLines()
-        } else if (!enabled) {
+        } else if (!anyRomanizationEnabled) {
             romanizationJob?.cancel()
             for (i in lyricsLines.indices) {
                 val old = lyricsLines[i]
@@ -1157,6 +1474,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 }
             }
         }
+    }
+
+    fun toggleRomanization(enabled: Boolean) {
+        isRomanizationEnabled = enabled
+        playerPrefs.setLyricsRomanizationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+        refreshRomanizationState()
+    }
+
+    fun toggleFullScreenRomanization(enabled: Boolean) {
+        lyricsFullScreenRomanizationEnabled = enabled
+        playerPrefs.setLyricsRomanizationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+        refreshRomanizationState()
+    }
+
+    fun toggleSidebarRomanization(enabled: Boolean) {
+        lyricsSidebarRomanizationEnabled = enabled
+        playerPrefs.setLyricsRomanizationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
+        refreshRomanizationState()
     }
 
     fun fetchRomanizationForCurrentLines() {
@@ -1185,17 +1520,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     var isLyricsTranslationEnabled by mutableStateOf(playerPrefs.getLyricsTranslationEnabled())
+    var lyricsFullScreenTranslationEnabled by mutableStateOf(playerPrefs.getLyricsTranslationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN))
+        private set
+    var lyricsSidebarTranslationEnabled by mutableStateOf(playerPrefs.getLyricsTranslationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR))
+        private set
+    val anyTranslationEnabled: Boolean
+        get() = isLyricsTranslationEnabled || lyricsFullScreenTranslationEnabled || lyricsSidebarTranslationEnabled
+
     var lyricsTranslationLang by mutableStateOf(playerPrefs.getLyricsTranslationLang())
     var isTranslatingLyrics by mutableStateOf(false)
     var lastFetchedMxmTrackId: Long? = null
     private var translationJob: Job? = null
 
-    fun toggleLyricsTranslation(enabled: Boolean) {
-        isLyricsTranslationEnabled = enabled
-        playerPrefs.setLyricsTranslationEnabled(enabled)
-        if (enabled && lyricsLines.isNotEmpty()) {
+    private fun refreshTranslationState() {
+        if (anyTranslationEnabled && lyricsLines.isNotEmpty()) {
             fetchTranslationsForCurrentLines(lyricsTranslationLang)
-        } else if (!enabled) {
+        } else if (!anyTranslationEnabled) {
             translationJob?.cancel()
             isTranslatingLyrics = false
             for (i in lyricsLines.indices) {
@@ -1207,10 +1547,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    fun toggleLyricsTranslation(enabled: Boolean) {
+        isLyricsTranslationEnabled = enabled
+        playerPrefs.setLyricsTranslationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.CENTRAL, enabled)
+        refreshTranslationState()
+    }
+
+    fun toggleFullScreenLyricsTranslation(enabled: Boolean) {
+        lyricsFullScreenTranslationEnabled = enabled
+        playerPrefs.setLyricsTranslationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.FULLSCREEN, enabled)
+        refreshTranslationState()
+    }
+
+    fun toggleSidebarLyricsTranslation(enabled: Boolean) {
+        lyricsSidebarTranslationEnabled = enabled
+        playerPrefs.setLyricsTranslationEnabled(com.alananasss.kittytune.data.local.LyricsSurfaceMode.SIDEBAR, enabled)
+        refreshTranslationState()
+    }
+
     fun setLyricsTranslationLanguage(lang: String) {
         lyricsTranslationLang = lang
         playerPrefs.setLyricsTranslationLang(lang)
-        if (isLyricsTranslationEnabled && lyricsLines.isNotEmpty()) {
+        if (anyTranslationEnabled && lyricsLines.isNotEmpty()) {
             fetchTranslationsForCurrentLines(lang)
         }
     }
@@ -1286,6 +1644,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var lyricsFullScreenFontSize by mutableFloatStateOf(playerPrefs.getLyricsFullScreenFontSize())
     var lyricsSidebarFontSize by mutableFloatStateOf(playerPrefs.getLyricsSidebarFontSize())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
+    var lyricsCentralPosition by mutableStateOf(playerPrefs.getLyricsCentralPosition())
     var lyricsFullScreenAlignment by mutableStateOf(playerPrefs.getLyricsFullScreenAlignment())
     var lyricsSidebarAlignment by mutableStateOf(playerPrefs.getLyricsSidebarAlignment())
 
@@ -2490,6 +2849,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         playerPrefs.setLyricsAlignment(alignment)
     }
 
+    fun updateLyricsCentralPosition(position: LyricsAlignment) {
+        lyricsCentralPosition = position
+        playerPrefs.setLyricsCentralPosition(position)
+    }
+
     fun updateLyricsFullScreenAlignment(alignment: LyricsAlignment) {
         lyricsFullScreenAlignment = alignment
         playerPrefs.setLyricsFullScreenAlignment(alignment)
@@ -2586,8 +2950,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun currentLyricsVariant() = LyricsVariant(
         providerPreference = lyricsProvider.name,
         translationLang =
-            if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null,
-        romanized = isRomanizationEnabled,
+            if (anyTranslationEnabled) playerPrefs.getLyricsTranslationLang() else null,
+        romanized = anyRomanizationEnabled,
     )
 
     /** A resolved lookup, ready either to be shown or to be parked in the cache. */
@@ -3474,10 +3838,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
                     "MUSIXMATCH" -> {
                         val targetLang =
-                            if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
+                            if (anyTranslationEnabled) playerPrefs.getLyricsTranslationLang() else null
                         lastFetchedMxmTrackId = result.id.toLongOrNull()
                         val data =
-                            MusixmatchClient.getLyricsData(result.id.toLong(), duration, targetLang, isRomanizationEnabled)
+                            MusixmatchClient.getLyricsData(result.id.toLong(), duration, targetLang, anyRomanizationEnabled)
                         finalLines = data.first
                         finalPlain = data.second
                     }

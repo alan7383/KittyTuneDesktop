@@ -106,9 +106,14 @@ fun groupIntoWords(syllables: List<KaraokeSyllable>): List<List<KaraokeSyllable>
     if (syllables.isEmpty()) return emptyList()
     val words = mutableListOf<List<KaraokeSyllable>>()
     var currentWord = mutableListOf<KaraokeSyllable>()
-    syllables.forEach { syllable ->
+    syllables.forEachIndexed { index, syllable ->
         currentWord.add(syllable)
-        if (syllable.content.trimEnd().length < syllable.content.length) {
+        val next = syllables.getOrNull(index + 1)
+        // A comma or full stop the source set apart ("мама , набей", or "," as its own timed word) stays with the
+        // word before it, so a wrap never leaves it at the start of the next row.
+        if (syllable.content.trimEnd().length < syllable.content.length &&
+            (next == null || !next.content.isClosingPunctuation())
+        ) {
             words.add(currentWord.toList())
             currentWord = mutableListOf()
         }
@@ -118,6 +123,14 @@ fun groupIntoWords(syllables: List<KaraokeSyllable>): List<List<KaraokeSyllable>
     }
     return words
 }
+
+/** True when [this] is only punctuation that closes what comes before it: ",", "...", "?!", ")". */
+fun String.isClosingPunctuation(): Boolean {
+    val trimmed = trim()
+    return trimmed.isNotEmpty() && trimmed.all { it in CLOSING_PUNCTUATION }
+}
+
+private val CLOSING_PUNCTUATION: Set<Char> = ",.;:!?…)]}»›”’、，。！？；：،؛؟".toSet()
 
 fun measureSyllablesAndDetermineAnimation(
     syllables: List<KaraokeSyllable>,

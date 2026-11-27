@@ -125,7 +125,8 @@ internal fun separateBackingVocals(line: LyricLine): Pair<LyricLine, LyricLine?>
                 )
             }
         }
-        val main = line.copy(text = own.joinToString("") { it.text }.trim(), words = own)
+        val mainText = formatLyricWordContents(line.text, own).joinToString("").trim()
+        val main = line.copy(text = mainText, words = own)
         val backing = LyricLine(
             text = backingWords.joinToString("") { it.text },
             startTime = backingWords.first().startTime,

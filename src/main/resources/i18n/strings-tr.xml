@@ -3737,4 +3737,5 @@
     <string name="performance_windows_rendering">Windows grafikleri</string>
     <string name="performance_compatible_rendering">Uyumluluk modu</string>
     <string name="performance_macos_rendering">macOS grafikleri</string>
+    <string name="pref_lyrics_position_title">Konum</string>
 </resources>
