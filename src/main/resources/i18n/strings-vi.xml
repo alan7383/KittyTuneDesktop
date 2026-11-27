@@ -2068,6 +2068,10 @@
     <string name="setup_use_windows_color">Bạn có muốn đồng bộ màu ứng dụng với màu chủ đạo của Windows?</string>
     <string name="setup_windows_color">Đã phát hiện màu nhấn Windows</string>
     <string name="shortcut_key_then">sau đó</string>
+    <string name="shortcut_key_space">Phím cách</string>
+    <string name="shortcut_key_shift">Shift</string>
+    <string name="shortcut_background_title">Phím tắt phát nhạc trong nền</string>
+    <string name="shortcut_background_unavailable">Windows không thể đăng ký các phím tắt này (%1$s).</string>
     <string name="shortcut_like">Thích bài hát đang phát</string>
     <string name="shortcut_mute">Tắt tiếng</string>
     <string name="shortcut_nav_feed">Đi tới Bảng tin</string>

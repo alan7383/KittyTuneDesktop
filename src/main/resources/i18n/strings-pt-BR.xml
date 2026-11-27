@@ -1347,6 +1347,10 @@
     <string name="setup_use_windows_color">Deseja sincronizar o aplicativo com a cor de destaque do Windows?</string>
     <string name="setup_windows_color">Cores do Windows detectadas</string>
     <string name="shortcut_key_then">depois</string>
+    <string name="shortcut_key_space">Espaço</string>
+    <string name="shortcut_key_shift">Shift</string>
+    <string name="shortcut_background_title">Atalhos de reprodução em segundo plano</string>
+    <string name="shortcut_background_unavailable">O Windows não conseguiu registrar estes atalhos (%1$s).</string>
     <string name="shortcut_like">Curtir faixa atual</string>
     <string name="shortcut_mute">Silenciar volume</string>
     <string name="shortcut_nav_feed">Ir para o feed</string>

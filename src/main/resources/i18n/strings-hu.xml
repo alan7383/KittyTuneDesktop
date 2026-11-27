@@ -1327,6 +1327,10 @@
     <string name="setup_use_windows_color">Szeretnéd szinkronizálni az alkalmazást a Windows kiemelő színével?</string>
     <string name="setup_windows_color">Windows Színek észlelve</string>
     <string name="shortcut_key_then">majd</string>
+    <string name="shortcut_key_space">Szóköz</string>
+    <string name="shortcut_key_shift">Shift</string>
+    <string name="shortcut_background_title">Lejátszási gyorsbillentyűk a háttérben</string>
+    <string name="shortcut_background_unavailable">A Windows nem tudta regisztrálni ezeket a gyorsbillentyűket (%1$s).</string>
     <string name="shortcut_like">Szám kedvelése</string>
     <string name="shortcut_mute">Némítás</string>
     <string name="shortcut_nav_feed">Ugrás a Hírfolyamhoz</string>

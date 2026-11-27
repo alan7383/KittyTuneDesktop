@@ -1347,6 +1347,10 @@
     <string name="setup_use_windows_color">Would you like to sync the app with your Windows accent color?</string>
     <string name="setup_windows_color">Windows Colors detected</string>
     <string name="shortcut_key_then">then</string>
+    <string name="shortcut_key_space">Space</string>
+    <string name="shortcut_key_shift">Shift</string>
+    <string name="shortcut_background_title">Background playback shortcuts</string>
+    <string name="shortcut_background_unavailable">Windows could not register these shortcuts: %1$s</string>
     <string name="shortcut_like">Like playing track</string>
     <string name="shortcut_mute">Mute volume</string>
     <string name="shortcut_nav_feed">Navigate to Feed</string>

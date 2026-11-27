@@ -614,6 +614,7 @@ class PlayerPreferences {
         private const val KEY_BOTTOM_MENU_FAB = "bottom_menu_fab"
         private const val KEY_BOTTOM_MENU_BLUR = "bottom_menu_blur_enabled"
         private const val KEY_STOP_ON_TASK_CLEAR = "stop_on_task_clear"
+        private const val KEY_BACKGROUND_PLAYBACK_SHORTCUTS = "background_playback_shortcuts"
         private const val KEY_HAS_COMPLETED_SETUP = "has_completed_setup"
 
         private const val KEY_PROXY_ENABLED = "proxy_enabled"
@@ -1474,6 +1475,10 @@ class PlayerPreferences {
 
     fun getStopOnTaskClear(): Boolean = Prefs.getBoolean(KEY_STOP_ON_TASK_CLEAR, true)
     fun setStopOnTaskClear(enabled: Boolean) = Prefs.putBoolean(KEY_STOP_ON_TASK_CLEAR, enabled)
+
+    internal fun getBackgroundPlaybackShortcuts() = Prefs.getBoolean(KEY_BACKGROUND_PLAYBACK_SHORTCUTS, true)
+    internal fun setBackgroundPlaybackShortcuts(enabled: Boolean) = Prefs.putBoolean(KEY_BACKGROUND_PLAYBACK_SHORTCUTS, enabled)
+    internal fun backgroundPlaybackShortcutsFlow() = Prefs.booleanFlow(KEY_BACKGROUND_PLAYBACK_SHORTCUTS, true)
     fun stopOnTaskClearFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_STOP_ON_TASK_CLEAR, true)
 
     fun getLyricsAppleEffectEnabled(mode: LyricsSurfaceMode = LyricsSurfaceMode.CENTRAL): Boolean =

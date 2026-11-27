@@ -43,6 +43,8 @@ import com.alananasss.kittytune.ui.setup.SetupScreen
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.AppInstance
+import com.alananasss.kittytune.core.BackgroundPlaybackShortcuts
+import com.alananasss.kittytune.core.PlaybackShortcut
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 import androidx.compose.ui.input.key.isAltPressed
@@ -186,6 +188,17 @@ fun main(args: Array<String>) {
         com.alananasss.kittytune.utils.StartupTimeline.markOnce("PlayerViewModel created")
         val prefsForTray = remember { PlayerPreferences() }
         val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())
+        LaunchedEffect(playerViewModel) {
+            if (!trainStartupCache) {
+                BackgroundPlaybackShortcuts.listen(prefsForTray.backgroundPlaybackShortcutsFlow()) { shortcut ->
+                    when (shortcut) {
+                        PlaybackShortcut.PLAY_PAUSE -> playerViewModel.togglePlayPause()
+                        PlaybackShortcut.PREVIOUS -> playerViewModel.smartPrevious()
+                        PlaybackShortcut.NEXT -> playerViewModel.playNext()
+                    }
+                }
+            }
+        }
 
         // Alternate icon switcher (issue #27): the selected variant drives both the
         // window/taskbar icon and the tray icon, live.

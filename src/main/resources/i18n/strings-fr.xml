@@ -1347,6 +1347,10 @@
     <string name="setup_use_windows_color">Voulez-vous synchroniser l\'application avec la couleur d\'accentuation de Windows ?</string>
     <string name="setup_windows_color">Couleurs Windows détectées</string>
     <string name="shortcut_key_then">puis</string>
+    <string name="shortcut_key_space">Espace</string>
+    <string name="shortcut_key_shift">Maj</string>
+    <string name="shortcut_background_title">Raccourcis de lecture en arrière-plan</string>
+    <string name="shortcut_background_unavailable">Windows n’a pas pu réserver ces raccourcis (%1$s).</string>
     <string name="shortcut_like">Aimer le titre</string>
     <string name="shortcut_mute">Couper le son</string>
     <string name="shortcut_nav_feed">Aller au Flux d\'actualités</string>

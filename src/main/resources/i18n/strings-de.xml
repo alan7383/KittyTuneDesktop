@@ -2220,6 +2220,10 @@
     <string name="setup_use_windows_color">Möchtest du die App mit deiner Windows-Akzentfarbe synchronisieren?</string>
     <string name="setup_windows_color">Windows-Farben erkannt</string>
     <string name="shortcut_key_then">dann</string>
+    <string name="shortcut_key_space">Leertaste</string>
+    <string name="shortcut_key_shift">Umschalt</string>
+    <string name="shortcut_background_title">Wiedergabe-Tastenkürzel im Hintergrund</string>
+    <string name="shortcut_background_unavailable">Windows konnte diese Tastenkürzel nicht registrieren (%1$s).</string>
     <string name="shortcut_like">Aktuellen Titel liken</string>
     <string name="shortcut_mute">Stummschalten</string>
     <string name="shortcut_nav_feed">Zum Feed navigieren</string>

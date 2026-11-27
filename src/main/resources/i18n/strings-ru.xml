@@ -1340,6 +1340,10 @@
     <string name="setup_use_windows_color">Хотите синхронизировать цвета с акцентным цветом Windows?</string>
     <string name="setup_windows_color">Обнаружен акцентный цвет Windows</string>
     <string name="shortcut_key_then">затем</string>
+    <string name="shortcut_key_space">Пробел</string>
+    <string name="shortcut_key_shift">Shift</string>
+    <string name="shortcut_background_title">Горячие клавиши воспроизведения в фоновом режиме</string>
+    <string name="shortcut_background_unavailable">Windows не удалось зарегистрировать эти сочетания клавиш (%1$s).</string>
     <string name="shortcut_like">Лайкнуть текущий трек</string>
     <string name="shortcut_mute">Заглушить звук</string>
     <string name="shortcut_nav_feed">Перейти в ленту</string>
