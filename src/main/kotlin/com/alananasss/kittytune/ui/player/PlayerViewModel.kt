@@ -2729,7 +2729,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         val target = LyricsMatcher.Target(
             title = songTitle,
             artist = artist,
-            durationMs = track.durationMs ?: 0L,
+            durationMs = track.effectiveFullDurationMs ?: 0L,
             alternativeArtists = listOfNotNull(track.displayArtist, track.user?.username).filter { it.isNotBlank() },
         )
         val hit = com.alananasss.kittytune.data.network.GeniusClient.search("$songTitle $artist".trim())
@@ -2759,7 +2759,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         if (localTrack.localAudioPath.isEmpty()) return null
         val raw = LyricsUtils.extractLocalLyrics(localTrack.localAudioPath)
         if (raw.isNullOrBlank()) return null
-        val trackDurationMs = track.durationMs ?: 0L
+        val trackDurationMs = track.effectiveFullDurationMs ?: 0L
         val parsed = LyricsUtils.parseLyricsContent(raw, trackDurationMs)
         // Embedded TTML that failed to parse must not be shown as raw tags; let the online
         // providers try instead.
@@ -2864,7 +2864,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         val target = LyricsMatcher.Target(
             title = parsedTitle.ifBlank { track.title ?: "" },
             artist = parsedArtist.ifBlank { effectiveArtist },
-            durationMs = track.durationMs ?: 0L,
+            durationMs = track.effectiveFullDurationMs ?: 0L,
             alternativeTitles = (
                 listOfNotNull(track.title, parsedTitle, track.title?.let { cleanTitleNoise(it) }) +
                     LyricsMatcher.titleParts(parsedTitle)
@@ -2876,7 +2876,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 track.user?.username,
             ).filter { it.isNotBlank() }.distinct(),
         )
-        val trackDurationMs = track.durationMs ?: 0L
+        val trackDurationMs = target.durationMs
         val orderedProviders = playerPrefs.getLyricsProviderOrder()
             .filter { playerPrefs.getLyricsProviderEnabled(it) }
             .ifEmpty { DefaultLyricsProviderOrder }
@@ -2915,6 +2915,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     ?.let { respelled ->
                         searchLrcLibCandidates(respelled, target, trackDurationMs).filter { it.isUsable }.maxByOrNull { it.rank }
                     }
+            }
+            PreferredLyricsProvider.SIMPMUSIC -> {
+                val results = ManualLyricsSearch.searchSimpMusic("${target.title} ${target.artist}", trackDurationMs, target)
+                ManualLyricsSearch.merge(emptyList(), results, target).firstOrNull()?.let { result ->
+                    val raw = requireNotNull(result.rawContent)
+                    val lines = LyricsUtils.parseLyricsContent(raw, trackDurationMs)
+                    LyricsCandidate(
+                        lines = lines,
+                        plain = raw.takeIf { lines.isEmpty() },
+                        provider = providerId.name,
+                        matchScore = LyricsMatcher.score(result.name, result.artistName, result.durationSec, target),
+                        titleSimilarity = LyricsMatcher.titleSimilarity(result.name, target),
+                    )
+                } ?: searchGenericProviderCandidate(
+                    providerId, target, trackDurationMs, track.id.toString(), track.publisherMetadata?.albumTitle,
+                )
             }
             PreferredLyricsProvider.GENIUS -> {
                 null
@@ -3285,7 +3301,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             title = track.title.orEmpty(),
             artist = effectiveArtist.trim(),
             album = track.publisherMetadata?.albumTitle,
-            durationMs = track.durationMs ?: 0L,
+            durationMs = track.effectiveFullDurationMs ?: 0L,
         )
         val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", effectiveArtist)
         val target = LyricsMatcher.Target(

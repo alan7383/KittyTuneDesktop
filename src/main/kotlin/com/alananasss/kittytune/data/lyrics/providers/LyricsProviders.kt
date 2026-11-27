@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data.lyrics.providers
 
 import com.alananasss.kittytune.data.lyrics.clients.BetterLyricsClient
+import com.alananasss.kittytune.data.lyrics.clients.KuGouClient
 import com.alananasss.kittytune.data.lyrics.clients.MegalobizClient
 import com.alananasss.kittytune.data.lyrics.clients.PaxsenixClient
 import com.alananasss.kittytune.data.lyrics.clients.SimpMusicClient
@@ -12,7 +13,6 @@ import com.alananasss.kittytune.data.network.MusixmatchClient
 import com.alananasss.kittytune.data.LyricsMatcher
 import com.zionhuang.innertube.YouTube
 import com.zionhuang.innertube.models.SongItem
-import com.zionhuang.kugou.KuGou
 import java.util.Locale
 import kotlin.math.abs
 
@@ -123,11 +123,7 @@ object KuGouLyricsProvider : LyricsProvider {
         artist: String,
         album: String?,
         duration: Int,
-    ): Result<String> = try {
-        KuGou.getLyrics(title, artist, duration)
-    } catch (t: Throwable) {
-        Result.failure(t)
-    }
+    ): Result<String> = KuGouClient.getLyrics(title, artist, duration)
 }
 
 object MegalobizLyricsProvider : LyricsProvider {

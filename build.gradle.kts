@@ -67,7 +67,7 @@ dependencies {
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("org.tukaani:xz:1.12")
     implementation("com.github.z-huang.InnerTune:lrclib:0.5.10")
-    implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
+    implementation("com.github.houbb:opencc4j:1.14.0")
     implementation(compose.desktop.currentOs)
     if (desktopIsLinux) {
         implementation("org.jetbrains.skiko:skiko-awt:$linuxSkikoVersion")

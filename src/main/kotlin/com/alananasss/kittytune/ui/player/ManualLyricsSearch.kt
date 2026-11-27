@@ -9,6 +9,9 @@ import com.alananasss.kittytune.data.network.GeniusClient
 import com.alananasss.kittytune.data.network.LrcLibClient
 import com.alananasss.kittytune.data.network.MusixmatchClient
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /** The track a manual lyrics search is for, as far as the providers need to know it. */
 internal data class LyricsSearchTrack(
@@ -49,7 +52,7 @@ internal object ManualLyricsSearch {
                 PreferredLyricsProvider.LRCLIB -> searchLrcLib(variant, track)
                 PreferredLyricsProvider.GENIUS -> searchGenius(variant)
                 PreferredLyricsProvider.MUSIXMATCH -> searchMusixmatch(variant)
-                PreferredLyricsProvider.SIMPMUSIC -> searchSimpMusic(variant)
+                PreferredLyricsProvider.SIMPMUSIC -> searchSimpMusic(variant, track.durationMs)
                 else -> searchByTitle(provider, variant, track)
             }
         }.getOrDefault(emptyList())
@@ -216,20 +219,43 @@ internal object ManualLyricsSearch {
             )
         }
 
-    private suspend fun searchSimpMusic(query: String): List<UnifiedLyricResult> =
-        SimpMusicClient.search(query).mapNotNull {
-            val videoId = it.videoId?.takeIf { id -> id.isNotBlank() } ?: return@mapNotNull null
-            UnifiedLyricResult(
-                id = videoId,
-                name = it.title ?: query,
-                artistName = it.artist ?: "",
-                albumName = it.album,
-                durationSec = (it.duration ?: 0).toDouble(),
-                hasLineSync = true,
-                hasWordSync = !it.richSyncLyrics.isNullOrBlank(),
-                provider = "SIMPMUSIC",
-            )
-        }
+    internal suspend fun searchSimpMusic(
+        query: String,
+        durationMs: Long,
+        target: LyricsMatcher.Target? = null,
+    ): List<UnifiedLyricResult> = coroutineScope {
+        val recordings = SimpMusicClient.search(query)
+            .filter { hit ->
+                !hit.videoId.isNullOrBlank() && (target == null ||
+                    (LyricsMatcher.isAcceptable(hit.title, hit.artist, target) &&
+                        LyricsMatcher.durationMatches((hit.duration ?: 0).toDouble(), durationMs)))
+            }
+            .distinctBy { it.videoId }
+        recordings.take(10).map { hit ->
+            async {
+                val videoId = requireNotNull(hit.videoId)
+                val raw = SimpMusicClient.lyricsText(hit)
+                    ?: SimpMusicClient.getLyricsByVideoId(videoId)
+                        .sortedBy { kotlin.math.abs((it.duration ?: 0) - (hit.duration ?: 0)) }
+                        .firstNotNullOfOrNull(SimpMusicClient::lyricsText)
+                    ?: return@async null
+                val lines = LyricsUtils.parseLyricsContent(raw, durationMs)
+                if (lines.isEmpty() && LyricsUtils.looksLikeTtml(raw)) return@async null
+                UnifiedLyricResult(
+                    id = videoId,
+                    name = hit.title ?: query,
+                    artistName = hit.artist.orEmpty(),
+                    albumName = hit.album,
+                    durationSec = (hit.duration ?: 0).toDouble(),
+                    hasLineSync = lines.isNotEmpty(),
+                    hasWordSync = lines.any { it.words.size > 1 },
+                    provider = "SIMPMUSIC",
+                    rawContent = raw,
+                    previewText = cleanPreview(raw),
+                )
+            }
+        }.awaitAll().filterNotNull()
+    }
 
     /**
      * Sources that look a song up by title and artist rather than search: the query is split into the
@@ -241,7 +267,11 @@ internal object ManualLyricsSearch {
         track: LyricsSearchTrack,
     ): List<UnifiedLyricResult> {
         val source = LyricsProviders.all[provider] ?: return emptyList()
-        for ((title, artist) in LyricsMatcher.generateCandidatePairs(query, track.artist).distinct()) {
+        val (artist, title) = LyricsMatcher.splitArtistAndTitle(track.title, track.artist)
+        val matchesCurrentTrack = LyricsMatcher.normalize(query) == LyricsMatcher.normalize("$title $artist")
+        val pairs = if (matchesCurrentTrack) LyricsMatcher.generateCandidatePairs(title, artist)
+            else LyricsMatcher.generateCandidatePairs(query, track.artist)
+        for ((title, artist) in pairs.distinct()) {
             if (title.isBlank()) continue
             val raw = source.getLyrics(
                 id = track.id,
@@ -250,6 +280,7 @@ internal object ManualLyricsSearch {
                 album = track.album,
                 duration = (track.durationMs / 1000L).toInt(),
             ).getOrNull()?.takeIf { it.isNotBlank() } ?: continue
+            if (LyricsUtils.looksLikeTtml(raw) && LyricsUtils.parseLyricsContent(raw, track.durationMs).isEmpty()) continue
             val (lineSync, wordSync) = timingsOf(raw, track.durationMs)
             return listOf(
                 UnifiedLyricResult(

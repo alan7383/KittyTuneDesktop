@@ -45,7 +45,8 @@ object SimpMusicClient {
             defaultRequest {
                 url(BASE_URL)
                 header(HttpHeaders.Accept, "application/json")
-                header(HttpHeaders.UserAgent, "KittyTune/1.0")
+                // The service requires the same lyrics client identity used on Android.
+                header(HttpHeaders.UserAgent, "SimpMusicLyrics/1.0")
                 header(HttpHeaders.ContentType, "application/json")
             }
 
@@ -101,7 +102,7 @@ object SimpMusicClient {
             emptyList()
         }
 
-    private fun extractLyricsText(track: LyricsData?): String? =
+    internal fun lyricsText(track: LyricsData?): String? =
         track?.richSyncLyrics?.takeIf { it.isNotBlank() }
             ?: track?.syncedLyrics?.takeIf { it.isNotBlank() }
             ?: track?.plainLyrics?.takeIf { it.isNotBlank() }
@@ -131,7 +132,7 @@ object SimpMusicClient {
                 val tracks = getLyricsByVideoId(cleanVideoId)
                 if (tracks.isNotEmpty()) {
                     val bestMatch = selectBestTrack(tracks, duration)
-                    val text = extractLyricsText(bestMatch)
+                    val text = lyricsText(bestMatch)
                     if (!text.isNullOrBlank()) {
                         return Result.success(text)
                     }
@@ -200,7 +201,7 @@ object SimpMusicClient {
                     val tracks = getLyricsByVideoId(candidateVideoId)
                     if (tracks.isNotEmpty()) {
                         val best = selectBestTrack(tracks, duration)
-                        val text = extractLyricsText(best)
+                        val text = lyricsText(best)
                         if (!text.isNullOrBlank()) {
                             return Result.success(text)
                         }
