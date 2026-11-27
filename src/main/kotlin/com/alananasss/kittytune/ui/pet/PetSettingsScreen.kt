@@ -759,8 +759,6 @@ private fun PetSettingsContent(
         )
     }
     if (showPlacementDialog) {
-        // Two homes, one choice: the floating window (the widget's desktop counterpart) or the
-        // inside of this window. Picking one applies it at once, as the app's other choice dialogs do.
         EscapableAlertDialog(
             onDismissRequest = { showPlacementDialog = false },
             title = { Text(str("pet_desk_placement_dialog")) },
@@ -806,31 +804,23 @@ private fun SectionTitle(text: String) {
     Box(Modifier.padding(horizontal = 16.dp)) { SettingsGroupTitle(text) }
 }
 
-/**
- * The two homes offered when the cat's placement is chosen: the floating window or this window.
- * Shared with the render test so the popup's own rows are checked as drawn.
- */
 @Composable
 internal fun PetPlacementChoices(selected: PetPlacement, onSelect: (PetPlacement) -> Unit) {
     Column {
-        PlacementOption(
-            title = str("pet_bar_title"),
-            subtitle = str("pet_bar_sub"),
-            icon = placementIcon(PetPlacement.BAR),
-            selected = selected == PetPlacement.BAR,
-        ) { onSelect(PetPlacement.BAR) }
-        PlacementOption(
-            title = str("pet_desk_float"),
-            subtitle = str("pet_desk_float_sub"),
-            icon = Icons.Rounded.DesktopWindows,
-            selected = selected == PetPlacement.DESKTOP,
-        ) { onSelect(PetPlacement.DESKTOP) }
-        PlacementOption(
-            title = str("pet_desk_inside"),
-            subtitle = str("pet_desk_inside_sub"),
-            icon = Icons.Rounded.PictureInPicture,
-            selected = selected == PetPlacement.IN_APP,
-        ) { onSelect(PetPlacement.IN_APP) }
+        PetPlacement.entries.forEach { placement ->
+            PlacementOption(
+                title = str(placementTitle(placement)),
+                subtitle = str(
+                    when (placement) {
+                        PetPlacement.BAR -> "pet_bar_sub"
+                        PetPlacement.DESKTOP -> "pet_desk_float_sub"
+                        PetPlacement.IN_APP -> "pet_desk_inside_sub"
+                    }
+                ),
+                icon = placementIcon(placement),
+                selected = selected == placement,
+            ) { onSelect(placement) }
+        }
     }
 }
 

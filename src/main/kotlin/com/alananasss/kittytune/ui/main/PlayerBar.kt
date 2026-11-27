@@ -24,12 +24,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Tune
 
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -44,6 +47,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +66,10 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import java.awt.Cursor
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.Tip
+import com.alananasss.kittytune.ui.pet.PetPlacement
+import com.alananasss.kittytune.ui.pet.PetWindowState
+import com.alananasss.kittytune.ui.pet.placementIcon
+import com.alananasss.kittytune.ui.pet.placementTitle
 import com.alananasss.kittytune.ui.player.CodecBadge
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
@@ -562,28 +571,12 @@ fun PlayerBar(
                         }
                     }
                 }
-                // The Kitty pet on and off in one click (lit while it is shown), in whichever home
-                // it was given: the floating window or the app's own window.
                 AnimatedVisibility(
                     visible = !isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_PET in visibleButtons,
                     enter = barButtonEnter,
                     exit = barButtonExit,
                 ) {
-                    val petShown = com.alananasss.kittytune.ui.pet.PetWindowState.visible
-                    Tip(str(if (petShown) "pet_desk_hide" else "pet_desk_tray_show")) {
-                        IconButton(
-                            shapes = iconShapes,
-                            onClick = { com.alananasss.kittytune.ui.pet.PetWindowState.toggle() },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Pets,
-                                contentDescription = str("pet_settings_title"),
-                                tint = if (petShown) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
+                    PetBarButton(shapes = iconShapes)
                 }
                 if (PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons) {
                     IconButton(
@@ -691,6 +684,63 @@ fun PlayerBar(
 }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PetBarButton(shapes: IconButtonShapes) {
+    val petShown = PetWindowState.visible
+    var showPlacementMenu by remember { mutableStateOf(false) }
+
+    Box {
+        Tip(
+            text = str(if (petShown) "pet_desk_hide" else "pet_desk_tray_show"),
+            enabled = !showPlacementMenu,
+        ) {
+            IconButton(
+                shapes = shapes,
+                modifier = Modifier.onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
+                    showPlacementMenu = true
+                },
+                onClick = PetWindowState::toggle,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Pets,
+                    contentDescription = str("pet_settings_title"),
+                    tint = if (petShown) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = showPlacementMenu,
+            onDismissRequest = { showPlacementMenu = false },
+            shape = RoundedCornerShape(16.dp),
+        ) {
+            val currentPlacement = PetWindowState.placement
+            PetPlacement.entries.forEach { placement ->
+                val isCurrent = placement == currentPlacement
+                DropdownMenuItem(
+                    text = { Text(str(placementTitle(placement))) },
+                    leadingIcon = { Icon(placementIcon(placement), contentDescription = null) },
+                    trailingIcon = if (isCurrent) {
+                        {
+                            Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else null,
+                    modifier = Modifier.semantics { selected = isCurrent },
+                    onClick = {
+                        showPlacementMenu = false
+                        PetWindowState.moveTo(placement)
+                    },
+                )
+            }
+        }
+    }
+}
 
 /** How long the player bar takes to settle into a new width's layout. */
 private const val BAR_MORPH_MS = 280
