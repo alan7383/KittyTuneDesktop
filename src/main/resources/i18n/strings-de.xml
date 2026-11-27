@@ -11,7 +11,7 @@
     <string name="ai_chip_ai_detected">KI erkannt</string>
     <string name="ai_chip_high_confidence">KI hohe Konfidenz</string>
     <string name="ai_chip_human_audio">Menschliches Audio</string>
-    <string name="ai_sheet_block_artist">Künstler \"%s\" blockieren</string>
+    <string name="ai_sheet_block_artist">Künstler \"%s\" ausblenden</string>
     <string name="ai_sheet_block_track">Diesen Titel ausblenden</string>
     <string name="ai_sheet_confidence_analyzing">Forensische Codec-Reste werden aus dem PCM-Stream extrahiert…</string>
     <string name="ai_sheet_confidence_borderline">Grenzfall / unklare akustische Merkmale</string>
@@ -94,7 +94,7 @@
     <string name="block_tab_artists">Blockierte Künstler</string>
     <string name="block_tab_tracks">Ausgeblendete Titel</string>
     <string name="block_unblock_artist_body">Titel von \"%s\" werden wieder in Warteschlangen und Empfehlungen angezeigt.</string>
-    <string name="block_unblock_artist_title">Diesen Künstler freigeben?</string>
+    <string name="block_unblock_artist_title">Diesen Künstler einblenden?</string>
     <string name="block_unblock_track_body">\"%s\" wird wieder in Warteschlangen und Empfehlungen angezeigt.</string>
     <string name="block_unblock_track_title">Diesen Titel wiederherstellen?</string>
     <string name="karaoke_settings_title">Karaoke &amp; KI-Vokaltrennung</string>
@@ -143,9 +143,9 @@
     <string name="karaoke_acapella_title">Studio-Acapella &amp; KI-Stimmverstärkung</string>
     <string name="karaoke_acapella_desc">Das HTDemucs v4-Modell extrahiert reine Vocals, indem es das Stimmsignal isoliert und Instrumente entfernt. Bei 100% werden Instrumente vollständig stummgeschaltet, um einen reinen Studio-Acapella-Track zu erzeugen.</string>
     <string name="common_undo">Rückgängig</string>
-    <string name="menu_block_artist">Künstler blockieren</string>
+    <string name="menu_block_artist">Künstler ausblenden</string>
     <string name="menu_block_track">Titel ausblenden</string>
-    <string name="menu_unblock_artist">Künstler freigeben</string>
+    <string name="menu_unblock_artist">Künstler einblenden</string>
     <string name="menu_unblock_track">Titel einblenden</string>
     <string name="msg_retrying">Erneuter Versuch&#8230;</string>
     <string name="pref_ai_show_badge">KI-Badge im Player anzeigen</string>

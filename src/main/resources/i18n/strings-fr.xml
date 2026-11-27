@@ -58,7 +58,7 @@
     <string name="ai_chip_ai_detected">IA Détectée</string>
     <string name="ai_chip_high_confidence">IA Haute Confiance</string>
     <string name="ai_chip_human_audio">Audio Humain</string>
-    <string name="ai_sheet_block_artist">Bloquer l\'artiste \"%s\"</string>
+    <string name="ai_sheet_block_artist">Masquer l\'artiste \"%s\"</string>
     <string name="ai_sheet_block_track">Masquer ce titre</string>
     <string name="ai_sheet_confidence_analyzing">Extraction des résidus de codec depuis le flux audio…</string>
     <string name="ai_sheet_confidence_borderline">Signaux ambigus ou limites</string>
@@ -158,7 +158,7 @@
     <string name="block_tab_artists">Artistes bloqués</string>
     <string name="block_tab_tracks">Titres masqués</string>
     <string name="block_unblock_artist_body">Les morceaux de "%s" réapparaîtront dans vos files de lecture et recommandations.</string>
-    <string name="block_unblock_artist_title">Débloquer cet artiste ?</string>
+    <string name="block_unblock_artist_title">Démasquer cet artiste ?</string>
     <string name="block_unblock_track_body">"%s" réapparaîtra dans vos files de lecture et recommandations.</string>
     <string name="block_unblock_track_title">Restaurer ce morceau ?</string>
     <string name="karaoke_settings_title">Karaoké &amp; Séparation Vocale IA</string>
@@ -210,9 +210,9 @@
     <string name="btn_cancel">Annuler</string>
     <string name="btn_clear">Vider</string>
     <string name="common_undo">Annuler</string>
-    <string name="menu_block_artist">Bloquer l\'artiste</string>
+    <string name="menu_block_artist">Masquer l\'artiste</string>
     <string name="menu_block_track">Masquer le morceau</string>
-    <string name="menu_unblock_artist">Débloquer l\'artiste</string>
+    <string name="menu_unblock_artist">Démasquer l\'artiste</string>
     <string name="menu_unblock_track">Démasquer le morceau</string>
     <string name="edit_playlist_title">Modifier la playlist</string>
     <string name="edit_playlist_permalink">Lien permanent *</string>

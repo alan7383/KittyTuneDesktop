@@ -58,7 +58,7 @@
     <string name="ai_chip_ai_detected">ИИ обнаружен</string>
     <string name="ai_chip_high_confidence">ИИ высокая точность</string>
     <string name="ai_chip_human_audio">Человеческий трек</string>
-    <string name="ai_sheet_block_artist">Заблокировать исполнителя «%s»</string>
+    <string name="ai_sheet_block_artist">Скрыть исполнителя «%s»</string>
     <string name="ai_sheet_block_track">Скрыть этот трек</string>
     <string name="ai_sheet_confidence_analyzing">Извлечение остатков кодека из PCM-потока…</string>
     <string name="ai_sheet_confidence_borderline">Пограничные / неоднозначные признаки</string>
@@ -158,7 +158,7 @@
     <string name="block_tab_artists">Заблокированные артисты</string>
     <string name="block_tab_tracks">Скрытые треки</string>
     <string name="block_unblock_artist_body">Треки «%s» снова будут появляться в очереди и рекомендациях.</string>
-    <string name="block_unblock_artist_title">Разблокировать исполнителя?</string>
+    <string name="block_unblock_artist_title">Показать этого исполнителя?</string>
     <string name="block_unblock_track_body">«%s» снова появится в очереди и рекомендациях.</string>
     <string name="block_unblock_track_title">Восстановить этот трек?</string>
     <string name="karaoke_settings_title">Караоке и ИИ-разделение вокала</string>
@@ -210,9 +210,9 @@
     <string name="btn_cancel">Отменить</string>
     <string name="btn_clear">Очистить</string>
     <string name="common_undo">Отменить</string>
-    <string name="menu_block_artist">Заблокировать исполнителя</string>
+    <string name="menu_block_artist">Скрыть исполнителя</string>
     <string name="menu_block_track">Скрыть трек</string>
-    <string name="menu_unblock_artist">Разблокировать исполнителя</string>
+    <string name="menu_unblock_artist">Показать исполнителя</string>
     <string name="menu_unblock_track">Показать трек</string>
     <string name="edit_playlist_title">Изменить плейлист</string>
     <string name="edit_playlist_permalink">Постоянная ссылка *</string>

@@ -58,7 +58,7 @@
     <string name="ai_chip_ai_detected">MI észlelve</string>
     <string name="ai_chip_high_confidence">MI magas megbízhatóság</string>
     <string name="ai_chip_human_audio">Emberi hang</string>
-    <string name="ai_sheet_block_artist">\"%s\" előadó letiltása</string>
+    <string name="ai_sheet_block_artist">\"%s\" előadó elrejtése</string>
     <string name="ai_sheet_block_track">Szám elrejtése</string>
     <string name="ai_sheet_confidence_analyzing">Kodekmaradványok kinyerése a PCM-folyamból…</string>
     <string name="ai_sheet_confidence_borderline">Határeset / kétértelmű hangjellemzők</string>
@@ -158,7 +158,7 @@
     <string name="block_tab_artists">Letiltott előadók</string>
     <string name="block_tab_tracks">Elrejtett számok</string>
     <string name="block_unblock_artist_body">\"%s\" számai újra meg fognak jelenni a lejátszási sorban és az ajánlásokban.</string>
-    <string name="block_unblock_artist_title">Feloldja ezt az előadót?</string>
+    <string name="block_unblock_artist_title">Megjeleníti ezt az előadót?</string>
     <string name="block_unblock_track_body">A(z) \"%s\" ismét meg fog jelenni a lejátszási sorban és az ajánlásokban.</string>
     <string name="block_unblock_track_title">Visszaállítja ezt a számot?</string>
     <string name="karaoke_settings_title">Karaoke és MI énekszétválasztás</string>
@@ -210,9 +210,9 @@
     <string name="btn_cancel">Mégse</string>
     <string name="btn_clear">Törlés</string>
     <string name="common_undo">Visszavonás</string>
-    <string name="menu_block_artist">Előadó letiltása</string>
+    <string name="menu_block_artist">Előadó elrejtése</string>
     <string name="menu_block_track">Szám elrejtése</string>
-    <string name="menu_unblock_artist">Előadó feloldása</string>
+    <string name="menu_unblock_artist">Előadó megjelenítése</string>
     <string name="menu_unblock_track">Szám megjelenítése</string>
     <string name="edit_playlist_title">Lejátszási lista szerkesztése</string>
     <string name="edit_playlist_permalink">Állandó hivatkozás *</string>

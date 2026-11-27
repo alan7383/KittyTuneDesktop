@@ -58,7 +58,7 @@
     <string name="ai_chip_ai_detected">AI Detected</string>
     <string name="ai_chip_high_confidence">AI High Confidence</string>
     <string name="ai_chip_human_audio">Human Audio</string>
-    <string name="ai_sheet_block_artist">Block artist \"%s\"</string>
+    <string name="ai_sheet_block_artist">Hide artist \"%s\"</string>
     <string name="ai_sheet_block_track">Block this track</string>
     <string name="ai_sheet_confidence_analyzing">Extracting forensic codec residuals from PCM stream…</string>
     <string name="ai_sheet_confidence_borderline">Borderline / ambiguous audio artifacts</string>
@@ -158,7 +158,7 @@
     <string name="block_tab_artists">Blocked Artists</string>
     <string name="block_tab_tracks">Hidden Tracks</string>
     <string name="block_unblock_artist_body">Tracks by "%s" will reappear in queues and recommendations.</string>
-    <string name="block_unblock_artist_title">Unblock this artist?</string>
+    <string name="block_unblock_artist_title">Unhide this artist?</string>
     <string name="block_unblock_track_body">"%s" will reappear in queues and recommendations.</string>
     <string name="block_unblock_track_title">Restore this track?</string>
     <string name="karaoke_settings_title">Karaoke &amp; AI Vocal Separation</string>
@@ -210,9 +210,9 @@
     <string name="btn_cancel">Cancel</string>
     <string name="btn_clear">Clear</string>
     <string name="common_undo">Undo</string>
-    <string name="menu_block_artist">Block artist</string>
+    <string name="menu_block_artist">Hide artist</string>
     <string name="menu_block_track">Hide track</string>
-    <string name="menu_unblock_artist">Unblock artist</string>
+    <string name="menu_unblock_artist">Unhide artist</string>
     <string name="menu_unblock_track">Unhide track</string>
     <string name="edit_playlist_title">Edit playlist</string>
     <string name="edit_playlist_permalink">Permalink *</string>

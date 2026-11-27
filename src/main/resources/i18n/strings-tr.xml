@@ -58,7 +58,7 @@
     <string name="ai_chip_ai_detected">YZ Tespit Edildi</string>
     <string name="ai_chip_high_confidence">YZ Yüksek Güvenilirlik</string>
     <string name="ai_chip_human_audio">İnsan Yapımı Ses</string>
-    <string name="ai_sheet_block_artist">"%s" sanatçısını engelle</string>
+    <string name="ai_sheet_block_artist">"%s" sanatçısını gizle</string>
     <string name="ai_sheet_block_track">Bu parçayı engelle</string>
     <string name="ai_sheet_confidence_analyzing">PCM akışından adli kodek kalıntıları ayıklanıyor…</string>
     <string name="ai_sheet_confidence_borderline">Sınırda / belirsiz ses bozulmaları</string>
@@ -158,7 +158,7 @@
     <string name="block_tab_artists">Engellenen Sanatçılar</string>
     <string name="block_tab_tracks">Gizli Parçalar</string>
     <string name="block_unblock_artist_body">"%s" tarafından yapılan parçalar yeniden sıralarda ve önerilerde görünecek.</string>
-    <string name="block_unblock_artist_title">Bu sanatçının engeli kaldırılsın mı?</string>
+    <string name="block_unblock_artist_title">Bu sanatçı gösterilsin mi?</string>
     <string name="block_unblock_track_body">"%s" yeniden sıralarda ve önerilerde görünecek.</string>
     <string name="block_unblock_track_title">Bu parça geri yüklensin mi?</string>
     <string name="karaoke_settings_title">Karaoke ve Yapay Zekâ Vokal Ayrıştırma</string>
@@ -210,9 +210,9 @@
     <string name="btn_cancel">İptal</string>
     <string name="btn_clear">Temizle</string>
     <string name="common_undo">Geri Al</string>
-    <string name="menu_block_artist">Sanatçıyı engelle</string>
+    <string name="menu_block_artist">Sanatçıyı gizle</string>
     <string name="menu_block_track">Parçayı gizle</string>
-    <string name="menu_unblock_artist">Sanatçının engelini kaldır</string>
+    <string name="menu_unblock_artist">Sanatçıyı göster</string>
     <string name="menu_unblock_track">Parçayı göster</string>
     <string name="edit_playlist_title">Çalma Listesini Düzenle</string>
     <string name="edit_playlist_permalink">Kalıcı Bağlantı *</string>

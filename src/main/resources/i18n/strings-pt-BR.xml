@@ -58,7 +58,7 @@
     <string name="ai_chip_ai_detected">IA detectada</string>
     <string name="ai_chip_high_confidence">IA · Alta confiança</string>
     <string name="ai_chip_human_audio">Produção humana</string>
-    <string name="ai_sheet_block_artist">Bloquear artista «%s»</string>
+    <string name="ai_sheet_block_artist">Ocultar artista «%s»</string>
     <string name="ai_sheet_block_track">Bloquear esta faixa</string>
     <string name="ai_sheet_confidence_analyzing">Extraindo resíduos do codec para análise no fluxo PCM…</string>
     <string name="ai_sheet_confidence_borderline">Resultado incerto: vestígios ambíguos no áudio</string>
@@ -158,7 +158,7 @@
     <string name="block_tab_artists">Artistas bloqueados</string>
     <string name="block_tab_tracks">Faixas ocultas</string>
     <string name="block_unblock_artist_body">As faixas de «%s» voltarão a aparecer nas filas e recomendações.</string>
-    <string name="block_unblock_artist_title">Desbloquear este artista?</string>
+    <string name="block_unblock_artist_title">Mostrar este artista?</string>
     <string name="block_unblock_track_body">«%s» voltará a aparecer nas filas e recomendações.</string>
     <string name="block_unblock_track_title">Restaurar esta faixa?</string>
     <string name="karaoke_settings_title">Karaokê e separação de vocais por IA</string>
@@ -210,9 +210,9 @@
     <string name="btn_cancel">Cancelar</string>
     <string name="btn_clear">Limpar</string>
     <string name="common_undo">Desfazer</string>
-    <string name="menu_block_artist">Bloquear artista</string>
+    <string name="menu_block_artist">Ocultar artista</string>
     <string name="menu_block_track">Ocultar faixa</string>
-    <string name="menu_unblock_artist">Desbloquear artista</string>
+    <string name="menu_unblock_artist">Mostrar artista</string>
     <string name="menu_unblock_track">Mostrar faixa</string>
     <string name="edit_playlist_title">Editar playlist</string>
     <string name="edit_playlist_permalink">Link permanente *</string>

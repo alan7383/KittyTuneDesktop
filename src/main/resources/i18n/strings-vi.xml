@@ -9,7 +9,7 @@
     <string name="ai_chip_ai_detected">Đã phát hiện AI</string>
     <string name="ai_chip_high_confidence">Độ tin cậy AI cao</string>
     <string name="ai_chip_human_audio">Âm thanh con người</string>
-    <string name="ai_sheet_block_artist">Chặn nghệ sĩ \"%s\"</string>
+    <string name="ai_sheet_block_artist">Ẩn nghệ sĩ \"%s\"</string>
     <string name="ai_sheet_block_track">Ẩn bài hát này</string>
     <string name="ai_sheet_confidence_analyzing">Đang trích xuất dư lượng codec từ luồng PCM…</string>
     <string name="ai_sheet_confidence_borderline">Dấu hiệu mơ hồ / ranh giới không rõ ràng</string>
@@ -92,7 +92,7 @@
     <string name="block_tab_artists">Nghệ sĩ đã chặn</string>
     <string name="block_tab_tracks">Bài hát đã ẩn</string>
     <string name="block_unblock_artist_body">Các bài hát của \"%s\" sẽ xuất hiện lại trong hàng đợi và gợi ý.</string>
-    <string name="block_unblock_artist_title">Bỏ chặn nghệ sĩ này?</string>
+    <string name="block_unblock_artist_title">Bỏ ẩn nghệ sĩ này?</string>
     <string name="block_unblock_track_body">\"%s\" sẽ xuất hiện lại trong hàng đợi và gợi ý.</string>
     <string name="block_unblock_track_title">Khôi phục bài hát này?</string>
     <string name="karaoke_settings_title">Karaoke &amp; Tách giọng hát AI</string>
@@ -141,9 +141,9 @@
     <string name="karaoke_acapella_title">Studio Acapella &amp; Tăng cường giọng AI</string>
     <string name="karaoke_acapella_desc">Mô hình HTDemucs v4 trích xuất giọng hát thuần túy bằng cách cách ly giọng hát và tắt nhạc cụ. Ở mức 100%, nhạc cụ bị tắt tiếng hoàn toàn để tạo bản acapella chất lượng phòng thu.</string>
     <string name="common_undo">Hoàn tác</string>
-    <string name="menu_block_artist">Chặn nghệ sĩ</string>
+    <string name="menu_block_artist">Ẩn nghệ sĩ</string>
     <string name="menu_block_track">Ẩn bài hát</string>
-    <string name="menu_unblock_artist">Bỏ chặn nghệ sĩ</string>
+    <string name="menu_unblock_artist">Bỏ ẩn nghệ sĩ</string>
     <string name="menu_unblock_track">Bỏ ẩn bài hát</string>
     <string name="msg_retrying">Đang thử lại&#8230;</string>
     <string name="pref_ai_show_badge">Hiển thị huy hiệu AI trong trình phát</string>

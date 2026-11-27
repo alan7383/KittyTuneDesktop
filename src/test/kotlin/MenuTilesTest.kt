@@ -1,7 +1,9 @@
+import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.main.MenuTiles
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -95,5 +97,37 @@ class MenuTilesTest {
         val known = (MenuTiles.TRACK + MenuTiles.PLAYLIST).map { it.id }.toSet()
         assertTrue(built.isNotEmpty(), "no tile ids found; the pattern no longer matches the menu code")
         assertEquals(emptySet(), built - known, "tiles missing from MenuTiles")
+    }
+
+    @Test
+    fun `track menu removes requested items and keeps radio and download`() {
+        val ids = MenuTiles.TRACK.map { it.id }.toSet()
+        val removed = setOf(
+            "repeat",
+            "shuffle",
+            "comments",
+            "lyrics",
+            "go_artist",
+            "details",
+            "duet_lyrics_blacklist",
+        )
+        removed.forEach { id ->
+            assertFalse(id in ids, "Track menu should not include removed tile '$id'")
+        }
+        assertTrue("track_radio" in ids, "Track menu should keep track_radio")
+        assertFalse("save_to_downloads" in ids, "Track menu should not include save_to_downloads")
+        assertTrue("download" in ids, "Track menu should keep download tile")
+        assertTrue("together_live" in ids, "Track menu should keep together_live tile")
+    }
+
+    @Test
+    fun `track menu strings use hide artist and keep inline live listen along`() {
+        val source = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/main/TrackOptionsOverlays.kt").readText()
+        assertFalse(source.contains("viewModel.showLiveListenDialog = true"), "Menu tile must open Live Listen inline, not in center dialog")
+        assertTrue(source.contains("TrackMenuPage.LIVE_LISTEN"), "Menu must switch inline to TrackMenuPage.LIVE_LISTEN")
+        assertTrue(source.contains("LiveListenContent("), "Inline Live Listen view must reuse LiveListenContent")
+        assertEquals("Hide artist", Strings.english("menu_block_artist"))
+        assertEquals("Unhide artist", Strings.english("menu_unblock_artist"))
+        assertEquals("Download", Strings.english("btn_download"))
     }
 }

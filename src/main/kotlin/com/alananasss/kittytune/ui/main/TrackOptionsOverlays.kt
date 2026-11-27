@@ -5,7 +5,14 @@ import com.alananasss.kittytune.data.playbackSource
 
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -33,8 +40,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.PointerMatcher
@@ -52,7 +57,6 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonOff
-import androidx.compose.material.icons.automirrored.rounded.Comment
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -68,14 +72,12 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material.icons.rounded.Radio
-import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Verified
@@ -134,7 +136,6 @@ import com.alananasss.kittytune.ui.player.CommentSort
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.local.RadioEligibility
-import com.alananasss.kittytune.ui.player.RepeatMode
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
@@ -172,8 +173,8 @@ private val SpotifyAccentGreen = androidx.compose.ui.graphics.Color(0xFF1DB954)
 fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
     if (viewModel.showMenuSheet) {
         BackHandler(onBack = { viewModel.showMenuSheet = false })
-        TrackMenuAtPointer(onDismiss = { viewModel.showMenuSheet = false }) {
-            MenuSheetContent(viewModel)
+        TrackMenuAtPointer(onDismiss = { viewModel.showMenuSheet = false }) { close ->
+            MenuSheetContent(viewModel, onRequestClose = close)
         }
     }
     if (viewModel.showTrackActionOfflineDialog) {
@@ -250,7 +251,7 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
  * back into it, and closes on a click outside or Escape.
  */
 @Composable
-private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable (close: () -> Unit) -> Unit) {
     val anchor = remember {
         val press = com.alananasss.kittytune.ui.common.PointerAnchor.lastPress.value
         androidx.compose.ui.unit.IntOffset(press.x.toInt(), press.y.toInt())
@@ -261,8 +262,12 @@ private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable () ->
     LaunchedEffect(shown.currentState, shown.isIdle) {
         if (closing && shown.isIdle && !shown.currentState) onDismiss()
     }
+    var openedLeft by remember(anchor) { mutableStateOf(false) }
+    val origin = androidx.compose.ui.graphics.TransformOrigin(if (openedLeft) 1f else 0f, 0f)
     androidx.compose.ui.window.Popup(
-        popupPositionProvider = remember(anchor) { com.alananasss.kittytune.ui.common.AtPointPositionProvider(anchor) },
+        popupPositionProvider = remember(anchor) {
+            com.alananasss.kittytune.ui.common.AtPointPositionProvider(anchor) { openedLeft = it }
+        },
         onDismissRequest = close,
         properties = androidx.compose.ui.window.PopupProperties(focusable = true),
         onKeyEvent = { event ->
@@ -272,9 +277,9 @@ private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable () ->
         androidx.compose.animation.AnimatedVisibility(
             visibleState = shown,
             enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)) +
-                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(200), initialScale = 0.9f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)),
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(200), initialScale = 0.9f, transformOrigin = origin),
             exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)) +
-                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(140), targetScale = 0.94f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)),
+                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(140), targetScale = 0.94f, transformOrigin = origin),
         ) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -283,7 +288,7 @@ private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable () ->
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                 modifier = Modifier.padding(6.dp).width(400.dp).heightIn(max = 600.dp),
             ) {
-                Box(Modifier.verticalScroll(rememberScrollState())) { content() }
+                Box(Modifier.verticalScroll(rememberScrollState())) { content(close) }
             }
         }
     }
@@ -365,12 +370,13 @@ private fun ArtistPickerRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(
-                androidx.compose.animation.animateColorAsState(
-                    if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest
-                    else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0f),
+                com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                    selected = hovered,
+                    selectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    unselectedColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0f),
                     animationSpec = androidx.compose.animation.core.tween(120),
                     label = "artistRowHover",
-                ).value
+                )
             )
             .hoverable(interaction)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -417,13 +423,16 @@ private fun ArtistPickerRow(
     }
 }
 
+private enum class TrackMenuPage { ACTIONS, LIVE_LISTEN }
+
 @Composable
-private fun MenuSheetContent(viewModel: PlayerViewModel) {
+private fun MenuSheetContent(viewModel: PlayerViewModel, onRequestClose: () -> Unit) {
     val track = viewModel.trackForMenu ?: viewModel.uiCurrentTrack ?: return
     fun withInternet(action: () -> Unit) {
         if (com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) action()
         else viewModel.showTrackActionOfflineDialog = true
     }
+    var activePage by remember(track.id) { mutableStateOf(TrackMenuPage.ACTIONS) }
     val downloadProgress by DownloadManager.downloadProgress.collectAsState()
     val storageTrigger by DownloadManager.storageTrigger.collectAsState()
     val likedTracks by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
@@ -479,295 +488,275 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 20.dp).padding(horizontal = 4.dp)) {
-            AsyncImage(
-                model = track.fullResArtwork,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-                contentScale = ContentScale.Crop
+    AnimatedContent(
+        targetState = activePage,
+        transitionSpec = {
+            val forward = targetState == TrackMenuPage.LIVE_LISTEN
+            val direction = if (forward) 1 else -1
+            (slideInHorizontally(tween(220)) { width -> direction * width / 4 } + fadeIn(tween(180))) togetherWith
+                (slideOutHorizontally(tween(180)) { width -> -direction * width / 4 } + fadeOut(tween(120)))
+        },
+        label = "trackMenuPage",
+    ) { page ->
+        if (page == TrackMenuPage.LIVE_LISTEN) {
+            com.alananasss.kittytune.ui.together.LiveListenContent(
+                playerViewModel = viewModel,
+                onOpenRoom = { code ->
+                    viewModel.showMenuSheet = false
+                    viewModel.isLyricsFullScreen = false
+                    com.alananasss.kittytune.core.AppWindowState.fullScreen = false
+                    viewModel.navigateToPlaylistId = "together:$code"
+                },
+                onDismissRequest = onRequestClose,
+                onBack = { activePage = TrackMenuPage.ACTIONS },
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
             )
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = track.title ?: str("untitled_track"),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    com.alananasss.kittytune.ui.common.ArtistLinkText(
-                        track = track,
-                        onArtistClick = { selectedTrack, artist ->
-                            withInternet { viewModel.navigateToTrackArtist(selectedTrack, artist) }
-                        }
-                    )
-                    if (track.user?.verified == true) {
-                        Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-                    }
-                }
-            }
+            return@AnimatedContent
         }
 
-        val activeColor = MaterialTheme.colorScheme.primary
-
-        val gridItems = mutableListOf<MenuOptionItem>().apply {
-            if (!isLocalFile) {
-                add(
-                    MenuOptionItem(
-                        id = "like",
-                        icon = if (isTrackLiked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
-                        text = if (isTrackLiked) str("action_unlike") else str("player_like_action"),
-                        tint = activeColor.takeIf { isTrackLiked },
-                    ) {
-                        viewModel.toggleTrackLike(track)
-                    }
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 20.dp).padding(horizontal = 4.dp)) {
+                AsyncImage(
+                    model = track.fullResArtwork,
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentScale = ContentScale.Crop
                 )
-            }
-            if (viewModel.isMenuContextFromPlayer) {
-                add(
-                    MenuOptionItem(
-                        id = "shuffle",
-                        icon = Icons.Rounded.Shuffle,
-                        text = str("menu_shuffle"),
-                        tint = activeColor.takeIf { viewModel.uiShuffleEnabled },
-                    ) { viewModel.toggleShuffle() }
-                )
-                add(
-                    MenuOptionItem(
-                        id = "repeat",
-                        icon = if (viewModel.uiRepeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne
-                        else Icons.Rounded.Repeat,
-                        text = when (viewModel.uiRepeatMode) {
-                            RepeatMode.ALL -> str("menu_repeat_all")
-                            RepeatMode.ONE -> str("menu_repeat_one")
-                            else -> str("menu_repeat")
-                        },
-                        tint = activeColor.takeIf { viewModel.uiRepeatMode != RepeatMode.NONE },
-                    ) { viewModel.toggleRepeatMode() }
-                )
-            }
-            if ((!viewModel.isMenuContextFromPlayer || viewModel.menuContextQueueIndex != null) &&
-                viewModel.menuContextQueueIndex != viewModel.currentQueueIndex) {
-                add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.playMenuTrackNext() })
-                add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
-            }
-            // In a shared playlist a song can go next for everyone, or be offered to the playlist itself.
-            val togetherCode = com.alananasss.kittytune.data.together.Together.active.collectAsState().value
-            if (viewModel.isMenuContextFromPlayer) {
-                add(MenuOptionItem(
-                    id = "together_live",
-                    icon = androidx.compose.material.icons.Icons.Rounded.Podcasts,
-                    text = str("together_live_title"),
-                    tint = activeColor.takeIf { togetherCode != null },
-                ) {
-                    viewModel.showMenuSheet = false
-                    viewModel.showLiveListenDialog = true
-                })
-            }
-            if (togetherCode != null) {
-                val shared = com.alananasss.kittytune.data.together.SharedTrack.of(track)
-                if (!shared.isLocalOnly) {
-                    add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_propose_session")) {
-                        com.alananasss.kittytune.data.together.Together.playNext(shared, togetherCode)
-                        viewModel.showMenuSheet = false
-                    })
-                    add(MenuOptionItem("together_suggest", Icons.Rounded.Groups, str("together_suggest")) {
-                        com.alananasss.kittytune.data.together.Together.suggest(togetherCode, shared)
-                        viewModel.showMenuSheet = false
-                    })
-                }
-            }
-            if (track.source != "youtube" && !isSpotify && !isLocalFile) {
-                add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) {
-                    withInternet { viewModel.openComments(track) }
-                })
-                if (isReposted) {
-                    add(
-                        MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_reposted"), tint = activeColor) {
-                            withInternet { showDeleteRepostConfirm = true }
-                        }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = track.title ?: str("untitled_track"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                } else {
-                    add(MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_repost")) {
-                        withInternet { showRepostDialog = true }
-                    })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.alananasss.kittytune.ui.common.ArtistLinkText(
+                            track = track,
+                            onArtistClick = { selectedTrack, artist ->
+                                withInternet { viewModel.navigateToTrackArtist(selectedTrack, artist) }
+                            }
+                        )
+                        if (track.user?.verified == true) {
+                            Spacer(Modifier.width(4.dp))
+                            Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                        }
+                    }
                 }
             }
-            if (track.source != "youtube" && !isSpotify) {
-                add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) {
-                    viewModel.openTrackDetails(track)
-                })
-            }
-            add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track) })
-            val isDuetBlacklisted = viewModel.isTrackDuetBlacklisted(track.id)
-            add(
-                MenuOptionItem(
-                    id = "duet_lyrics_blacklist",
-                    icon = if (isDuetBlacklisted) Icons.Rounded.MicOff else Icons.Rounded.RecordVoiceOver,
-                    text = if (isDuetBlacklisted) str("menu_enable_duet_lyrics") else str("menu_disable_duet_lyrics"),
-                    tint = activeColor.takeIf { isDuetBlacklisted },
-                ) {
-                    viewModel.toggleTrackDuetBlacklist(track.id)
-                }
-            )
-            add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
 
-            // Catalog tracks carry their album id: jump straight to it.
-            val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
-            if (!isLocalFile && albumId != null && (isSpotify || albumId.length == 22)) {
-                add(MenuOptionItem("go_album", Icons.Rounded.Album, str("menu_go_album")) {
-                    withInternet {
-                        viewModel.showMenuSheet = false
-                        viewModel.navigateToAlbum(albumId)
-                    }
-                })
-            }
-            if (track.source != "youtube" && !isLocalFile) {
-                add(
-                    MenuOptionItem("go_artist", Icons.Rounded.Person, str("menu_go_artist")) {
-                        withInternet { viewModel.navigateToTrackArtist(track) }
-                    }
-                )
-                val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
-                if (isOwnTrack) {
-                    add(MenuOptionItem("edit_track", Icons.Rounded.Edit, str("menu_edit_track")) {
-                        withInternet {
-                            viewModel.showMenuSheet = false
-                            viewModel.navigateToEditTrack(track.id)
-                        }
-                    })
-                }
-            }
-            if (!isLocalFile && RadioEligibility.canStartRadio(track)) {
-                add(MenuOptionItem("track_radio", Icons.Rounded.Radio, str("menu_track_radio")) {
-                    withInternet {
-                        if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) {
-                            viewModel.startYoutubeRadio(track)
-                        } else {
-                            viewModel.startRadioFromTrack(track)
-                        }
-                    }
-                })
-                add(MenuOptionItem("share", Icons.Outlined.Link, str("cover_copy_link")) { viewModel.shareTrack(track) })
-                add(MenuOptionItem("share_card", Icons.Outlined.PhotoLibrary, str("share_card_title")) { viewModel.openShareCard(track) })
-            }
-            // Content filtering (issue #41): hide track / block artist, like Android.
-            run {
-                val blockedTrackIds by com.alananasss.kittytune.data.BlockManager.blockedTrackIdsFlow.collectAsState()
-                val blockedArtistIds by com.alananasss.kittytune.data.BlockManager.blockedArtistIdsFlow.collectAsState()
-                val isTrackBlocked = track.id in blockedTrackIds
-                val menuArtistId = track.user?.id
-                val menuArtistName = track.user?.username
-                val isArtistBlocked = menuArtistId != null && menuArtistId in blockedArtistIds
-                add(
-                    MenuOptionItem(
-                        id = "block_track",
-                        icon = if (isTrackBlocked) Icons.Outlined.VisibilityOff else Icons.Rounded.VisibilityOff,
-                        text = if (isTrackBlocked) str("menu_unblock_track") else str("menu_block_track"),
-                    ) {
-                        if (isTrackBlocked) {
-                            com.alananasss.kittytune.data.BlockManager.unblockTrack(track.id)
-                        } else {
-                            com.alananasss.kittytune.data.BlockManager.blockTrack(
-                                track,
-                                currentlyPlayingId = viewModel.currentTrack?.id,
-                            )
-                        }
-                        viewModel.showMenuSheet = false
-                    }
-                )
-                if (menuArtistId != null && menuArtistId != 0L && !menuArtistName.isNullOrBlank()) {
+            val activeColor = MaterialTheme.colorScheme.primary
+
+            val gridItems = mutableListOf<MenuOptionItem>().apply {
+                if (!isLocalFile) {
                     add(
                         MenuOptionItem(
-                            id = "block_artist",
-                            icon = if (isArtistBlocked) Icons.Rounded.Person else Icons.Rounded.PersonOff,
-                            text = if (isArtistBlocked) str("menu_unblock_artist") else str("menu_block_artist"),
+                            id = "like",
+                            icon = if (isTrackLiked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                            text = if (isTrackLiked) str("action_unlike") else str("player_like_action"),
+                            tint = activeColor.takeIf { isTrackLiked },
                         ) {
-                            if (isArtistBlocked) {
-                                com.alananasss.kittytune.data.BlockManager.unblockArtist(menuArtistId)
+                            viewModel.toggleTrackLike(track)
+                        }
+                    )
+                }
+                if ((!viewModel.isMenuContextFromPlayer || viewModel.menuContextQueueIndex != null) &&
+                    viewModel.menuContextQueueIndex != viewModel.uiCurrentQueueIndex) {
+                    add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.playMenuTrackNext() })
+                    add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
+                }
+                // In a shared playlist a song can go next for everyone, or be offered to the playlist itself.
+                val togetherCode = com.alananasss.kittytune.data.together.Together.active.collectAsState().value
+                if (viewModel.isMenuContextFromPlayer) {
+                    add(MenuOptionItem(
+                        id = "together_live",
+                        icon = Icons.Rounded.Podcasts,
+                        text = str("together_live_title"),
+                        tint = activeColor.takeIf { togetherCode != null },
+                    ) {
+                        activePage = TrackMenuPage.LIVE_LISTEN
+                    })
+                }
+                if (togetherCode != null) {
+                    val shared = com.alananasss.kittytune.data.together.SharedTrack.of(track)
+                    if (!shared.isLocalOnly) {
+                        add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_propose_session")) {
+                            com.alananasss.kittytune.data.together.Together.playNext(shared, togetherCode)
+                            viewModel.showMenuSheet = false
+                        })
+                        add(MenuOptionItem("together_suggest", Icons.Rounded.Groups, str("together_suggest")) {
+                            com.alananasss.kittytune.data.together.Together.suggest(togetherCode, shared)
+                            viewModel.showMenuSheet = false
+                        })
+                    }
+                }
+                if (track.source != "youtube" && !isSpotify && !isLocalFile) {
+                    if (isReposted) {
+                        add(
+                            MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_reposted"), tint = activeColor) {
+                                withInternet { showDeleteRepostConfirm = true }
+                            }
+                        )
+                    } else {
+                        add(MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_repost")) {
+                            withInternet { showRepostDialog = true }
+                        })
+                    }
+                }
+                add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
+
+                // Catalog tracks carry their album id: jump straight to it.
+                val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
+                if (!isLocalFile && albumId != null && (isSpotify || albumId.length == 22)) {
+                    add(MenuOptionItem("go_album", Icons.Rounded.Album, str("menu_go_album")) {
+                        withInternet {
+                            viewModel.showMenuSheet = false
+                            viewModel.navigateToAlbum(albumId)
+                        }
+                    })
+                }
+                if (track.source != "youtube" && !isLocalFile) {
+                    val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
+                    if (isOwnTrack) {
+                        add(MenuOptionItem("edit_track", Icons.Rounded.Edit, str("menu_edit_track")) {
+                            withInternet {
+                                viewModel.showMenuSheet = false
+                                viewModel.navigateToEditTrack(track.id)
+                            }
+                        })
+                    }
+                }
+                if (!isLocalFile) {
+                    if (RadioEligibility.canStartRadio(track)) {
+                        add(MenuOptionItem("track_radio", Icons.Rounded.Radio, str("menu_track_radio")) {
+                            withInternet {
+                                if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) {
+                                    viewModel.startYoutubeRadio(track)
+                                } else {
+                                    viewModel.startRadioFromTrack(track)
+                                }
+                            }
+                        })
+                    }
+                    add(MenuOptionItem("share", Icons.Outlined.Link, str("cover_copy_link")) { viewModel.shareTrack(track) })
+                    add(MenuOptionItem("share_card", Icons.Outlined.PhotoLibrary, str("share_card_title")) { viewModel.openShareCard(track) })
+                }
+                // Content filtering (issue #41): hide track / hide artist.
+                run {
+                    val blockedTrackIds by com.alananasss.kittytune.data.BlockManager.blockedTrackIdsFlow.collectAsState()
+                    val blockedArtistIds by com.alananasss.kittytune.data.BlockManager.blockedArtistIdsFlow.collectAsState()
+                    val isTrackBlocked = track.id in blockedTrackIds
+                    val menuArtistId = track.user?.id
+                    val menuArtistName = track.user?.username
+                    val isArtistBlocked = menuArtistId != null && menuArtistId in blockedArtistIds
+                    add(
+                        MenuOptionItem(
+                            id = "block_track",
+                            icon = if (isTrackBlocked) Icons.Outlined.VisibilityOff else Icons.Rounded.VisibilityOff,
+                            text = if (isTrackBlocked) str("menu_unblock_track") else str("menu_block_track"),
+                        ) {
+                            if (isTrackBlocked) {
+                                com.alananasss.kittytune.data.BlockManager.unblockTrack(track.id)
                             } else {
-                                com.alananasss.kittytune.data.BlockManager.blockArtist(
-                                    artistId = menuArtistId,
-                                    artistName = menuArtistName,
-                                    avatarUrl = track.user?.avatarUrl,
-                                    source = track.source ?: "soundcloud",
-                                    currentlyPlayingTrack = viewModel.currentTrack,
+                                com.alananasss.kittytune.data.BlockManager.blockTrack(
+                                    track,
+                                    currentlyPlayingId = viewModel.currentTrack?.id,
                                 )
                             }
                             viewModel.showMenuSheet = false
                         }
                     )
-                }
-            }
-            if (viewModel.menuContextPlaylistId != null) {
-                add(MenuOptionItem("remove_from_playlist", Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
-            }
-            if (viewModel.isMenuContextFromPlayer) {
-                add(
-                    MenuOptionItem(
-                        id = "sleep_timer",
-                        icon = Icons.Rounded.Bedtime,
-                        text = if (viewModel.isSleepTimerActive) viewModel.formatSleepTimerRemaining()
-                        else str("sleep_timer_title"),
-                        tint = activeColor.takeIf { viewModel.isSleepTimerActive },
-                    ) { viewModel.showSleepTimerDialog = true }
-                )
-                // Only for the track that is playing: the editor's whole method is "listen, mark here", so
-                // it needs a playhead to mark from (issue #33).
-                add(MenuOptionItem("trim", Icons.Rounded.ContentCut, str("trim_title")) {
-                    viewModel.showMenuSheet = false
-                    viewModel.showTrimDialog = true
-                })
-            }
-            if (!isLocalFile) {
-                val trackId = track.id
-                val isDownloading = DownloadManager.isTrackDownloading(trackId)
-                val downloadProgressVal = downloadProgress[trackId]
-                add(
-                    MenuOptionItem(
-                        id = "download",
-                        icon = if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
-                        text = when {
-                            isDownloaded -> str("btn_delete")
-                            isDownloading -> "${downloadProgressVal ?: 0}%"
-                            else -> str("btn_download")
-                        },
-                        tint = MaterialTheme.colorScheme.error.takeIf { isDownloaded },
-                        iconContent = { tint ->
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(26.dp)) {
-                                if (isDownloading) {
-                                    val animatedProgress by animateFloatAsState(
-                                        targetValue = (downloadProgressVal ?: 0) / 100f,
-                                        label = "progress",
-                                    )
-                                    CircularWavyProgressIndicator(
-                                        progress = { animatedProgress },
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                    Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(16.dp))
+                    if (menuArtistId != null && menuArtistId != 0L && !menuArtistName.isNullOrBlank()) {
+                        add(
+                            MenuOptionItem(
+                                id = "block_artist",
+                                icon = if (isArtistBlocked) Icons.Rounded.Person else Icons.Rounded.PersonOff,
+                                text = if (isArtistBlocked) str("menu_unblock_artist") else str("menu_block_artist"),
+                            ) {
+                                if (isArtistBlocked) {
+                                    com.alananasss.kittytune.data.BlockManager.unblockArtist(menuArtistId)
                                 } else {
-                                    Icon(
-                                        if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
-                                        null,
-                                        modifier = Modifier.size(26.dp),
-                                        tint = tint,
+                                    com.alananasss.kittytune.data.BlockManager.blockArtist(
+                                        artistId = menuArtistId,
+                                        artistName = menuArtistName,
+                                        avatarUrl = track.user?.avatarUrl,
+                                        source = track.source ?: "soundcloud",
+                                        currentlyPlayingTrack = viewModel.currentTrack,
                                     )
                                 }
+                                viewModel.showMenuSheet = false
                             }
-                        },
-                    ) {
-                        if (isDownloaded) showDeleteDialog = true
-                        else if (isDownloading) DownloadManager.cancelDownload(trackId)
-                        else viewModel.downloadTrack(track)
+                        )
                     }
-                )
+                }
+                if (viewModel.menuContextPlaylistId != null) {
+                    add(MenuOptionItem("remove_from_playlist", Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
+                }
+                if (viewModel.isMenuContextFromPlayer) {
+                    add(
+                        MenuOptionItem(
+                            id = "sleep_timer",
+                            icon = Icons.Rounded.Bedtime,
+                            text = if (viewModel.isSleepTimerActive) viewModel.formatSleepTimerRemaining()
+                            else str("sleep_timer_title"),
+                            tint = activeColor.takeIf { viewModel.isSleepTimerActive },
+                        ) { viewModel.showSleepTimerDialog = true }
+                    )
+                    // Only for the track that is playing: the editor's whole method is "listen, mark here", so
+                    // it needs a playhead to mark from (issue #33).
+                    add(MenuOptionItem("trim", Icons.Rounded.ContentCut, str("trim_title")) {
+                        viewModel.showMenuSheet = false
+                        viewModel.showTrimDialog = true
+                    })
+                }
+                if (!isLocalFile) {
+                    val trackId = track.id
+                    val isDownloading = DownloadManager.isTrackDownloading(trackId)
+                    val downloadProgressVal = downloadProgress[trackId]
+                    add(
+                        MenuOptionItem(
+                            id = "download",
+                            icon = if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
+                            text = when {
+                                isDownloaded -> str("btn_delete")
+                                isDownloading -> "${downloadProgressVal ?: 0}%"
+                                else -> str("btn_download")
+                            },
+                            tint = MaterialTheme.colorScheme.error.takeIf { isDownloaded },
+                            iconContent = { tint ->
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(26.dp)) {
+                                    if (isDownloading) {
+                                        val animatedProgress by animateFloatAsState(
+                                            targetValue = (downloadProgressVal ?: 0) / 100f,
+                                            label = "progress",
+                                        )
+                                        CircularWavyProgressIndicator(
+                                            progress = { animatedProgress },
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                        Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(16.dp))
+                                    } else {
+                                        Icon(
+                                            if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
+                                            null,
+                                            modifier = Modifier.size(26.dp),
+                                            tint = tint,
+                                        )
+                                    }
+                                }
+                            },
+                        ) {
+                            if (isDownloaded) showDeleteDialog = true
+                            else if (isDownloading) DownloadManager.cancelDownload(trackId)
+                            else viewModel.downloadTrack(track)
+                        }
+                    )
+                }
             }
-        }
 
-        MenuTileGrid(menu = PlayerPreferences.MENU_TRACK, items = gridItems)
+            MenuTileGrid(menu = PlayerPreferences.MENU_TRACK, items = gridItems)
+        }
     }
 }
 
