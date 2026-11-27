@@ -830,19 +830,15 @@ private fun rememberFixedLibraryTiles(): List<LibEntry> {
             )
         }
         if (PlayerPreferences.LIBRARY_TILE_TOGETHER !in hidden) {
-            val rooms by com.alananasss.kittytune.data.together.Together.saved.collectAsState()
-            val importedIcon = togetherIcon?.takeIf { java.io.File(it).isFile }
-            val roomCover = if (importedIcon == null) rooms.firstOrNull()?.tracks?.firstOrNull()?.artworkUrl else null
             add(
                 LibEntry(
                     key = "pin_together",
                     title = str("together_title"),
                     subtitle = str("together_library_subtitle"),
-                    artworkUrl = roomCover,
-                    icon = if (roomCover == null) Icons.Rounded.Groups else null,
-                    iconPath = importedIcon,
-                    gradient = if (themed || roomCover != null) null else listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)),
-                    flatColor = if (themed && roomCover == null) scheme.tertiaryContainer else null,
+                    icon = Icons.Rounded.Groups,
+                    iconPath = togetherIcon,
+                    gradient = if (themed) null else listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)),
+                    flatColor = if (themed) scheme.tertiaryContainer else null,
                     iconTint = if (themed) scheme.onTertiaryContainer else Color.White,
                     destination = "together",
                     isPinned = true,

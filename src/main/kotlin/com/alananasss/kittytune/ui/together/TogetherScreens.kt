@@ -488,7 +488,7 @@ private fun JoinOrCreateCard(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = joinCode,
-                                onValueChange = onJoinCodeChange,
+                                onValueChange = { onJoinCodeChange(TogetherLinks.formatCodeInput(it)) },
                                 placeholder = {
                                     Text(
                                         str("together_link_or_code_hint"),
@@ -514,7 +514,7 @@ private fun JoinOrCreateCard(
                                                     } else null
                                                 }.getOrNull()
                                                 if (!clip.isNullOrBlank()) {
-                                                    onJoinCodeChange(clip.trim())
+                                                    onJoinCodeChange(TogetherLinks.formatCodeInput(clip.trim()))
                                                 }
                                             },
                                         ) {
@@ -640,12 +640,7 @@ private fun SavedSessionsSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        TogetherArtwork(
-                            url = room?.nowPlaying?.artworkUrl ?: entry.tracks.firstOrNull()?.artworkUrl,
-                            isLive = live,
-                            size = 56.dp,
-                            cornerRadius = 16.dp,
-                        )
+                        TogetherIconBadge(icon = Icons.Rounded.Groups, size = 56.dp)
                         Column(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -724,8 +719,10 @@ private fun LiveBroadcastHeroCard(
 ) {
     val cs = MaterialTheme.colorScheme
     val isLive = activeCode != null
-    val containerColor by animateColorAsState(
-        targetValue = if (isLive) cs.primaryContainer else cs.surfaceContainerHigh,
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isLive,
+        selectedColor = cs.primaryContainer,
+        unselectedColor = cs.surfaceContainerHigh,
         animationSpec = tween(280),
         label = "liveHeroContainer",
     )

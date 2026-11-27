@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -88,18 +89,6 @@ fun LiveListenDialog(
     onDismissRequest: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
-    val prefs = remember { PlayerPreferences() }
-    val activeCode by Together.active.collectAsState()
-    val rooms by Together.rooms.collectAsState()
-    val isHostLocked by Together.isHostLocked.collectAsState()
-    val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
-    var discordListenAlong by remember { mutableStateOf(prefs.getDiscordListenAlongEnabled()) }
-    var joinInput by remember { mutableStateOf("") }
-
-    val activeRoom = activeCode?.let { rooms[it] ?: Together.Room(it, "") }
-    val isHost = activeCode?.let { Together.isHostOf(it) } == true
-    val currentTrack = playerViewModel.uiCurrentTrack
-
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -114,425 +103,472 @@ fun LiveListenDialog(
             tonalElevation = 6.dp,
             shadowElevation = 20.dp,
         ) {
-            Column(
+            LiveListenContent(
+                playerViewModel = playerViewModel,
+                onOpenRoom = onOpenRoom,
+                onDismissRequest = onDismissRequest,
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Shared Live Listen Along controls used both inside the centered [LiveListenDialog] and inline
+ * inside the track context menu popup.
+ */
+@Composable
+fun LiveListenContent(
+    playerViewModel: PlayerViewModel,
+    onOpenRoom: (String) -> Unit,
+    onDismissRequest: () -> Unit,
+    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val cs = MaterialTheme.colorScheme
+    val prefs = remember { PlayerPreferences() }
+    val activeCode by Together.active.collectAsState()
+    val rooms by Together.rooms.collectAsState()
+    val isHostLocked by Together.isHostLocked.collectAsState()
+    val myAvatarUrl by Together.myAvatarUrlFlow.collectAsState()
+    var discordListenAlong by remember { mutableStateOf(prefs.getDiscordListenAlongEnabled()) }
+    var joinInput by remember { mutableStateOf("") }
+
+    val activeRoom = activeCode?.let { rooms[it] ?: Together.Room(it, "") }
+    val isHost = activeCode?.let { Together.isHostOf(it) } == true
+    val currentTrack = playerViewModel.uiCurrentTrack
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (onBack != null) {
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = cs.surfaceContainerHigh,
+                        contentColor = cs.onSurfaceVariant,
+                    ),
                 ) {
-                    ExpressiveCookieBadge(
-                        isActive = activeCode != null,
-                        size = 56.dp,
-                        activeColor = cs.primary,
-                        inactiveColor = cs.secondaryContainer,
-                    ) {
-                        if (activeCode != null) {
-                            ListeningBars(
-                                isPlaying = true,
-                                modifier = Modifier.size(22.dp),
-                                color = cs.onPrimary,
-                            )
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+                }
+            }
+            ExpressiveCookieBadge(
+                isActive = activeCode != null,
+                size = if (onBack != null) 48.dp else 56.dp,
+                activeColor = cs.primary,
+                inactiveColor = cs.secondaryContainer,
+            ) {
+                if (activeCode != null) {
+                    ListeningBars(
+                        isPlaying = true,
+                        modifier = Modifier.size(if (onBack != null) 20.dp else 22.dp),
+                        color = cs.onPrimary,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Podcasts,
+                        contentDescription = null,
+                        tint = cs.onSecondaryContainer,
+                        modifier = Modifier.size(if (onBack != null) 22.dp else 26.dp),
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = str("together_live_title"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (activeRoom != null) {
+                        val listeners = activeRoom.listeners.map { it.name }
+                        if (listeners.isEmpty()) {
+                            str("together_code", TogetherWire.displayCode(activeRoom.code))
                         } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Podcasts,
-                                contentDescription = null,
-                                tint = cs.onSecondaryContainer,
-                                modifier = Modifier.size(26.dp),
-                            )
+                            str("together_listening_now", listeners.joinToString(", "))
                         }
-                    }
+                    } else {
+                        str("together_live_subtitle")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                )
+            }
+            FilledTonalIconButton(
+                onClick = onDismissRequest,
+                shapes = IconButtonDefaults.shapes(),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = cs.surfaceContainerHigh,
+                    contentColor = cs.onSurfaceVariant,
+                ),
+            ) {
+                Icon(Icons.Rounded.Close, contentDescription = str("btn_cancel"))
+            }
+        }
+
+        if (activeCode == null) {
+            if (currentTrack != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(cs.surfaceContainerHigh)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TogetherArtwork(
+                        url = currentTrack.fullResArtwork,
+                        isLive = false,
+                        size = 52.dp,
+                        cornerRadius = 14.dp,
+                    )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = str("together_live_title"),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                        )
-                        Text(
-                            text = if (activeRoom != null) {
-                                val listeners = activeRoom.listeners.map { it.name }
-                                if (listeners.isEmpty()) {
-                                    str("together_code", TogetherWire.displayCode(activeRoom.code))
-                                } else {
-                                    str("together_listening_now", listeners.joinToString(", "))
-                                }
-                            } else {
-                                str("together_live_subtitle")
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = cs.onSurfaceVariant,
-                        )
-                    }
-                    FilledTonalIconButton(
-                        onClick = onDismissRequest,
-                        shapes = IconButtonDefaults.shapes(),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = cs.surfaceContainerHigh,
-                            contentColor = cs.onSurfaceVariant,
-                        ),
-                    ) {
-                        Icon(Icons.Rounded.Close, contentDescription = str("btn_cancel"))
-                    }
-                }
-
-                if (activeCode == null) {
-                    if (currentTrack != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(cs.surfaceContainerHigh)
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            TogetherArtwork(
-                                url = currentTrack.fullResArtwork,
-                                isLive = false,
-                                size = 52.dp,
-                                cornerRadius = 14.dp,
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = currentTrack.title ?: str("untitled_track"),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    text = currentTrack.displayArtist.ifBlank { str("unknown_artist") },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = cs.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
-
-                    Button(
-                        onClick = { playerViewModel.startLiveListenAlong() },
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                    ) {
-                        Icon(Icons.Rounded.Podcasts, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text(str("together_start_live"), fontWeight = FontWeight.Bold)
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(cs.surfaceContainerHigh)
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(
-                            text = str("together_join"),
+                            text = currentTrack.title ?: str("untitled_track"),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        val submitJoin = {
-                            val joined = Together.joinAndListen(joinInput)
-                            if (joined != null) {
-                                joinInput = ""
-                                onDismissRequest()
-                                onOpenRoom(joined.code)
-                            } else {
-                                Toaster.show(str("together_bad_code"))
-                            }
-                        }
-                        OutlinedTextField(
-                            value = joinInput,
-                            onValueChange = { joinInput = it },
-                            placeholder = {
-                                Text(
-                                    str("together_link_or_code_hint"),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            singleLine = true,
-                            shape = RoundedCornerShape(18.dp),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { submitJoin() }),
-                            modifier = Modifier.fillMaxWidth().trackTextInput(),
-                        )
-                        FilledTonalButton(
-                            onClick = { submitJoin() },
-                            enabled = joinInput.isNotBlank(),
-                            shapes = ButtonDefaults.shapes(),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Rounded.Groups, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("together_listen"))
-                        }
-                    }
-                } else {
-                    val code = activeCode!!
-                    val inviteUrl = remember(code) { TogetherLinks.inviteUrl(code) }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(26.dp))
-                            .background(cs.surfaceContainerHigh)
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Surface(
-                                onClick = { TogetherLinks.copyCode(code) },
-                                shape = CircleShape,
-                                color = cs.primaryContainer,
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.ContentCopy,
-                                        contentDescription = str("together_copy_code"),
-                                        tint = cs.onPrimaryContainer,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Text(
-                                        text = TogetherWire.displayCode(code),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = cs.onPrimaryContainer,
-                                    )
-                                }
-                            }
-                            TogetherInviteQrButton(code)
-                        }
                         Text(
-                            text = inviteUrl,
+                            text = currentTrack.displayArtist.ifBlank { str("unknown_artist") },
                             style = MaterialTheme.typography.bodySmall,
                             color = cs.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        val liveMembers = remember(activeRoom?.listeners, isHost, myAvatarUrl) {
-                            buildList {
-                                add(Together.Member(Together.memberId, Together.myName, true, System.currentTimeMillis(), myAvatarUrl))
-                                activeRoom?.listeners?.filterNot { it.id == Together.memberId }?.forEach { add(it) }
-                            }
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            liveMembers.forEach { member ->
-                                TogetherMemberPill(
-                                    name = member.name,
-                                    isHost = member.id == activeRoom?.hostId || (isHost && member.id == Together.memberId),
-                                    isMe = member.id == Together.memberId,
-                                    avatarUrl = if (member.id == Together.memberId) (myAvatarUrl ?: member.avatarUrl) else member.avatarUrl,
-                                )
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Button(
-                                onClick = { TogetherLinks.copyShareMessage(code) },
-                                shapes = ButtonDefaults.shapes(),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(str("together_share_link"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            FilledTonalButton(
-                                onClick = { TogetherLinks.copyInviteLink(code) },
-                                shapes = ButtonDefaults.shapes(),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(str("together_copy_link"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
                     }
+                }
+            }
 
-                    if (isHost) {
-                        TogetherGroupSection {
-                            TogetherGroupItem(
-                                onClick = { Together.setHostLocked(!isHostLocked) },
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    TogetherIconBadge(icon = Icons.Rounded.Lock)
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = str("together_lock_controls"),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                        Text(
-                                            text = str("together_lock_controls_desc"),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = cs.onSurfaceVariant,
-                                        )
-                                    }
-                                    Switch(
-                                        checked = isHostLocked,
-                                        onCheckedChange = { Together.setHostLocked(it) },
-                                        thumbContent = if (isHostLocked) {
-                                            { Icon(Icons.Rounded.Check, null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
-                                        } else null,
-                                    )
-                                }
-                            }
+            Button(
+                onClick = { playerViewModel.startLiveListenAlong() },
+                shapes = ButtonDefaults.shapes(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            ) {
+                Icon(Icons.Rounded.Podcasts, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(str("together_start_live"), fontWeight = FontWeight.Bold)
+            }
 
-                            TogetherGroupItem(
-                                onClick = {
-                                    val next = !discordListenAlong
-                                    discordListenAlong = next
-                                    prefs.setDiscordListenAlongEnabled(next)
-                                    playerViewModel.updateDiscordPresence()
-                                },
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    TogetherIconBadge(icon = Icons.Rounded.Headphones)
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = str("discord_listen_along_title"),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                        Text(
-                                            text = str("discord_listen_along_desc"),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = cs.onSurfaceVariant,
-                                        )
-                                    }
-                                    Switch(
-                                        checked = discordListenAlong,
-                                        onCheckedChange = {
-                                            discordListenAlong = it
-                                            prefs.setDiscordListenAlongEnabled(it)
-                                            playerViewModel.updateDiscordPresence()
-                                        },
-                                        thumbContent = if (discordListenAlong) {
-                                            { Icon(Icons.Rounded.Check, null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
-                                        } else null,
-                                    )
-                                }
-                            }
-
-                            if (code == Together.personalLiveCode) {
-                                TogetherGroupItem(
-                                    onClick = {
-                                        val fresh = Together.regeneratePersonalLiveCode()
-                                        TogetherLinks.copyInviteLink(fresh)
-                                        playerViewModel.updateDiscordPresence()
-                                    },
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        TogetherIconBadge(icon = Icons.Rounded.Refresh)
-                                        Text(
-                                            text = str("together_reset_link"),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else if (activeRoom?.hostLocked == true) {
-                        Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = cs.secondaryContainer,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Lock,
-                                    contentDescription = null,
-                                    tint = cs.onSecondaryContainer,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Text(
-                                    text = str("together_listen_only_badge"),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = cs.onSecondaryContainer,
-                                )
-                            }
-                        }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(cs.surfaceContainerHigh)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = str("together_join"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                val submitJoin = {
+                    val joined = Together.joinAndListen(joinInput)
+                    if (joined != null) {
+                        joinInput = ""
+                        onDismissRequest()
+                        onOpenRoom(joined.code)
+                    } else {
+                        Toaster.show(str("together_bad_code"))
                     }
+                }
+                OutlinedTextField(
+                    value = joinInput,
+                    onValueChange = { joinInput = TogetherLinks.formatCodeInput(it) },
+                    placeholder = {
+                        Text(
+                            str("together_link_or_code_hint"),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submitJoin() }),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
+                )
+                FilledTonalButton(
+                    onClick = { submitJoin() },
+                    enabled = joinInput.isNotBlank(),
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Rounded.Groups, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("together_listen"))
+                }
+            }
+        } else {
+            val code = activeCode!!
+            val inviteUrl = remember(code) { TogetherLinks.inviteUrl(code) }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(cs.surfaceContainerHigh)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(
+                        onClick = { TogetherLinks.copyCode(code) },
+                        shape = CircleShape,
+                        color = cs.primaryContainer,
                     ) {
-                        FilledTonalButton(
-                            onClick = {
-                                onDismissRequest()
-                                onOpenRoom(code)
-                            },
-                            shapes = ButtonDefaults.shapes(),
-                            modifier = Modifier.weight(1f),
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("together_open_room"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        OutlinedButton(
-                            onClick = { Together.stopListening() },
-                            shapes = ButtonDefaults.shapes(),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = cs.error),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Rounded.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.ContentCopy,
+                                contentDescription = str("together_copy_code"),
+                                tint = cs.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp),
+                            )
                             Text(
-                                str(if (isHost) "together_stop_live" else "together_leave"),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                text = TogetherWire.displayCode(code),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = cs.onPrimaryContainer,
                             )
                         }
                     }
+                    TogetherInviteQrButton(code)
+                }
+                Text(
+                    text = inviteUrl,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val liveMembers = remember(activeRoom?.listeners, isHost, myAvatarUrl) {
+                    buildList {
+                        add(Together.Member(Together.memberId, Together.myName, true, System.currentTimeMillis(), myAvatarUrl))
+                        activeRoom?.listeners?.filterNot { it.id == Together.memberId }?.forEach { add(it) }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    liveMembers.forEach { member ->
+                        TogetherMemberPill(
+                            name = member.name,
+                            isHost = member.id == activeRoom?.hostId || (isHost && member.id == Together.memberId),
+                            isMe = member.id == Together.memberId,
+                            avatarUrl = if (member.id == Together.memberId) (myAvatarUrl ?: member.avatarUrl) else member.avatarUrl,
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Button(
+                        onClick = { TogetherLinks.copyShareMessage(code) },
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("together_share_link"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    FilledTonalButton(
+                        onClick = { TogetherLinks.copyInviteLink(code) },
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("together_copy_link"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+
+            if (isHost) {
+                TogetherGroupSection {
+                    TogetherGroupItem(
+                        onClick = { Together.setHostLocked(!isHostLocked) },
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            TogetherIconBadge(icon = Icons.Rounded.Lock)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = str("together_lock_controls"),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = str("together_lock_controls_desc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = cs.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = isHostLocked,
+                                onCheckedChange = { Together.setHostLocked(it) },
+                                thumbContent = if (isHostLocked) {
+                                    { Icon(Icons.Rounded.Check, null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
+                                } else null,
+                            )
+                        }
+                    }
+
+                    TogetherGroupItem(
+                        onClick = {
+                            val next = !discordListenAlong
+                            discordListenAlong = next
+                            prefs.setDiscordListenAlongEnabled(next)
+                            playerViewModel.updateDiscordPresence()
+                        },
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            TogetherIconBadge(icon = Icons.Rounded.Headphones)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = str("discord_listen_along_title"),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = str("discord_listen_along_desc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = cs.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = discordListenAlong,
+                                onCheckedChange = {
+                                    discordListenAlong = it
+                                    prefs.setDiscordListenAlongEnabled(it)
+                                    playerViewModel.updateDiscordPresence()
+                                },
+                                thumbContent = if (discordListenAlong) {
+                                    { Icon(Icons.Rounded.Check, null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
+                                } else null,
+                            )
+                        }
+                    }
+
+                    if (code == Together.personalLiveCode) {
+                        TogetherGroupItem(
+                            onClick = {
+                                val fresh = Together.regeneratePersonalLiveCode()
+                                TogetherLinks.copyInviteLink(fresh)
+                                playerViewModel.updateDiscordPresence()
+                            },
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                TogetherIconBadge(icon = Icons.Rounded.Refresh)
+                                Text(
+                                    text = str("together_reset_link"),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                }
+            } else if (activeRoom?.hostLocked == true) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = cs.secondaryContainer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = cs.onSecondaryContainer,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = str("together_listen_only_badge"),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = cs.onSecondaryContainer,
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        onDismissRequest()
+                        onOpenRoom(code)
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("together_open_room"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                OutlinedButton(
+                    onClick = { Together.stopListening() },
+                    shapes = ButtonDefaults.shapes(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = cs.error),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Rounded.StopCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        str(if (isHost) "together_stop_live" else "together_leave"),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

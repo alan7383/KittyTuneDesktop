@@ -634,4 +634,26 @@ class TogetherLiveLinksAndProtocolTest {
         assertEquals(sampleTrack.id, roomAfterFresh?.nowPlaying?.id)
         assertEquals(2, roomAfterFresh?.listeners?.size)
     }
+
+    @Test
+    fun testFormatCodeInput() {
+        // Raw characters limit to 8 and put dash between 4 characters
+        assertEquals("ABCD", TogetherLinks.formatCodeInput("abcd"))
+        assertEquals("ABCD-", TogetherLinks.formatCodeInput("abcd-"))
+        assertEquals("ABCD-E", TogetherLinks.formatCodeInput("abcde"))
+        assertEquals("ABCD-EFGH", TogetherLinks.formatCodeInput("abcdefgh"))
+        assertEquals("ABCD-EFGH", TogetherLinks.formatCodeInput("abcd-efgh"))
+        assertEquals("ABCD-EFGH", TogetherLinks.formatCodeInput("abcdefghijklmnop"))
+        assertEquals("ABCD-EFGH", TogetherLinks.formatCodeInput("abcd efgh"))
+
+        // Does not format or truncate if it begins with https (or http / kittytune://)
+        val httpsInvite = "https://kittytune.pages.dev/ABCD-EFGH"
+        assertEquals(httpsInvite, TogetherLinks.formatCodeInput(httpsInvite))
+        val httpsQuery = "https://kittytune.pages.dev/listen?together=ABCD-EFGH&from=Alice"
+        assertEquals(httpsQuery, TogetherLinks.formatCodeInput(httpsQuery))
+        val httpUrl = "http://localhost:8080/together/ABCD-EFGH"
+        assertEquals(httpUrl, TogetherLinks.formatCodeInput(httpUrl))
+        val customScheme = "kittytune://together/ABCD-EFGH"
+        assertEquals(customScheme, TogetherLinks.formatCodeInput(customScheme))
+    }
 }

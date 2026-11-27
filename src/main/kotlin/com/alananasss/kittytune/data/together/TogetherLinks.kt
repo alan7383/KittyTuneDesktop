@@ -66,6 +66,29 @@ object TogetherLinks {
 
     fun isTogetherUri(raw: String?): Boolean = extractCodeFromUri(raw) != null
 
+    /**
+     * Formats user input when typing or pasting a Together code or invite link.
+     * If the input begins with an HTTPS/HTTP URL or custom scheme, it is left as-is.
+     * Otherwise, it enforces a limit of 8 alphanumeric characters and formats as `XXXX-XXXX`.
+     */
+    fun formatCodeInput(raw: String): String {
+        val trimmed = raw.trimStart()
+        if (trimmed.startsWith("https", ignoreCase = true) ||
+            trimmed.startsWith("http", ignoreCase = true) ||
+            trimmed.startsWith("kittytune://", ignoreCase = true)
+        ) {
+            return raw.trim()
+        }
+        val clean = raw.filter { it.isLetterOrDigit() }.uppercase().take(TogetherWire.CODE_LENGTH)
+        return if (clean.length > 4) {
+            clean.substring(0, 4) + "-" + clean.substring(4)
+        } else if (clean.length == 4 && raw.endsWith("-")) {
+            "$clean-"
+        } else {
+            clean
+        }
+    }
+
     fun extractCodeFromUri(uriString: String?): String? {
         if (uriString.isNullOrBlank()) return null
         return extractCode(uriString, allowRawCode = false)
