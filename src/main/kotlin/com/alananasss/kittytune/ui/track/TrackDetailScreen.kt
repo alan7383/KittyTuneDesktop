@@ -449,7 +449,7 @@ private fun TrackDetailHeader(track: Track, playerViewModel: PlayerViewModel) {
             Spacer(Modifier.width(20.dp))
             Column {
                 Text(
-                    track.title ?: "",
+                    track.displayTitle.orEmpty(),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -498,8 +498,11 @@ private fun DetailTabs(selected: Int, tabs: List<DetailTab>, onSelect: (Int) -> 
     ) {
         tabs.forEachIndexed { index, tab ->
             val isSelected = index == selected
-            val container by androidx.compose.animation.animateColorAsState(
-                if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+            val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = isSelected,
+                selectedColor = MaterialTheme.colorScheme.secondaryContainer,
+                unselectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                animationSpec = androidx.compose.animation.core.spring(),
                 label = "detailTab",
             )
             Surface(

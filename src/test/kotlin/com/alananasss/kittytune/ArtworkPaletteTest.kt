@@ -40,4 +40,46 @@ class ArtworkPaletteTest {
             server.stop(0)
         }
     }
+
+    @Test
+    fun extractTrackColorsCachesAllRolesAndServesInstantHits() {
+        val imageBytes = ByteArrayOutputStream().use { out ->
+            val image = BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB)
+            val graphics = image.createGraphics()
+            graphics.color = Color(20, 150, 170)
+            graphics.fillRect(0, 0, 32, 32)
+            graphics.dispose()
+            ImageIO.write(image, "png", out)
+            out.toByteArray()
+        }
+
+        var requests = 0
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/cached-cover.png") { exchange ->
+            requests++
+            exchange.responseHeaders.add("Content-Type", "image/png")
+            exchange.sendResponseHeaders(200, imageBytes.size.toLong())
+            exchange.responseBody.use { it.write(imageBytes) }
+        }
+        server.start()
+        try {
+            val url = "http://127.0.0.1:${server.address.port}/cached-cover.png"
+            org.junit.Assert.assertNull(ArtworkPalette.cachedTrackColors(url))
+
+            val first = ArtworkPalette.extractTrackColors(url)
+            assertNotNull(first)
+            org.junit.Assert.assertTrue(first!!.meshColors.isNotEmpty())
+            org.junit.Assert.assertEquals(1, requests)
+
+            val cached = ArtworkPalette.cachedTrackColors(url)
+            assertNotNull(cached)
+            org.junit.Assert.assertEquals(first, cached)
+
+            val second = ArtworkPalette.extractTrackColors(url)
+            org.junit.Assert.assertEquals(first, second)
+            org.junit.Assert.assertEquals("Cached track colors must not re-fetch over HTTP", 1, requests)
+        } finally {
+            server.stop(0)
+        }
+    }
 }

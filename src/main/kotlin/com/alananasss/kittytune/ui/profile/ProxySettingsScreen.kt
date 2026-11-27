@@ -353,17 +353,19 @@ fun ProxySettingsScreen(
                                             (host == profile.config.host && portText == profile.config.port.toString())
 
                                     val itemShape = getSettingsShape(savedProfiles.size, index)
-                                    val containerColor by animateColorAsState(
-                                        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                        else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                                        selected = isSelected,
+                                        selectedColor = MaterialTheme.colorScheme.primaryContainer,
+                                        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                         animationSpec = tween(250),
-                                        label = "profile_bg"
+                                        label = "profile_bg",
                                     )
-                                    val contentColor by animateColorAsState(
-                                        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurface,
+                                    val contentColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                                        selected = isSelected,
+                                        selectedColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        unselectedColor = MaterialTheme.colorScheme.onSurface,
                                         animationSpec = tween(250),
-                                        label = "profile_content"
+                                        label = "profile_content",
                                     )
 
                                     AnimatedVisibility(

@@ -69,15 +69,19 @@ fun RecognitionScreen(
     val isSearching = state is RecognitionState.Recording || state is RecognitionState.Processing
     val isErrorOrSuccess = state is RecognitionState.Error || state is RecognitionState.Success
     // Matches Android: idle = secondaryContainer, searching = primaryContainer, result = surface
-    val bgColor = when {
-        isErrorOrSuccess -> MaterialTheme.colorScheme.surface
-        isSearching -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.secondaryContainer
-    }
-    val animatedBgColor by animateColorAsState(
-        targetValue = bgColor,
+    val searchingBg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSearching && !isErrorOrSuccess,
+        selectedColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedColor = MaterialTheme.colorScheme.secondaryContainer,
         animationSpec = tween(1000),
-        label = "bg_color"
+        label = "bg_search_color",
+    )
+    val animatedBgColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isErrorOrSuccess,
+        selectedColor = MaterialTheme.colorScheme.surface,
+        unselectedColor = searchingBg,
+        animationSpec = tween(1000),
+        label = "bg_color",
     )
 
     Box(
@@ -228,13 +232,12 @@ private fun RecognitionHomeView(
     else
         MaterialTheme.colorScheme.onSecondary         // icon on secondary circle
 
-    val labelColor by animateColorAsState(
-        targetValue = if (isSearching)
-            MaterialTheme.colorScheme.onPrimaryContainer
-        else
-            MaterialTheme.colorScheme.onSecondaryContainer,
+    val labelColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSearching,
+        selectedColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedColor = MaterialTheme.colorScheme.onSecondaryContainer,
         animationSpec = tween(300),
-        label = "label_color"
+        label = "label_color",
     )
 
     Column(

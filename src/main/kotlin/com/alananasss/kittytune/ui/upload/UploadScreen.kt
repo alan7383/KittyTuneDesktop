@@ -469,13 +469,17 @@ private fun HeroFilePickerSection(
     isDraggingOver: Boolean,
     onFileSelected: (File) -> Unit
 ) {
-    val containerColor by animateColorAsState(
-        if (isDraggingOver) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-        else MaterialTheme.colorScheme.surfaceContainerLow
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isDraggingOver,
+        selectedColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        label = "uploadDropContainer",
     )
-    val borderColor by animateColorAsState(
-        if (isDraggingOver) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    val borderColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isDraggingOver,
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        label = "uploadDropBorder",
     )
 
     Box(

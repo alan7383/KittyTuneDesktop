@@ -3,7 +3,9 @@ package com.alananasss.kittytune.ui.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
@@ -105,34 +107,62 @@ internal fun rememberSoundTuneColorScheme(
     // Artwork seed is only used when track-based dynamic color is enabled.
     val coverSeed = if (trackDynamicColor) ThemeState.coverSeedColor else null
 
-    if (coverSeed == null && colorStyle.contains("end4", ignoreCase = true)) {
-        val end4Colors by com.alananasss.kittytune.data.theme.End4ThemeManager.colorsMap.collectAsState()
-        @Suppress("UNUSED_VARIABLE")
-        val unused = end4Colors
-        val fallbackScheme = rememberDynamicColorScheme(
-            seedColor = KittyTuneDefaultSeedColor,
-            isDark = useDarkTheme,
-            isAmoled = pureBlack,
-            style = PaletteStyle.Expressive,
-            specVersion = ColorSpec.SpecVersion.SPEC_2025,
-            platform = DynamicScheme.Platform.PHONE,
-        )
-        return com.alananasss.kittytune.data.theme.End4ThemeManager.buildColorScheme(fallbackScheme, pureBlack && useDarkTheme)
-    }
-
     val wantsWindowsAccent = colorStyle.contains("windows", ignoreCase = true)
-    if (coverSeed == null && wantsWindowsAccent) {
-        val isWindowsOS = System.getProperty("os.name").lowercase().contains("win")
-        if (isWindowsOS) {
+    if (!wantsWindowsAccent) {
+        com.alananasss.kittytune.data.theme.WindowsThemeManager.stopWatching()
+    }
+    val isWindowsHost = remember { System.getProperty("os.name").lowercase().contains("win") }
+
+    val target = when {
+        coverSeed == null && colorStyle.contains("end4", ignoreCase = true) -> {
+            val end4Colors by com.alananasss.kittytune.data.theme.End4ThemeManager.colorsMap.collectAsState()
+            @Suppress("UNUSED_VARIABLE")
+            val unused = end4Colors
+            val fallbackScheme = rememberDynamicColorScheme(
+                seedColor = KittyTuneDefaultSeedColor,
+                isDark = useDarkTheme,
+                isAmoled = pureBlack,
+                style = PaletteStyle.Expressive,
+                specVersion = ColorSpec.SpecVersion.SPEC_2025,
+                platform = DynamicScheme.Platform.PHONE,
+            )
+            com.alananasss.kittytune.data.theme.End4ThemeManager.buildColorScheme(fallbackScheme, pureBlack && useDarkTheme)
+        }
+        coverSeed == null && wantsWindowsAccent && isWindowsHost -> {
             com.alananasss.kittytune.data.theme.WindowsThemeManager.startWatching()
             val winColor by com.alananasss.kittytune.data.theme.WindowsThemeManager.accentColor.collectAsState()
             val effectiveWinColor = ThemeState.previewKeyColor?.let { Color(it) } ?: winColor ?: KittyTuneDefaultSeedColor
-            
-            val style = PaletteStyle.Fidelity
-            val specVersion = parseMaterialKolorColorSpec(colorSpec)
-            
-            return rememberDynamicColorScheme(
+            val specVersion = remember(colorSpec) { parseMaterialKolorColorSpec(colorSpec) }
+
+            rememberDynamicColorScheme(
                 seedColor = effectiveWinColor,
+                isDark = useDarkTheme,
+                isAmoled = pureBlack,
+                style = PaletteStyle.Fidelity,
+                specVersion = specVersion,
+                platform = DynamicScheme.Platform.PHONE,
+                modifyColorScheme = { scheme ->
+                    if (pureBlack && useDarkTheme) scheme.withAmoledSurfaces() else scheme
+                }
+            )
+        }
+        else -> {
+            val style = remember(colorStyle) { parseMaterialKolorPaletteStyle(colorStyle) }
+            val specVersion = remember(colorSpec) { parseMaterialKolorColorSpec(colorSpec) }
+
+            val effectiveKeyColor = ThemeState.previewKeyColor ?: keyColor
+            // The whole palette is seeded from the current track's dominant artwork colour, falling
+            // back to the user's key colour when there is none.
+            val seedColor = remember(effectiveKeyColor, coverSeed, useDarkTheme) {
+                when {
+                    coverSeed != null -> Color(coverSeed)
+                    effectiveKeyColor != 0 -> Color(effectiveKeyColor)
+                    else -> KittyTuneDefaultSeedColor
+                }
+            }
+
+            rememberDynamicColorScheme(
+                seedColor = seedColor,
                 isDark = useDarkTheme,
                 isAmoled = pureBlack,
                 style = style,
@@ -144,39 +174,35 @@ internal fun rememberSoundTuneColorScheme(
             )
         }
     }
-    if (!wantsWindowsAccent) {
-        com.alananasss.kittytune.data.theme.WindowsThemeManager.stopWatching()
-    }
-
-    val style = remember(colorStyle) { parseMaterialKolorPaletteStyle(colorStyle) }
-    val specVersion = remember(colorSpec) { parseMaterialKolorColorSpec(colorSpec) }
-
-    val effectiveKeyColor = ThemeState.previewKeyColor ?: keyColor
-    // The whole palette is seeded from the current track's dominant artwork colour, falling
-    // back to the user's key colour when there is none.
-    val seedColor = remember(effectiveKeyColor, coverSeed, useDarkTheme) {
-        when {
-            coverSeed != null -> Color(coverSeed)
-            effectiveKeyColor != 0 -> Color(effectiveKeyColor)
-            else -> KittyTuneDefaultSeedColor
-        }
-    }
-
-    val target = rememberDynamicColorScheme(
-        seedColor = seedColor,
-        isDark = useDarkTheme,
-        isAmoled = pureBlack,
-        style = style,
-        specVersion = specVersion,
-        platform = DynamicScheme.Platform.PHONE,
-        modifyColorScheme = { scheme ->
-            if (pureBlack && useDarkTheme) scheme.withAmoledSurfaces() else scheme
-        }
-    )
 
     // Snapped rather than eased while the colour picker is being dragged: there the whole point is
     // that the app follows your finger, and a tween would only lag behind it.
     return target.easedInto(instant = ThemeState.previewKeyColor != null)
+}
+
+/**
+ * Smoothly interpolates between [unselectedColor] and [selectedColor] by animating only the 0..1
+ * state factor rather than the resolved colors themselves.
+ *
+ * Wrapping `MaterialTheme.colorScheme` tokens in `animateColorAsState` causes buttons, tabs, and
+ * pills to restart their tween on every frame of a dynamic theme transition and lag behind the
+ * background surfaces. Animating only the scalar progress keeps controls synchronized with theme
+ * changes while preserving smooth selection and hover animations.
+ */
+@Composable
+fun animatePaletteColor(
+    selected: Boolean,
+    selectedColor: Color,
+    unselectedColor: Color,
+    animationSpec: AnimationSpec<Float> = spring(),
+    label: String = "paletteColor",
+): Color {
+    val progress by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = animationSpec,
+        label = label,
+    )
+    return androidx.compose.ui.graphics.lerp(unselectedColor, selectedColor, progress)
 }
 
 /**

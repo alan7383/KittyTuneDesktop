@@ -184,7 +184,13 @@ fun AccountScreen(
 @Composable
 private fun SavedAccountRow(account: TokenManager.SavedAccount, active: Boolean, shape: Shape, onClick: () -> Unit, onForget: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val container by animateColorAsState(if (active) cs.secondaryContainer else cs.surfaceContainerHigh, label = "accountRow")
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = active,
+        selectedColor = cs.secondaryContainer,
+        unselectedColor = cs.surfaceContainerHigh,
+        animationSpec = spring(),
+        label = "accountRow",
+    )
     Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag("account-${account.id}"), shape = shape, color = container,
         contentColor = if (active) cs.onSecondaryContainer else cs.onSurface) {
         Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically,

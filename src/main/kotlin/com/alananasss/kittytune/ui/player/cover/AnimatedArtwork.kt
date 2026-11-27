@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.player.cover
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,14 +31,21 @@ fun AnimatedArtwork(
         // (local files without embedded art) or it fails. It used to be an empty black square.
         ArtworkPlaceholder(Modifier.fillMaxSize())
 
-        // Base static artwork
-        if (!artworkUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = artworkUrl,
-                contentDescription = contentDescription,
-                contentScale = contentScale,
-                modifier = Modifier.fillMaxSize()
-            )
+        // Base static artwork cross-faded cleanly on track changes.
+        Crossfade(
+            targetState = artworkUrl?.takeIf { it.isNotBlank() },
+            animationSpec = tween(250),
+            label = "artworkCrossfade",
+            modifier = Modifier.fillMaxSize(),
+        ) { url ->
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = contentDescription,
+                    contentScale = contentScale,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
         // Animated cover video overlay

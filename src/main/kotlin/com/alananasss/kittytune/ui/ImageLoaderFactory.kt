@@ -16,11 +16,20 @@ import okio.Path.Companion.toOkioPath
 
 object ImageLoaderFactory {
 
+    @Volatile
+    var diskCache: DiskCache? = null
+        private set
+
     fun create(): ImageLoader {
         // Route image requests through the proxy when one is configured
         // (same as the Android app wiring Coil to ProxyManager's client).
         val okHttp = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
         val performance = PerformanceSettings.active
+        val builtDiskCache = DiskCache.Builder()
+            .directory(AppDirs.imageCacheDir.toOkioPath())
+            .maxSizeBytes(performance.diskCacheMiB.toLong() * 1024 * 1024)
+            .build()
+        diskCache = builtDiskCache
         return ImageLoader.Builder(PlatformContext.INSTANCE)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { okHttp }))
@@ -49,12 +58,7 @@ object ImageLoaderFactory {
                     .maxSizeBytes(performance.imageCacheMiB.toLong() * 1024 * 1024)
                     .build()
             }
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(AppDirs.imageCacheDir.toOkioPath())
-                    .maxSizeBytes(performance.diskCacheMiB.toLong() * 1024 * 1024)
-                    .build()
-            }
+            .diskCache { builtDiskCache }
             // No global crossfade: it applied to every AsyncImage in the app, including 56-dp
             // thumbnails in fast-scrolling grids, where dozens of 150-300 ms fades read as flicker
             // and waste GPU compositing. Callers that want a crossfade on large artwork (full

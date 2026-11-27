@@ -810,17 +810,26 @@ fun FxTile(
     val scheme = MaterialTheme.colorScheme
     val activeContainer = if (isDanger) scheme.errorContainer else scheme.secondaryContainer
     val activeContent = if (isDanger) scheme.onErrorContainer else scheme.onSecondaryContainer
-    val containerColor by animateColorAsState(
-        targetValue = if (isActive) activeContainer else scheme.surfaceContainerHigh,
-        animationSpec = tween(250), label = "containerColor"
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = activeContainer,
+        unselectedColor = scheme.surfaceContainerHigh,
+        animationSpec = tween(250),
+        label = "containerColor",
     )
-    val contentColor by animateColorAsState(
-        targetValue = if (isActive) activeContent else scheme.onSurface,
-        animationSpec = tween(250), label = "contentColor"
+    val contentColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = activeContent,
+        unselectedColor = scheme.onSurface,
+        animationSpec = tween(250),
+        label = "contentColor",
     )
-    val iconColor by animateColorAsState(
-        targetValue = if (isActive) activeContent else scheme.onSurfaceVariant,
-        animationSpec = tween(250), label = "iconColor"
+    val iconColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = activeContent,
+        unselectedColor = scheme.onSurfaceVariant,
+        animationSpec = tween(250),
+        label = "iconColor",
     )
     val iconScale by animateFloatAsState(
         targetValue = if (isActive) 1.12f else 1f,
@@ -950,13 +959,19 @@ private fun SpeedCard(viewModel: PlayerViewModel, allowPitch: Boolean = true) {
                 }
             }
 
-            val pitchContainerColor by animateColorAsState(
-                targetValue = if (isPitchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                label = "pitchContainer"
+            val pitchContainerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = isPitchActive,
+                selectedColor = MaterialTheme.colorScheme.primary,
+                unselectedColor = MaterialTheme.colorScheme.surface,
+                animationSpec = spring(),
+                label = "pitchContainer",
             )
-            val pitchContentColor by animateColorAsState(
-                targetValue = if (isPitchActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                label = "pitchContent"
+            val pitchContentColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = isPitchActive,
+                selectedColor = MaterialTheme.colorScheme.onPrimary,
+                unselectedColor = MaterialTheme.colorScheme.onSurface,
+                animationSpec = spring(),
+                label = "pitchContent",
             )
             Surface(
                 onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
@@ -1169,15 +1184,19 @@ fun ActiveQSTile(
     val activeColor = if (fx.isDanger) scheme.errorContainer else scheme.secondaryContainer
     val activeContentColor = if (fx.isDanger) scheme.onErrorContainer else scheme.onSecondaryContainer
 
-    val containerColor by animateColorAsState(
-        targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHighest,
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = activeColor,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         animationSpec = tween(250),
-        label = "activeContainerColor"
+        label = "activeContainerColor",
     )
-    val contentColor by animateColorAsState(
-        targetValue = if (isActive) activeContentColor else MaterialTheme.colorScheme.onSurface,
+    val contentColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = activeContentColor,
+        unselectedColor = MaterialTheme.colorScheme.onSurface,
         animationSpec = tween(250),
-        label = "activeContentColor"
+        label = "activeContentColor",
     )
 
     Surface(

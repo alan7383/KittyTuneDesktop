@@ -153,8 +153,10 @@ internal fun ExpressiveCookieBadge(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val bgColor by animateColorAsState(
-        targetValue = if (isActive) activeColor else inactiveColor,
+    val bgColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = activeColor,
+        unselectedColor = inactiveColor,
         animationSpec = tween(280),
         label = "cookieBg",
     )
@@ -249,13 +251,10 @@ internal fun TogetherGroupItem(
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 700f),
         label = "groupItemCorner",
     )
-    val targetBg = when {
-        highlighted -> containerColor
-        isHovered && onClick != null -> MaterialTheme.colorScheme.surfaceContainerHighest
-        else -> containerColor
-    }
-    val animatedBg by animateColorAsState(
-        targetValue = targetBg,
+    val animatedBg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isHovered && onClick != null && !highlighted,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        unselectedColor = containerColor,
         animationSpec = tween(180),
         label = "groupItemBg",
     )

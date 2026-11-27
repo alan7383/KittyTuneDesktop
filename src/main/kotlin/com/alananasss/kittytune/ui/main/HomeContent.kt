@@ -236,8 +236,10 @@ internal fun QuickTile(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val bg by androidx.compose.animation.animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+    val bg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         animationSpec = androidx.compose.animation.core.tween(HOVER_FADE_MS),
         label = "quickTileHover",
     )
@@ -374,8 +376,10 @@ fun MediaCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val hoverFill by androidx.compose.animation.animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0f),
+    val hoverFill = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0f),
         animationSpec = androidx.compose.animation.core.tween(HOVER_FADE_MS),
         label = "mediaCardHover",
     )
@@ -2024,10 +2028,12 @@ private fun SearchTopMatchHeroCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val cardBg by androidx.compose.animation.animateColorAsState(
-        if (isHovered) MaterialTheme.colorScheme.surfaceContainerHighest
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
-        label = "heroCardBg"
+    val cardBg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isHovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = androidx.compose.animation.core.spring(),
+        label = "heroCardBg",
     )
 
     Surface(

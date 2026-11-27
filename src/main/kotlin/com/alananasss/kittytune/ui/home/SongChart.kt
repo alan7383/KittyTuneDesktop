@@ -371,12 +371,18 @@ internal fun ChartTrackRow(
     val colors = MaterialTheme.colorScheme
     val itemShapes = chartSegmentedShapes(index, totalCount)
 
-    val containerColor by animateColorAsState(
-        targetValue = when {
-            isCurrent -> colors.secondaryContainer
-            hovered || focused -> colors.surfaceContainerHighest
-            else -> colors.surfaceContainerHigh
-        },
+    val hoverContainer = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = (hovered || focused) && !isCurrent,
+        selectedColor = colors.surfaceContainerHighest,
+        unselectedColor = colors.surfaceContainerHigh,
+        animationSpec = spring(),
+        label = "chartRowHover",
+    )
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isCurrent,
+        selectedColor = colors.secondaryContainer,
+        unselectedColor = hoverContainer,
+        animationSpec = spring(),
         label = "chartRowContainer",
     )
     val contentColor = if (isCurrent) colors.onSecondaryContainer else colors.onSurface
@@ -501,12 +507,18 @@ internal fun ChartLeaderCard(
     val focused by interactionSource.collectIsFocusedAsState()
     val pressed by interactionSource.collectIsPressedAsState()
     val colors = MaterialTheme.colorScheme
-    val containerColor by animateColorAsState(
-        targetValue = when {
-            isCurrent -> colors.secondaryContainer
-            hovered || focused -> colors.surfaceContainerHighest
-            else -> colors.surfaceContainerHigh
-        },
+    val hoverLeader = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = (hovered || focused) && !isCurrent,
+        selectedColor = colors.surfaceContainerHighest,
+        unselectedColor = colors.surfaceContainerHigh,
+        animationSpec = spring(),
+        label = "chartLeaderHover",
+    )
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isCurrent,
+        selectedColor = colors.secondaryContainer,
+        unselectedColor = hoverLeader,
+        animationSpec = spring(),
         label = "chartLeaderContainer",
     )
     val contentColor = if (isCurrent) colors.onSecondaryContainer else colors.onSurface

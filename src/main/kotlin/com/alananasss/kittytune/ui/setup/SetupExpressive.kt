@@ -252,8 +252,20 @@ internal fun StepIndicator(index: Int, onSelect: (Int) -> Unit, modifier: Modifi
         SetupStep.entries.forEachIndexed { i, step ->
             val current = i == index
             val width by animateDpAsState(if (current) 36.dp else 10.dp, spring(dampingRatio = 0.55f, stiffness = 500f), label = "stepWidth")
-            val color by animateColorAsState(
-                when { current -> cs.primary; i < index -> cs.secondary; else -> cs.outlineVariant }, label = "stepColor")
+            val pastColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = i < index && !current,
+                selectedColor = cs.secondary,
+                unselectedColor = cs.outlineVariant,
+                animationSpec = spring(),
+                label = "stepPastColor",
+            )
+            val color = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = current,
+                selectedColor = cs.primary,
+                unselectedColor = pastColor,
+                animationSpec = spring(),
+                label = "stepColor",
+            )
             Tip(str("onboard_" + step.key + "_label")) {
                 Box(
                     Modifier.height(32.dp).clip(CircleShape)
@@ -348,7 +360,13 @@ internal fun PaletteSwatch(
     val zoom by animateFloatAsState(
         when { pressed -> 0.8f; selected -> 1f; else -> 0.86f }, spring(dampingRatio = 0.5f, stiffness = 500f), label = "swatchZoom")
     val corner by animateDpAsState(if (selected) 30.dp else 20.dp, spring(dampingRatio = 0.6f, stiffness = 500f), label = "swatchCorner")
-    val container by animateColorAsState(if (selected) cs.secondaryContainer else cs.surfaceContainerHigh, label = "swatchContainer")
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = selected,
+        selectedColor = cs.secondaryContainer,
+        unselectedColor = cs.surfaceContainerHigh,
+        animationSpec = spring(),
+        label = "swatchContainer",
+    )
     Column(modifier.width(84.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
             Modifier.size(76.dp).clip(RoundedCornerShape(corner)).background(container)

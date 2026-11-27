@@ -253,11 +253,17 @@ fun MainTopBar(
 @Composable
 private fun cornerButtonColors(isActive: Boolean): androidx.compose.material3.IconButtonColors {
     val scheme = MaterialTheme.colorScheme
-    val container by androidx.compose.animation.animateColorAsState(
-        if (isActive) scheme.primaryContainer else scheme.surfaceVariant.copy(alpha = 0.6f), label = "cornerContainer",
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = scheme.primaryContainer,
+        unselectedColor = scheme.surfaceVariant.copy(alpha = 0.6f),
+        label = "cornerContainer",
     )
-    val content by androidx.compose.animation.animateColorAsState(
-        if (isActive) scheme.onPrimaryContainer else scheme.onSurfaceVariant, label = "cornerContent",
+    val content = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = scheme.onPrimaryContainer,
+        unselectedColor = scheme.onSurfaceVariant,
+        label = "cornerContent",
     )
     return IconButtonDefaults.filledTonalIconButtonColors(containerColor = container, contentColor = content)
 }

@@ -153,15 +153,14 @@ fun FloatingMenuItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val container by animateColorAsState(
-        targetValue = when {
-            hovered && danger -> MaterialTheme.colorScheme.errorContainer
-            hovered -> MaterialTheme.colorScheme.surfaceContainerHighest
-            else -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0f)
-        },
+    val hoverColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = if (danger) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0f),
         animationSpec = tween(120),
         label = "floatingMenuItemBg",
     )
+    val container = hoverColor
     val contentColor = when {
         hovered && danger -> MaterialTheme.colorScheme.onErrorContainer
         danger -> MaterialTheme.colorScheme.error

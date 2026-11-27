@@ -312,10 +312,11 @@ private fun ShapeOptionCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val containerColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
-        label = "shapeCardContainer"
+    val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+        label = "shapeCardContainer",
     )
 
     Surface(

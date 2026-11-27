@@ -412,9 +412,27 @@ private fun ExportHero(state: AudioFxExporter.State, title: String, artist: Stri
     val running = state as? AudioFxExporter.State.Running
     val failed = state is AudioFxExporter.State.Failed
     val done = state is AudioFxExporter.State.Done
-    val container by animateColorAsState(if (failed) scheme.errorContainer else scheme.primaryContainer, label = "heroContainer")
-    val content by animateColorAsState(if (failed) scheme.onErrorContainer else scheme.onPrimaryContainer, label = "heroContent")
-    val badge by animateColorAsState(if (failed) scheme.error else scheme.onPrimaryContainer, label = "heroBadge")
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = failed,
+        selectedColor = scheme.errorContainer,
+        unselectedColor = scheme.primaryContainer,
+        animationSpec = spring(),
+        label = "heroContainer",
+    )
+    val content = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = failed,
+        selectedColor = scheme.onErrorContainer,
+        unselectedColor = scheme.onPrimaryContainer,
+        animationSpec = spring(),
+        label = "heroContent",
+    )
+    val badge = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = failed,
+        selectedColor = scheme.error,
+        unselectedColor = scheme.onPrimaryContainer,
+        animationSpec = spring(),
+        label = "heroBadge",
+    )
     val rotation = remember { Animatable(0f) }
     LaunchedEffect(running != null) {
         if (running != null) {
@@ -587,8 +605,20 @@ private fun <T> ExpressiveChoiceGroup(options: List<T>, selected: T, label: (T) 
             val isSelected = option == selected
             val inner by animateDpAsState(if (isSelected) 26.dp else 8.dp, spring(dampingRatio = 0.6f, stiffness = 500f), label = "choiceInner")
             val weight by animateFloatAsState(if (isSelected) 1.3f else 1f, spring(dampingRatio = 0.7f, stiffness = 400f), label = "choiceWeight")
-            val bg by animateColorAsState(if (isSelected) scheme.primary else scheme.secondaryContainer, label = "choiceBg")
-            val fg by animateColorAsState(if (isSelected) scheme.onPrimary else scheme.onSecondaryContainer, label = "choiceFg")
+            val bg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = isSelected,
+                selectedColor = scheme.primary,
+                unselectedColor = scheme.secondaryContainer,
+                animationSpec = spring(),
+                label = "choiceBg",
+            )
+            val fg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = isSelected,
+                selectedColor = scheme.onPrimary,
+                unselectedColor = scheme.onSecondaryContainer,
+                animationSpec = spring(),
+                label = "choiceFg",
+            )
             val start = if (i == 0) 26.dp else inner
             val end = if (i == options.lastIndex) 26.dp else inner
             Box(

@@ -489,15 +489,19 @@ private fun InfoHalfChip(
 ) {
     val scheme = MaterialTheme.colorScheme
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val background by animateColorAsState(
-        targetValue = if (isSelected) scheme.secondaryContainer else Color.Transparent,
+    val background = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = scheme.secondaryContainer,
+        unselectedColor = Color.Transparent,
         animationSpec = tween(250),
-        label = "infoHalfBackground"
+        label = "infoHalfBackground",
     )
-    val textColor by animateColorAsState(
-        targetValue = if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+    val textColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = scheme.onSecondaryContainer,
+        unselectedColor = scheme.onSurfaceVariant,
         animationSpec = tween(250),
-        label = "infoHalfText"
+        label = "infoHalfText",
     )
     Row(
         modifier = modifier

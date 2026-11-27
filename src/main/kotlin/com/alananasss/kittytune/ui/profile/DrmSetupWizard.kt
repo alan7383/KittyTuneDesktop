@@ -261,8 +261,10 @@ internal fun StepDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         repeat(count) { i ->
             val width by animateFloatAsState(if (i == current) 28f else 8f, label = "dot")
-            val color by animateColorAsState(
-                if (i <= current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+            val color = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = i <= current,
+                selectedColor = MaterialTheme.colorScheme.primary,
+                unselectedColor = MaterialTheme.colorScheme.outlineVariant,
                 label = "dot-color",
             )
             Box(Modifier.size(width = width.dp, height = 8.dp).background(color, CircleShape))

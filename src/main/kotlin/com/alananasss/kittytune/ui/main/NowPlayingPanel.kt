@@ -354,18 +354,25 @@ private fun PanelTabRow(
 private fun PanelTabButton(tab: NowPlayingTab, label: String, isSelected: Boolean, onClick: () -> Unit) {
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
-    val container by animateColorAsState(
-        when {
-            isSelected -> MaterialTheme.colorScheme.secondaryContainer
-            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            else -> Color.Transparent
-        },
-        tween(TAB_ANIM_MS),
+    val hoveredContainer = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isHovered && !isSelected,
+        selectedColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        unselectedColor = Color.Transparent,
+        animationSpec = tween(TAB_ANIM_MS),
+        label = "panelTabHover",
+    )
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.secondaryContainer,
+        unselectedColor = hoveredContainer,
+        animationSpec = tween(TAB_ANIM_MS),
         label = "panelTabContainer",
     )
-    val content by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        tween(TAB_ANIM_MS),
+    val content = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(TAB_ANIM_MS),
         label = "panelTabContent",
     )
     Row(

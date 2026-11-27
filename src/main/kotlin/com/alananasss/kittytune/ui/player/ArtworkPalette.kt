@@ -1,6 +1,9 @@
 package com.alananasss.kittytune.ui.player
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.alananasss.kittytune.core.BoundedCache
+import com.alananasss.kittytune.ui.ImageLoaderFactory
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.awt.image.BufferedImage
@@ -11,6 +14,13 @@ import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
 import kotlin.math.max
 import kotlin.math.min
+
+data class TrackArtworkColors(
+    val dominantDark: Color,
+    val dominantLight: Color,
+    val seedColor: Int,
+    val meshColors: List<Int>,
+)
 
 object ArtworkPalette {
 
@@ -25,6 +35,9 @@ object ArtworkPalette {
     /** Extracted colours by URL, so scrolling a list does not re-download and re-decode per card. */
     private val colorCache = PaletteCache()
 
+    /** Full track color bundle memoised by URL so track switches update the dynamic theme on frame 0. */
+    private val trackColorsCache = BoundedCache<String, TrackArtworkColors>(512)
+
     /**
      * Longest edge decoded for colour extraction. The histogram downscales to 64×64 anyway, so
      * anything above this only spends heap: a 2000×2000 cover decoded in full was ~16 MB of
@@ -33,6 +46,40 @@ object ArtworkPalette {
      * so the mesh palette's spread has room to differ from the dominant's.
      */
     private const val PALETTE_MAX_DECODE = 256
+
+    private fun decodeSubsampled(stream: ImageInputStream?): BufferedImage? {
+        if (stream == null) return null
+        return stream.use { input ->
+            val readers = ImageIO.getImageReaders(input)
+            if (!readers.hasNext()) return null
+            val reader = readers.next()
+            try {
+                reader.input = input
+                var subsample = 1
+                val w = reader.getWidth(0)
+                val h = reader.getHeight(0)
+                if (w > 0 && h > 0) {
+                    val longest = max(w, h)
+                    if (longest > PALETTE_MAX_DECODE) {
+                        subsample = (longest + PALETTE_MAX_DECODE - 1) / PALETTE_MAX_DECODE
+                    }
+                }
+                val param = reader.defaultReadParam
+                if (subsample > 1) param.setSourceSubsampling(subsample, subsample, 0, 0)
+                reader.read(0, param)
+            } finally {
+                reader.dispose()
+            }
+        }
+    }
+
+    private fun loadFromCoilDiskCache(url: String): BufferedImage? = runCatching {
+        val diskCache = ImageLoaderFactory.diskCache ?: return null
+        diskCache.openSnapshot(url)?.use { snapshot ->
+            val file = snapshot.data.toFile()
+            if (file.isFile) decodeSubsampled(ImageIO.createImageInputStream(file)) else null
+        }
+    }.getOrNull()
 
     /**
      * The artwork as pixels for colour extraction, decoded at extraction scale via
@@ -54,30 +101,45 @@ object ArtworkPalette {
         } else {
             File(url).takeIf { it.isFile }?.let { ImageIO.createImageInputStream(it) }
         }
-        input?.use { stream ->
-            val readers = ImageIO.getImageReaders(stream)
-            if (!readers.hasNext()) return null
-            val reader = readers.next()
-            try {
-                reader.input = stream
-                var subsample = 1
-                val w = reader.getWidth(0)
-                val h = reader.getHeight(0)
-                if (w > 0 && h > 0) {
-                    val longest = max(w, h)
-                    if (longest > PALETTE_MAX_DECODE) {
-                        subsample = (longest + PALETTE_MAX_DECODE - 1) / PALETTE_MAX_DECODE
-                    }
-                }
-                val param = reader.defaultReadParam
-                if (subsample > 1) param.setSourceSubsampling(subsample, subsample, 0, 0)
-                reader.read(0, param)
-            } finally {
-                reader.dispose()
-            }
-        }
+        decodeSubsampled(input)
     } catch (_: Exception) {
         null
+    }
+
+    /** Synchronous in-memory lookup of previously extracted or prefetched track colors. */
+    fun cachedTrackColors(url: String?): TrackArtworkColors? =
+        url?.takeIf { it.isNotBlank() }?.let { trackColorsCache[it] }
+
+    /**
+     * Extracts and caches the dominant backdrop colors, theme seed, and mesh palette for [url].
+     * Checks in-memory cache, Coil's disk cache, and [localFallbackFile] before hitting the network.
+     */
+    fun extractTrackColors(url: String?, localFallbackFile: File? = null): TrackArtworkColors? {
+        if (url.isNullOrBlank()) return null
+        trackColorsCache[url]?.let { return it }
+
+        val bitmap = loadFromCoilDiskCache(url)
+            ?: localFallbackFile?.takeIf { it.isFile }?.let { file ->
+                runCatching { decodeSubsampled(ImageIO.createImageInputStream(file)) }.getOrNull()
+            }
+            ?: load(url)
+            ?: return null
+
+        if (localFallbackFile != null && !localFallbackFile.exists()) {
+            runCatching {
+                localFallbackFile.parentFile?.mkdirs()
+                ImageIO.write(bitmap, "jpg", localFallbackFile)
+            }
+        }
+
+        val bundle = TrackArtworkColors(
+            dominantDark = dominantColor(bitmap, preferLight = true),
+            dominantLight = dominantColor(bitmap, preferLight = false),
+            seedColor = dominantSeed(bitmap).toArgb(),
+            meshColors = meshPalette(bitmap).map { it.toArgb() },
+        )
+        trackColorsCache[url] = bundle
+        return bundle
     }
 
     /**

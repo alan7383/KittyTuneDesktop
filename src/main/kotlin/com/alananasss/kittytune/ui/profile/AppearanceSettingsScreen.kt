@@ -583,8 +583,10 @@ private fun ThemePresetCard(
         style = style,
     )
     val interaction = remember { MutableInteractionSource() }
-    val ring by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+    val ring = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
         label = "presetRing",
     )
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {

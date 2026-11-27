@@ -1028,24 +1028,40 @@ private fun ThemedTitleBarEffect(window: java.awt.Window) {
     val captionText = scheme.onSurface
     val dark = caption.luminance() < 0.5f
 
-    androidx.compose.runtime.LaunchedEffect(enabled, caption, captionText, dark) {
-        // The window is realised by the time an effect runs, but a first launch can still race the
-        // native peer; one retry is enough and costs nothing when the first attempt worked.
+    // Retry once after window realization without cancelling/restarting a 400ms delay on every
+    // color frame while the dynamic theme cross-fades.
+    val latestCaption by androidx.compose.runtime.rememberUpdatedState(caption)
+    val latestCaptionText by androidx.compose.runtime.rememberUpdatedState(captionText)
+    val latestDark by androidx.compose.runtime.rememberUpdatedState(dark)
+
+    androidx.compose.runtime.LaunchedEffect(window, enabled) {
         com.alananasss.kittytune.core.MacWindowIntegration.themeTitleBar(window, enabled)
-        repeat(2) { attempt ->
-            if (attempt > 0) kotlinx.coroutines.delay(400)
-            if (enabled) {
-                com.alananasss.kittytune.data.theme.WindowsTitleBar.apply(window, caption, captionText, dark)
-            } else {
-                com.alananasss.kittytune.data.theme.WindowsTitleBar.reset(window)
-            }
+        kotlinx.coroutines.delay(400)
+        if (enabled) {
+            com.alananasss.kittytune.data.theme.WindowsTitleBar.apply(
+                window,
+                latestCaption,
+                latestCaptionText,
+                latestDark,
+            )
+        } else {
+            com.alananasss.kittytune.data.theme.WindowsTitleBar.reset(window)
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(enabled, caption, captionText, dark) {
+        if (enabled) {
+            com.alananasss.kittytune.data.theme.WindowsTitleBar.apply(window, caption, captionText, dark)
+        } else {
+            com.alananasss.kittytune.data.theme.WindowsTitleBar.reset(window)
         }
     }
 }
 
 /**
  * Sets the underlying AWT Window, root panes and child canvas components to match the dynamic theme palette.
- * Uses synchronous DisposableEffect with hierarchy and resize listeners to prevent light/gray flashes during resize.
+ * Registers hierarchy and resize listeners once per window and updates component backgrounds smoothly
+ * without tearing down listeners on every animation frame.
  */
 @Composable
 private fun ThemedWindowBackgroundEffect(window: java.awt.Window) {
@@ -1056,45 +1072,51 @@ private fun ThemedWindowBackgroundEffect(window: java.awt.Window) {
     val g = (background.green * 255f).toInt().coerceIn(0, 255)
     val b = (background.blue * 255f).toInt().coerceIn(0, 255)
     val awtBg = remember(r, g, b) { java.awt.Color(r, g, b) }
+    val latestBg = remember { androidx.compose.runtime.mutableStateOf(awtBg) }
+    latestBg.value = awtBg
 
-    androidx.compose.runtime.DisposableEffect(window, awtBg) {
-        fun applyBg(comp: java.awt.Component?) {
-            if (comp == null || !window.isDisplayable) return
-            runCatching {
-                comp.background = awtBg
-                if (comp is javax.swing.JComponent) {
-                    comp.isOpaque = true
-                }
-            }
-            if (comp is java.awt.Container) {
-                val children = runCatching { comp.components }.getOrNull() ?: return
-                for (child in children) {
-                    applyBg(child)
-                }
+    fun applyBg(comp: java.awt.Component?, color: java.awt.Color) {
+        if (comp == null || !window.isDisplayable) return
+        runCatching {
+            comp.background = color
+            if (comp is javax.swing.JComponent) {
+                comp.isOpaque = true
             }
         }
-
-        fun applyAll() {
-            if (!window.isDisplayable) return
-            runCatching {
-                window.background = awtBg
-                if (window is javax.swing.JFrame) {
-                    window.rootPane?.background = awtBg
-                    window.contentPane?.background = awtBg
-                    window.layeredPane?.background = awtBg
-                }
-                applyBg(window)
+        if (comp is java.awt.Container) {
+            val children = runCatching { comp.components }.getOrNull() ?: return
+            for (child in children) {
+                applyBg(child, color)
             }
         }
+    }
 
-        applyAll()
+    fun applyAll(color: java.awt.Color) {
+        if (!window.isDisplayable) return
+        runCatching {
+            window.background = color
+            if (window is javax.swing.JFrame) {
+                window.rootPane?.background = color
+                window.contentPane?.background = color
+                window.layeredPane?.background = color
+            }
+            applyBg(window, color)
+        }
+    }
+
+    androidx.compose.runtime.SideEffect {
+        applyAll(awtBg)
+    }
+
+    androidx.compose.runtime.DisposableEffect(window) {
+        applyAll(latestBg.value)
 
         val hierarchyListener = java.awt.event.HierarchyListener {
-            applyAll()
+            applyAll(latestBg.value)
         }
         val compListener = object : java.awt.event.ComponentAdapter() {
             override fun componentResized(e: java.awt.event.ComponentEvent?) {
-                applyAll()
+                applyAll(latestBg.value)
             }
         }
 

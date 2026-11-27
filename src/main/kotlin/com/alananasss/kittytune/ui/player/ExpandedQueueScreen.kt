@@ -283,11 +283,10 @@ private fun SwipeToDeleteItem(
 
     val progress = (-offsetX.value / dismissThresholdPx).coerceIn(0f, 1f)
 
-    val bgColor by animateColorAsState(
-        targetValue = if (progress > 0f)
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = progress.coerceIn(0.1f, 1f))
-        else
-            Color.Transparent,
+    val bgColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = progress > 0f,
+        selectedColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = progress.coerceIn(0.1f, 1f)),
+        unselectedColor = Color.Transparent,
         label = "swipe_bg"
     )
     val iconAlpha by animateFloatAsState(

@@ -316,11 +316,13 @@ private fun TrackFeedItem(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = androidx.compose.animation.animateColorAsState(
-            if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+        color = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+            selected = hovered,
+            selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unselectedColor = MaterialTheme.colorScheme.surfaceContainer,
             animationSpec = androidx.compose.animation.core.tween(120),
             label = "feedCardHover",
-        ).value,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
@@ -439,11 +441,13 @@ private fun PlaylistFeedItem(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = androidx.compose.animation.animateColorAsState(
-            if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+        color = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+            selected = hovered,
+            selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unselectedColor = MaterialTheme.colorScheme.surfaceContainer,
             animationSpec = androidx.compose.animation.core.tween(120),
             label = "feedCardHover",
-        ).value,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)

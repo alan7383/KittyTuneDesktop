@@ -357,15 +357,26 @@ private fun ReorderableCollectionItemScope.QueueRow(
     val showsControls = isHovered || isDragging
 
     val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "queue_row_elevation")
-    val background by animateColorAsState(
-        targetValue = when {
-            isDragging -> scheme.surfaceContainerHighest
-            isCurrent -> scheme.secondaryContainer
-            isHovered -> scheme.surfaceContainerHigh
-            else -> Color.Transparent
-        },
+    val hoverBackground = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isHovered && !isCurrent && !isDragging,
+        selectedColor = scheme.surfaceContainerHigh,
+        unselectedColor = Color.Transparent,
         animationSpec = tween(150),
-        label = "queue_row_background"
+        label = "queue_row_hover",
+    )
+    val currentBackground = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isCurrent && !isDragging,
+        selectedColor = scheme.secondaryContainer,
+        unselectedColor = hoverBackground,
+        animationSpec = tween(150),
+        label = "queue_row_current",
+    )
+    val background = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isDragging,
+        selectedColor = scheme.surfaceContainerHighest,
+        unselectedColor = currentBackground,
+        animationSpec = tween(150),
+        label = "queue_row_background",
     )
     val rowShape = RoundedCornerShape(12.dp)
 

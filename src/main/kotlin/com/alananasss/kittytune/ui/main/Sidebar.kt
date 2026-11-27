@@ -1268,8 +1268,10 @@ private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
         focusManager.clearFocus()
     }
     val scheme = MaterialTheme.colorScheme
-    val container by androidx.compose.animation.animateColorAsState(
-        if (isFocused) scheme.surfaceContainerHighest else scheme.surfaceContainerHigh,
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isFocused,
+        selectedColor = scheme.surfaceContainerHighest,
+        unselectedColor = scheme.surfaceContainerHigh,
         label = "librarySearchContainer",
     )
 
@@ -1970,15 +1972,18 @@ private fun SidebarNavItem(
 ) {
     // Material's navigation indicator: the current destination sits on a secondary-container pill,
     // eased in and out, instead of being told apart only by bold text.
-    val indicator by androidx.compose.animation.animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.secondaryContainer
-        else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
+    val scheme = MaterialTheme.colorScheme
+    val indicator = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = selected,
+        selectedColor = scheme.secondaryContainer,
+        unselectedColor = scheme.secondaryContainer.copy(alpha = 0f),
         animationSpec = androidx.compose.animation.core.tween(180),
         label = "navIndicator",
     )
-    val color by androidx.compose.animation.animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
+    val color = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = selected,
+        selectedColor = scheme.onSecondaryContainer,
+        unselectedColor = scheme.onSurfaceVariant,
         animationSpec = androidx.compose.animation.core.tween(180),
         label = "navContent",
     )

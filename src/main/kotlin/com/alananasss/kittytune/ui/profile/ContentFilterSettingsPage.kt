@@ -727,20 +727,16 @@ fun ContentFilterSettingsPage() {
                 ) {
                     for (option in AiDetectionWindow.entries) {
                         val isSelected = aiWindow == option
-                        val containerColor by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            },
+                        val containerColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                            selected = isSelected,
+                            selectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            unselectedColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             label = "aiWindowContainer",
                         )
-                        val borderColor by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                            },
+                        val borderColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                            selected = isSelected,
+                            selectedColor = MaterialTheme.colorScheme.primary,
+                            unselectedColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                             label = "aiWindowBorder",
                         )
 

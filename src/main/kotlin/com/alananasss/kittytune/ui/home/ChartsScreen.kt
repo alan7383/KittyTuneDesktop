@@ -346,17 +346,23 @@ private fun ChartsCountryCard(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainer,
-        label = "bgColor"
+    val backgroundColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainer,
+        label = "bgColor",
     )
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        label = "textColor"
+    val contentColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = MaterialTheme.colorScheme.onSurface,
+        label = "textColor",
     )
-    val borderColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-        label = "borderColor"
+    val borderColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = Color.Transparent,
+        label = "borderColor",
     )
 
     Surface(

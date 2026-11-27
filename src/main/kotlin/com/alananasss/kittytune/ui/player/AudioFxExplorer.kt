@@ -392,20 +392,16 @@ private fun AudioFxRow(
     val danger = fx.isDanger
     val accent = if (danger) scheme.error else scheme.primary
     val onAccent = if (danger) scheme.onError else scheme.onPrimary
-    val container by animateColorAsState(
-        when {
-            isActive && danger -> scheme.errorContainer
-            isActive -> scheme.secondaryContainer
-            else -> scheme.surfaceContainerHigh
-        },
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = if (danger) scheme.errorContainer else scheme.secondaryContainer,
+        unselectedColor = scheme.surfaceContainerHigh,
         label = "fxRowContainer",
     )
-    val content by animateColorAsState(
-        when {
-            isActive && danger -> scheme.onErrorContainer
-            isActive -> scheme.onSecondaryContainer
-            else -> scheme.onSurface
-        },
+    val content = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = if (danger) scheme.onErrorContainer else scheme.onSecondaryContainer,
+        unselectedColor = scheme.onSurface,
         label = "fxRowContent",
     )
     val iconScale by animateFloatAsState(

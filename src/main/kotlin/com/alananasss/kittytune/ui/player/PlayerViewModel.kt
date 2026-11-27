@@ -6693,6 +6693,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         MusicManager.prebufferTransition(mediaItem, nextTrack, plan)
                     }
                 }
+                prefetchTrackColors(nextTrack)
             } catch (e: Exception) {
                 Logger.e("PlayerViewModel", "triggerPrebuffer failed for track ${nextTrack.id}: ${e.message}")
             }
@@ -7226,12 +7227,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private fun observeArtworkColors() {
         viewModelScope.launch {
-            snapshotFlow { currentTrack }
+            snapshotFlow { uiCurrentTrack }
                 .distinctUntilChangedBy { it?.fullResArtwork }
-                .collect { track ->
+                .collectLatest { track ->
                     if (track == null) {
                         com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
                         com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors = emptyList()
+                        backgroundColor = Color(0xFF1E1E1E)
                     } else {
                         updatePlayerColors(track)
                     }
@@ -7282,59 +7284,82 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    private fun updatePlayerColors(track: Track) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val isDarkMode = playerPrefs.getThemeMode() != com.alananasss.kittytune.data.local.AppThemeMode.LIGHT
+    private fun artCacheFileFor(track: Track): File =
+        File(com.alananasss.kittytune.core.AppDirs.imageCacheDir, "art_${track.id}.jpg")
 
-            // No real cover: `fullResArtwork` invents a random picsum image for those, and seeding
-            // the whole palette from a stranger's photo is worse than falling back to the key
-            // colour the user picked.
-            if (track.fullResArtwork.startsWith(PLACEHOLDER_ARTWORK_PREFIX)) {
-                com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
-                com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors = emptyList()
-                return@launch
-            }
+    private fun applyTrackArtworkColors(colors: TrackArtworkColors, isDarkMode: Boolean) {
+        backgroundColor = if (isDarkMode) colors.dominantDark else colors.dominantLight
+        com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = colors.seedColor
+        com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors = colors.meshColors
+    }
 
-            // Spotify catalog: use Spotify's own cover color extraction (one
-            // tiny request) instead of downloading and analyzing the artwork.
-            if (isSpotifyTrack(track)) {
-                val extracted = com.alananasss.kittytune.data.spotify.SpotifyRepository
-                    .getExtractedColors(track.artworkUrl)
-                if (extracted != null && !extracted.isFallback) {
-                    val chosen = if (isDarkMode) extracted.light else extracted.dark
-                    val color = parseHexColor(chosen)
-                    if (color != null) {
-                        backgroundColor = color
-                        com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = backgroundColor.toArgb()
-                        return@launch
-                    }
+    private fun applyCachedPlayerColorsIfAvailable(track: Track, isDarkMode: Boolean): Boolean {
+        if (track.fullResArtwork.startsWith(PLACEHOLDER_ARTWORK_PREFIX)) {
+            com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
+            com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors = emptyList()
+            backgroundColor = Color(0xFF1E1E1E)
+            return true
+        }
+        if (isSpotifyTrack(track)) {
+            val cachedSpotify = com.alananasss.kittytune.data.spotify.SpotifyRepository
+                .cachedExtractedColors(track.artworkUrl)
+            if (cachedSpotify != null && !cachedSpotify.isFallback) {
+                val chosen = if (isDarkMode) cachedSpotify.light else cachedSpotify.dark
+                val color = parseHexColor(chosen)
+                if (color != null) {
+                    backgroundColor = color
+                    com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = color.toArgb()
+                    com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors =
+                        ArtworkPalette.cachedTrackColors(track.fullResArtwork)?.meshColors ?: emptyList()
+                    return true
                 }
             }
+        }
+        val cachedArtwork = ArtworkPalette.cachedTrackColors(track.fullResArtwork) ?: return false
+        applyTrackArtworkColors(cachedArtwork, isDarkMode)
+        return true
+    }
 
-            val bitmap = loadBitmap(track.fullResArtwork)
-            if (bitmap != null) {
-                try {
-                    val artFile = File(com.alananasss.kittytune.core.AppDirs.imageCacheDir, "art_${track.id}.jpg")
-                    if (!artFile.exists()) {
-                        javax.imageio.ImageIO.write(bitmap, "jpg", artFile)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+    private suspend fun prefetchTrackColors(track: Track) {
+        if (track.fullResArtwork.startsWith(PLACEHOLDER_ARTWORK_PREFIX)) return
+        if (isSpotifyTrack(track)) {
+            com.alananasss.kittytune.data.spotify.SpotifyRepository.getExtractedColors(track.artworkUrl)
+        }
+        if (ArtworkPalette.cachedTrackColors(track.fullResArtwork) == null) {
+            ArtworkPalette.extractTrackColors(track.fullResArtwork, localFallbackFile = artCacheFileFor(track))
+        }
+    }
 
-                // Desktop app is dark-first; pick a light vibrant color for contrast on dark bg.
-                backgroundColor = ArtworkPalette.dominantColor(bitmap, preferLight = isDarkMode)
-                // The theme seeds from the cover's own colour, not from the lightened backdrop:
-                // the palette style the user chose is what should decide tone from there.
-                com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor =
-                    ArtworkPalette.dominantSeed(bitmap).toArgb()
-                // And the several colours the full player's background moves through — read from the same
-                // bitmap we already have decoded, so this costs a histogram and no extra request (issue #33).
-                com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors =
-                    ArtworkPalette.meshPalette(bitmap).map { it.toArgb() }
-            } else {
-                backgroundColor = Color(0xFF1E1E1E)
+    private suspend fun updatePlayerColors(track: Track) {
+        val isDarkMode = playerPrefs.getThemeMode() != com.alananasss.kittytune.data.local.AppThemeMode.LIGHT
+        if (applyCachedPlayerColorsIfAvailable(track, isDarkMode)) return
+
+        if (isSpotifyTrack(track)) {
+            val extracted = withContext(Dispatchers.IO) {
+                com.alananasss.kittytune.data.spotify.SpotifyRepository.getExtractedColors(track.artworkUrl)
             }
+            if (!currentCoroutineContext().isActive) return
+            if (extracted != null && !extracted.isFallback) {
+                val chosen = if (isDarkMode) extracted.light else extracted.dark
+                val color = parseHexColor(chosen)
+                if (color != null) {
+                    backgroundColor = color
+                    com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = color.toArgb()
+                    com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors =
+                        ArtworkPalette.cachedTrackColors(track.fullResArtwork)?.meshColors ?: emptyList()
+                    return
+                }
+            }
+        }
+
+        val extracted = withContext(Dispatchers.IO) {
+            ArtworkPalette.extractTrackColors(track.fullResArtwork, localFallbackFile = artCacheFileFor(track))
+        }
+        if (!currentCoroutineContext().isActive) return
+        if (extracted != null) {
+            applyTrackArtworkColors(extracted, isDarkMode)
+        } else {
+            backgroundColor = Color(0xFF1E1E1E)
         }
     }
 
@@ -7639,7 +7664,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         // a certain 403 before anything re-resolved. Topping them up costs a cache lookup
         // until one actually lapses.
         prefetchWarmJob = viewModelScope.launch(Dispatchers.IO) {
-            warmUpTrack?.let { warmStreamCache(it) }
+            warmUpTrack?.let {
+                warmStreamCache(it)
+                prefetchTrackColors(it)
+            }
             while (isActive) {
                 delay(PREFETCH_REWARM_INTERVAL_MS)
                 if (!MusicManager.player.isPlaying) continue

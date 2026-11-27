@@ -203,8 +203,20 @@ private fun AudioFxPresetCard(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(if (isActive) scheme.secondaryContainer else scheme.surfaceContainerHigh, label = "presetContainer")
-    val content by animateColorAsState(if (isActive) scheme.onSecondaryContainer else scheme.onSurface, label = "presetContent")
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = scheme.secondaryContainer,
+        unselectedColor = scheme.surfaceContainerHigh,
+        animationSpec = spring(),
+        label = "presetContainer",
+    )
+    val content = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isActive,
+        selectedColor = scheme.onSecondaryContainer,
+        unselectedColor = scheme.onSurface,
+        animationSpec = spring(),
+        label = "presetContent",
+    )
     val corner by animateDpAsState(
         if (isActive) 32.dp else 24.dp,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),

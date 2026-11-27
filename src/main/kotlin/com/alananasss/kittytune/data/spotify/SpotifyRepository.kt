@@ -197,6 +197,15 @@ object SpotifyRepository {
         return null
     }
 
+    private val extractedColorsCache = BoundedCache<String, SpotifyColors>(256)
+
+    /** Synchronous cache lookup for pre-extracted Spotify artwork colors. */
+    fun cachedExtractedColors(artworkUrl: String?): SpotifyColors? {
+        if (artworkUrl.isNullOrBlank()) return null
+        val imageId = Regex("/image/([a-f0-9]+)").find(artworkUrl)?.groupValues?.get(1) ?: return null
+        return extractedColorsCache[imageId]
+    }
+
     /**
      * Spotify's own cover-art color extraction (fetchExtractedColors): one
      * small request instead of downloading the artwork and analyzing pixels.
@@ -205,6 +214,7 @@ object SpotifyRepository {
     suspend fun getExtractedColors(artworkUrl: String?): SpotifyColors? {
         if (artworkUrl.isNullOrBlank()) return null
         val imageId = Regex("/image/([a-f0-9]+)").find(artworkUrl)?.groupValues?.get(1) ?: return null
+        extractedColorsCache[imageId]?.let { return it }
         return try {
             val extracted = fetchPathfinderData(
                 SpotifyPathfinderApi.buildExtractedColorsUrl(listOf("spotify:image:$imageId"))
@@ -221,7 +231,7 @@ object SpotifyRepository {
                 dark = hex(extracted.optJSONObject("colorDark")) ?: raw,
                 light = hex(extracted.optJSONObject("colorLight")) ?: raw,
                 isFallback = extracted.optJSONObject("colorRaw")?.optBoolean("isFallback", false) == true
-            )
+            ).also { extractedColorsCache[imageId] = it }
         } catch (e: Exception) {
             Logger.w(TAG, "Failed to extract cover colors: ${e.message}")
             null
