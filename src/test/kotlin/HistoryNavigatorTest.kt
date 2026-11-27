@@ -1,4 +1,8 @@
 import com.alananasss.kittytune.ui.main.HistoryNavigator
+import com.alananasss.kittytune.ui.profile.SettingsCategory
+import com.alananasss.kittytune.ui.profile.SettingsNavigation
+import com.alananasss.kittytune.ui.profile.SettingsPlace
+import com.alananasss.kittytune.ui.profile.SettingsSubPage
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -54,6 +58,27 @@ class HistoryNavigatorTest {
         nav.onRouteChanged()
         assertEquals("explorer", stack.last())
         assertFalse(nav.canGoForward)
+    }
+
+    @Test
+    fun `back leaves settings even after browsing several panes`() {
+        navigator()
+        visit("settings")
+        val start = SettingsNavigation.current
+        val lastPane = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES))
+        try {
+            SettingsNavigation.go(SettingsPlace(SettingsCategory.AUDIO))
+            SettingsNavigation.go(SettingsPlace(SettingsCategory.SYNC))
+            SettingsNavigation.go(lastPane)
+            nav.back()
+            nav.onRouteChanged()
+            assertEquals("home", stack.last())
+            nav.forward()
+            assertEquals("settings", stack.last())
+            assertEquals(lastPane, SettingsNavigation.current)
+        } finally {
+            SettingsNavigation.go(start)
+        }
     }
 
     @Test

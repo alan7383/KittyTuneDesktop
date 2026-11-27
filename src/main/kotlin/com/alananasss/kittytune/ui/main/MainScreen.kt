@@ -402,6 +402,11 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
 
     // The mouse's side buttons, on the root so they work wherever the pointer happens to be.
     val historyNavigator = rememberHistoryNavigator(navController, playerViewModel)
+    com.alananasss.kittytune.core.BackHandler(
+        enabled = com.alananasss.kittytune.ui.profile.isSettingsRoute(backStackEntry?.destination?.route) &&
+            historyNavigator.canGoBack,
+        onBack = historyNavigator::back,
+    )
 
     val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
     val isBarFloating = playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING

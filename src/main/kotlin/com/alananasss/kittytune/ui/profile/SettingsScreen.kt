@@ -3,13 +3,16 @@ package com.alananasss.kittytune.ui.profile
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.ui.common.escapeDismisses
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -88,23 +91,26 @@ fun SettingsScreen(
         if (SettingsNavigation.current == location && highlighted?.first != location) highlighted = null
     }
 
-    com.alananasss.kittytune.core.BackHandler(enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
-    com.alananasss.kittytune.core.BackHandler(enabled = searchQuery.isEmpty() && location.depth > 0) { SettingsNavigation.up() }
-
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val isWide = maxWidth >= WIDE_LAYOUT
         Row(Modifier.fillMaxSize().padding(start = 12.dp, top = 12.dp, bottom = 12.dp)) {
-            CategoryList(
-                selected = location.category,
-                isWide = isWide,
-                onSelect = {
-                    searchQuery = ""
-                    highlighted = null
-                    SettingsNavigation.go(SettingsPlace(it))
-                },
-                searchQuery = searchQuery,
-                onSearchQueryChange = updateSearchQuery,
-            )
+            AnimatedContent(
+                targetState = isWide,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "settingsCategoryLayout",
+            ) { wide ->
+                CategoryList(
+                    selected = location.category,
+                    isWide = wide,
+                    onSelect = {
+                        searchQuery = ""
+                        highlighted = null
+                        SettingsNavigation.go(SettingsPlace(it))
+                    },
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = updateSearchQuery,
+                )
+            }
             Spacer(Modifier.width(8.dp))
             AnimatedContent(
                 targetState = location,
@@ -397,9 +403,15 @@ private fun SettingsPane(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (showsSearchField) {
-                Spacer(Modifier.width(16.dp))
-                SettingsSearchField(searchQuery, onSearchQueryChange, Modifier.width(320.dp))
+            AnimatedVisibility(
+                visible = showsSearchField,
+                enter = expandIn(expandFrom = Alignment.CenterEnd) + fadeIn(),
+                exit = shrinkOut(shrinkTowards = Alignment.CenterEnd) + fadeOut(),
+            ) {
+                Row {
+                    Spacer(Modifier.width(16.dp))
+                    SettingsSearchField(searchQuery, onSearchQueryChange, Modifier.width(320.dp))
+                }
             }
         }
         SettingsHighlightScope(highlight) {
@@ -524,8 +536,10 @@ private fun CategoryItem(
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val container by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isSelected,
+        selectedColor = MaterialTheme.colorScheme.secondaryContainer,
+        unselectedColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
         label = "categoryPill",
     )
     val content = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant

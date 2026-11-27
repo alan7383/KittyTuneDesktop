@@ -1,8 +1,7 @@
 package com.alananasss.kittytune.ui.profile
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /** Where settings are: a category and the sub-pages opened inside it, outermost first. */
@@ -13,50 +12,29 @@ internal data class SettingsPlace(val category: SettingsCategory, val pages: Lis
     fun parent(): SettingsPlace = copy(pages = pages.dropLast(1))
 }
 
-/**
- * The settings' own history, kept for the whole session.
- *
- * It lives outside the screen so that leaving settings and coming back lands where you were, and so the app's
- * back and forward buttons (and the mouse's side buttons) walk through categories and sub-pages before they
- * leave settings — Interface → Themes → back returns to Interface instead of to whatever was open before.
- */
+/** The last settings pane, remembered independently of the app's navigation stack. */
 internal object SettingsNavigation {
-    private val places = mutableStateListOf(SettingsPlace(SettingsCategory.INTERFACE))
-    private var index by mutableIntStateOf(0)
+    var current by mutableStateOf(SettingsPlace(SettingsCategory.INTERFACE))
+        private set
 
-    val current: SettingsPlace get() = places[index]
-    val canGoBack: Boolean get() = index > 0
-    val canGoForward: Boolean get() = index < places.lastIndex
-
-    /** Goes to [place] as a new step: whatever was ahead is dropped, like a browser. */
     fun go(place: SettingsPlace) {
-        if (place == current) return
-        while (places.lastIndex > index) places.removeAt(places.lastIndex)
-        places += place
-        index = places.lastIndex
-        if (places.size > MAX_STEPS) {
-            places.removeAt(0)
-            index--
-        }
+        current = place
     }
 
-    /** The in-page back arrow: one level up, reusing the history step when that is where it leads. */
     fun up() {
-        val parent = current.parent()
-        if (canGoBack && places[index - 1] == parent) index-- else go(parent)
+        current = current.parent()
     }
-
-    fun back(): Boolean {
-        if (!canGoBack) return false
-        index--
-        return true
-    }
-
-    fun forward(): Boolean {
-        if (!canGoForward) return false
-        index++
-        return true
-    }
-
-    private const val MAX_STEPS = 50
 }
+
+/** The app screen that preceded a stack of settings pages, when one pop would stay in settings. */
+internal fun settingsBackDestination(routes: List<String>): String? {
+    val lastAppScreen = routes.indexOfLast { !isSettingsRoute(it) }
+    return routes.getOrNull(lastAppScreen)?.takeIf { routes.lastIndex - lastAppScreen > 1 }
+}
+
+internal fun isSettingsRoute(route: String?): Boolean = route != null && route in settingsRoutes
+
+private val settingsRoutes = setOf(
+    "settings", "sync_settings", "proxy_settings", "color_palette", "provider_order",
+    "qobuz_settings", "tidal_settings", "deezer_settings", "music_import",
+)

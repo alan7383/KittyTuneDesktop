@@ -1,45 +1,31 @@
 package com.alananasss.kittytune.ui.profile
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SettingsNavigationTest {
 
     @Test
-    fun backFromASubPageReturnsToItsCategoryAndForwardReopensIt() {
+    fun theLocalArrowFollowsTheSettingsHierarchy() {
         val nav = SettingsNavigation
-        nav.go(SettingsPlace(SettingsCategory.INTERFACE))
-        nav.go(SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)))
-
-        nav.back()
-        assertEquals(SettingsPlace(SettingsCategory.INTERFACE), nav.current)
-
-        nav.forward()
-        assertEquals(SettingsSubPage.THEMES, nav.current.subPage)
+        val start = nav.current
+        try {
+            nav.go(SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES, SettingsSubPage.CUSTOM_THEME)))
+            nav.up()
+            assertEquals(SettingsSubPage.THEMES, nav.current.subPage)
+            nav.up()
+            assertEquals(SettingsPlace(SettingsCategory.INTERFACE), nav.current)
+        } finally {
+            nav.go(start)
+        }
     }
 
     @Test
-    fun theCategoryIsRememberedAndBackWalksCategories() {
-        val nav = SettingsNavigation
-        nav.go(SettingsPlace(SettingsCategory.AUDIO))
-        nav.go(SettingsPlace(SettingsCategory.SYNC))
-
-        assertEquals(SettingsCategory.SYNC, nav.current.category)
-        nav.back()
-        assertEquals(SettingsCategory.AUDIO, nav.current.category)
-    }
-
-    @Test
-    fun upReusesTheHistoryStepInsteadOfAddingOne() {
-        val nav = SettingsNavigation
-        nav.go(SettingsPlace(SettingsCategory.INTERFACE))
-        nav.go(SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)))
-        nav.up()
-
-        assertEquals(SettingsPlace(SettingsCategory.INTERFACE), nav.current)
-        assertEquals(SettingsSubPage.PLAYER, nav.let { it.forward(); it.current.subPage })
-        nav.back()
-        assertFalse(nav.current.depth > 0)
+    fun externalSettingsPagesAreClosedTogetherWhenOpenedFromSettings() {
+        assertEquals("feed", settingsBackDestination(listOf("home", "feed", "settings", "qobuz_settings")))
+        assertEquals("home", settingsBackDestination(listOf("home", "settings", "settings")))
+        assertNull(settingsBackDestination(listOf("home", "qobuz_settings")))
+        assertNull(settingsBackDestination(listOf("home", "settings", "feed")))
     }
 }
