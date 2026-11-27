@@ -53,8 +53,9 @@ uses a monotonic clock. Reconnection uses bounded backoff.
 
 - Queues larger than 500 tracks transfer a window around the active item.
 - Local files are not copied; the destination needs its own access to a source.
-- Together session membership, audio effects and AI results are not carried in
-  the playback snapshot. Mixed Connect/Together sessions need interactive
+- Connect shares the current track's completed AI detection verdict when the
+  renderer has one. Together membership and audio effects stay device-local.
+  Mixed Connect/Together sessions need interactive
   validation. Local Together callbacks retain their local command path.
 - Direct LAN initiation is provided by Android. Desktop-to-desktop live control
   can use the optional relay.

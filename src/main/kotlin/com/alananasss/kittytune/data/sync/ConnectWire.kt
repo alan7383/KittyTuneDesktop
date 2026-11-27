@@ -56,6 +56,7 @@ object ConnectWire {
         JsonObject().apply {
             addProperty("id", track.id); addProperty("title", track.title)
             addProperty("artwork_url", track.artworkUrl); addProperty("duration", track.durationMs)
+            addProperty("full_duration", track.fullDurationMs)
             addProperty("source", track.source); addProperty("permalink_url", track.permalinkUrl)
             addProperty("permalink", track.permalink); addProperty("secret_token", track.secretToken)
             addProperty("user_favorite", track.isLiked); addProperty("policy", track.policy)

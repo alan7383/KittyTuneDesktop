@@ -352,16 +352,25 @@ fun ConnectPanel() {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
         // Play independently toggle card (MicroG-style M3 SwitchBar)
-        val cardBg by animateColorAsState(
-            targetValue = if (independent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        val cardBg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+            selected = independent,
+            selectedColor = MaterialTheme.colorScheme.primaryContainer,
+            unselectedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            animationSpec = androidx.compose.animation.core.spring(),
             label = "cardBg",
         )
-        val titleColor by animateColorAsState(
-            targetValue = if (independent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        val titleColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+            selected = independent,
+            selectedColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            unselectedColor = MaterialTheme.colorScheme.onSurface,
+            animationSpec = androidx.compose.animation.core.spring(),
             label = "titleColor",
         )
-        val descColor by animateColorAsState(
-            targetValue = if (independent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+        val descColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+            selected = independent,
+            selectedColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+            unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            animationSpec = androidx.compose.animation.core.spring(),
             label = "descColor",
         )
 

@@ -2,8 +2,14 @@ package com.alananasss.kittytune.data.sync
 
 import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.domain.Track
+import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+
+data class ConnectAiVerdict(
+    @SerializedName("score") val score: Float,
+    @SerializedName("isAi") val isAi: Boolean,
+)
 
 /** The last playable queue and playhead, independent of the append-only listen history. */
 data class PlaybackSnapshot(
@@ -21,12 +27,21 @@ data class PlaybackSnapshot(
     val speed: Float? = null,
     val sleepTimerRemainingMs: Long? = null,
     val sleepTimerEndOfTrack: Boolean? = null,
+    val durationMs: Long? = null,
+    val aiVerdict: ConnectAiVerdict? = null,
 ) {
-    fun projectedPosition(nowMs: Long): Long {
-        val elapsed = if (isPlaying) (nowMs - updatedAtMs).coerceAtLeast(0L) else 0L
-        val duration = queue.getOrNull(currentIndex)?.durationMs?.takeIf { it > 0L }
-        val projected = positionMs.coerceAtLeast(0L) + elapsed
-        return if (duration != null) projected.coerceAtMost(duration) else projected
+    val currentTrack: Track? get() = queue.getOrNull(currentIndex)
+    val playbackDurationMs: Long? get() = durationMs?.takeIf { it > 0L }
+        ?: currentTrack?.effectiveFullDurationMs?.takeIf { it > 0L }
+    val playbackSpeed: Float get() = speed?.takeIf { it in 0.25f..3f } ?: 1f
+
+    fun projectedPosition(nowMs: Long): Long = positionAfter(nowMs - updatedAtMs)
+
+    internal fun positionAfter(elapsedMs: Long): Long {
+        val advance = if (isPlaying) (elapsedMs.coerceAtLeast(0L) * playbackSpeed.toDouble()).toLong() else 0L
+        val start = positionMs.coerceAtLeast(0L)
+        val projected = start + advance.coerceAtMost(Long.MAX_VALUE - start)
+        return playbackDurationMs?.let(projected::coerceAtMost) ?: projected
     }
 }
 

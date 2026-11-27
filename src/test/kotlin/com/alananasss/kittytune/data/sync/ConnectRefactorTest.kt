@@ -55,6 +55,18 @@ class ConnectRefactorTest {
         assertEquals(1L, ConnectWire.deserializeSnapshot(compact)!!.queue.first().id)
     }
 
+    @Test fun newVerdictPublishesWithoutResendingTheQueue() {
+        val publisher = ConnectStatePublisher()
+        val state = state()
+        publisher.plan(state, nowNanos = 0)
+        val verdict = ConnectAiVerdict(0.91f, true)
+        val verdictFrame = assertNotNull(publisher.plan(state.copy(aiVerdict = verdict), nowNanos = 1))
+        assertEquals(verdict, verdictFrame.state.aiVerdict)
+        assertTrue(verdictFrame.state.queue.isEmpty())
+        assertTrue(publisher.reset())
+        assertEquals(state.queue, publisher.plan(state, nowNanos = 2)?.state?.queue)
+    }
+
     @Test fun disconnectFailsOnlyItsCommandsAndOldSessionCannotAcknowledgeNewOne() = runBlocking {
         val pending = ConnectPendingCommands<Any>(1)
         val old = Any(); val new = Any()

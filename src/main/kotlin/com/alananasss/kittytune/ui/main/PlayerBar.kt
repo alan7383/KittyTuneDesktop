@@ -308,9 +308,9 @@ fun PlayerBar(
                                         )
                                     }
                                     // ArtifactNet AI-detection badge (issue #41)
-                                    val aiResult by com.alananasss.kittytune.audio.ai.AiDetectionManager.result.collectAsState()
                                     com.alananasss.kittytune.ui.player.ai.AiDetectionBadge(
-                                        result = aiResult.takeUnless { vm.isRemotePlayback },
+                                        result = vm.uiAiDetectionResult,
+                                        showPending = !vm.isRemotePlayback,
                                         textColor = MaterialTheme.colorScheme.onSurface,
                                         onClick = { vm.showAiDetectionSheet = true },
                                         modifier = Modifier.padding(start = 6.dp),

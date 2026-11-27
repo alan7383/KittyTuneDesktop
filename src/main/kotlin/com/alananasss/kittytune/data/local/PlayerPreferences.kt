@@ -2011,32 +2011,41 @@ class PlayerPreferences {
         Prefs.putString("paxsenix_api_key", key)
     }
 
-    fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode, saveQueue: Boolean = true) {
+    fun savePlaybackState(
+        track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?,
+        shuffleEnabled: Boolean, repeatMode: RepeatMode, saveQueue: Boolean = true, queueIndex: Int = -1,
+    ) {
         if (!getPersistentQueueEnabled()) {
             Prefs.putBoolean(KEY_SHUFFLE_MODE, shuffleEnabled)
             Prefs.putString(KEY_REPEAT_MODE, repeatMode.name)
             Prefs.remove(KEY_TRACK_JSON)
+            Prefs.remove("last_queue_index")
             if (queueFile.exists()) queueFile.delete()
             positionPrefs.remove(KEY_POSITION)
             Prefs.remove(KEY_CONTEXT_JSON)
             return
         }
 
-        if (saveQueue && queue.isNotEmpty()) {
+        if (saveQueue) {
             synchronized(queueLock) {
-                try {
-                    val tempFile = File(queueFile.parentFile, "queue_cache.tmp")
-                    tempFile.writeText(gson.toJson(queue))
-                    // renameTo silently fails on Windows while the target exists, leaving the
-                    // persistent queue never updated; see AtomicFiles.replace for the why.
-                    com.alananasss.kittytune.core.AtomicFiles.replace(tempFile, queueFile)
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                if (queue.isEmpty()) {
+                    queueFile.delete()
+                    Prefs.remove("last_queue_full_json")
+                } else {
+                    try {
+                        val tempFile = File(queueFile.parentFile, "queue_cache.tmp")
+                        tempFile.writeText(gson.toJson(queue))
+                        // renameTo silently fails on Windows while the target exists.
+                        com.alananasss.kittytune.core.AtomicFiles.replace(tempFile, queueFile)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
         }
 
-        track?.let { Prefs.putString(KEY_TRACK_JSON, gson.toJson(it)) }
+        if (track != null) Prefs.putString(KEY_TRACK_JSON, gson.toJson(track)) else Prefs.remove(KEY_TRACK_JSON)
+        Prefs.putInt("last_queue_index", queueIndex)
         Prefs.putString(KEY_CONTEXT_JSON, gson.toJson(context))
         if (getSavePositionEnabled()) positionPrefs.putLong(KEY_POSITION, position) else positionPrefs.remove(KEY_POSITION)
         Prefs.putBoolean(KEY_SHUFFLE_MODE, shuffleEnabled)
@@ -2125,6 +2134,7 @@ class PlayerPreferences {
     fun saveDownloadLocation(uriString: String?) = if (uriString != null) Prefs.putString(KEY_DOWNLOAD_DIR, uriString) else Prefs.remove(KEY_DOWNLOAD_DIR)
     fun getDownloadLocation(): String? = Prefs.getString(KEY_DOWNLOAD_DIR, null)
     fun getLastTrack(): Track? { if (!getPersistentQueueEnabled()) return null; val json = Prefs.getString(KEY_TRACK_JSON, null) ?: return null; return try { gson.fromJson(json, Track::class.java) } catch (_: Exception) { null } }
+    fun getLastQueueIndex(): Int = if (getPersistentQueueEnabled()) Prefs.getInt("last_queue_index", -1) else -1
     fun getLastPosition(): Long = if (getSavePositionEnabled()) positionPrefs.getLong(KEY_POSITION, 0L) else 0L
     fun getLastQueue(): List<Track> {
         if (!getPersistentQueueEnabled()) return emptyList()

@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data.sync
 
 import com.google.gson.Gson
+import com.alananasss.kittytune.domain.Track
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,13 +17,15 @@ data class ConnectPeerState(
     val queueVersion: String = "", val receivedAtNanos: Long = System.nanoTime(),
     val error: String = "",
 ) {
+    val track: Track? get() = snapshot?.currentTrack
+    val isPlaying: Boolean get() = connected && snapshot?.isPlaying == true
+
     fun offline(): ConnectPeerState = copy(connected = false,
         snapshot = snapshot?.copy(positionMs = position()), receivedAtNanos = System.nanoTime())
     fun position(): Long {
         val s = snapshot ?: return 0L
-        val elapsed = if (connected && s.isPlaying) (System.nanoTime() - receivedAtNanos) / 1_000_000 else 0L
-        val p = s.positionMs + elapsed.coerceAtLeast(0L)
-        return s.queue.getOrNull(s.currentIndex)?.durationMs?.takeIf { it > 0 }?.let { p.coerceAtMost(it) } ?: p
+        val elapsed = if (connected) (System.nanoTime() - receivedAtNanos) / 1_000_000 else 0L
+        return s.positionAfter(elapsed)
     }
 }
 
@@ -390,7 +393,10 @@ object ConnectManager {
         }
         @Synchronized fun sendState(state: PlaybackSnapshot?, force: Boolean = false) {
             if (peerChallenge.isEmpty()) return
-            if (state == null) { if (force) sendMessage("idle"); return }
+            if (state == null) {
+                if (publisher.reset() || force) sendMessage("idle")
+                return
+            }
             val frame = publisher.plan(state, force) ?: return
             sendMessage("state", state = frame.state, queueVersion = frame.queueVersion)
         }
@@ -410,6 +416,9 @@ object ConnectManager {
                     sendState(localState(), force = true)
                 }
                 "resync" -> sendState(localState(), force = true)
+                "idle" -> updatePeer(peer.deviceId) {
+                    (it ?: ConnectPeerState(peer.deviceId, peer.label)).copy(snapshot = null, queueVersion = "")
+                }
                 "state" -> {
                     val incoming = message.state ?: return
                     val old = _peers.value[peer.deviceId]?.snapshot
@@ -476,22 +485,38 @@ object ConnectManager {
         }
     }
 
-    fun command(peerId: String, action: String, value: Long = 0, state: PlaybackSnapshot? = null, value2: Long = 0) {
+    fun command(
+        peerId: String,
+        action: String,
+        value: Long = 0,
+        state: PlaybackSnapshot? = null,
+        value2: Long = 0,
+        remote: ConnectPeerState? = _peers.value[peerId],
+    ) {
         scope.launch {
             _feedback.value = ""
-            val result = runCatching { executeRemote(peerId, action, value, state, value2) }
+            val result = runCatching { executeRemote(peerId, action, value, state, value2, remote) }
             _feedback.value = result.exceptionOrNull()?.message ?: "✓"
         }
     }
-    private suspend fun executeRemote(peerId: String, action: String, value: Long = 0, state: PlaybackSnapshot? = null, value2: Long = 0) {
+    private suspend fun executeRemote(
+        peerId: String,
+        action: String,
+        value: Long = 0,
+        state: PlaybackSnapshot? = null,
+        value2: Long = 0,
+        remote: ConnectPeerState? = _peers.value[peerId],
+    ) {
         val link = links[peerId]?.takeIf { _peers.value[peerId]?.connected == true } ?: error("Device is offline")
-        val remote = _peers.value[peerId]
+        val queueVersion = if (action in listOf("queue", "remove", "move", "queue_next")) {
+            remote?.queueVersion?.takeIf { it.isNotBlank() } ?: error("Queue is unavailable")
+        } else ""
         val id = UUID.randomUUID().toString()
         val deferred = link.registerCommand(id)
         try {
             link.sendMessage("command", id = id, action = action, value = value, value2 = value2, state = state,
                 trackId = remote?.snapshot?.queue?.getOrNull(remote.snapshot.currentIndex)?.id.takeIf { action == "seek" },
-                queueVersion = remote?.queueVersion.orEmpty().takeIf { action in listOf("queue", "remove", "move") }.orEmpty())
+                queueVersion = queueVersion)
             val ack = withTimeout(if (action == "transfer") 30_000L else 8_000L) { deferred.await() }
             check(ack.ok) { ack.error.ifBlank { "Command rejected" } }
         } finally { pending.discard(id, deferred) }

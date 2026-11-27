@@ -88,7 +88,7 @@ class MprisService(
     // Preserve D-Bus command order and keep player mutations from running concurrently.
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val actions = Channel<() -> Unit>(Channel.UNLIMITED)
-    private val actionWorker = serviceScope.launch {
+    private val actionWorker = serviceScope.launch(Dispatchers.Main) {
         for (action in actions) {
             runCatching { action() }.onFailure { e ->
                 println("MPRIS action failed: ${e.message}")

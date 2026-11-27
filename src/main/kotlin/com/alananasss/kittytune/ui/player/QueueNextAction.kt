@@ -41,3 +41,8 @@ internal fun resolveQueueIndex(queue: List<Track>, trackId: Long?, preferredInde
     if (queue.getOrNull(preferredIndex)?.id == trackId) return preferredIndex
     return queue.indexOfFirst { it.id == trackId }
 }
+
+internal fun filteredQueueIndex(queue: List<Track>, index: Int, keep: (Track) -> Boolean): Int {
+    val selected = queue.getOrNull(index) ?: return -1
+    return if (keep(selected)) queue.take(index).count(keep) else -1
+}

@@ -1324,9 +1324,9 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                     )
                 }
                 // ArtifactNet AI-detection badge (issue #41)
-                val aiResult by com.alananasss.kittytune.audio.ai.AiDetectionManager.result.collectAsState()
                 com.alananasss.kittytune.ui.player.ai.AiDetectionBadge(
-                    result = aiResult.takeUnless { viewModel.isRemotePlayback },
+                    result = viewModel.uiAiDetectionResult,
+                    showPending = !viewModel.isRemotePlayback,
                     textColor = palette.bright,
                     onClick = { viewModel.showAiDetectionSheet = true },
                     modifier = Modifier.padding(start = 6.dp),

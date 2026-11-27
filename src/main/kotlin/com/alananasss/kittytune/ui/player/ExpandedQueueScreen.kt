@@ -163,7 +163,7 @@ fun ExpandedQueueScreen(
                     state = reorderableState,
                     key = itemKey
                 ) { isDragging ->
-                    val isCurrent = index == viewModel.currentQueueIndex
+                    val isCurrent = index == viewModel.uiCurrentQueueIndex
                     val shouldDarken = viewModel.uiRepeatMode == RepeatMode.ONE && !isCurrent
                     val itemAlpha by animateFloatAsState(
                         targetValue = if (shouldDarken) 0.3f else 1.0f,

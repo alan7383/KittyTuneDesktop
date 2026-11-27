@@ -24,6 +24,7 @@ internal class ConnectStatePublisher {
             old.isPlaying != state.isPlaying || old.shuffleEnabled != state.shuffleEnabled ||
             old.repeatMode != state.repeatMode || old.volume != state.volume || old.isLiked != state.isLiked ||
             old.isYourMixActive != state.isYourMixActive || old.speed != state.speed ||
+            old.durationMs != state.durationMs || old.aiVerdict != state.aiVerdict ||
             old.sleepTimerEndOfTrack != state.sleepTimerEndOfTrack ||
             (old.sleepTimerRemainingMs == null) != (state.sleepTimerRemainingMs == null) ||
             version != lastQueue ||
@@ -35,5 +36,13 @@ internal class ConnectStatePublisher {
         lastQueue = version
         sentAtNanos = nowNanos
         return Frame(payload, version)
+    }
+
+    fun reset(): Boolean {
+        val hadState = lastSent != null
+        lastSent = null
+        lastQueue = ""
+        versionQueue = null
+        return hadState
     }
 }

@@ -8,6 +8,7 @@ import com.alananasss.kittytune.data.ListeningStatsRepository
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.local.BeatInfoEntity
+import com.alananasss.kittytune.data.sync.ConnectManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -118,10 +119,12 @@ object PetState {
     }
 
     private suspend fun refreshNow(force: Boolean, reroll: Boolean) {
-        val playing = isPlayingNow()
-        val track = try { MusicManager.currentTrack } catch (e: Exception) { null }
+        val deviceId = ConnectManager.selectedDevice.value
+        val peer = deviceId?.let(ConnectManager.peers.value::get)
+        val playing = if (deviceId == null) isPlayingNow() else peer?.isPlaying == true
+        val track = if (deviceId == null) MusicManager.currentTrack else peer?.track
 
-        val (go, wasPlaying) = signatureChanged("$playing|${track?.id}", force)
+        val (go, wasPlaying) = signatureChanged("$playing|$deviceId|${track?.source}|${track?.id}", force)
         if (!go) return
 
         val now = System.currentTimeMillis()
@@ -159,12 +162,12 @@ object PetState {
             dance = dance,
             facts = facts,
             boopUntil = prev.boopUntil,
-            liveBpm = if (playing) prev.liveBpm else 0f,
-            quiet = if (playing) prev.quiet else false,
+            liveBpm = if (playing && deviceId == null) prev.liveBpm else 0f,
+            quiet = playing && deviceId == null && prev.quiet,
             tick = now,
         )
         offlineBeat = beat
-        if (playing && track != null) startBeatSync(track.id) else stopBeatSync()
+        if (playing && track != null && deviceId == null) startBeatSync(track.id) else stopBeatSync()
         // A rare moment only counts when it can actually be seen (fed, not sleeping).
         rolled?.takeIf { it.isRare && !playing }?.let { PetConfig.addRareSeen(it) }
     }
@@ -220,6 +223,7 @@ object PetState {
      * tracker, or the automix analysis for the first seconds of a track. Null otherwise.
      */
     fun nextHeardBeat(minAheadMs: Long = 30): Pair<Long, Long>? = runCatching {
+        if (ConnectManager.selectedDevice.value != null) return null
         val player = MusicManager.player
         if (!player.isPlaying) return null
         val pos = player.audiblePosition

@@ -3,6 +3,26 @@ package com.alananasss.kittytune.data.sync
 import kotlin.test.*
 
 class ConnectWireTest {
+    @Test fun queueAndRendererStateRoundTripForARepeatedTrack() {
+        val track = com.alananasss.kittytune.domain.Track(
+            id = 42L, title = "Repeated", artworkUrl = null, durationMs = 30_000L,
+            user = null, fullDurationMs = 160_000L,
+        )
+        val state = PlaybackSnapshot(
+            "phone", 1L, listOf(track, track.copy(id = 43L), track.copy()), 2, 140_000L, true, false,
+            "NONE", speed = 1.5f, durationMs = 161_000L, aiVerdict = ConnectAiVerdict(0.91f, true),
+        )
+        val message = message(kind = "state").copy(state = state)
+        val restored = assertNotNull(ConnectWire.open(credentials, ConnectWire.seal(credentials, message))?.state)
+        assertEquals(listOf(42L, 43L, 42L), restored.queue.map { it.id })
+        assertEquals(2, restored.currentIndex)
+        assertEquals(160_000L, restored.currentTrack?.effectiveFullDurationMs)
+        assertEquals(state.aiVerdict, restored.aiVerdict)
+        assertEquals(146_000L, restored.projectedPosition(4_001L))
+        assertEquals(161_000L, restored.projectedPosition(25_001L))
+        assertEquals(140_000L, restored.copy(isPlaying = false).projectedPosition(25_001L))
+    }
+
     @Test fun queuePayloadOmitsApiMetadataAndNegotiatesCompression() {
         val track = com.alananasss.kittytune.domain.Track(id = 42, title = "Music", artworkUrl = "https://example.com/art.jpg",
             durationMs = 120000, user = com.alananasss.kittytune.domain.User(7, "Artist", null,

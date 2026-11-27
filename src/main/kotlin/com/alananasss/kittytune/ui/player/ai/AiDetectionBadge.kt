@@ -119,9 +119,10 @@ fun AiDetectionBadge(
     textColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showPending: Boolean = true,
 ) {
     val prefs = remember { PlayerPreferences() }
-    val showBadge = prefs.aiShowBadge && AiDetectionManager.isModelReady()
+    val showBadge = prefs.aiShowBadge && (result != null || (showPending && AiDetectionManager.isModelReady()))
     if (!showBadge) {
         return
     }
@@ -243,15 +244,15 @@ fun AiDetectionDialog(
     onDismissRequest: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val track = viewModel.currentTrack ?: return
+    val track = viewModel.uiCurrentTrack ?: return
     val prefs = remember { PlayerPreferences() }
-    val aiResult by AiDetectionManager.result.collectAsState()
+    val aiResult = viewModel.uiAiDetectionResult
 
     val rawScore = aiResult?.score ?: 0f
     val score = if (rawScore.isNaN()) 0f else rawScore.coerceIn(0f, 1f)
     val pct = (score * 100).roundToInt().coerceIn(0, 100)
     val threshold = prefs.aiScoreThreshold
-    val isAi = score >= threshold
+    val isAi = aiResult?.isAi ?: (score >= threshold)
     val isAnalyzing = aiResult?.status == AiDetectionManager.Status.ANALYZING
 
     val blockedTracks by BlockManager.blockedTrackIdsFlow.collectAsState()

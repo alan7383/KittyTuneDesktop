@@ -59,6 +59,20 @@ class ConnectHandoffTest {
         }
         assertEquals(0, commands)
     }
+
+    @Test fun anotherOccurrenceOfTheSameTrackAbortsHandoff() = runBlocking {
+        val repeated = state.copy(queue = listOf(state.queue.single(), state.queue.single().copy()),
+            aiVerdict = ConnectAiVerdict(0.92f, true))
+        val calls = mutableListOf<String>()
+        assertFailsWith<IllegalStateException> {
+            ConnectHandoff.move("pc", null, repeated, { repeated.copy(currentIndex = 1) }) { _, action, snapshot, _ ->
+                calls += action
+                assertEquals(repeated.aiVerdict, snapshot?.aiVerdict)
+                assertEquals(0, snapshot?.currentIndex)
+            }
+        }
+        assertEquals(listOf("transfer"), calls)
+    }
     @Test fun ambiguousDestinationPauseDoesNotResumeSource() = runBlocking {
         val calls = mutableListOf<Pair<String?, String>>()
         assertFailsWith<IllegalStateException> {

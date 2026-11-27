@@ -55,4 +55,14 @@ class QueueNextActionTest {
         assertEquals(0, resolveQueueIndex(queue, 78L, 99))
         assertEquals(-1, resolveQueueIndex(queue, null, 1))
     }
+
+    @Test fun filteringAQueuePreservesTheSelectedDuplicate() {
+        val song = Track(78L, "Song", null, 120_000, null)
+        val local = song.copy(id = -1, source = "local")
+        val queue = listOf(song, local, song.copy(id = 79), song.copy())
+        val portable = queue.filter { it.source != "local" }
+        val selected = filteredQueueIndex(queue, 3) { it.source != "local" }
+        assertEquals(2, selected)
+        assertEquals(2, resolveQueueIndex(portable, song.id, selected))
+    }
 }
