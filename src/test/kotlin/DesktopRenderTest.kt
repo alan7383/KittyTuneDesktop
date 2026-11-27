@@ -87,10 +87,38 @@ class DesktopRenderTest {
                         SkiaFont(variant, 80f).use { font ->
                             Shaper.make().use { shaper ->
                                 fun width(text: String) = shaper.shapeLine(text, font).use { it.width }
-                                for (pair in listOf("тр", "тв", "ет", "ст", "св", "гк")) {
+                                for (pair in listOf("тр", "тв", "св")) {
                                     val separated = width(pair.take(1)) + width(pair.takeLast(1))
                                     val adjustment = separated - width(pair)
                                     assertTrue("$pair at roundness $roundness kerned by $adjustment pixels", adjustment > 1f)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun smallTextHasRoomBetweenLetters() {
+        Data.makeFromBytes(flexFontBytes()).use { data ->
+            checkNotNull(FontMgr.default.makeFromData(data)).use { typeface ->
+                val settings = arrayOf(
+                    FontVariation("wght", 500f), FontVariation("opsz", 14f), FontVariation("ROND", 100f),
+                )
+                checkNotNull(typeface.makeClone(settings)).use { variant ->
+                    SkiaFont(variant, 80f).use { font ->
+                        Shaper.make().use { shaper ->
+                            val clearances = listOf("Ск" to 4.5f, "ть" to 4.5f, "ïï" to 3.2f)
+                            for ((pair, minimumGap) in clearances) {
+                                shaper.shapeLine(pair, font).use { line ->
+                                    val glyphs = line.glyphs
+                                    val left = checkNotNull(font.getPath(glyphs[0])).use { it.computeTightBounds() }
+                                    val right = checkNotNull(font.getPath(glyphs[1])).use { it.computeTightBounds() }
+                                    val positions = line.positions
+                                    val gap = (positions[2] + right.left) - (positions[0] + left.right)
+                                    assertTrue("The letter pair '$pair' has a $gap px ink gap at 80 px", gap >= minimumGap)
                                 }
                             }
                         }

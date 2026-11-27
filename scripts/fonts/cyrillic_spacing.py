@@ -17,10 +17,12 @@ _TEXT_ROWS = slice(4 - _FIRST_ROW, 29 - _FIRST_ROW)
 class _EdgePen(BasePen):
     """Record the outer ink edges at evenly spaced heights through a glyph."""
 
-    def __init__(self, step):
+    def __init__(self, step, first_row=_FIRST_ROW, last_row=_LAST_ROW):
         super().__init__(None)
         self.step = step
-        count = _LAST_ROW - _FIRST_ROW + 1
+        self.first_row = first_row
+        self.last_row = last_row
+        count = last_row - first_row + 1
         self.left = [inf] * count
         self.right = [-inf] * count
 
@@ -28,12 +30,12 @@ class _EdgePen(BasePen):
         self.start = point
 
     def _rows(self, *heights):
-        low = max(_FIRST_ROW, ceil(min(heights) / self.step))
-        high = min(_LAST_ROW, floor(max(heights) / self.step))
+        low = max(self.first_row, ceil(min(heights) / self.step))
+        high = min(self.last_row, floor(max(heights) / self.step))
         return range(low, high + 1)
 
     def _edge(self, row, x):
-        index = row - _FIRST_ROW
+        index = row - self.first_row
         self.left[index] = min(self.left[index], x)
         self.right[index] = max(self.right[index], x)
 
@@ -108,7 +110,8 @@ def fit_cyrillic_text(designs, glyphs, drawn, inherited):
         reference = [_measure_gap(left, right)[1] for left, right in ((n, n), (n, o), (o, n), (o, o))]
         low = min(reference) * 0.99
         high = max(reference) * 1.14
-        clearance = max(50.0, m.n_lsb * 0.47)
+        # At UI sizes a gap near half an n sidebearing can disappear after rasterization.
+        clearance = max(75.0, m.n_lsb * 0.95)
         display = max(0.0, (m.opsz - 18.0) / 126.0)
         strength = 0.72 * (1.0 - 0.52 * display)
         for (left, right), (_, baseline, values) in pairs.items():
@@ -117,12 +120,10 @@ def fit_cyrillic_text(designs, glyphs, drawn, inherited):
             nearest += original
             optical += original
             adjustment = 0.0
-            if nearest < clearance and (left in "ждЗз" or right in "ждз"):
-                adjustment = min(clearance - nearest, m.n_adv * 0.06)
+            if nearest < clearance:
+                adjustment = clearance - nearest
             elif optical > high and nearest < inf:
-                # Keep the existing clearance when a pair is already tighter than the floor.
-                available = max(0.0, nearest - clearance)
-                adjustment = -min((optical - high) * strength, available, m.n_adv * 0.115)
+                adjustment = -min((optical - high) * strength, nearest - clearance, m.n_adv * 0.115)
             elif optical < low:
                 adjustment = min((low - optical) * strength, m.n_adv * 0.023)
             values.append(otRound(adjustment))

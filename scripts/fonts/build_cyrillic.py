@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: OFL-1.1
-"""Build the bundled KittyTune Flex TTF with Python 3.10+ and fonttools 4.68.
+"""Build the bundled KittyTune Flex TTF using Python 3.10+, fontTools and NumPy.
 
 Run python scripts/fonts/build_cyrillic.py from the checkout. The unmodified
 Google Sans Flex 3.007 is the input to this build.
@@ -21,6 +21,7 @@ from fontTools.varLib.varStore import NO_VARIATION_INDEX, OnlineVarStoreBuilder
 
 from cyrillic_design import ENCLOSING, HOMOGLYPHS, combining, coverage, draw_design
 from cyrillic_spacing import fit_cyrillic_text
+from letter_clearance import build_clearance_kerning
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -873,11 +874,11 @@ def layout_variations(font, model, designs, glyphs, added, locations=None):
                 stack[glyphs[code]] = record
             replace_records(subtable, "Mark2", "Mark2", stack)
 
-    def add_lookup(feature_tag, subtables, flags=0):
+    def add_lookup(feature_tag, subtables, flags=0, extension=False):
         feature = next(f.Feature for f in table.FeatureList.FeatureRecord if f.FeatureTag == feature_tag)
         feature.LookupListIndex.append(len(lookups))
         feature.LookupCount = len(feature.LookupListIndex)
-        lookups.append(layout.buildLookup(subtables, flags=flags))
+        lookups.append(layout.buildLookup(subtables, flags=flags, table="GPOS", extension=extension))
         table.LookupList.LookupCount = len(lookups)
 
     enclosures = {glyphs[ord(char)]: (0, layout.buildAnchor(0, 0)) for char in ENCLOSING}
@@ -895,6 +896,11 @@ def layout_variations(font, model, designs, glyphs, added, locations=None):
     if optical:
         add_lookup("kern", _build_text_kern(optical, text_model, store, offset, glyph_map), flags=8)
     append_var_store(gdef.VarStore, store.finish())
+
+    clearance, guard_store = build_clearance_kerning(font, locations)
+    if clearance:
+        append_var_store(gdef.VarStore, guard_store)
+        add_lookup("kern", clearance, flags=8, extension=True)
 
     scripts = table.ScriptList.ScriptRecord
     cyrillic = otTables.ScriptRecord()
