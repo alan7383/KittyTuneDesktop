@@ -2329,7 +2329,8 @@
     <string name="chart_genre_rnb">R&amp;B</string>
     <string name="chart_genre_country">Country</string>
     <string name="chart_genre_latin">Música latina</string>
-    <string name="home_from_your_artists">Novidades dos seus artistas</string>
+    <string name="home_from_your_artists">Novos lançamentos</string>
+    <string name="home_releases_recent">Recente</string>
     <string name="home_from_your_artists_sub">Lançamentos dos artistas de que você gosta</string>
     <string name="explore">Explorar</string>
     <string name="chart_section_title">Parada</string>

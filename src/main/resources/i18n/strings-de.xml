@@ -2526,7 +2526,8 @@
     <string name="chart_genre_rnb">R&amp;B</string>
     <string name="chart_genre_country">Country</string>
     <string name="chart_genre_latin">Latin</string>
-    <string name="home_from_your_artists">Neu von deinen Künstlern</string>
+    <string name="home_from_your_artists">Neuerscheinungen</string>
+    <string name="home_releases_recent">Kürzlich</string>
     <string name="home_from_your_artists_sub">Was die Künstler, die du magst, veröffentlicht haben</string>
     <string name="explore">Entdecken</string>
     <string name="chart_section_title">Chartliste</string>

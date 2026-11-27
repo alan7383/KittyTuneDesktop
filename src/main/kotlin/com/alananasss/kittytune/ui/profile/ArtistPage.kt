@@ -490,8 +490,10 @@ internal fun artistRadioDestination(user: User, profileViewModel: ProfileViewMod
 internal fun ArtistSectionTitle(title: String, onOpen: (() -> Unit)?, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val color by animateColorAsState(
-        if (hovered && onOpen != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+    val color = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered && onOpen != null,
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = MaterialTheme.colorScheme.onSurface,
         label = "artistSectionTitle",
     )
     val shift by animateDpAsState(if (hovered) 4.dp else 0.dp, label = "artistSectionArrow")
@@ -538,12 +540,10 @@ internal fun NewReleaseCard(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(
-        when {
-            previous -> if (hovered) scheme.surfaceContainer else scheme.surfaceContainerLow
-            hovered -> scheme.surfaceContainerHigh
-            else -> scheme.surfaceContainer
-        },
+    val container = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = if (previous) scheme.surfaceContainer else scheme.surfaceContainerHigh,
+        unselectedColor = if (previous) scheme.surfaceContainerLow else scheme.surfaceContainer,
         label = "newReleaseContainer",
     )
     val cover = if (previous) 64.dp else 132.dp
@@ -556,12 +556,7 @@ internal fun NewReleaseCard(
             .hoverable(interaction)
             .clip(shape)
             .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
-                when (release) {
-                    is ArtistRelease.Song -> playerViewModel.playPlaylist(listOf(release.track), 0, context)
-                    is ArtistRelease.Record -> onNavigate(
-                        if (release.playlist.urn?.contains("spotify") == true) release.playlist.urn else release.playlist.id.toString()
-                    )
-                }
+                playerViewModel.openArtistRelease(release, context, onNavigate)
             },
     ) {
         Row(Modifier.padding(if (previous) 10.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -573,16 +568,11 @@ internal fun NewReleaseCard(
             )
             Spacer(Modifier.width(if (previous) 10.dp else 16.dp))
             Column(Modifier.weight(1f)) {
-                Surface(shape = CircleShape, color = if (previous) scheme.surfaceVariant else scheme.primaryContainer) {
-                    Text(
-                        release.kindLabel().uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (previous) scheme.onSurfaceVariant else scheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
+                val today = java.time.LocalDate.now()
+                release.freshness(today)?.let {
+                    ReleaseFreshnessBadge(it)
+                    Spacer(Modifier.height(6.dp))
                 }
-                Spacer(Modifier.height(if (previous) 4.dp else 10.dp))
                 Text(
                     release.title,
                     style = if (previous) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge,
@@ -591,82 +581,37 @@ internal fun NewReleaseCard(
                     maxLines = if (previous) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                release.byline().takeIf { it.isNotBlank() }?.let {
+                release.artist.takeIf { it.isNotBlank() }?.let {
                     Spacer(Modifier.height(2.dp))
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                // A date, not "3 years ago": for an artist who has been quiet that says nothing about when.
-                val released = ReleaseDate.text(release.date)
-                val facts = listOfNotNull(released.takeIf { it.isNotBlank() }?.let { str("artist_released_when", it) }, release.sizeLabel())
-                if (facts.isNotEmpty()) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        facts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant.copy(alpha = if (previous) 0.7f else 1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                val released = release.day?.let { formatReleaseDay(it, today) }
+                val facts = listOfNotNull(released, release.sizeLabel())
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ReleaseKindBadge(release)
+                    if (facts.isNotEmpty()) {
+                        Text(
+                            text = facts.joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-/** What an artist put out: a single song, or a record of several. */
-internal sealed interface ArtistRelease {
-    val title: String
-    val artworkUrl: String?
-    val date: String?
-
-    /** "Track", "Album", "Single", "EP" or "Compilation". */
-    @Composable fun kindLabel(): String
-
-    /** Who it is by. */
-    fun byline(): String
-
-    /** How long a song is, or how many songs a record holds. */
-    @Composable fun sizeLabel(): String?
-
-    data class Song(val track: Track) : ArtistRelease {
-        override val title get() = track.title.orEmpty()
-        override val artworkUrl get() = track.fullResArtwork
-        override val date get() = track.releaseDate ?: track.createdAt
-        @Composable override fun kindLabel() = str("release_kind_track")
-        override fun byline() = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
-        @Composable override fun sizeLabel() = track.durationMs?.takeIf { it > 0 }?.let {
-            val seconds = it / 1000
-            String.format("%d:%02d", seconds / 60, seconds % 60)
-        }
+@Composable
+private fun ArtistRelease.sizeLabel(): String? = when (this) {
+    is ArtistRelease.Song -> track.durationMs?.takeIf { it > 0 }?.let {
+        val seconds = it / 1000
+        String.format("%d:%02d", seconds / 60, seconds % 60)
     }
-
-    data class Record(val playlist: Playlist) : ArtistRelease {
-        override val title get() = playlist.title.orEmpty()
-        override val artworkUrl get() = playlist.fullResArtwork
-        override val date get() = playlist.releaseDate ?: playlist.createdAt
-        @Composable override fun kindLabel() = when ((playlist.setType ?: playlist.playlistType)?.lowercase()) {
-            "single" -> str("release_kind_single")
-            "ep" -> str("release_kind_ep")
-            "compilation" -> str("release_kind_compilation")
-            else -> str("release_kind_album")
-        }
-        override fun byline() = playlist.user?.username.orEmpty()
-        @Composable override fun sizeLabel() = playlist.trackCount?.takeIf { it > 0 }?.let { str("playlist_num_tracks", it) }
-    }
-
-    companion object {
-        /**
-         * The newest of the artist's songs and records, newest first, by release date where one is given and upload
-         * date if not. A song that shares its name with a record is the record's own, so it is listed once.
-         */
-        fun latestOf(tracks: List<Track>, records: List<Playlist>, count: Int = 2): List<ArtistRelease> {
-            val recordTitles = records.mapNotNull { it.title?.trim()?.lowercase() }.toSet()
-            val candidates = records.map { Record(it) } +
-                tracks.filter { it.title?.trim()?.lowercase() !in recordTitles }.map { Song(it) }
-            val dated = candidates.filter { !it.date.isNullOrBlank() }.sortedByDescending { it.date!!.take(10) }
-            return (dated + candidates.filter { it.date.isNullOrBlank() }).take(count)
-        }
-    }
+    is ArtistRelease.Record -> playlist.trackCount?.takeIf { it > 0 }?.let { str("playlist_num_tracks", it) }
 }
 
 /** One of the artist's mixes, as the row of mixes shows it. */

@@ -150,8 +150,8 @@ internal fun HomeFeed(
             item(key = "clips") { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel, homeClips) }
         }
 
-        if (vm.likedArtistUpdates.isNotEmpty()) {
-            item(key = "from_artists") { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
+        if (vm.artistReleases.isNotEmpty()) {
+            item(key = "from_artists") { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm.artistReleases, playerViewModel) }
         }
 
         if (showHomeYourMix) {

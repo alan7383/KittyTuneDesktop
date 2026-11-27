@@ -35,6 +35,18 @@ import com.alananasss.kittytune.utils.Logger
     import kotlinx.coroutines.async
     import kotlinx.coroutines.coroutineScope
     import kotlinx.coroutines.delay
+    import com.alananasss.kittytune.data.DownloadManager
+    import com.alananasss.kittytune.data.spotify.SpotifyRepository
+    import com.alananasss.kittytune.ui.profile.ArtistRelease
+    import com.alananasss.kittytune.ui.profile.fetchReleaseData
+    import com.alananasss.kittytune.ui.profile.loadReleaseAlbums
+    import java.time.LocalDate
+    import kotlinx.coroutines.flow.MutableStateFlow
+    import kotlinx.coroutines.flow.collectLatest
+    import kotlinx.coroutines.flow.combine
+    import kotlinx.coroutines.flow.distinctUntilChanged
+    import kotlinx.coroutines.flow.map
+    import kotlinx.coroutines.flow.update
     import kotlinx.coroutines.flow.first
     import kotlinx.coroutines.launch
     import kotlinx.coroutines.withContext
@@ -239,7 +251,9 @@ import com.alananasss.kittytune.utils.Logger
         private var recentSearchesJob: Job? = null
 
         /** Newest songs from the artists whose work is already in the liked list. */
-        val likedArtistUpdates = mutableStateListOf<Track>()
+        internal var artistReleases by mutableStateOf<List<ArtistRelease>>(emptyList())
+            private set
+        private val releaseRefresh = MutableStateFlow(0)
 
         private fun observeRecentSearches() {
             if (recentSearchesJob != null) return
@@ -345,49 +359,63 @@ import com.alananasss.kittytune.utils.Logger
             searchJob = viewModelScope.launch { performSearch(query) }
         }
 
-        /**
-         * Newest songs from artists already present in the liked list.
-         *
-         * A handful of artists rather than all of them: the endpoint is one request per artist, and
-         * this runs on the home screen's critical path. Artists with nothing new simply contribute
-         * nothing, and the songs already liked are dropped so the row is only ever new ones.
-         */
-        private suspend fun fetchLikedArtistUpdates(localLikes: List<Track>): List<Track> {
-            val artists = localLikes.asSequence()
-                .mapNotNull { it.user?.takeIf { user -> user.id > 0 } }
-                .distinctBy { it.id }
-                .take(ARTIST_UPDATE_SOURCES)
-                .toList()
-            if (artists.isEmpty()) return emptyList()
+        private fun observeArtistReleases() {
+            viewModelScope.launch {
+                val savedIds = DownloadManager.getSavedArtists()
+                    .map { artists -> artists.map { it.id }.filter { it > 0L }.distinct() }
+                    .distinctUntilChanged()
+                val releasesByArtist = mutableMapOf<Long, List<ArtistRelease>>()
+                var lastRefresh = -1
+                combine(savedIds, SessionManager.isClientIdValid, releaseRefresh) { ids, ready, refresh ->
+                    (if (ready) ids else emptyList()) to refresh
+                }.collectLatest { (ids, refresh) ->
+                    releasesByArtist.keys.retainAll(ids.toSet())
+                    publishArtistReleases(releasesByArtist.values.flatten())
+                    if (ids.isEmpty() || !NetworkUtils.isInternetAvailable()) return@collectLatest
 
-            val likedIds = localLikes.mapTo(HashSet()) { it.id }
-            val fetched = coroutineScope {
-                artists.map { artist ->
-                    async {
-                        runCatching { api.getUserTracks(artist.id, limit = TRACKS_PER_ARTIST).collection }
-                            .getOrDefault(emptyList())
+                    val artistsToLoad = if (refresh != lastRefresh) ids else ids.filterNot { it in releasesByArtist }
+                    for (batch in artistsToLoad.chunked(4)) {
+                        val results = coroutineScope {
+                            batch.map { artistId -> async { artistId to fetchFavoriteArtistReleases(artistId) } }
+                                .awaitAll()
+                        }
+                        for ((artistId, releases) in results) {
+                            if (releases != null) releasesByArtist[artistId] = releases
+                        }
+                        publishArtistReleases(releasesByArtist.values.flatten())
                     }
-                }.awaitAll()
+                    lastRefresh = refresh
+                }
+            }
+        }
+
+        private fun publishArtistReleases(releases: List<ArtistRelease>) {
+            val today = LocalDate.now()
+            val tracks = releases.filterIsInstance<ArtistRelease.Song>().map { it.track }
+            val records = releases.filterIsInstance<ArtistRelease.Record>().map { it.playlist }
+            artistReleases = ArtistRelease.latestOf(tracks, records)
+                .filter { release -> release.day?.isAfter(today) != true }
+                .take(30)
+        }
+
+        private suspend fun fetchFavoriteArtistReleases(artistId: Long): List<ArtistRelease>? = coroutineScope {
+            val spotifyId = playerPrefs.getSpotifyArtistIdForStableId(artistId)
+            if (!spotifyId.isNullOrBlank()) {
+                val artist = fetchReleaseData { SpotifyRepository.getArtist(spotifyId) } ?: return@coroutineScope null
+                val albums = (artist.albums + artist.singles + artist.compilations).map { it.toPlaylist() }
+                return@coroutineScope ArtistRelease.latestOf(emptyList(), albums, count = 3)
             }
 
-            // At most [MAX_PER_ARTIST] songs from any one artist, while the rest of the row stays in
-            // date order. One prolific uploader was filling the whole shelf with their own newest
-            // five, which is a shelf of one artist wearing a shelf's clothes.
-            val perArtist = mutableMapOf<Long, Int>()
-            return fetched.flatten()
-                .filter { it.id > 0L && it.id !in likedIds }
-                .distinctBy { it.id }
-                // ISO 8601 sorts as text, so the newest really is last; a track with no date goes to
-                // the end rather than to the top on an empty string.
-                .sortedByDescending { it.createdAt ?: it.releaseDate ?: "" }
-                .filter { track ->
-                    val id = track.user?.id ?: 0L
-                    if (id == 0L) return@filter true
-                    val seen = perArtist.getOrDefault(id, 0)
-                    perArtist[id] = seen + 1
-                    seen < MAX_PER_ARTIST
-                }
-                .take(ARTIST_UPDATE_TOTAL)
+            val tracks = async {
+                fetchReleaseData { api.getUserTracks(artistId, limit = 20).collection }.orEmpty()
+                    .filterNotNull().filter { it.user?.id == artistId }
+            }
+            val albums = async { api.loadReleaseAlbums(artistId) }
+            val records = albums.await() ?: return@coroutineScope null
+            val today = LocalDate.now()
+            ArtistRelease.latestOf(tracks.await(), records)
+                .filter { it.day?.isAfter(today) != true }
+                .take(3)
         }
 
         companion object {
@@ -397,15 +425,11 @@ import com.alananasss.kittytune.utils.Logger
             /** How long a query has to stand still before its results' streams are looked up. */
             private const val WARM_AFTER_IDLE_MS = 700L
 
-            /** How many liked artists are asked for new songs. One request each, all at once. */
-            const val ARTIST_UPDATE_SOURCES = 10
 
-            private const val TRACKS_PER_ARTIST = 6
-            private const val MAX_PER_ARTIST = 3
-            private const val ARTIST_UPDATE_TOTAL = 30
         }
 
         init {
+            observeArtistReleases()
             viewModelScope.launch {
                 playerPrefs.verifiedFilterEnabledFlow().collect { enabled ->
                     val changed = verifiedFilterEnabled != enabled
@@ -493,6 +517,7 @@ import com.alananasss.kittytune.utils.Logger
             
             isOfflineMode = false
             
+            releaseRefresh.update { it + 1 }
             viewModelScope.launch {
                 isRefreshing = true
                 val token = tokenManager.getAccessToken()
@@ -1354,6 +1379,10 @@ import com.alananasss.kittytune.utils.Logger
                     if (data.sections.isNotEmpty()) {
                         homeSections.clear()
                         data.sections.forEach { section ->
+                            // The old track-only shelf was also cached as an ordinary home row.
+                            if (section.type == SectionType.TRACKS_ROW && section.subtitle == str("home_from_your_artists_sub")) {
+                                return@forEach
+                            }
                             val content: List<Any> = when (section.type) {
                                 SectionType.TRACKS_ROW -> section.tracks
                                 SectionType.STATIONS_ROW -> section.playlists
@@ -1759,33 +1788,16 @@ import com.alananasss.kittytune.utils.Logger
                     val historySectionDef = async { fetchHistoryBasedSection() }
                     val discoverySectionDef = async { fetchDiscoverySection(localLikes) }
                     val recommendationsDef = async { fetchTrackRecommendations(localLikes) }
-                    val artistUpdatesDef = async { fetchLikedArtistUpdates(localLikes) }
 
                     val genericSections = genericSectionsDef.await()
                     val personalSections = personalSectionsDef.await()
                     val historySection = historySectionDef.await()
                     val discoverySection = discoverySectionDef.await()
                     val recommendationsSection = recommendationsDef.await()
-                    val artistUpdates = artistUpdatesDef.await()
-
-                    likedArtistUpdates.clear()
-                    likedArtistUpdates.addAll(artistUpdates)
 
                     if (discoverySection != null) allSections.add(discoverySection)
                     if (recommendationsSection != null) allSections.add(recommendationsSection)
                     if (historySection != null) allSections.add(historySection)
-                    // Straight after your own history: what the artists you already play have put
-                    // out belongs next to what you just listened to, not down with the generic rows.
-                    if (artistUpdates.isNotEmpty()) {
-                        allSections.add(
-                            HomeSection(
-                                title = str("home_from_your_artists"),
-                                subtitle = str("home_from_your_artists_sub"),
-                                content = artistUpdates,
-                                type = SectionType.TRACKS_ROW,
-                            )
-                        )
-                    }
                     allSections.addAll(personalSections)
                     allSections.addAll(genericSections)
                 }
@@ -1858,7 +1870,6 @@ import com.alananasss.kittytune.utils.Logger
                     val historySectionDef = async { fetchHistoryBasedSection() }
                     val discoverySectionDef = async { fetchDiscoverySection(sourceLikes) }
                     val recommendationsDef = async { fetchTrackRecommendations(localLikes) }
-                    val artistUpdatesDef = async { fetchLikedArtistUpdates(sourceLikes) }
 
                     val discoverySection = discoverySectionDef.await()
                     if (discoverySection != null) allSections.add(discoverySection)
@@ -1874,19 +1885,6 @@ import com.alananasss.kittytune.utils.Logger
                     val historySection = historySectionDef.await()
                     if (historySection != null) allSections.add(historySection)
 
-                    val artistUpdates = artistUpdatesDef.await()
-                    likedArtistUpdates.clear()
-                    likedArtistUpdates.addAll(artistUpdates)
-                    if (artistUpdates.isNotEmpty()) {
-                        allSections.add(
-                            HomeSection(
-                                title = str("home_from_your_artists"),
-                                subtitle = str("home_from_your_artists_sub"),
-                                content = artistUpdates,
-                                type = SectionType.TRACKS_ROW,
-                            )
-                        )
-                    }
 
                     if (sourceLikes.isNotEmpty()) {
                         val personalSections = fetchPersonalizedSections(sourceLikes, me.username ?: str("unknown_user"))

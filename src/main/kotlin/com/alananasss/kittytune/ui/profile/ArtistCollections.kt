@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -58,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.domain.Playlist
+import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.pressScale
 
 /**
@@ -164,15 +167,17 @@ internal fun ReleaseGridScreen(
 /** A release's cover with its name, and under it what it is and when it came out. */
 @Composable
 private fun ReleaseCard(release: Playlist, onClick: () -> Unit) {
-    ReleaseTile(release.title.orEmpty(), release.fullResArtwork, releaseDetails(release), onClick)
+    ReleaseTile(release.displayTitle.orEmpty(), release.fullResArtwork, releaseDetails(release), onClick)
 }
 
 @Composable
 private fun ReleaseTile(title: String, artworkUrl: String?, details: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val background by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+    val background = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        unselectedColor = MaterialTheme.colorScheme.surfaceContainer,
         label = "releaseCard",
     )
     Column(
@@ -219,10 +224,7 @@ private fun releaseDetails(release: Playlist): String {
     return listOfNotNull(kind, year, count).joinToString(" · ")
 }
 
-/**
- * Everything an artist has put out, songs and records together, newest first or oldest first (round 3 of the tester list,
- * item 8.1). The page "new releases" opened only the albums, which left out the singles that had never been put on a record.
- */
+/** Albums and standalone tracks, ordered by release date. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun AllReleasesScreen(
@@ -234,10 +236,8 @@ internal fun AllReleasesScreen(
     onLoadMore: () -> Unit = {},
 ) {
     var newestFirst by remember { mutableStateOf(true) }
-    val ordered = remember(releases, newestFirst) {
-        val dated = releases.sortedBy { ReleaseDate.parse(it.date) ?: java.time.LocalDate.MIN }
-        if (newestFirst) dated.reversed() else dated
-    }
+    val ordered = remember(releases, newestFirst) { orderReleases(releases, newestFirst) }
+    val today = java.time.LocalDate.now()
 
     Scaffold(
         topBar = {
@@ -263,18 +263,18 @@ internal fun AllReleasesScreen(
             modifier = Modifier.padding(innerPadding).fillMaxSize(),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }, key = "sort") {
-                SortChips(
+                ExpressiveConnectedButtonGroup(
                     options = listOf(true, false),
-                    selected = newestFirst,
-                    labelOf = { str(if (it) "sort_newest" else "sort_oldest") },
-                    onSelect = { newestFirst = it },
-                    sidePadding = 0.dp,
+                    selectedOption = newestFirst,
+                    onOptionSelected = { newestFirst = it },
+                    modifier = Modifier.wrapContentWidth(Alignment.Start).widthIn(max = 260.dp),
+                    fillMaxWidth = true,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    labelProvider = { Text(str(if (it) "sort_newest" else "sort_oldest")) },
                 )
             }
-            items(ordered, key = { it.stableKey() }) { release ->
-                val year = ReleaseDate.parse(release.date)?.year?.toString()
-                val details = listOfNotNull(release.kindLabel(), year, release.sizeLabel()).joinToString(" · ")
-                ReleaseTile(release.title, release.artworkUrl, details) { onOpen(release) }
+            items(ordered, key = { it.key }) { release ->
+                ArtistReleaseTile(release, today, { onOpen(release) })
             }
             if (hasMore) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "more") {
@@ -287,9 +287,4 @@ internal fun AllReleasesScreen(
             }
         }
     }
-}
-
-private fun ArtistRelease.stableKey(): String = when (this) {
-    is ArtistRelease.Song -> "song:${track.id}"
-    is ArtistRelease.Record -> "record:${playlist.id}"
 }

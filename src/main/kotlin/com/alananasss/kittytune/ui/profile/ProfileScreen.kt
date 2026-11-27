@@ -397,15 +397,15 @@ fun ProfileScreen(
 
                 // On an artist's page the popular songs come first and the newest release beside them; who they
                 // are moved to the header's "about", which a page opened to listen does not need first (issue #66).
-                if (isArtistPage && (popularTracks.isNotEmpty() || allTracks.isNotEmpty())) {
+                if (isArtistPage) {
                     item {
                         val popular = popularTracks.ifEmpty { allTracks }
-                        val latest = remember(allTracks.size, profileViewModel.albums.size, profileViewModel.singles.size) {
-                            ArtistRelease.latestOf(allTracks.take(10), profileViewModel.albums + profileViewModel.singles)
-                        }
+                        val latest = rememberArtistReleases(profileViewModel).take(2)
+                        val artistId = user.urn?.takeIf { it.startsWith("spotify:artist:") }
+                            ?.substringAfterLast(':') ?: user.id.toString()
                         BoxWithConstraints(Modifier.fillMaxWidth()) {
                             val popularColumn: @Composable (Modifier) -> Unit = { m ->
-                                Column(m) {
+                                if (popular.isNotEmpty()) Column(m) {
                                     ArtistSectionTitle(str("profile_tab_popular"), onOpen = { onNavigate("profile_collection:${user.id}:popular") })
                                     popular.take(5).forEachIndexed { index, track ->
                                         ProfileTrackItem(track, index, playerViewModel, downloadProgress, popular, artistPlaybackContext, showPlays = true, showDate = false)
@@ -416,8 +416,7 @@ fun ProfileScreen(
                                 if (latest.isNotEmpty()) Column(m) {
                                     ArtistSectionTitle(
                                         str("artist_new_releases"),
-                                        // Every release, songs and records, newest first.
-                                        onOpen = { onNavigate("profile_collection:${user.id}:releases_all") },
+                                        onOpen = { onNavigate("profile_collection:$artistId:releases_all") },
                                     )
                                     latest.forEachIndexed { index, release ->
                                         NewReleaseCard(
@@ -428,7 +427,7 @@ fun ProfileScreen(
                                     }
                                 }
                             }
-                            if (maxWidth >= 860.dp && latest.isNotEmpty()) {
+                            if (maxWidth >= 860.dp && latest.isNotEmpty() && popular.isNotEmpty()) {
                                 Row(Modifier.fillMaxWidth()) {
                                     popularColumn(Modifier.weight(1.5f))
                                     releaseColumn(Modifier.weight(1f).padding(top = 0.dp))
@@ -690,8 +689,18 @@ fun ProfileScreen(
 
             // dynamic app bar
             val showBarBackground by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 300 } }
-            val barColor by animateColorAsState(if (showBarBackground) MaterialTheme.colorScheme.surface.copy(alpha = 0.98f) else Color.Transparent, label = "bar")
-            val contentColor by animateColorAsState(if (showBarBackground) MaterialTheme.colorScheme.onSurface else Color.White, label = "content")
+            val barColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = showBarBackground,
+                selectedColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                unselectedColor = Color.Transparent,
+                label = "bar",
+            )
+            val contentColor = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+                selected = showBarBackground,
+                selectedColor = MaterialTheme.colorScheme.onSurface,
+                unselectedColor = Color.White,
+                label = "content",
+            )
 
             val isArtistSaved by DownloadManager.isArtistSavedFlow(user.id).collectAsState(initial = null)
 
@@ -1704,10 +1713,11 @@ fun <T> ProfileHorizontalCarouselRow(
 fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val cardBg by animateColorAsState(
-        if (isHovered) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
-        else Color.Transparent,
-        label = "profileCardBg"
+    val cardBg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isHovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+        unselectedColor = Color.Transparent,
+        label = "profileCardBg",
     )
 
     Column(
@@ -1731,7 +1741,7 @@ fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = playlist.title ?: "",
+            text = playlist.displayTitle.orEmpty(),
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -2119,9 +2129,7 @@ fun ProfileCollectionScreen(
     val profileViewModel: ProfileViewModel = viewModel(key = "profile_$userId") { ProfileViewModel(AppInstance.application) }
 
     LaunchedEffect(userId) {
-        userId.toLongOrNull()?.let { id ->
-            profileViewModel.loadProfile(id)
-        }
+        profileViewModel.loadProfile(userId)
     }
 
     val user = profileViewModel.user
@@ -2149,21 +2157,12 @@ fun ProfileCollectionScreen(
             playerViewModel.navigateToPlaylistId = if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()
         }
         when {
-            section == "releases_all" -> {
-                val records = (profileViewModel.albums + profileViewModel.singles + profileViewModel.compilations).distinctBy { it.id }
-                // Content filtering (issue #41): Song releases of blocked tracks
-                // are hidden; Record releases are playlists and stay.
-                val visibleSongs = rememberFilteredTracks(profileViewModel.allTracks.toList())
+            section == "releases_all" || section == "latest" -> {
                 AllReleasesScreen(
                     title = str("artist_new_releases"),
-                    releases = ArtistRelease.latestOf(visibleSongs, records, count = Int.MAX_VALUE),
+                    releases = rememberArtistReleases(profileViewModel),
                     onBack = onBackClick,
-                    onOpen = { release ->
-                        when (release) {
-                            is ArtistRelease.Song -> playerViewModel.playPlaylist(listOf(release.track), 0, artistPlaybackContext)
-                            is ArtistRelease.Record -> openRelease(release.playlist)
-                        }
-                    },
+                    onOpen = { release -> playerViewModel.openArtistRelease(release, artistPlaybackContext) },
                     hasMore = profileViewModel.isSpotifyProfile && profileViewModel.hasMoreDiscography(),
                     onLoadMore = { profileViewModel.loadMoreDiscography() },
                 )
@@ -2201,9 +2200,6 @@ fun ProfileCollectionScreen(
                     // the chips below the search change that (round 2 of the tester's list, item 8).
                     "popular" -> str("profile_tab_popular") to (profileViewModel.popularTracks + profileViewModel.allTracks)
                         .distinctBy { it.id }
-                    // The artist's newest songs: a page of releases when the artist has none of their own, since a
-                    // new single of theirs is a song first.
-                    "latest" -> str("artist_new_releases") to profileViewModel.allTracks.toList()
                     "tracks" -> str("profile_tab_tracks") to profileViewModel.allTracks.toList()
                     "reposts" -> str("profile_tab_reposts") to profileViewModel.repostedTracks.toList()
                     "likes" -> str("profile_likes_by_user", user?.username ?: "") to profileViewModel.likedTracks.toList()
@@ -2220,12 +2216,12 @@ fun ProfileCollectionScreen(
                     showPlays = section != "likes" && section != "reposts",
                     sorts = when (section) {
                         "popular" -> ArtistOrder.TrackSort.entries
-                        "latest", "tracks" -> listOf(ArtistOrder.TrackSort.NEWEST, ArtistOrder.TrackSort.OLDEST, ArtistOrder.TrackSort.NOW, ArtistOrder.TrackSort.ALL_TIME)
+                        "tracks" -> listOf(ArtistOrder.TrackSort.NEWEST, ArtistOrder.TrackSort.OLDEST, ArtistOrder.TrackSort.NOW, ArtistOrder.TrackSort.ALL_TIME)
                         else -> emptyList()
                     },
                     initialSort = when (section) {
                         "popular" -> ArtistOrder.TrackSort.NOW
-                        "latest", "tracks" -> ArtistOrder.TrackSort.NEWEST
+                        "tracks" -> ArtistOrder.TrackSort.NEWEST
                         else -> null
                     },
                     cardOrder = if (section == "popular") profileViewModel.popularTracks.toList() else emptyList(),
@@ -2273,10 +2269,11 @@ data class ArtistPresetItem(
 fun ArtistPresetCard(preset: ArtistPresetItem) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val cardBg by animateColorAsState(
-        if (isHovered) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
-        else Color.Transparent,
-        label = "artistPresetCardBg"
+    val cardBg = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = isHovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+        unselectedColor = Color.Transparent,
+        label = "artistPresetCardBg",
     )
     val artwork = remember(preset.id) { preset.artworkProvider() }
 

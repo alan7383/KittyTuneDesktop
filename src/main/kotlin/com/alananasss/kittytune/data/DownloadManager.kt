@@ -719,20 +719,23 @@ object DownloadManager {
             val userId = user.numericId
             val isSpotifyArtist = user.urn?.startsWith("spotify") == true || user.permalink?.length == 22
             val isSaved = dao.getArtist(userId) != null
+            val spotifyId = if (isSpotifyArtist) user.permalink ?: user.urn?.removePrefix("spotify:artist:") else null
+            val playerPrefs = spotifyId?.takeIf { it.isNotBlank() }?.let {
+                com.alananasss.kittytune.data.local.PlayerPreferences()
+            }
+            // Publish the catalogue mapping before the saved-artist row becomes observable.
+            if (!isSaved && spotifyId != null) playerPrefs?.saveSpotifyArtistMapping(userId, spotifyId)
             if (isSaved) dao.deleteArtist(userId)
             else dao.insertArtist(LocalArtist(userId, user.username ?: str("menu_go_artist"), user.avatarUrl ?: "", user.trackCount))
 
             if (isSpotifyArtist) {
-                val spotifyId = user.permalink ?: user.urn?.removePrefix("spotify:artist:") ?: ""
-                if (spotifyId.isNotBlank()) {
-                    val playerPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                if (spotifyId != null && playerPrefs != null) {
                     if (isSaved) {
                         playerPrefs.removeSpotifyArtistMapping(userId)
                         if (playerPrefs.isSpotifyArtistLiked(spotifyId)) {
                             playerPrefs.toggleLikeSpotifyArtist(spotifyId)
                         }
                     } else {
-                        playerPrefs.saveSpotifyArtistMapping(userId, spotifyId)
                         if (!playerPrefs.isSpotifyArtistLiked(spotifyId)) {
                             playerPrefs.toggleLikeSpotifyArtist(spotifyId)
                         }

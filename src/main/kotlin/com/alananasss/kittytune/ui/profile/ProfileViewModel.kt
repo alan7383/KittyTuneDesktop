@@ -605,7 +605,7 @@
                             } catch (_: Exception) { emptyList() }
                         }
                         val commentsResponseDef = async { runCatching { api.getUserComments(userId, limit = 20) }.getOrNull() }
-                        val albumsDef = async { try { api.getUserAlbums(userId).collection.filterNotNull() } catch (_: Exception) { emptyList() } }
+                        val albumsDef = async { api.loadReleaseAlbums(userId).orEmpty() }
                         val playDef = async { try { api.getUserCreatedPlaylists(userId).collection.filterNotNull() } catch (_: Exception) { emptyList() } }
                         val likesDef = async { fetchUserLikesFirstPage(userId) }
                         val stationDef = async { runCatching { api.getArtistStation(userId) }.getOrNull() }

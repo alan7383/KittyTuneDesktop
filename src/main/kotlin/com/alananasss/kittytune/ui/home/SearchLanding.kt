@@ -57,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
-import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.common.TrackArtistClick
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -65,6 +64,10 @@ import com.alananasss.kittytune.ui.common.ScrollableLazyRow
 import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter
 import com.alananasss.kittytune.ui.player.PlaybackContext
+import com.alananasss.kittytune.ui.profile.ArtistRelease
+import com.alananasss.kittytune.ui.profile.ArtistReleaseStrip
+import com.alananasss.kittytune.ui.profile.openArtistRelease
+import com.alananasss.kittytune.ui.profile.rememberVisibleArtistReleases
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import androidx.compose.material3.ButtonDefaults
 
@@ -212,49 +215,28 @@ internal fun HomeChartSection(viewModel: ChartsViewModel, playerViewModel: Playe
     )
 }
 
-/**
- * New songs from the artists already in the liked list, newest first, in one row; nothing when there are none.
- *
- * It used to split them by release Friday under three sub-titles, each with a row and a line of explanation, which on
- * a page of rows was a lot of small print. One row, each song with its date, is what it is for.
- */
 @Composable
-internal fun FromYourArtistsSection(vm: HomeViewModel, playerViewModel: PlayerViewModel) {
-    if (vm.likedArtistUpdates.isEmpty()) return
-    val unfilteredTracks = remember(vm.likedArtistUpdates.toList()) {
-        ReleaseWeeks.group(vm.likedArtistUpdates.toList()).flatMap { it.tracks }.take(FROM_YOUR_ARTISTS_COUNT)
-    }
-    val tracks = rememberFilteredTracks(unfilteredTracks)
+internal fun FromYourArtistsSection(
+    releases: List<ArtistRelease>,
+    playerViewModel: PlayerViewModel,
+) {
+    val visible = rememberVisibleArtistReleases(releases)
+    if (visible.isEmpty()) return
+
+    val title = str("home_from_your_artists")
     Column {
-        LandingHeader(str("home_from_your_artists"), action = null)
-        ScrollableLazyRow(
-            contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ) {
-            items(tracks.size) { index ->
-                val track = tracks[index]
-                LandingTrackCard(
-                    track = track,
-                    isCurrent = playerViewModel.uiCurrentTrack?.id == track.id,
-                    releaseDate = ReleaseWeeks.releaseDateOf(track),
-                    onClick = {
-                        playerViewModel.playPlaylist(
-                            tracks = tracks,
-                            startIndex = index,
-                            context = PlaybackContext(
-                                displayText = str("home_from_your_artists"),
-                                navigationId = "home",
-                            ),
-                        )
-                    },
+        LandingHeader(title, action = null)
+        ArtistReleaseStrip(
+            releases = visible,
+            onOpen = { release ->
+                playerViewModel.openArtistRelease(
+                    release,
+                    PlaybackContext(displayText = title, navigationId = "home"),
                 )
-            }
-        }
+            },
+        )
     }
 }
-
-private const val FROM_YOUR_ARTISTS_COUNT = 16
 
 /**
  * The one way this screen introduces a section: a title, and optionally a link into more.
@@ -358,8 +340,10 @@ private fun RecentVisitRow(
     val interactionSource = remember { MutableInteractionSource() }
     val crossSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val background by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+    val background = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        unselectedColor = Color.Transparent,
         label = "recentVisitBackground",
     )
     val crossAlpha by animateFloatAsState(if (hovered) 1f else 0f, label = "recentVisitCross")
@@ -462,12 +446,10 @@ private fun RecentSearchRow(
     val crossSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
 
-    val background by animateColorAsState(
-        targetValue = if (hovered) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        } else {
-            Color.Transparent
-        },
+    val background = com.alananasss.kittytune.ui.theme.animatePaletteColor(
+        selected = hovered,
+        selectedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        unselectedColor = Color.Transparent,
         label = "recentSearchBackground",
     )
     val crossAlpha by animateFloatAsState(if (hovered) 1f else 0f, label = "recentSearchCross")
@@ -634,78 +616,6 @@ internal fun ChartPreviewSection(
 }
 
 /** A square cover and two lines, for the horizontal shelves. */
-@Composable
-private fun LandingTrackCard(
-    track: Track,
-    isCurrent: Boolean,
-    onClick: () -> Unit,
-    releaseDate: java.time.LocalDate? = null,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val hovered by interactionSource.collectIsHoveredAsState()
-
-    Column(
-        modifier = Modifier
-            .width(150.dp)
-            .hoverable(interactionSource)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .pressScale(interactionSource),
-    ) {
-        AsyncImage(
-            model = track.thumbnailUrl,
-            contentDescription = null,
-            error = rememberDefaultAvatarPainter(),
-            fallback = rememberDefaultAvatarPainter(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp)
-                .clip(RoundedCornerShape(10.dp)),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = track.title ?: str("untitled_track"),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = track.displayArtist,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (releaseDate != null) {
-            Text(
-                text = ReleaseWeeks.shortDate(releaseDate, com.alananasss.kittytune.core.Strings.resolvedLanguage),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-/** "This Friday's releases · since 3 Oct", "Last Friday", "Earlier". */
-@Composable
-private fun releaseWeekTitle(group: ReleaseWeeks.Group): String {
-    val language = com.alananasss.kittytune.core.Strings.resolvedLanguage
-    return when (group.week) {
-        ReleaseWeeks.Week.THIS_FRIDAY ->
-            str("home_releases_this_friday", ReleaseWeeks.shortDate(group.since!!, language))
-        ReleaseWeeks.Week.LAST_FRIDAY ->
-            str("home_releases_last_friday", ReleaseWeeks.shortDate(group.since!!, language))
-        ReleaseWeeks.Week.EARLIER -> str("home_releases_earlier")
-    }
-}
-
 /** A compact shortcut, for the two screens that are more than a search away. */
 @Composable
 private fun LandingDoorCard(

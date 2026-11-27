@@ -2308,7 +2308,8 @@
     <string name="chart_genre_rnb">R&amp;B</string>
     <string name="chart_genre_country">Кантри</string>
     <string name="chart_genre_latin">Латинская</string>
-    <string name="home_from_your_artists">Новое от ваших исполнителей</string>
+    <string name="home_from_your_artists">Новые релизы</string>
+    <string name="home_releases_recent">Недавно</string>
     <string name="home_from_your_artists_sub">Что выпустили исполнители, которых вы любите</string>
     <string name="explore">Обзор</string>
     <string name="chart_section_title">Чарт</string>

@@ -57,7 +57,7 @@ internal object ArtistOrder {
     fun sortReleases(sort: ReleaseSort, releases: List<Playlist>): List<Playlist> = when (sort) {
         ReleaseSort.NEWEST -> releases.sortedByDescending { dateOf(it.releaseDate ?: it.createdAt) ?: LocalDate.MIN }
         ReleaseSort.OLDEST -> releases.sortedBy { dateOf(it.releaseDate ?: it.createdAt) ?: LocalDate.MAX }
-        ReleaseSort.TITLE -> releases.sortedBy { it.title.orEmpty().lowercase() }
+        ReleaseSort.TITLE -> releases.sortedBy { it.displayTitle.orEmpty().lowercase() }
         ReleaseSort.LIKES -> releases.sortedByDescending { it.likesCount ?: 0 }
     }
 
