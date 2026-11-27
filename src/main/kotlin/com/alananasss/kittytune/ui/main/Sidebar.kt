@@ -1013,7 +1013,9 @@ private fun LibraryHeader(
     val hiddenButtons by headerPrefs.hiddenLibraryButtonsFlow()
         .collectAsState(initial = headerPrefs.getHiddenLibraryButtons())
 
-    val headerVerticalPadding = androidx.compose.ui.unit.lerp(10.dp, 8.dp, collapse)
+    val startPadding = if (fullScreen) 12.dp else SidebarMorph.ICON_INSET - 4.dp
+    val endPadding = 8.dp
+    val actionsVisibility = SidebarMorph.outgoingAlpha(collapse)
     AdaptiveLibraryHeader(
         modifier = Modifier
             .fillMaxWidth()
@@ -1021,14 +1023,14 @@ private fun LibraryHeader(
             // navigation icons above and the artwork of every entry below — the line at the middle of
             // [SidebarMorph.RAIL_WIDTH].
             .padding(
-                start = if (fullScreen) 12.dp else SidebarMorph.ICON_INSET - 4.dp,
-                end = 8.dp,
-                top = headerVerticalPadding,
+                start = startPadding,
+                end = endPadding,
+                top = 10.dp,
                 bottom = 4.dp,
-            )
-            // Keep a stable minimum height; exceptionally narrow headers can use two rows.
-            .heightIn(min = LIBRARY_HEADER_HEIGHT),
-        title = {
+            ),
+        expandedWidth = if (fullScreen) null else libraryViewModel.sidebarWidth.dp - startPadding - endPadding,
+        actionsVisibility = actionsVisibility,
+        title = { measuring ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val currentFolder = libraryViewModel.currentFolder
                 if (currentFolder != null) {
@@ -1102,7 +1104,7 @@ private fun LibraryHeader(
                             )
                             // Leaves the way the navigation labels above it do, so the whole panel closes with
                             // one gesture instead of the top half receding and the library card cutting.
-                            Box(Modifier.pushedBack(collapse).padding(start = 10.dp)) {
+                            Box(Modifier.pushedBack(if (measuring) 0f else collapse).padding(start = 10.dp)) {
                                 Text(
                                     text = str("nav_library"),
                                     style = MaterialTheme.typography.titleMedium,
@@ -1122,7 +1124,7 @@ private fun LibraryHeader(
             // Only while they can be seen: past FADE_DONE_AT they have faded out, so leaving or arriving there is
             // invisible. They keep their full size throughout and give up room instead of being squeezed into it,
             // which is what made them shrink and pop while the panel was still narrow.
-            if (collapse < SidebarMorph.FADE_DONE_AT) {
+            if (actionsVisibility > 0f) {
                 Row(Modifier.receded(collapse), verticalAlignment = Alignment.CenterVertically) {
                     libraryViewModel.currentFolder?.let { folder ->
                         FolderPlaySplitButton(folder, libraryViewModel, playerViewModel, showMenu = !measuring)
@@ -1876,9 +1878,6 @@ private fun EntryArtwork(
  * do not exist at all before then — an invisible button that can still be clicked is worse than no
  * animation.
  */
-/** Minimum header height, including when only compact icon actions are visible. */
-private val LIBRARY_HEADER_HEIGHT = 40.dp
-
 @Composable
 private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> Unit) {
     val appearance = SidebarMorph.arrivalOf(collapse)

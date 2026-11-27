@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.profile
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -110,7 +111,10 @@ private fun SidebarLayoutEditor(prefs: PlayerPreferences) {
             str("sidebar_items_hint"),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp, bottom = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, bottom = 12.dp)
+                .animateContentSize(alignment = Alignment.TopStart),
         )
         ReorderableColumn(
             list = layout,

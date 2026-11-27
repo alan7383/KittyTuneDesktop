@@ -4,16 +4,22 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.library.AdaptiveLibraryHeader
+import com.alananasss.kittytune.ui.main.SidebarMorph
+import com.alananasss.kittytune.ui.main.pushedBack
 import org.junit.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LibraryHeaderLayoutTest {
@@ -78,5 +84,58 @@ class LibraryHeaderLayoutTest {
                 }
             }
         } finally { Strings.appLanguage = previous }
+    }
+
+    @Test
+    fun collapsingKeepsTheHeaderIconInPlaceAndMovesTheFirstTileGradually() {
+        for ((expandedWidth, expandedHeight) in listOf(300 to 40f, 264 to 80f)) {
+            val width = mutableStateOf(expandedWidth)
+            var iconTop = 0f
+            var tileTop = 0f
+            val scene = ImageComposeScene(width = expandedWidth, height = 160) {
+                val collapse = SidebarMorph.progressFor(expandedWidth.dp, width.value.dp)
+                val visibility = SidebarMorph.outgoingAlpha(collapse)
+                MaterialTheme {
+                    Column(Modifier.width((width.value - 28).dp)) {
+                        AdaptiveLibraryHeader(
+                            expandedWidth = (expandedWidth - 28).dp,
+                            actionsVisibility = visibility,
+                            title = { measuring ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(28.dp).onGloballyPositioned {
+                                        if (!measuring) iconTop = it.positionInRoot().y
+                                    })
+                                    Text(
+                                        "Library",
+                                        Modifier.pushedBack(if (measuring) 0f else collapse),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                }
+                            },
+                            actions = { extended, _ ->
+                                if (visibility > 0f) {
+                                    Box(Modifier.width(if (extended) 240.dp else 205.dp).height(40.dp))
+                                }
+                            },
+                        )
+                        Spacer(Modifier.size(24.dp).onGloballyPositioned { tileTop = it.positionInRoot().y })
+                    }
+                }
+            }
+            try {
+                val positions = (expandedWidth downTo 72 step 4).map { currentWidth ->
+                    width.value = currentWidth
+                    scene.render().close()
+                    assertEquals(6f, iconTop, "Header icon at sidebar width $currentWidth")
+                    tileTop
+                }
+                assertEquals(expandedHeight, positions.first())
+                assertEquals(40f, positions.last())
+                assertTrue(positions.zipWithNext().all { (before, after) -> before - after in 0f..2f }, "$positions")
+            } finally {
+                scene.close()
+            }
+        }
     }
 }

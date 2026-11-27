@@ -5,6 +5,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ButtonDefaults
 import com.alananasss.kittytune.core.str
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -54,7 +55,9 @@ fun SettingsGroupTitle(title: String, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 8.dp, bottom = 12.dp, top = 24.dp)
+        modifier = modifier
+            .padding(start = 8.dp, bottom = 12.dp, top = 24.dp)
+            .animateContentSize(alignment = Alignment.TopStart)
     )
 }
 
@@ -174,7 +177,9 @@ fun SettingsItem(
                 Spacer(modifier = Modifier.width(16.dp))
             }
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f).animateContentSize(alignment = Alignment.TopStart),
+            ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,

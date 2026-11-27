@@ -96,6 +96,9 @@ internal object SidebarMorph {
     fun arrivalOf(progress: Float): Float =
         ((progress - FADE_DONE_AT) / (1f - FADE_DONE_AT)).coerceIn(0f, 1f)
 
+    fun outgoingAlpha(progress: Float): Float =
+        (1f - progress / FADE_DONE_AT).coerceIn(0f, 1f)
+
     /**
      * Where the fade of a receding element finishes, as a fraction of the travel.
      *
@@ -146,7 +149,7 @@ fun Modifier.pushedBack(progress: Float): Modifier {
             layout(width, placeable.height) { placeable.placeRelative(0, 0) }
         }
         .graphicsLayer {
-            alpha = fadeOut(progress)
+            alpha = SidebarMorph.outgoingAlpha(progress)
             val shrink = 1f - 0.4f * progress
             scaleX = shrink
             scaleY = shrink
@@ -180,7 +183,7 @@ fun Modifier.receded(progress: Float): Modifier {
     val shouldBlockClicks = progress > POINTERS_OFF_AT
     return this
         .graphicsLayer {
-            alpha = fadeOut(progress)
+            alpha = SidebarMorph.outgoingAlpha(progress)
             val shrink = 1f - 0.12f * progress
             scaleX = shrink
             scaleY = shrink
@@ -204,10 +207,6 @@ fun Modifier.receded(progress: Float): Modifier {
             }
         }
 }
-
-/** One fade curve for everything that leaves, so nothing is still visible when the layouts swap. */
-private fun fadeOut(progress: Float): Float =
-    (1f - progress / SidebarMorph.FADE_DONE_AT).coerceIn(0f, 1f)
 
 /** Far enough in that the block is nearly invisible, early enough that it cannot be clicked blind. */
 private const val POINTERS_OFF_AT = 0.35f

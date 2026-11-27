@@ -561,15 +561,19 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
             val targetSidebarWidth =
                 if (libraryViewModel.isSidebarCollapsed && !isHoverExpanded) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH
                 else libraryViewModel.sidebarWidth
+            // Keep the displayed width in sync with the drag so the spring can start there on release.
             val animatedSidebarWidth by androidx.compose.animation.core.animateDpAsState(
                 targetValue = targetSidebarWidth.dp,
-                animationSpec = androidx.compose.animation.core.spring(
-                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
-                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
-                ),
+                animationSpec = if (draggingSidebar) {
+                    androidx.compose.animation.core.snap()
+                } else {
+                    androidx.compose.animation.core.spring(
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                    )
+                },
                 label = "sidebarWidth"
             )
-            val sidebarWidth = if (draggingSidebar) targetSidebarWidth.dp else animatedSidebarWidth
 
             // The hover detection wraps both the sidebar and the resize handle with full height so that the cursor
             // can move anywhere on the left panel or cross the handle gap without triggering an unexpected exit.
@@ -639,7 +643,7 @@ private fun MainAccountScreen(playerViewModel: PlayerViewModel) {
                     },
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(sidebarWidth)
+                        .width(animatedSidebarWidth)
                 )
                 com.alananasss.kittytune.utils.StartupTimeline.markOnce("main screen: sidebar composed")
             }
