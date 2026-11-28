@@ -185,6 +185,8 @@ dependencies {
 // `-PuiScale=1.5` runs the tests as on a display scaled to 150%. AWT reads the property once at start-up,
 // which is why it is a JVM argument of the test task and not something a test could set for itself.
 tasks.withType<Test>().configureEach {
+    // Tests load FFmpeg without running the app's bootstrap.
+    systemProperty("org.bytedeco.javacpp.maxphysicalbytes", "0")
     val profileName = if (name == "headlessTest") "test-profile" else "test-profile-$name"
     val profile = layout.buildDirectory.dir(profileName).get().asFile
     systemProperty("user.home", File(profile, "home").absolutePath)
