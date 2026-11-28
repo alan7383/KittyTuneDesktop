@@ -3801,4 +3801,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Senkronize Sözler</string>
     <string name="discord_rpc_browsing_home">Geziniyor...</string>
     <string name="discord_rpc_browsing_home_state">Ana Sayfa</string>
+    <string name="startup_stage_starting">KittyTune başlatılıyor</string>
+    <string name="startup_stage_settings">Ayarlar</string>
+    <string name="startup_stage_database">Müzik kitaplığı</string>
+    <string name="startup_stage_library">Hizmetler</string>
+    <string name="startup_stage_player">Oynatıcı</string>
+    <string name="startup_stage_window">Arayüz</string>
+    <string name="startup_stage_layout">Yerleşim</string>
+    <string name="startup_stage_ready">Hazır</string>
+    <string name="startup_fade_title">Başlangıçta yumuşak geçiş</string>
+    <string name="startup_fade_sub">Uygulama başladığında oynatıcıyı kısa bir geçişle göster.</string>
 </resources>
