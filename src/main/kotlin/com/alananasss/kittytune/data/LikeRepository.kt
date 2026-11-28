@@ -98,12 +98,14 @@ object LikeRepository {
             UnlikeMark(id, at)
         }
 
+    private val blacklistLock = Any()
+
     private fun writeUnlikeMarks(marks: Collection<UnlikeMark>) =
         putStringSet(KEY_LOCALLY_UNLIKED_IDS, marks.map { "${it.trackId}:${it.atMs}" }.toSet())
 
     private fun addToBlacklist(trackId: Long) = addToBlacklist(listOf(trackId))
 
-    private fun addToBlacklist(trackIds: Collection<Long>) {
+    private fun addToBlacklist(trackIds: Collection<Long>) = synchronized(blacklistLock) {
         if (trackIds.isEmpty()) return
         val ids = trackIds.toSet()
         val kept = readUnlikeMarks().filterNot { it.trackId in ids }
@@ -113,22 +115,22 @@ object LikeRepository {
 
     private fun removeFromBlacklist(trackId: Long) = removeFromBlacklist(listOf(trackId))
 
-    private fun removeFromBlacklist(trackIds: Collection<Long>) {
+    private fun removeFromBlacklist(trackIds: Collection<Long>) = synchronized(blacklistLock) {
         if (trackIds.isEmpty()) return
         val ids = trackIds.toSet()
         writeUnlikeMarks(readUnlikeMarks().filterNot { it.trackId in ids })
     }
 
-    private fun getBlacklist(): Set<Long> {
+    private fun getBlacklist(): Set<Long> = synchronized(blacklistLock) {
         val cutoff = System.currentTimeMillis() - UNLIKE_BLACKLIST_TTL_MS
-        return readUnlikeMarks().filter { it.atMs >= cutoff }.map { it.trackId }.toSet()
+        readUnlikeMarks().filter { it.atMs >= cutoff }.map { it.trackId }.toSet()
     }
 
     /**
      * Drops the entries that no longer suppress anything — expired ones and the untimestamped
      * legacy ones — so the stored set cannot grow without bound and cannot keep hiding a like.
      */
-    private fun pruneBlacklist() {
+    private fun pruneBlacklist() = synchronized(blacklistLock) {
         val stored = getStringSet(KEY_LOCALLY_UNLIKED_IDS)
         if (stored.isEmpty()) return
         val cutoff = System.currentTimeMillis() - UNLIKE_BLACKLIST_TTL_MS
@@ -237,7 +239,7 @@ object LikeRepository {
         if (toLike.isEmpty()) return 0
 
         val now = System.currentTimeMillis()
-        toLike.forEach { removeFromBlacklist(it.id) }
+        removeFromBlacklist(toLike.map { it.id })
         _likedTracks.update { current ->
             val byId = current.associateBy { it.id }.toMutableMap()
             for (track in toLike) {
