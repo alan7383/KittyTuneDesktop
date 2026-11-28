@@ -3800,4 +3800,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Синхронизированный текст</string>
     <string name="discord_rpc_browsing_home">Просмотр...</string>
     <string name="discord_rpc_browsing_home_state">Главная</string>
+    <string name="startup_stage_starting">Запуск KittyTune</string>
+    <string name="startup_stage_settings">Настройки</string>
+    <string name="startup_stage_database">Музыкальная библиотека</string>
+    <string name="startup_stage_library">Сервисы</string>
+    <string name="startup_stage_player">Плеер</string>
+    <string name="startup_stage_window">Интерфейс</string>
+    <string name="startup_stage_layout">Разметка</string>
+    <string name="startup_stage_ready">Готово</string>
+    <string name="startup_fade_title">Плавное появление при запуске</string>
+    <string name="startup_fade_sub">Плавно показывать плеер при запуске приложения.</string>
 </resources>

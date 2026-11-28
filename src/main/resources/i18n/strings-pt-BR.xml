@@ -3798,4 +3798,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Letra sincronizada</string>
     <string name="discord_rpc_browsing_home">Navegando...</string>
     <string name="discord_rpc_browsing_home_state">Início</string>
+    <string name="startup_stage_starting">Iniciando KittyTune</string>
+    <string name="startup_stage_settings">Configurações</string>
+    <string name="startup_stage_database">Biblioteca de músicas</string>
+    <string name="startup_stage_library">Serviços</string>
+    <string name="startup_stage_player">Reprodutor</string>
+    <string name="startup_stage_window">Interface</string>
+    <string name="startup_stage_layout">Layout</string>
+    <string name="startup_stage_ready">Pronto</string>
+    <string name="startup_fade_title">Transição ao iniciar</string>
+    <string name="startup_fade_sub">Mostrar o reprodutor com uma breve transição ao iniciar o aplicativo.</string>
 </resources>

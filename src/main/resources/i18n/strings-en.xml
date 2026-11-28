@@ -3798,4 +3798,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Synced Lyrics</string>
     <string name="discord_rpc_browsing_home">Browsing...</string>
     <string name="discord_rpc_browsing_home_state">Home</string>
+    <string name="startup_stage_starting">Starting KittyTune</string>
+    <string name="startup_stage_settings">Settings</string>
+    <string name="startup_stage_database">Music library</string>
+    <string name="startup_stage_library">Services</string>
+    <string name="startup_stage_player">Player</string>
+    <string name="startup_stage_window">Interface</string>
+    <string name="startup_stage_layout">Layout</string>
+    <string name="startup_stage_ready">Ready</string>
+    <string name="startup_fade_title">Fade in on startup</string>
+    <string name="startup_fade_sub">Reveal the player with a short fade when the app starts.</string>
 </resources>

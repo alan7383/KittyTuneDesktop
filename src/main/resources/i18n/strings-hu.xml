@@ -3799,4 +3799,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Szinkronizált dalszöveg</string>
     <string name="discord_rpc_browsing_home">Böngészés...</string>
     <string name="discord_rpc_browsing_home_state">Kezdőlap</string>
+    <string name="startup_stage_starting">A KittyTune indítása</string>
+    <string name="startup_stage_settings">Beállítások</string>
+    <string name="startup_stage_database">Zenetár</string>
+    <string name="startup_stage_library">Szolgáltatások</string>
+    <string name="startup_stage_player">Lejátszó</string>
+    <string name="startup_stage_window">Felület</string>
+    <string name="startup_stage_layout">Elrendezés</string>
+    <string name="startup_stage_ready">Kész</string>
+    <string name="startup_fade_title">Áttűnés indításkor</string>
+    <string name="startup_fade_sub">A lejátszó rövid áttűnéssel jelenik meg az alkalmazás indításakor.</string>
 </resources>

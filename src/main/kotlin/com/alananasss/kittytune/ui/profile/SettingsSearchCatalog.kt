@@ -65,6 +65,7 @@ internal fun buildSettingsSearchCatalog(os: String): List<SettingsSearchEntry> =
     }
 
     controls(THEMES.place) {
+        control("startup_fade_title", "startup_fade_sub", aliases = listOf("startup", "splash", "loading screen", "fade", "boot"))
         control(
             "pref_dynamic_theme_merged",
             "pref_dynamic_theme_merged_sub",

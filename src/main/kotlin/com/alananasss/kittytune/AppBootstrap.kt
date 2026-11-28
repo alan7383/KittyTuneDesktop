@@ -1,5 +1,7 @@
 package com.alananasss.kittytune
 
+import com.alananasss.kittytune.core.StartupSplash
+import com.alananasss.kittytune.core.StartupStage
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.NetworkMonitor
 import com.alananasss.kittytune.core.Strings
@@ -116,8 +118,10 @@ object AppBootstrap {
         // 1. Core config + persistence.
         Config.init()
         com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: Config.init")
+        StartupSplash.advance(StartupStage.SETTINGS)
         AppDatabase.init()
         com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: AppDatabase.init")
+        StartupSplash.advance(StartupStage.DATABASE)
 
         // 1c. Cache sweep: drop leftover partial/temp files from a previous run, prune stale
         //     lyrics JSON, and pull the audio cache back under its byte bound. Each step is
@@ -185,6 +189,7 @@ object AppBootstrap {
         DownloadManager.init()
         AlbumResolver.init()
         com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: remaining repositories")
+        StartupSplash.advance(StartupStage.LIBRARY)
 
         // The Kitty pet follows playback from the start (it gets hungry, sad, sleepy on its own),
         // whether or not its window is shown.
@@ -211,6 +216,7 @@ object AppBootstrap {
         // 4. Player + session keep-alive.
         MusicManager.init()
         com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: MusicManager.init")
+        StartupSplash.advance(StartupStage.PLAYER)
         SessionManager.start()
         com.alananasss.kittytune.utils.StartupTimeline.mark("bootstrap: SessionManager.start")
 

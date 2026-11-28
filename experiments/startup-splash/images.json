@@ -1,0 +1,16 @@
+{
+  "normal": {
+    "image": "normal-comparison-image",
+    "jar": "KittyTuneWindows-1.8.0-e48abb393b7372222f27876e1faa2dd.jar",
+    "sha256": "89f051fc58a473e308d5e4f33b741e63c65b09db32f1a782adfe8ddc38fc4db5",
+    "runtime_modules_sha256": "20320f450cf32343dabe40d567c1eb2139e786010cfe853ec6dde5118fcc4da5",
+    "launcher_sha256": "15e8da01ee26c4738a57f703cbfbd5decf5af165957560b53c947f58d01ffca0"
+  },
+  "splash": {
+    "image": "splash-comparison-image",
+    "jar": "KittyTuneWindows-1.8.0-bd19369d97452712bb8993e877a8ad.jar",
+    "sha256": "d367313ca1fed026f916334f4c1d613086759c20d0f591b636d9ebb82d0029cd",
+    "runtime_modules_sha256": "20320f450cf32343dabe40d567c1eb2139e786010cfe853ec6dde5118fcc4da5",
+    "launcher_sha256": "15e8da01ee26c4738a57f703cbfbd5decf5af165957560b53c947f58d01ffca0"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "pairs": 8,
+  "feedback": {
+    "normal_median": 7339.676650000456,
+    "splash_median": 149.8464999999669,
+    "normal_p95": 8357.32883500018,
+    "splash_p95": 151.89240999984577,
+    "paired_median_delta": -7190.808500000458,
+    "paired_bootstrap95": [
+      -8100.541400000111,
+      -7093.220400000064
+    ]
+  },
+  "main": {
+    "normal_median": 7364.538750000065,
+    "splash_median": 7287.604799999826,
+    "normal_p95": 8369.963640000424,
+    "splash_p95": 7642.5677099999575,
+    "paired_median_delta": -40.47769999988304,
+    "paired_bootstrap95": [
+      -721.6654000003473,
+      -2.795000000332948
+    ]
+  },
+  "revealed": {
+    "normal_median": 7364.541200000076,
+    "splash_median": 7561.685699999998,
+    "normal_p95": 8369.966130000375,
+    "splash_p95": 7890.701879999733,
+    "paired_median_delta": 232.95959999950355,
+    "paired_bootstrap95": [
+      -461.97880000090663,
+      268.3902999997372
+    ]
+  },
+  "renderer": [
+    {
+      "window": "KittyTune",
+      "api": "OPENGL",
+      "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+      "width": 1214,
+      "height": 622,
+      "scaleX": 1.25,
+      "scaleY": 1.25
+    }
+  ],
+  "publication_gate_passed": false
+}

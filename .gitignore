@@ -65,3 +65,7 @@ bin/
 arch_build/
 *.pkg.tar.zst
 !scripts/enable-segment-heap.ps1
+
+!src/main/resources/startup/text.png
+!experiments/startup-splash/*.py
+/experiments/startup-splash/__pycache__/

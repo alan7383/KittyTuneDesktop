@@ -3881,4 +3881,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Lời bài hát đồng bộ</string>
     <string name="discord_rpc_browsing_home">Đang duyệt...</string>
     <string name="discord_rpc_browsing_home_state">Trang chủ</string>
+    <string name="startup_stage_starting">Đang khởi động KittyTune</string>
+    <string name="startup_stage_settings">Cài đặt</string>
+    <string name="startup_stage_database">Thư viện nhạc</string>
+    <string name="startup_stage_library">Dịch vụ</string>
+    <string name="startup_stage_player">Trình phát</string>
+    <string name="startup_stage_window">Giao diện</string>
+    <string name="startup_stage_layout">Bố cục</string>
+    <string name="startup_stage_ready">Sẵn sàng</string>
+    <string name="startup_fade_title">Hiện dần khi khởi động</string>
+    <string name="startup_fade_sub">Hiện trình phát bằng hiệu ứng mờ dần ngắn khi khởi động ứng dụng.</string>
 </resources>

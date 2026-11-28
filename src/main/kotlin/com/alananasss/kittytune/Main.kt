@@ -20,6 +20,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.Modifier
+import com.alananasss.kittytune.core.StartupSplash
+import com.alananasss.kittytune.core.StartupStage
+import com.alananasss.kittytune.core.StartupTransition
+import com.alananasss.kittytune.ui.common.startupReveal
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -136,6 +140,7 @@ fun main(args: Array<String>) {
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
+    StartupSplash.start()
     com.alananasss.kittytune.core.PerformanceSettings.applyAtStartup()
     if (!trainStartupCache && System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
         com.alananasss.kittytune.core.ProtocolHandlerInstaller.registerAsync()
@@ -207,6 +212,7 @@ fun main(args: Array<String>) {
             com.alananasss.kittytune.core.AppIconRuntime.loadAppPainter(appIconVariant)
         }
         var mainWindowDrawn by remember { mutableStateOf(false) }
+        val startupFade = remember { StartupSplash.transition == StartupTransition.FADE }
         var isWindowVisible by remember { mutableStateOf(true) }
 
         // Whether the main window exists at all. Closed to the tray it used to be merely hidden, keeping its
@@ -693,6 +699,7 @@ fun main(args: Array<String>) {
             },
         ) {
             com.alananasss.kittytune.utils.StartupTimeline.markOnce("window content composing")
+            StartupSplash.advance(StartupStage.WINDOW)
             LaunchedEffect(window) {
                 val timeline = com.alananasss.kittytune.utils.StartupTimeline
                 if (timeline.isEnabled) {
@@ -946,17 +953,18 @@ fun main(args: Array<String>) {
                     LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
                     androidx.compose.foundation.layout.Box(
-                        modifier = if (mainWindowDrawn) Modifier else Modifier.drawWithContent {
+                        modifier = (if (mainWindowDrawn) Modifier else Modifier.drawWithContent {
                             drawContent()
                             // Let Compose size and show the native window itself. Showing it
                             // during composition can re-enter Skiko while it is rendering.
                             java.awt.EventQueue.invokeLater {
                                 if (!mainWindowDrawn) {
                                     com.alananasss.kittytune.utils.StartupTimeline.markOnce("window content drawn")
+                                    StartupSplash.advance(StartupStage.READY)
                                     mainWindowDrawn = true
                                 }
                             }
-                        },
+                        }).startupReveal(mainWindowDrawn, startupFade),
                         propagateMinConstraints = true,
                     ) {
                         Surface {
@@ -964,6 +972,7 @@ fun main(args: Array<String>) {
                                 androidx.compose.material3.Text("KittyTune")
                             } else {
                                 AppRouter(playerViewModel = playerViewModel)
+                                StartupSplash.advance(StartupStage.LAYOUT)
                             }
                         }
                         // Closing dialogs fade out over the app, drawn above it.

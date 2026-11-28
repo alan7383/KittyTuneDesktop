@@ -185,6 +185,8 @@ dependencies {
 // `-PuiScale=1.5` runs the tests as on a display scaled to 150%. AWT reads the property once at start-up,
 // which is why it is a JVM argument of the test task and not something a test could set for itself.
 tasks.withType<Test>().configureEach {
+    // Tests load FFmpeg without running the app's bootstrap.
+    systemProperty("org.bytedeco.javacpp.maxphysicalbytes", "0")
     val profileName = if (name == "headlessTest") "test-profile" else "test-profile-$name"
     val profile = layout.buildDirectory.dir(profileName).get().asFile
     systemProperty("user.home", File(profile, "home").absolutePath)
@@ -237,6 +239,7 @@ tasks.withType<JavaExec>().configureEach {
 compose.desktop {
     application {
         mainClass = "com.alananasss.kittytune.MainKt"
+        jvmArgs += "-splash:${'$'}APPDIR/resources/startup.gif"
         val localJdk21 = File(System.getProperty("user.home"), ".gradle/jdks/eclipse_adoptium-21-amd64-linux.2")
         if (localJdk21.exists()) {
             javaHome = localJdk21.absolutePath
@@ -403,6 +406,7 @@ compose.desktop {
                 TargetFormat.Rpm,
                 TargetFormat.AppImage
             )
+            appResourcesRootDir.set(project.layout.projectDirectory.dir("packaging-resources"))
             packageName = "KittyTune"
             // Must track the project version: the MSI ProductVersion has to increase with
             // every release, otherwise Windows Installer refuses the upgrade with
@@ -1039,7 +1043,7 @@ tasks.register<Test>("headlessTest") {
             "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest", "ClearStreamFilesTest", "ThemePersistenceTest", "SetupOnboardingTest",
             "*WindowsProtectedPlaybackTest", "*WindowsProtectedMediaTest",
             "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*", "InstallerProcessTest", "*ChromeCdmArchiveTest", "KittyTuneProcessesTest", "*SidecarLockOrderTest",
-            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest", "*LazyAudioEngineTest", "*LocalMediaScanIndexTest", "PerformanceSettingsTest", "GraphicsDevicesTest", "PerformanceGraphicsRenderTest"
+            "*HlsOpeningTest", "*WindowsHeadphoneDetectionTest", "*LazyAudioEngineTest", "*LocalMediaScanIndexTest", "StartupProgressTest", "StartupRevealTest", "StartupArtworkTest", "StartupSettingsTest", "PerformanceSettingsTest", "GraphicsDevicesTest", "PerformanceGraphicsRenderTest"
         ).forEach(::includeTestsMatching)
     }
 }

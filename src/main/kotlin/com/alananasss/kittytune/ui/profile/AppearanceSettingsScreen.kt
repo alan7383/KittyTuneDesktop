@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.core.StartupSplash
+import com.alananasss.kittytune.core.StartupTransition
 import com.alananasss.kittytune.data.local.*
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
@@ -71,6 +73,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     var keyColor by remember { mutableIntStateOf(prefs.getKeyColor()) }
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
+    var startupFade by remember { mutableStateOf(StartupSplash.transition == StartupTransition.FADE) }
     var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
     var appFont by remember { mutableStateOf(com.alananasss.kittytune.ui.theme.AppFont.parse(prefs.getAppFont())) }
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
@@ -171,6 +174,20 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     SettingsGroup(
         title = str("settings_group_window"),
         items = buildList {
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("startup_fade_title"),
+                    subtitle = str("startup_fade_sub"),
+                    highlightKey = "startup_fade_title",
+                    hasSwitch = true,
+                    switchState = startupFade,
+                    onSwitchChange = {
+                        startupFade = it
+                        StartupSplash.transition = if (it) StartupTransition.FADE else StartupTransition.NONE
+                    },
+                )
+            }
             if (isWindows) add { shape ->
                 SettingsItem(
                     shape = shape,

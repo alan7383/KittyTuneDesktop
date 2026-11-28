@@ -4020,4 +4020,14 @@
     <string name="discord_rpc_browsing_lyrics_state">Synchronisierte Lyrics</string>
     <string name="discord_rpc_browsing_home">Stöbert...</string>
     <string name="discord_rpc_browsing_home_state">Startseite</string>
+    <string name="startup_stage_starting">KittyTune wird gestartet</string>
+    <string name="startup_stage_settings">Einstellungen</string>
+    <string name="startup_stage_database">Musikbibliothek</string>
+    <string name="startup_stage_library">Dienste</string>
+    <string name="startup_stage_player">Player</string>
+    <string name="startup_stage_window">Oberfläche</string>
+    <string name="startup_stage_layout">Layout</string>
+    <string name="startup_stage_ready">Bereit</string>
+    <string name="startup_fade_title">Beim Start einblenden</string>
+    <string name="startup_fade_sub">Den Player beim Start kurz einblenden.</string>
 </resources>
