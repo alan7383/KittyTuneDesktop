@@ -117,7 +117,9 @@ data class UnifiedLyricResult(
     val provider: String,
     val rawContent: String? = null,
     val previewText: String? = null
-)
+) {
+    val key: String get() = "${PreferredLyricsProvider.fromName(provider)?.name ?: provider}/$id"
+}
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application), com.alananasss.kittytune.data.together.TogetherPlayer {
     // configure() captures state synchronously in init, including a restored nonempty queue.
@@ -1640,6 +1642,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var currentLyricsSource by mutableStateOf<String?>(null)
         private set
 
+    var currentLyricsResultKey by mutableStateOf<String?>(null)
+        private set
+
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
     var lyricsFullScreenFontSize by mutableFloatStateOf(playerPrefs.getLyricsFullScreenFontSize())
     var lyricsSidebarFontSize by mutableFloatStateOf(playerPrefs.getLyricsSidebarFontSize())
@@ -3088,6 +3093,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             lyricSearchTrackId = null
         }
         currentLyricsSource = null
+        currentLyricsResultKey = null
 
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
             // A previously chosen manual search result wins over automatic matching.
@@ -3785,6 +3791,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         manualLyricSearchJob = viewModelScope.launch {
             PaxsenixClient.setApiKey(playerPrefs.getPaxsenixApiKey())
+            val merger = ProgressiveLyricsMerger()
             try {
                 supervisorScope {
                     sources.forEach { source ->
@@ -3793,11 +3800,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                                 ManualLyricsSearch.search(source, query, searchTrack)
                             }.orEmpty()
                             withContext(Dispatchers.Main) {
-                                if (generation != manualSearchGeneration) return@withContext
-                                val merged = ManualLyricsSearch.merge(unifiedLyricSearchResults.toList(), found, target)
-                                unifiedLyricSearchResults.clear()
-                                unifiedLyricSearchResults.addAll(merged)
-                                pendingLyricSources.remove(source)
+                                merger.merge(
+                                    incoming = found,
+                                    target = target,
+                                    current = { unifiedLyricSearchResults.toList() },
+                                    activeKey = { currentLyricsResultKey },
+                                    isCurrent = { generation == manualSearchGeneration },
+                                ) { merged ->
+                                    unifiedLyricSearchResults.clear()
+                                    unifiedLyricSearchResults.addAll(merged)
+                                    pendingLyricSources.remove(source)
+                                }
                             }
                         }
                     }
@@ -3945,6 +3958,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 isLyricsLoading = false
                 isSearchingLyrics = false
                 currentLyricsSource = result.provider.takeIf { finalLines.isNotEmpty() || !finalPlain.isNullOrBlank() }
+                currentLyricsResultKey = result.key.takeIf { finalLines.isNotEmpty() || !finalPlain.isNullOrBlank() }
             }
 
             // Remember the manual pick for the current track (issue #27), and drop the cached

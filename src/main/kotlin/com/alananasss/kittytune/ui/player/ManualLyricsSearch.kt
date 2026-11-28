@@ -78,12 +78,16 @@ internal object ManualLyricsSearch {
         current: List<UnifiedLyricResult>,
         incoming: List<UnifiedLyricResult>,
         target: LyricsMatcher.Target,
+        activeKey: String? = null,
     ): List<UnifiedLyricResult> {
         val targetSec = target.durationMs / 1000.0
         val candidates = (current + incoming)
+            .distinctBy { it.key }
             .groupBy { duplicateKey(it) }
             .values
-            .map { copies -> copies.minBy { lengthMiss(it, targetSec) } }
+            .map { copies ->
+                copies.firstOrNull { it.key == activeKey } ?: copies.minBy { lengthMiss(it, targetSec) }
+            }
         if (candidates.size < 2) return candidates
 
         class Scored(val result: UnifiedLyricResult) {
