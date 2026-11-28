@@ -1,0 +1,620 @@
+[
+  {
+    "label": "warmup-0-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 8008.962999999312,
+    "reveal_ms": 8008.965999999418,
+    "prelaunch_cpu": [
+      12.9,
+      4.3,
+      4.3
+    ],
+    "feedback": {
+      "ms": 7990.939799999978,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "warmup-0-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 8048.180000000684,
+    "reveal_ms": 8351.553000000422,
+    "prelaunch_cpu": [
+      23.4,
+      9.0,
+      18.4
+    ],
+    "feedback": {
+      "ms": 156.00010000071052,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-0-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 8266.717900000003,
+    "reveal_ms": 8266.720000000532,
+    "prelaunch_cpu": [
+      33.1,
+      18.1,
+      17.4
+    ],
+    "feedback": {
+      "ms": 8248.295299999882,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-0-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7545.052499999656,
+    "reveal_ms": 7804.741199999626,
+    "prelaunch_cpu": [
+      25.5,
+      38.2,
+      42.5,
+      4.9,
+      4.7,
+      4.3
+    ],
+    "feedback": {
+      "ms": 147.7538999997705,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-1-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7186.807199999748,
+    "reveal_ms": 7503.815099999883,
+    "prelaunch_cpu": [
+      13.2,
+      23.1,
+      8.6
+    ],
+    "feedback": {
+      "ms": 151.90129999973578,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-1-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 8425.55750000065,
+    "reveal_ms": 8425.560200000291,
+    "prelaunch_cpu": [
+      30.6,
+      16.7,
+      18.6
+    ],
+    "feedback": {
+      "ms": 8416.039200000341,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-2-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 7280.978999999206,
+    "reveal_ms": 7280.996599999526,
+    "prelaunch_cpu": [
+      10.9,
+      13.1,
+      12.4
+    ],
+    "feedback": {
+      "ms": 7262.705599999208,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-2-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7261.878399999659,
+    "reveal_ms": 7538.694800000485,
+    "prelaunch_cpu": [
+      28.4,
+      9.0,
+      8.7
+    ],
+    "feedback": {
+      "ms": 149.73530000042956,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-3-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7313.331199999993,
+    "reveal_ms": 7584.676599999511,
+    "prelaunch_cpu": [
+      14.4,
+      7.6,
+      5.3
+    ],
+    "feedback": {
+      "ms": 146.16389999991952,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-3-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 7333.790399999998,
+    "reveal_ms": 7333.792600000379,
+    "prelaunch_cpu": [
+      12.9,
+      46.8,
+      40.2,
+      28.4,
+      5.0,
+      3.7
+    ],
+    "feedback": {
+      "ms": 7328.391300000476,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-4-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 7151.818299999832,
+    "reveal_ms": 7151.821100000234,
+    "prelaunch_cpu": [
+      12.1,
+      9.4,
+      16.6
+    ],
+    "feedback": {
+      "ms": 7125.128499999846,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-4-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7149.023299999499,
+    "reveal_ms": 7420.211399999971,
+    "prelaunch_cpu": [
+      15.4,
+      15.7,
+      6.6
+    ],
+    "feedback": {
+      "ms": 149.95769999950426,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-5-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7695.07590000012,
+    "reveal_ms": 7936.988399999791,
+    "prelaunch_cpu": [
+      12.1,
+      7.4,
+      5.3
+    ],
+    "feedback": {
+      "ms": 151.87590000005002,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-5-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 7258.931700000176,
+    "reveal_ms": 7258.934299999964,
+    "prelaunch_cpu": [
+      15.3,
+      13.0,
+      12.3
+    ],
+    "feedback": {
+      "ms": 7245.096300000114,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-6-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 7395.287100000132,
+    "reveal_ms": 7395.289799999773,
+    "prelaunch_cpu": [
+      24.8,
+      3.7,
+      7.8
+    ],
+    "feedback": {
+      "ms": 7350.962000000436,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-6-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7334.790900000371,
+    "reveal_ms": 7610.324999999648,
+    "prelaunch_cpu": [
+      9.2,
+      6.8,
+      13.1
+    ],
+    "feedback": {
+      "ms": 151.57240000007732,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-7-splash",
+    "variant": "splash",
+    "count": 0,
+    "ms": 7028.807200000301,
+    "reveal_ms": 7287.417599999571,
+    "prelaunch_cpu": [
+      11.1,
+      11.3,
+      31.3
+    ],
+    "feedback": {
+      "ms": 148.2317999998486,
+      "windows": [
+        {
+          "title": "",
+          "kind": "JavaSplash",
+          "width": 288,
+          "height": 202
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  },
+  {
+    "label": "pair-0-7-normal",
+    "variant": "normal",
+    "count": 0,
+    "ms": 7660.992500000248,
+    "reveal_ms": 7660.9951000000365,
+    "prelaunch_cpu": [
+      35.9,
+      14.3,
+      4.7
+    ],
+    "feedback": {
+      "ms": 7654.642999999851,
+      "windows": [
+        {
+          "title": "KittyTune",
+          "kind": "SunAwtFrame",
+          "width": 1228,
+          "height": 659
+        }
+      ]
+    },
+    "renderer": [
+      {
+        "window": "KittyTune",
+        "api": "OPENGL",
+        "info": "GraphicsApi: OPENGL\nOS: windows x64\nVendor: Intel\nModel: Intel(R) HD Graphics 530\nTotal VRAM: 31 MB\n",
+        "width": 1214,
+        "height": 622,
+        "scaleX": 1.25,
+        "scaleY": 1.25
+      }
+    ]
+  }
+]
